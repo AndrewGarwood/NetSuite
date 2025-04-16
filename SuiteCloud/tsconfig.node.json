@@ -1,0 +1,14 @@
+{    
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "module": "commonjs",
+        "moduleResolution": "nodenext",
+        "esModuleInterop": true,
+        "target": "es2020",
+        "sourceMap": true,
+        "baseUrl": ".",
+        "paths": {
+            "src/*": ["./src/*"]
+        }
+    }
+}
