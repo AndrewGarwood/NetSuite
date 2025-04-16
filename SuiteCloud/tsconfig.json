@@ -1,0 +1,22 @@
+{    
+    "compilerOptions": {
+        "strict": true,
+        "module": "amd",
+        "target": "es5",
+        "moduleResolution": "node",
+        "sourceMap": false,
+        "newLine": "LF",
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "experimentalDecorators": true,
+        "baseUrl": ".",
+        // "outDir": "./dist/FileCabinet/SuiteScripts",
+        "lib": ["ES7","ES6", "DOM.Iterable", "DOM", "es5", "es2015.promise", "dom"],
+        "paths": {      
+            "N": ["node_modules/@hitc/netsuite-types/N"],
+            "N/*": ["node_modules/@hitc/netsuite-types/N/*"]
+        }
+    },
+    "include": ["src/**/*.ts", "src/**/**/*.ts", "src/server/authServer.ts", "src/*.ts", "src/**/*.d.ts", "src/**/**/*.d.ts"],
+    "exclude": ["node_modules", "src/FileCabinet/SuiteScripts/javascript/**/*.js", "src/FileCabinet/SuiteScripts/javascript/*.mjs", "src/FileCabinet/SuiteScripts/javascript/*.js"]
+}

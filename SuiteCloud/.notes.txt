@@ -1,0 +1,17 @@
+/*
+# Run once
+npx ts-node src/main.ts
+
+# Run with auto-restart when files change
+npx ts-node-dev --respawn src/main.ts
+
+# Check if TypeScript compiler is working
+npx tsc --version
+    Version 5.8.2
+# Verify ts-node installation
+npx ts-node --version
+    v10.9.2
+# Test a minimal TypeScript execution
+npx ts-node -e "console.log('TS-Node is working correctly')"
+    TS-Node is working correctly
+*/
