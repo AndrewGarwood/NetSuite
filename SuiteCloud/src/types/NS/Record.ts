@@ -12,11 +12,7 @@ import * as HITCRecord from '@hitc/netsuite-types/N/record';
  * @description Represents a reference to a record in NetSuite.
  */
 export type RecordRef = string | number | { internalId: number } | { externalId: string };
-// export type RecordRef = {
-//     externalId?: string;
-//     internalId?: string;
-//     type?: RecordTypeEnum;
-// };
+
 export interface NetSuiteRecord {
     internalid?: string;
     isinactive?: boolean;

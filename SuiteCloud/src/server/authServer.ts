@@ -1,12 +1,12 @@
 import express, {Request, Response} from 'express';
 import { Server } from 'node:http';
-import axios from 'axios'; //~\node_modules\@types\axios\index.d.ts
+import axios from 'axios';
 import open from 'open';
 import bodyParser from 'body-parser';
 import { 
     STOP_RUNNING, SERVER_PORT, REDIRECT_URI, AUTH_URL, TOKEN_URL, 
     REST_CLIENT_ID as CLIENT_ID, REST_CLIENT_SECRET as CLIENT_SECRET,
-    SCOPE, STATE, RESTLET_URL_STEM, OUTPUT_DIR, READLINE as rl
+    SCOPE, STATE, OUTPUT_DIR
 } from '../config/env';
 import { AxiosContentTypeEnum, TokenResponse } from '../types/auth/Auth';
 import { writeObjectToJson, getCurrentPacificTime, readJsonFileAsObject, printConsoleGroup } from 'src/utils/io/io_utils';
@@ -194,7 +194,7 @@ export async function initiateAuthFlow(
             });
             return refreshedTokens;
         }
-        // Step 4: Call RESTlet with the access token
+        // Step 4: Call RESTlet with the access token. see '../api.ts' and '../main.ts'
     } catch (error) {
         console.error('Error in authServer.ts initiateAuthFlow():', error);
         return null;

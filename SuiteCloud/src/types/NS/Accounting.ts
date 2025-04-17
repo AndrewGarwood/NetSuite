@@ -1,5 +1,6 @@
 /**
- * @file Accounting.d.ts
+ * @notimplemented
+ * @file Accounting.ts
  * @description TypeScript definitions for Accounting fields in NetSuite.
  * @module Accounting
  */
