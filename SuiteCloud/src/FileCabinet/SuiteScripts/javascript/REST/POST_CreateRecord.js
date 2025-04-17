@@ -21,15 +21,26 @@ define(['N/record', 'N/log'], (record, log) => {
      * */
     const logArray = [];
 
-    const post = (/**@type {CreateRecordRequest} */req) => {
-        // log.debug('POST (CreateRecordRequest) triggered', req);
-        writeLog(LogTypeEnum.DEBUG, 'POST (CreateRecordRequest) triggered', req);
-        const recId = processCreateRecordRequest(req);
+    /**
+     * 
+     * @param {CreateRecordOptions} reqBody {@link CreateRecordOptions}
+     * @param {string} reqBody.recordType - The record type to create, see {@link RecordTypeEnum}
+     * @param {FieldDictionary} [reqBody.fieldDict]
+     * -- {@link FieldDictionary} = { textFields: Array<{@link SetFieldTextOptions}>, valueFields: Array<{@link SetFieldValueOptions}> }
+     * - an object containing field IDs and their corresponding values.
+     * @param {Record.<[sublistId: string], SublistFieldDictionary>} [reqBody.sublistDict]
+     * -- Record<[sublistId: string], {@link SublistFieldDictionary}> = { sublistId: { textFields: Array<{@link SetSublistTextOptions}>, valueFields: Array<{@link SetSublistValueOptions}> } }
+     * - an object containing sublist IDs and their corresponding field IDs and values.
+     * @returns {CreateRecordResponse} .{@link CreateRecordResponse}
+     */
+    const post = (reqBody) => {
+        writeLog(LogTypeEnum.DEBUG, 'POST (CreateRecordOptions) triggered', reqBody);
+        const recId = processCreateRecordOptions(reqBody);
         if (recId) {
             return { 
                 success: true, 
                 recordId: recId, 
-                message: `Successfully created ${req.recordType} record with ID ${recId}`, 
+                message: `Successfully created ${reqBody.recordType} record with ID ${recId}`, 
                 logArray 
             };
         } else {
@@ -41,21 +52,19 @@ define(['N/record', 'N/log'], (record, log) => {
         }
     }
     /**
-     * @param {CreateRecordRequest} createReq {@link CreateRecordRequest}
+     * @param {CreateRecordOptions} createReq {@link CreateRecordOptions}
      * @returns {number} recordId or null if error
      */
-    function processCreateRecordRequest(createReq) {
+    function processCreateRecordOptions(createReq) {
         let {recordType, fieldDict, sublistDict} = createReq;
         if (!recordType || (!fieldDict && !sublistDict)) {
-            // log.error('Input Error in Post_BatchCreateRecordRequest.processRecordRequest(createReq)', 'createReq {CreateRecordRequest} is missing required parameters: recordType and one of (fieldDict, sublistDict)');
-            writeLog(LogTypeEnum.ERROR, 'Input Error in Post_BatchCreateRecordRequest.processRecordRequest(createReq)', 'createReq {CreateRecordRequest} is missing required parameters: recordType and one of (fieldDict, sublistDict)');
+            writeLog(LogTypeEnum.ERROR, 'Input Error in Post_BatchCreateRecordOptions.processRecordRequest(createReq)', 'createReq {CreateRecordOptions} is missing required parameters: recordType and one of (fieldDict, sublistDict)');
             return null;
         }
         recordType = recordType.toLowerCase();
         if (Object.keys(RecordTypeEnum).includes(recordType.toUpperCase())) {
             recordType = RecordTypeEnum[recordType.toUpperCase()];
         } else if (!Object.values(RecordTypeEnum).includes(recordType)) {
-            // log.error('Invalid recordType', `Invalid recordType: ${recordType}. Must be a RecordTypeEnum key or one of RecordTypeEnum's values: ${Object.values(RecordTypeEnum).join(', ')}.`);
             writeLog(LogTypeEnum.ERROR, 'Invalid recordType', `Invalid recordType: ${recordType}. Must be a RecordTypeEnum key or one of RecordTypeEnum's values: ${Object.values(RecordTypeEnum).join(', ')}.`);
             return null;
         }
@@ -65,14 +74,12 @@ define(['N/record', 'N/log'], (record, log) => {
             const validFieldIds = rec.getFields();
             /**@type {string[]} */
             const validSublistIds = rec.getSublists();
-            // log.debug(`Creating ${recordType} record`);
             writeLog(LogTypeEnum.DEBUG, `Creating ${recordType} record`);
             if (fieldDict) {
                 if (fieldDict.textFields && Array.isArray(fieldDict.textFields)) {
                     fieldDict.textFields.forEach(({fieldId, text}) => {
                         fieldId = fieldId.toLowerCase();
                         if (!validFieldIds.includes(fieldId)) {
-                            // log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
                             writeLog(LogTypeEnum.ERROR, `Invalid fieldId: ${fieldId}`, `Field ID not found in ${recordType} record.`);
                             return; // continue to next textField
                         } 
@@ -83,7 +90,6 @@ define(['N/record', 'N/log'], (record, log) => {
                     fieldDict.valueFields.forEach(({fieldId, value}) => {
                         fieldId = fieldId.toLowerCase();
                         if (!validFieldIds.includes(fieldId)) {
-                            // log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
                             writeLog(LogTypeEnum.ERROR, `Invalid fieldId: ${fieldId}`, `Field ID not found in ${recordType} record.`);
                             return; // continue to next valueField
                         }
@@ -97,7 +103,6 @@ define(['N/record', 'N/log'], (record, log) => {
                     if (validSublistIds.includes(sublistId)) {
                         /**@type {string[]} */
                         const validSublistFieldIds = rec.getSublistFields({ sublistId });
-                        // log.debug(`Processing sublistId: ${sublistId}`);
                         writeLog(LogTypeEnum.DEBUG, `Processing sublistId: ${sublistId}`);
                         /**@type {SublistFieldDictionary} */
                         const sublistFieldDict = sublistDict[sublistId];                    
@@ -105,7 +110,6 @@ define(['N/record', 'N/log'], (record, log) => {
                             sublistFieldDict.textFields.forEach(({fieldId, line, text}) => {
                                 fieldId = fieldId.toLowerCase();
                                 if (!validSublistFieldIds.includes(fieldId)) {
-                                    // log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
                                     writeLog(LogTypeEnum.ERROR, `Invalid fieldId: ${fieldId}`, `Field ID not found in ${recordType} record.`);
                                     return; // continue to next textField
                                 }
@@ -116,7 +120,6 @@ define(['N/record', 'N/log'], (record, log) => {
                             sublistFieldDict.valueFields.forEach(({fieldId, line, value}) => {
                                 fieldId = fieldId.toLowerCase();
                                 if (!validSublistFieldIds.includes(fieldId)) {
-                                    // log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
                                     writeLog(LogTypeEnum.ERROR, `Invalid fieldId: ${fieldId}`, `Field ID not found in ${recordType} record.`);
                                     return; // continue to next valueField
                                 }
@@ -124,34 +127,22 @@ define(['N/record', 'N/log'], (record, log) => {
                             });
                         }
                     } else {
-                        // log.error({ title: `Invalid sublistId: ${sublistId}`, details: `Sublist ID not found in ${recordType} record.` });
                         writeLog(LogTypeEnum.ERROR, `Invalid sublistId: ${sublistId}`, `Sublist ID not found in ${recordType} record.`);
                         continue;
                     }
                 }
             }
             const recId = rec.save();
-            // log.audit(`Successfully created ${recordType} record`, { recordId: recId });
             writeLog(LogTypeEnum.AUDIT, `Successfully created ${recordType} record`, { recordId: recId });
             return recId;
         } catch (e) {
-            // log.error(`Error creating ${recordType} record`, e);
             writeLog(LogTypeEnum.ERROR, `Error creating ${recordType} record`, e);
             return null;
         }
     }
 
     /**
-     * @enum {string} LogTypeEnum
-     */
-    const LogTypeEnum = {
-        DEBUG: 'debug',
-        ERROR: 'error',
-        AUDIT: 'audit',
-        EMERGENCY: 'emergency',
-    };
-    /**
-     * Calls NetSuite log module and saves pushes log with timestamp to {@link logArray} to return later
+     * @description Calls NetSuite log module and saves pushes log with timestamp to {@link logArray} to return later
      * @reference ~\node_modules\@hitc\netsuite-types\N\log.d.ts
      * @param {LogTypeEnum} type {@link LogTypeEnum}
      * @param {string} title 
@@ -191,7 +182,40 @@ define(['N/record', 'N/log'], (record, log) => {
     }
 
 /**
- * @typedef {Object} CreateRecordRequest
+ * @typedef {Object} LogStatement
+ * @property {string} timestamp - The timestamp of the log entry.
+ * @property {LogTypeEnum} type - The type of log entry (see {@link LogTypeEnum}).
+ * @property {string} title - The title of the log entry.
+ * @property {any} details - The details of the log entry.
+ * @description typedef for elements of the {@link logArray} array
+ */
+
+/**
+ * @enum {string} LogTypeEnum
+ * @readonly
+ * @description Enum for NetSuite's log module types
+ * @property {string} DEBUG - Debug log type
+ * @property {string} ERROR - Error log type
+ * @property {string} AUDIT - Audit log type
+ * @property {string} EMERGENCY - Emergency log type
+ */
+const LogTypeEnum = {
+    DEBUG: 'debug',
+    ERROR: 'error',
+    AUDIT: 'audit',
+    EMERGENCY: 'emergency',
+};
+
+/**
+ * @typedef {Object} CreateRecordResponse
+ * @property {boolean} success - Indicates if the record was created successfully.
+ * @property {number} [recordId] - The ID of the created record. (does not exist if success is false)
+ * @property {string} message - A message indicating the result of the operation.
+ * @property {Array<LogStatement>} logArray - Array<{@link LogStatement}> generated during the POST requeset.
+ */
+
+/**
+ * @typedef {Object} CreateRecordOptions
  * @property {RecordTypeEnum} recordType - The record type to create, see {@link RecordTypeEnum} (e.g., 'assemblyitem', 'bom', 'bomrevision', 'inventoryitem', 'customer', 'salesorder', 'invoice', etc.)
  * @property {FieldDictionary} [fieldDict] 
  * - {@link FieldDictionary} = { textFields: Array<{@link SetFieldTextOptions}>, valueFields: Array<{@link SetFieldValueOptions}> } 
@@ -236,31 +260,32 @@ define(['N/record', 'N/log'], (record, log) => {
  */
 
 /**
+ * \@reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  * @typedef {Object} SetFieldValueOptions
  * @property {string} fieldId - The internal ID of a standard or custom field.
  * @property {FieldValue} value 
  * - The {@link FieldValue} to set the field to. 
  * - = {Date | number | number[] | string | string[] | boolean | null}
- * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  */
 
 /**
+ * \@reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  * @typedef {Object} SetFieldTextOptions
  * @property {string} fieldId - The internal ID of a standard or custom field.
  * @property {string} text - The text to set the value to.
- * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  */
 
 /**
+ * \@reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  * @typedef {Object} SetSublistTextOptions
  * @property {string} sublistId - The internal ID of the sublist.
  * @property {string} fieldId - (i.e. sublistFieldId) The internal ID of a standard or custom sublist field.
  * @property {number} line - The line number for the field.
  * @property {string} text - The text to set the value to.
- * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  */
 
 /**
+ * \@reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  * @typedef {Object} SetSublistValueOptions
  * @property {string} sublistId - The internal ID of the sublist.
  * @property {string} fieldId - The internal ID of a standard or custom sublist field.
@@ -268,7 +293,6 @@ define(['N/record', 'N/log'], (record, log) => {
  * @property {FieldValue} value 
  * - The {@link FieldValue} to set the sublist field to.
  * - = {Date | number | number[] | string | string[] | boolean | null}
- * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  */
 
 
