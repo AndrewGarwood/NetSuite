@@ -1,11 +1,3 @@
-/*
-Name	Type
-internalId	string
-scriptId	string
-
-*/
-
-import { RecordTypeEnum } from './Record';
 
 /**
  * @typedefinitinon CustomFieldRef

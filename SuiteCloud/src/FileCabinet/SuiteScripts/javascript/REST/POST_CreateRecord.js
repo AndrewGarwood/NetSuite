@@ -11,18 +11,53 @@
 // import * as record from '@hitc/netsuite-types/N/record.d.ts';
 
 define(['N/record', 'N/log'], (record, log) => {
+    /**
+     * @TODO : decide if want to take out N/log statements from writeLog() and uncomment them in main functions
+     * @type {{timestamp: string, type: string, title: string, details: any}[]} 
+     * @see {@link writeLog}(type, title, details)
+     * @description return logArray in post response so can process in client
+     * e.g. in client write logArray to a json or txt file in a readable format
+     * or use logArray to display in a UI component (e.g. table, list, etc.)
+     * */
+    const logArray = [];
+
     const post = (/**@type {CreateRecordRequest} */req) => {
-        log.debug('POST (CreateRecordRequest) triggered', req);
-        let {recordType, fieldDict, sublistDict} = req;
-        recordType = recordType.toLowerCase();
-        if (!recordType || (!fieldDict && !sublistDict)) {
-            throw new Error('post(CreateRecordRequest) Missing required parameters: recordType and one of (fieldDict, sublistDict)');
+        // log.debug('POST (CreateRecordRequest) triggered', req);
+        writeLog(LogTypeEnum.DEBUG, 'POST (CreateRecordRequest) triggered', req);
+        const recId = processCreateRecordRequest(req);
+        if (recId) {
+            return { 
+                success: true, 
+                recordId: recId, 
+                message: `Successfully created ${req.recordType} record with ID ${recId}`, 
+                logArray 
+            };
+        } else {
+            return { 
+                success: false, 
+                message: 'Error creating record', 
+                logArray 
+            };
         }
+    }
+    /**
+     * @param {CreateRecordRequest} createReq {@link CreateRecordRequest}
+     * @returns {number} recordId or null if error
+     */
+    function processCreateRecordRequest(createReq) {
+        let {recordType, fieldDict, sublistDict} = createReq;
+        if (!recordType || (!fieldDict && !sublistDict)) {
+            // log.error('Input Error in Post_BatchCreateRecordRequest.processRecordRequest(createReq)', 'createReq {CreateRecordRequest} is missing required parameters: recordType and one of (fieldDict, sublistDict)');
+            writeLog(LogTypeEnum.ERROR, 'Input Error in Post_BatchCreateRecordRequest.processRecordRequest(createReq)', 'createReq {CreateRecordRequest} is missing required parameters: recordType and one of (fieldDict, sublistDict)');
+            return null;
+        }
+        recordType = recordType.toLowerCase();
         if (Object.keys(RecordTypeEnum).includes(recordType.toUpperCase())) {
             recordType = RecordTypeEnum[recordType.toUpperCase()];
         } else if (!Object.values(RecordTypeEnum).includes(recordType)) {
-            log.error({ title: 'Invalid recordType', details: `Invalid recordType: ${recordType}. Must be a RecordTypeEnum key or one of RecordTypeEnum's values: ${Object.values(RecordTypeEnum).join(', ')}.` });
-            throw new Error(`Invalid recordType: ${recordType}. Must be a RecordTypeEnum key or one of RecordTypeEnum's values: ${Object.values(RecordTypeEnum).join(', ')}.`);
+            // log.error('Invalid recordType', `Invalid recordType: ${recordType}. Must be a RecordTypeEnum key or one of RecordTypeEnum's values: ${Object.values(RecordTypeEnum).join(', ')}.`);
+            writeLog(LogTypeEnum.ERROR, 'Invalid recordType', `Invalid recordType: ${recordType}. Must be a RecordTypeEnum key or one of RecordTypeEnum's values: ${Object.values(RecordTypeEnum).join(', ')}.`);
+            return null;
         }
         try {
             const rec = record.create({ type: recordType });
@@ -30,74 +65,129 @@ define(['N/record', 'N/log'], (record, log) => {
             const validFieldIds = rec.getFields();
             /**@type {string[]} */
             const validSublistIds = rec.getSublists();
-            log.debug(`Creating ${recordType} record`);
+            // log.debug(`Creating ${recordType} record`);
+            writeLog(LogTypeEnum.DEBUG, `Creating ${recordType} record`);
             if (fieldDict) {
                 if (fieldDict.textFields && Array.isArray(fieldDict.textFields)) {
                     fieldDict.textFields.forEach(({fieldId, text}) => {
-                        if (validFieldIds.includes(fieldId)) {
-                            rec.setText({ fieldId, text });
-                        } else {
-                            log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
-                            throw new Error(`Invalid fieldId: ${fieldId}. Field ID not found in ${recordType} record.`);
-                        }
+                        fieldId = fieldId.toLowerCase();
+                        if (!validFieldIds.includes(fieldId)) {
+                            // log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
+                            writeLog(LogTypeEnum.ERROR, `Invalid fieldId: ${fieldId}`, `Field ID not found in ${recordType} record.`);
+                            return; // continue to next textField
+                        } 
+                        rec.setText({ fieldId, text });
                     });
                 }
                 if (fieldDict.valueFields && Array.isArray(fieldDict.valueFields)) {
                     fieldDict.valueFields.forEach(({fieldId, value}) => {
-                        if (validFieldIds.includes(fieldId)) {
-                            rec.setValue({ fieldId, value });
-                        } else {
-                            log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
-                            throw new Error(`Invalid fieldId: ${fieldId}. Field ID not found in ${recordType} record.`);
+                        fieldId = fieldId.toLowerCase();
+                        if (!validFieldIds.includes(fieldId)) {
+                            // log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
+                            writeLog(LogTypeEnum.ERROR, `Invalid fieldId: ${fieldId}`, `Field ID not found in ${recordType} record.`);
+                            return; // continue to next valueField
                         }
+                        rec.setValue({ fieldId, value });
                     });
                 }
             }
             if (sublistDict) {
-                for (const sublistId in Object.keys(sublistDict)) {
+                for (let sublistId in Object.keys(sublistDict)) {
+                    sublistId = sublistId.toLowerCase();
                     if (validSublistIds.includes(sublistId)) {
                         /**@type {string[]} */
-                        const validSublistFieldIds = rec.getSublistFields({ sublistId: sublistId.toLowerCase() });
-                        log.debug(`Setting sublistId: ${sublistId}`);
+                        const validSublistFieldIds = rec.getSublistFields({ sublistId });
+                        // log.debug(`Processing sublistId: ${sublistId}`);
+                        writeLog(LogTypeEnum.DEBUG, `Processing sublistId: ${sublistId}`);
                         /**@type {SublistFieldDictionary} */
                         const sublistFieldDict = sublistDict[sublistId];                    
                         if (sublistFieldDict.textFields && Array.isArray(sublistFieldDict.textFields)) {
                             sublistFieldDict.textFields.forEach(({fieldId, line, text}) => {
-                                if (validSublistFieldIds.includes(fieldId)) {
-                                    rec.setSublistText({ sublistId, fieldId, line, text });
-                                } else {
-                                    log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
-                                    throw new Error(`Invalid fieldId: ${fieldId}. Field ID not found in ${recordType} record.`);
+                                fieldId = fieldId.toLowerCase();
+                                if (!validSublistFieldIds.includes(fieldId)) {
+                                    // log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
+                                    writeLog(LogTypeEnum.ERROR, `Invalid fieldId: ${fieldId}`, `Field ID not found in ${recordType} record.`);
+                                    return; // continue to next textField
                                 }
+                                rec.setSublistText({ sublistId, fieldId, line, text });
                             });
                         }
                         if (sublistFieldDict.valueFields && Array.isArray(sublistFieldDict.valueFields)) {
                             sublistFieldDict.valueFields.forEach(({fieldId, line, value}) => {
-                                if (validSublistFieldIds.includes(fieldId)) {
-                                    rec.setSublistValue({ sublistId, fieldId, line, value });
-                                } else {
-                                    log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
-                                    throw new Error(`Invalid fieldId: ${fieldId}. Field ID not found in ${recordType} record.`);
+                                fieldId = fieldId.toLowerCase();
+                                if (!validSublistFieldIds.includes(fieldId)) {
+                                    // log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
+                                    writeLog(LogTypeEnum.ERROR, `Invalid fieldId: ${fieldId}`, `Field ID not found in ${recordType} record.`);
+                                    return; // continue to next valueField
                                 }
+                                rec.setSublistValue({ sublistId, fieldId, line, value });
                             });
                         }
                     } else {
-                        log.error({ title: `Invalid sublistId: ${sublistId}`, details: `Sublist ID not found in ${recordType} record.` });
-                        throw new Error(`Invalid sublistId: ${sublistId}. Sublist ID not found in ${recordType} record.`);
+                        // log.error({ title: `Invalid sublistId: ${sublistId}`, details: `Sublist ID not found in ${recordType} record.` });
+                        writeLog(LogTypeEnum.ERROR, `Invalid sublistId: ${sublistId}`, `Sublist ID not found in ${recordType} record.`);
+                        continue;
                     }
                 }
             }
             const recId = rec.save();
-            log.audit(`Successfully created ${recordType} record`, { recordId: recId });
-            return { // post return value
-                recordId: recId, 
-                success: true, 
-                message: `Successfully created ${recordType} record with ID ${recId}` 
-            };
-        } catch (error) {
-            log.error({ title: 'Error creating record', details: error });
-            throw new Error(`Error creating record: ${error.message ? error.message : error}`);
+            // log.audit(`Successfully created ${recordType} record`, { recordId: recId });
+            writeLog(LogTypeEnum.AUDIT, `Successfully created ${recordType} record`, { recordId: recId });
+            return recId;
+        } catch (e) {
+            // log.error(`Error creating ${recordType} record`, e);
+            writeLog(LogTypeEnum.ERROR, `Error creating ${recordType} record`, e);
+            return null;
         }
+    }
+
+    /**
+     * @enum {string} LogTypeEnum
+     */
+    const LogTypeEnum = {
+        DEBUG: 'debug',
+        ERROR: 'error',
+        AUDIT: 'audit',
+        EMERGENCY: 'emergency',
+    };
+    /**
+     * Calls NetSuite log module and saves pushes log with timestamp to {@link logArray} to return later
+     * @reference ~\node_modules\@hitc\netsuite-types\N\log.d.ts
+     * @param {LogTypeEnum} type {@link LogTypeEnum}
+     * @param {string} title 
+     * @param {any} [details]
+     * @returns {void} 
+     */
+    function writeLog(type, title, details) {
+        if (!type || !title) {
+            log.error('Invalid log', 'type and title are required');
+            return;
+        }
+        if (!Object.values(LogTypeEnum).includes(type)) {
+            log.error('Invalid log type', `type must be one of ${Object.values(LogTypeEnum).join(', ')}`);
+            return;
+        }
+        if (type === LogTypeEnum.DEBUG) {
+            log.debug(title, details);
+        } else if (type === LogTypeEnum.ERROR) {
+            log.error(title, details);
+        } else if (type === LogTypeEnum.AUDIT) {
+            log.audit(title, details);
+        } else if (type === LogTypeEnum.EMERGENCY) {
+            log.emergency(title, details);
+        }
+        details = typeof details === 'object' ? JSON.stringify(details, null, 4) : details;
+        logArray.push({ timestamp: getCurrentPacificTime(), type, title, details });
+    }
+
+    /**
+     * Gets the current date and time in Pacific Time
+     * @returns {string} The current date and time in Pacific Time
+     */
+    function getCurrentPacificTime() {
+        const currentDate = new Date();
+        const pacificTime = currentDate.toLocaleString('en-US', {timeZone: 'America/Los_Angeles'});
+        return pacificTime;
     }
 
 /**
@@ -181,30 +271,6 @@ define(['N/record', 'N/log'], (record, log) => {
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  */
 
-/*
-@reference ~\node_modules\@hitc\netsuite-types\N\log.d.ts
-log.d.ts
-interface LogOptions {
-    // String to appear in the Title column on the Execution Log tab of the script deployment. Maximum length is 99 characters.
-    title?: string;
-    // 
-    // You can pass any value for this parameter.
-    // If the value is a JavaScript object type, JSON.stringify(obj) is called on the object before displaying the value.
-    // NetSuite truncates any resulting string over 3999 characters.
-    
-    details: any;
-}
-
-interface LogFunction {
-    (title: string, details: any): void;
-    (options: LogOptions): void;
-}
-
-export const debug: LogFunction;
-export const audit: LogFunction;
-export const error: LogFunction;
-export const emergency: LogFunction;
-*/
 
 /**
  * @enum {string} RecordTypeEnum

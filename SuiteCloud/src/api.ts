@@ -1,3 +1,9 @@
+/**
+ * @file api.ts
+ * @module api
+ * @description API functions for calling RESTlets in NetSuite. (javascript files uploaded and deployed on NetSuite)
+ * @see './FileCabinet/SuiteScripts/REST/*.js' for examples of RESTlet scripts.
+ */
 import axios from "axios";
 import { RESTLET_URL_STEM } from "./config/env";
 import { AxiosCallEnum, AxiosContentTypeEnum } from "./types/auth/AxiosEnums";
@@ -30,7 +36,7 @@ export async function callRestlet(
         });
         return response;
     } catch (error) {
-        console.error('Error in api_calls.ts callRestlet():', error);
+        console.error('Error in api.ts callRestlet():', error);
         throw new Error('Failed to call RESTlet');
     }
 }
@@ -41,8 +47,9 @@ export type PostPayload = AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN
  * @param {string} accessToken 
  * @param {string | number} scriptId 
  * @param {string | number} deployId 
- * @param {Record<string, any>} payload 
- * @returns 
+ * @param {Record<string, any>} payload
+ * @param {PostPayload} contentType {@link PostPayload}
+ * @returns {Promise<any>}
  */
 export async function callPostRestletWithPayload(
     accessToken: string, 
@@ -52,7 +59,6 @@ export async function callPostRestletWithPayload(
     contentType: PostPayload = AxiosContentTypeEnum.JSON,
 ): Promise<any> {
     const restletUrl = `${RESTLET_URL_STEM}?script=${scriptId}&deploy=${deployId}`;
-    console.log('callPostRestletWithPayload()\'s restletUrl:', restletUrl);
     try {
         const response = await axios.post(restletUrl, payload, {
             headers: { 

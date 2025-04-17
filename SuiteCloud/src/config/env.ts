@@ -13,7 +13,10 @@ export const READLINE = readline.createInterface({ input, output });
 // @example import READLINE as rl; const answer = await rl.question('What do you think of Node.js? ');
 
 
-/**@description Exit the program/script for debugging purposes @returns {void}*/
+/**
+ * @description Exit the program/script for debugging purposes 
+ * @returns {void}
+ * */
 export const STOP_RUNNING = (): void => {
     process.exit(1);
 }
@@ -37,23 +40,30 @@ export const REST_CLIENT_SECRET = inProduction
     ? (process.env.PROD_REST_CLIENT_SECRET || 'MISSING_ENV_VARIABLE-REST_CLIENT_SECRET') as string
     : (process.env.SB_REST_CLIENT_SECRET || 'MISSING_ENV_VARIABLE-REST_CLIENT_SECRET') as string;
 
-/** `https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/` @see {@link ACCOUNT_ID}*/
+/** `https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/` 
+ * @see {@link ACCOUNT_ID}*/
 export const SUITETALK_URL=`https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/` as string;
 
-/** https://${ACCOUNT_ID}.app.netsuite.com/app/login/oauth2/authorize.nl @see {@link ACCOUNT_ID}*/
+/** https://${ACCOUNT_ID}.app.netsuite.com/app/login/oauth2/authorize.nl 
+ * @see {@link ACCOUNT_ID}*/
 export const AUTH_URL = `https://${ACCOUNT_ID}.app.netsuite.com/app/login/oauth2/authorize.nl` as string;
 
-/** https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token @see {@link ACCOUNT_ID}*/
+/** https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token 
+ * @see {@link ACCOUNT_ID}*/
 export const TOKEN_URL = `https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token` as string;
 
 /**
- * `https://${ACCOUNT_ID}.restlets.api.netsuite.com/app/site/hosting/restlet.nl` @see {@link ACCOUNT_ID} 
+ * `https://${ACCOUNT_ID}.restlets.api.netsuite.com/app/site/hosting/restlet.nl` 
+ * @see {@link ACCOUNT_ID} 
  * @example specificRestletUrl = `${RESTLET_URL_STEM}?script=${scriptId}&deploy=${deployId}`
 */
 export const RESTLET_URL_STEM = `https://${ACCOUNT_ID}.restlets.api.netsuite.com/app/site/hosting/restlet.nl` as string;
 
 export const SERVER_PORT = (process.env.SERVER_PORT || '3000') as string;
-/**@description `http://localhost:${SERVER_PORT}/callback` @example `http://localhost:3000/callback` */
+/**
+ * @description `http://localhost:${SERVER_PORT}/callback` 
+ * @example `http://localhost:3000/callback` 
+ * */
 export const REDIRECT_URI = (process.env.REST_REDIRECT_URI || `http://localhost:${SERVER_PORT}/callback`) as string;
 
 export const REST_APPLICATION_ID = (process.env.REST_APPLICATION_ID || 'MISSING_ENV_VARIABLE-REST_APPLICATION_ID') as string;
@@ -71,21 +81,23 @@ nlauth_role=${NLAUTH_ADMIN}, \
 nlauth_application_id=${REST_APPLICATION_ID}\
 ` as string;
 
-// export const SB_HITC_UPLOADER_TOKEN_ID = (process.env.HITC_UPLOADER_TOKEN_ID || 'MISSING_ENV_VARIABLE-HITC_UPLOADER_TOKEN_ID') as string;
-// export const SB_HITC_UPLOADER_TOKEN_SECRET = (process.env.HITC_UPLOADER_TOKEN_SECRET || 'MISSING_ENV_VARIABLE-HITC_UPLOADER_TOKEN_SECRET') as string;
-
 /** restlets */
 export const SCOPE = 'restlets'; //,rest_webservices,webservices,suiteanalytics,full,offline';
 
 // export const STATE = 'ykv2XLx1BpT5Q0F3MRPHb94j';
-/**https://9866738-sb1.app.netsuite.com/app/help/helpcenter.nl?fid=section_158081944642.html 
- * The length of the state parameter must be between 22 and 1024 characters. Valid characters are all printable ASCII characters.
-
- * The value of the state parameter must be unique for each authorization flow.
-*/
+/**
+ * @reference https://9866738-sb1.app.netsuite.com/app/help/helpcenter.nl?fid=section_158081944642.html 
+ * @description (from reference)
+ * - The length of the state parameter must be between 22 and 1024 characters. 
+ * - Valid characters are all printable ASCII characters.
+ * - The value of the state parameter must be unique for each authorization flow.
+ */
 export const STATE = require('crypto').randomBytes(32).toString('hex'); // 64 characters long
 
-/** @description instantiate known script deployments */
+/** 
+ * @description instantiate known script deployments 
+ * @see {@link SuiteScriptEnvironment}
+ * */
 export const SCRIPT_ENVIORNMENT: SuiteScriptEnvironment = {
     production: {},
     sandbox: {

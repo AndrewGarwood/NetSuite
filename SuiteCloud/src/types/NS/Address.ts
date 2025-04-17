@@ -1,5 +1,6 @@
 /**
- * @file Address.d.ts
+ * @incomplete
+ * @file Address.ts
  * @description TypeScript definition for the Address record and related objects in NetSuite.
  * @module Address
  * @reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html
@@ -46,22 +47,6 @@ export interface Address {
     state?: string;
     zip?: string;
 }
-// export type Address = {
-//     addr1: string;
-//     addr2?: string;
-//     addr3?: string;
-//     addressee: string;
-//     addressformat?: string;
-//     addrphone?: string;
-//     attention?: string;
-//     city?: string;
-//     country?: NetSuiteCountryEnum;
-//     externalid?: string;
-//     internalid?: string;
-//     override?: boolean;
-//     state?: string;
-//     zip?: string;
-// };
 
 /**
  * @typedefn AddressBook
@@ -89,32 +74,6 @@ export interface AddressBookEntry {
 export type AddressBook = AddressBookEntry[];
 
 /*
-@reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html
-Address
-Internal ID: address
-Subrecord
-Supports Deleted Record Search
-Fields
-
-Search Filters
-Internal ID	Type	Label
-address	textarea	Address Text
-address1	text	Address 1
-address2	text	Address 2
-address3	text	Address 3
-addressee	text	Addressee
-attention	text	Attention
-city	text	City
-country	select	Country
-countrycode	text	Country Code
-externalid	select	External ID
-externalidstring	text	External ID (Text)
-internalid	select	Internal ID
-internalidnumber	integer	Internal ID (Number)
-override	checkbox	Override
-phone	text	Address Phone
-state	text	State
-zip	text	Zip
 
 Search Columns
 Internal ID	Type	Label

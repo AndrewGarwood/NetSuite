@@ -1,34 +1,44 @@
 /**
- * @file Enums.d.ts
+ * @file Enums.ts
  * @description TypeScript definitions for various enums used in NetSuite.
  * @module Enums
  */
 
-/*
-    Net 30  
-    50 Prepay/50 Net30  
-    Upon Receipt  
-    Net 15  
-    Prepay-Payment  
-    Credit Card  
-    Net 10  
-    Check in Advance  
-    Net 60  
-    50 prepay/50 upon delivery  
-    Net 20  
-    Cash  
-    Pay In Full  
-    Net 90
 
-
-*/
+/**
+ * @enum {string} UnitsTypeEnum
+ * @description Enum for unit types in NetSuite. (defined by account user)
+ * @property {string} QUANTITY - Quantity unit type.
+ * @property {string} WEIGHT - Weight unit type.
+ * @property {string} LENGTH - Length unit type.
+ * @property {string} VOLUME - Volume unit type.
+ * @property {string} TIME - Time unit type.
+ */
 export enum UnitsTypeEnum {
     QUANTITY = "Quantity",
     WEIGHT = "Weight",
     LENGTH = "Length",
     VOLUME = "Volume",
+    TIME = "Time",
 }
 
+/**
+ * @TODO make enums for each of the unit types in {@link UnitsTypeEnum}
+ * @enum {string} UnitsEnum
+ * @description Enum for unit types in NetSuite. (defined by account user)
+ * @property {string} EACH - Each unit.
+ * @property {string} DOZEN - Dozen unit.
+ * @property {string} GRAMS - Grams unit.
+ * @property {string} KILOGRAMS - Kilograms unit.
+ * @property {string} MILLIGRAMS - Milligrams unit.
+ * @property {string} LITERS - Liters unit.
+ * @property {string} MILLILITERS - Milliliters unit.
+ * @property {string} GALLONS - Gallons unit.
+ * @property {string} POUNDS - Pounds unit.
+ * @property {string} METERS - Meters unit.
+ * @property {string} INCHES - Inches unit.
+ * @property {string} FEET - Feet unit.
+ */
 export enum UnitsEnum {
     EACH = "each",
     DOZEN = "dozen",
@@ -39,8 +49,17 @@ export enum UnitsEnum {
     MILLILITERS = "milliliters",
     GALLONS = "gallons",
     POUNDS = "pounds",
+    METERS = "meters",
+    INCHES = "inches",
+    FEET = "feet",
 }
 
+/**
+ * @enum {string} EmailPreferenceEnum
+ * @description Enum for email file attachment preferences in NetSuite.
+ * @property {string} HTML - HTML format.
+ * @property {string} PDF - PDF format.
+ */
 export enum EmailPreferenceEnum {
     HTML = "_HTML",
     PDF = "_PDF",

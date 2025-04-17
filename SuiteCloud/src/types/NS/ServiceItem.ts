@@ -1,10 +1,12 @@
 /**
- * @file ServiceItem.d.ts
+ * @file ServiceItem.ts
  * @description TypeScript definition for the Service Item record in NetSuite.
  * @module ServiceItem
  * @NetSuiteInternalId serviceitem
  */
+
 import { UnitsTypeEnum, UnitsEnum } from "./Enums";
+
 export interface ServiceItem  {
     itemid: string;
     taxschedule: string;

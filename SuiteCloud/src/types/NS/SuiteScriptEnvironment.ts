@@ -1,5 +1,5 @@
 /**
- * @file SuiteScriptEnvironment.d.ts
+ * @file SuiteScriptEnvironment.ts
  * @module SuiteScriptEnvironment
  */
 
@@ -17,6 +17,7 @@ export type SuiteScriptEnvironment = {
         [S in ScriptTypeEnum]?: ScriptDictionary
     }
 };
+// could try to use "Partial":
 // export type SuiteScriptEnvironment = Partial<{
 //     [K in AccountEnvironmentEnum]: Partial<{
 //         [S in ScriptTypeEnum]: ScriptDictionary

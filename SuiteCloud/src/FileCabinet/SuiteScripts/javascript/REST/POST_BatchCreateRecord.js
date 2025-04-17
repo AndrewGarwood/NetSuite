@@ -1,17 +1,26 @@
 /**
- * @notimplemented work in progress
- * 
  * @NApiVersion 2.1
  * @NScriptType Restlet
  * @NScriptName POST_BatchCreateRecord
- * @ProdNScriptId NOT_DEPLOYED
- * @ProdDeployId NOT_DEPLOYED
- * @SbNScriptId NOT_DEPLOYED
- * @SbDeployId NOT_DEPLOYED
+ * @ProdNScriptId number
+ * @ProdDeployId number
+ * @SbNScriptId number
+ * @SbDeployId number
  */
 
 // import * as record from '@hitc/netsuite-types/N/record.d.ts';
 define(['N/record', 'N/log'], (record, log) => {
+    
+    /**
+     * @TODO : decide if want to take out N/log statements from writeLog() and uncomment them in main functions
+     * @type {{timestamp: string, type: string, title: string, details: any}[]} 
+     * @see {@link writeLog}(type, title, details)
+     * @description return logArray in post response so can process in client
+     * e.g. in client write logArray to a json or txt file in a readable format
+     * or use logArray to display in a UI component (e.g. table, list, etc.)
+     * */
+    const logArray = [];
+    
     const post = (
         /**
          * @type {{ "createRecordArray"?: Array<CreateRecordRequest>; "createRecordDict"?: {[K in RecordTypeEnum]?: Array<CreateRecordRequest>;};}} 
@@ -21,21 +30,215 @@ define(['N/record', 'N/log'], (record, log) => {
          */
         req
     ) => {
-        log.debug('POST (BatchCreateRecordRequest) Start', req);
+        // log.debug('POST (BatchCreateRecordRequest) Start', req);
+        writeLog(LogTypeEnum.DEBUG, 'POST (BatchCreateRecordRequest) Start', req);
         let createRecordArrayIsUndefined = !req.createRecordArray || !Array.isArray(req.createRecordArray);
         let createRecordDictIsUndefined = !req.createRecordDict || typeof req.createRecordDict !== 'object';
         if (createRecordArrayIsUndefined && createRecordDictIsUndefined) {
-            log.error('Invalid request body', 'Body must contain either "createRecordArray"?: Array<CreateRecordRequest>; or "createRecordDict"?: {[K in RecordTypeEnum]?: Array<CreateRecordRequest>;};');
+            // log.error('Invalid request body', 'Body must contain either "createRecordArray"?: Array<CreateRecordRequest>; or "createRecordDict"?: {[K in RecordTypeEnum]?: Array<CreateRecordRequest>;};');
+            writeLog(LogTypeEnum.ERROR, 'Invalid request body', 'Body must contain either "createRecordArray"?: Array<CreateRecordRequest>; or "createRecordDict"?: {[K in RecordTypeEnum]?: Array<CreateRecordRequest>;};');
             throw new Error('Invalid request body: Body must contain either "createRecordArray"?: Array<CreateRecordRequest>; or "createRecordDict"?: {[K in RecordTypeEnum]?: Array<CreateRecordRequest>;};.');
         }
+        let recIdArray = [];
         let createRecordArray = req.createRecordArray || [];
         let createRecordDict = req.createRecordDict || {};
-        log.audit('Array<CreateRecordRequest>.length:', createRecordArray.length);
-        log.audit('Object.keys<CreateRecordRequest>.length:', Object.keys(createRecordDict).length);
-        Object.keys(createRecordDict).forEach((recordType) => {
-            log.audit('recordType:', recordType, 'Array<CreateRecordRequest>.length:', createRecordDict[recordType].length);
-        });
+        log.audit('req.createRecordArray.length:', createRecordArray.length);
+        try {
+            if (createRecordArray.length > 0) {
+                for (let i = 0; i < createRecordArray.length; i++) {
+                    let createReq = createRecordArray[i];
+                    let result = processCreateRecordRequest(createReq);
+                    if (!result) {
+                        // log.error(`Error Processing createRecordArray[${i}]`, 'Invalid createReq: ' + JSON.stringify(createReq));
+                        writeLog(LogTypeEnum.ERROR, `Error Processing createRecordArray[${i}]`, 'Invalid createReq: ' + JSON.stringify(createReq));
+                        continue;
+                    } 
+                    recIdArray.push(result);
+                }
+            }         
+            // log.audit('Object.keys(req.createRecordDict).length:', Object.keys(createRecordDict).length);
+            writeLog(LogTypeEnum.AUDIT, 'Object.keys(req.createRecordDict).length:', Object.keys(createRecordDict).length);
+            if (Object.keys(createRecordDict).length > 0) {
+                for (let recordType in createRecordDict) {
+                    let createReqArray = createRecordDict[recordType];
+                    if (!Array.isArray(createReqArray)) {
+                        // log.error(`Invalid createRecordDict[${recordType}]`, 'createReqArray is not an array: ' + JSON.stringify(createReqArray));
+                        writeLog(LogTypeEnum.ERROR, `Invalid createRecordDict[${recordType}]`, 'createReqArray is not an array: ' + JSON.stringify(createReqArray));
+                        continue;
+                    }
+                    for (let i = 0; i < createReqArray.length; i++) {
+                        let createReq = createReqArray[i];
+                        let result = processCreateRecordRequest(createReq);
+                        if (!result) {
+                            // log.error(`Error Processing createRecordDict[${recordType}][${i}]`, 'Invalid createReq: ' + JSON.stringify(createReq));
+                            writeLog(LogTypeEnum.ERROR, `Error Processing createRecordDict[${recordType}][${i}]`, 'Invalid createReq: ' + JSON.stringify(createReq));
+                            continue;
+                        } 
+                        recIdArray.push(result);
+                    }
+                }
+            }
+            return { // post return value
+                success: true,
+                message: 'Records created successfully',
+                recordIds: recIdArray,
+                logArray: logArray
+            }
+        } catch (e) {
+            // log.error('Error processing request', e);
+            writeLog(LogTypeEnum.ERROR, 'Error processing request in POST_BatchCreateRecord', e);
+            throw new Error('Error processing request: ' + (e.message || e));
+        }
+    }
+    
+    /**
+     * @param {CreateRecordRequest} createReq {@link CreateRecordRequest}
+     * @returns {number|null} recordId or null if error
+     */
+    function processCreateRecordRequest(createReq) {
+        let {recordType, fieldDict, sublistDict} = createReq;
+        if (!recordType || (!fieldDict && !sublistDict)) {
+            // log.error('Input Error in Post_BatchCreateRecordRequest.processRecordRequest(createReq)', 'createReq {CreateRecordRequest} is missing required parameters: recordType and one of (fieldDict, sublistDict)');
+            writeLog(LogTypeEnum.ERROR, 'Input Error in Post_BatchCreateRecordRequest.processRecordRequest(createReq)', 'createReq {CreateRecordRequest} is missing required parameters: recordType and one of (fieldDict, sublistDict)');
+            return null;
+        }
+        recordType = recordType.toLowerCase();
+        if (Object.keys(RecordTypeEnum).includes(recordType.toUpperCase())) {
+            recordType = RecordTypeEnum[recordType.toUpperCase()];
+        } else if (!Object.values(RecordTypeEnum).includes(recordType)) {
+            // log.error('Invalid recordType', `Invalid recordType: ${recordType}. Must be a RecordTypeEnum key or one of RecordTypeEnum's values: ${Object.values(RecordTypeEnum).join(', ')}.`);
+            writeLog(LogTypeEnum.ERROR, 'Invalid recordType', `Invalid recordType: ${recordType}. Must be a RecordTypeEnum key or one of RecordTypeEnum's values: ${Object.values(RecordTypeEnum).join(', ')}.`);
+            return null;
+        }
+        try {
+            const rec = record.create({ type: recordType });
+            /**@type {string[]} */
+            const validFieldIds = rec.getFields();
+            /**@type {string[]} */
+            const validSublistIds = rec.getSublists();
+            // log.debug(`Creating ${recordType} record`);
+            writeLog(LogTypeEnum.DEBUG, `Creating ${recordType} record`);
+            if (fieldDict) {
+                if (fieldDict.textFields && Array.isArray(fieldDict.textFields)) {
+                    fieldDict.textFields.forEach(({fieldId, text}) => {
+                        fieldId = fieldId.toLowerCase();
+                        if (!validFieldIds.includes(fieldId)) {
+                            // log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
+                            writeLog(LogTypeEnum.ERROR, `Invalid fieldId: ${fieldId}`, `Field ID not found in ${recordType} record.`);
+                            return; // continue to next textField
+                        } 
+                        rec.setText({ fieldId, text });
+                    });
+                }
+                if (fieldDict.valueFields && Array.isArray(fieldDict.valueFields)) {
+                    fieldDict.valueFields.forEach(({fieldId, value}) => {
+                        fieldId = fieldId.toLowerCase();
+                        if (!validFieldIds.includes(fieldId)) {
+                            // log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
+                            writeLog(LogTypeEnum.ERROR, `Invalid fieldId: ${fieldId}`, `Field ID not found in ${recordType} record.`);
+                            return; // continue to next valueField
+                        }
+                        rec.setValue({ fieldId, value });
+                    });
+                }
+            }
+            if (sublistDict) {
+                for (let sublistId in Object.keys(sublistDict)) {
+                    sublistId = sublistId.toLowerCase();
+                    if (validSublistIds.includes(sublistId)) {
+                        /**@type {string[]} */
+                        const validSublistFieldIds = rec.getSublistFields({ sublistId });
+                        // log.debug(`Processing sublistId: ${sublistId}`);
+                        writeLog(LogTypeEnum.DEBUG, `Processing sublistId: ${sublistId}`);
+                        /**@type {SublistFieldDictionary} */
+                        const sublistFieldDict = sublistDict[sublistId];                    
+                        if (sublistFieldDict.textFields && Array.isArray(sublistFieldDict.textFields)) {
+                            sublistFieldDict.textFields.forEach(({fieldId, line, text}) => {
+                                fieldId = fieldId.toLowerCase();
+                                if (!validSublistFieldIds.includes(fieldId)) {
+                                    // log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
+                                    writeLog(LogTypeEnum.ERROR, `Invalid fieldId: ${fieldId}`, `Field ID not found in ${recordType} record.`);
+                                    return; // continue to next textField
+                                }
+                                rec.setSublistText({ sublistId, fieldId, line, text });
+                            });
+                        }
+                        if (sublistFieldDict.valueFields && Array.isArray(sublistFieldDict.valueFields)) {
+                            sublistFieldDict.valueFields.forEach(({fieldId, line, value}) => {
+                                fieldId = fieldId.toLowerCase();
+                                if (!validSublistFieldIds.includes(fieldId)) {
+                                    // log.error({ title: `Invalid fieldId: ${fieldId}`, details: `Field ID not found in ${recordType} record.` });
+                                    writeLog(LogTypeEnum.ERROR, `Invalid fieldId: ${fieldId}`, `Field ID not found in ${recordType} record.`);
+                                    return; // continue to next valueField
+                                }
+                                rec.setSublistValue({ sublistId, fieldId, line, value });
+                            });
+                        }
+                    } else {
+                        // log.error({ title: `Invalid sublistId: ${sublistId}`, details: `Sublist ID not found in ${recordType} record.` });
+                        writeLog(LogTypeEnum.ERROR, `Invalid sublistId: ${sublistId}`, `Sublist ID not found in ${recordType} record.`);
+                        continue;
+                    }
+                }
+            }
+            const recId = rec.save();
+            // log.audit(`Successfully created ${recordType} record`, { recordId: recId });
+            writeLog(LogTypeEnum.AUDIT, `Successfully created ${recordType} record`, { recordId: recId });
+            return recId;
+        } catch (e) {
+            // log.error(`Error creating ${recordType} record`, e);
+            writeLog(LogTypeEnum.ERROR, `Error creating ${recordType} record`, e);
+            return null;
+        }
+    }
 
+    /**
+     * @enum {string} LogTypeEnum
+     */
+    const LogTypeEnum = {
+        DEBUG: 'debug',
+        ERROR: 'error',
+        AUDIT: 'audit',
+        EMERGENCY: 'emergency',
+    };
+    /**
+     * Calls NetSuite log module and saves pushes log with timestamp to {@link logArray} to return later
+     * @reference ~\node_modules\@hitc\netsuite-types\N\log.d.ts
+     * @param {LogTypeEnum} type {@link LogTypeEnum}
+     * @param {string} title 
+     * @param {any} [details]
+     * @returns {void} 
+     */
+    function writeLog(type, title, details) {
+        if (!type || !title) {
+            log.error('Invalid log', 'type and title are required');
+            return;
+        }
+        if (!Object.values(LogTypeEnum).includes(type)) {
+            log.error('Invalid log type', `type must be one of ${Object.values(LogTypeEnum).join(', ')}`);
+            return;
+        }
+        if (type === LogTypeEnum.DEBUG) {
+            log.debug(title, details);
+        } else if (type === LogTypeEnum.ERROR) {
+            log.error(title, details);
+        } else if (type === LogTypeEnum.AUDIT) {
+            log.audit(title, details);
+        } else if (type === LogTypeEnum.EMERGENCY) {
+            log.emergency(title, details);
+        }
+        details = typeof details === 'object' ? JSON.stringify(details, null, 4) : details;
+        logArray.push({ timestamp: getCurrentPacificTime(), type, title, details });
+    }
+
+    /**
+     * Gets the current date and time in Pacific Time
+     * @returns {string} The current date and time in Pacific Time
+     */
+    function getCurrentPacificTime() {
+        const currentDate = new Date();
+        const pacificTime = currentDate.toLocaleString('en-US', {timeZone: 'America/Los_Angeles'});
+        return pacificTime;
     }
 
 /**
@@ -119,27 +322,7 @@ define(['N/record', 'N/log'], (record, log) => {
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  */
 
-/*
-log.d.ts
-interface LogOptions {
-    // String to appear in the Title column on the Execution Log tab of the script deployment. Maximum length is 99 characters.
-    title?: string;
-    /*
-    * You can pass any value for this parameter.
-    * If the value is a JavaScript object type, JSON.stringify(obj) is called on the object before displaying the value.
-    * NetSuite truncates any resulting string over 3999 characters.
-    details: any;
-}
-interface LogFunction {
-    (title: string, details: any): void;
-    (options: LogOptions): void;
-}
 
-export const debug: LogFunction;
-export const audit: LogFunction;
-export const error: LogFunction;
-export const emergency: LogFunction;
-*/
 
 /**
  * @enum {string} RecordTypeEnum
@@ -716,5 +899,3 @@ const RecordTypeEnum = { // As of 4 June 2024
 };
     return { post };
 });
-
-
