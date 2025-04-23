@@ -14,4 +14,3 @@ My current approach is as follows:
 #### Guides I found useful: 
 - [NetSuite RESTlet Creation - SuiteScript 2.0 with OAuth 2 - YouTube](https://www.youtube.com/watch?v=MAOMQp5dh0U)
 - [The SuiteScript Developer's Guide on NetSuite Subrecords - NetSuite Insights](https://netsuite.smash-ict.com/suitescript-developers-guide-on-netsuite-subrecords-part-1/)
-- - Part 2 not found. . . 
