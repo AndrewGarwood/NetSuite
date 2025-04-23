@@ -2,24 +2,29 @@
  * @file env.ts
  * @description Environment variables for the SuiteCloud project.
  */
-import { AccountEnvironmentEnum, SuiteScriptEnvironment } from '../types/NS/SuiteScriptEnvironment';
+import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 dotenv.config();
+
+import { AccountEnvironmentEnum, SuiteScriptEnvironment, ScriptDictionary, ScriptDetails } from '../types/NS/SuiteScriptEnvironment';
 
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 
+
 export const READLINE = readline.createInterface({ input, output });
-// @example import READLINE as rl; const answer = await rl.question('What do you think of Node.js? ');
+// const answer = await rl.question('What do you think of Node.js? ');
 
 
-/**
- * @description Exit the program/script for debugging purposes 
- * @returns {void}
- * */
+/**@description Exit the program/script for debugging purposes @returns {void}*/
 export const STOP_RUNNING = (): void => {
     process.exit(1);
 }
+/**@description Pause execution for specified amount of milliseconds @returns {Promise<void>}*/
+export const DELAY = (ms: number): Promise<void> => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+export { CLOSE_SERVER } from 'src/server/authServer';
 
 export const BASE_ACCOUNT_ID = (process.env.ACCOUNT_ID || 'MISSING_ENV_VARIABLE-ACCOUNT_ID') as string;
 
@@ -84,7 +89,6 @@ nlauth_application_id=${REST_APPLICATION_ID}\
 /** restlets */
 export const SCOPE = 'restlets'; //,rest_webservices,webservices,suiteanalytics,full,offline';
 
-// export const STATE = 'ykv2XLx1BpT5Q0F3MRPHb94j';
 /**
  * @reference https://9866738-sb1.app.netsuite.com/app/help/helpcenter.nl?fid=section_158081944642.html 
  * @description (from reference)
@@ -95,8 +99,8 @@ export const SCOPE = 'restlets'; //,rest_webservices,webservices,suiteanalytics,
 export const STATE = require('crypto').randomBytes(32).toString('hex'); // 64 characters long
 
 /** 
+ * see {@link SuiteScriptEnvironment}
  * @description instantiate known script deployments 
- * @see {@link SuiteScriptEnvironment}
  * */
 export const SCRIPT_ENVIORNMENT: SuiteScriptEnvironment = {
     production: {},
@@ -110,12 +114,17 @@ export const SCRIPT_ENVIORNMENT: SuiteScriptEnvironment = {
                 scriptId: 168,
                 deployId: 1,
             },
-        }
+            POST_BatchCreateRecord: {
+                scriptId: 169,
+                deployId: 1,
+            },
+        } as ScriptDictionary,
     }
 }
 
 /**Define in .env use in path stem C:/Users/${USER} */
 export const USER = process.env.CURRENT_USER || 'MISSING_ENV_VARIABLE-CURRENT_USER';
+console.log('USER:'.padEnd(13), USER);
 
 /** ~/OneDrive - ENTITY_NAME */
 export const ONE_DRIVE_DIR = `C:/Users/${USER}/OneDrive - ENTITY_NAME`;
@@ -125,3 +134,9 @@ export const DATA_DIR = `C:/Users/${USER}/path/to/NetSuite/data`;
 
 /** ~/NetSuiteDev/SuiteCloud/.output */
 export const OUTPUT_DIR =`C:/Users/${USER}/path/to/NetSuite/SuiteCloud/.output`;
+
+// Check if OUTPUT_DIR is a valid path
+if (!fs.existsSync(OUTPUT_DIR)) {
+    console.error(`ERROR: OUTPUT_DIR path does not exist: ${OUTPUT_DIR}, please check your .env file.`);
+    STOP_RUNNING();
+}

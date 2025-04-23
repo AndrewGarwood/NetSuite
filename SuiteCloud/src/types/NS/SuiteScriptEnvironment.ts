@@ -1,8 +1,20 @@
 /**
  * @file SuiteScriptEnvironment.ts
  * @module SuiteScriptEnvironment
+ * @description strucutres to define/hold the scripts one has uploaded/deployed to NetSuite.
  */
 
+
+/**
+ * @enum {string} AccountEnvironmentEnum
+ * @description Enum for NetSuite account environments.
+ * @property {string} PRODUCTION - Production environment.
+ * @property {string} SANDBOX - Sandbox (development) environment.
+ */
+export enum AccountEnvironmentEnum {
+    PRODUCTION = 'production',
+    SANDBOX = 'sandbox',
+}
 
 /**
  * @typedefn SuiteScriptEnvironment
@@ -17,7 +29,6 @@ export type SuiteScriptEnvironment = {
         [S in ScriptTypeEnum]?: ScriptDictionary
     }
 };
-// could try to use "Partial":
 // export type SuiteScriptEnvironment = Partial<{
 //     [K in AccountEnvironmentEnum]: Partial<{
 //         [S in ScriptTypeEnum]: ScriptDictionary
@@ -48,17 +59,6 @@ export type ScriptDetails = {
     deployId: string | number
     deployName?: string;
 };
-
-/**
- * @enum {string} AccountEnvironmentEnum
- * @description Enum for NetSuite account environments.
- * @property {string} PRODUCTION - Production environment.
- * @property {string} SANDBOX - Sandbox (development) environment.
- */
-export enum AccountEnvironmentEnum {
-    PRODUCTION = 'production',
-    SANDBOX = 'sandbox',
-}
 
 /**
  * @enum {string} ScriptTypeEnum

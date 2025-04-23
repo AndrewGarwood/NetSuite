@@ -1,32 +1,11 @@
 Cutting Room Floor
-/*
-interface LogOptions {
-    // String to appear in the Title column on the Execution Log tab of the script deployment. Maximum length is 99 characters.
-    title?: string;
-    /*
-    * You can pass any value for this parameter.
-    * If the value is a JavaScript object type, JSON.stringify(obj) is called on the object before displaying the value.
-    * NetSuite truncates any resulting string over 3999 characters.
-    
-    details: any;
-}
-
-interface LogFunction {
-    (title: string, details: any): void;
-    (options: LogOptions): void;
-}
-
-export const debug: LogFunction;
-export const audit: LogFunction;
-export const error: LogFunction;
-export const emergency: LogFunction;
-*/
 
 https://oauth.pstmn.io/v1/callback
 
 https://<accountID>.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token
 
 /*
+from website
 define Object
 The define object is an overloaded function that is used to create entry point scripts and custom modules in SuiteScript 2.x. This function executes asynchronously on the client and synchronously on the server. The define object conforms to the Asynchronous Module Definition (AMD) specification.
 

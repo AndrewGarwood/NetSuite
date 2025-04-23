@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { OUTPUT_DIR } from 'src/config/env';
-import { getCurrentPacificTime } from './date_utils';
-import { validateFileExtension } from './read_utils';
+import { getCurrentPacificTime } from './dateTime';
+import { validateFileExtension } from './reading';
 
 
 /**
