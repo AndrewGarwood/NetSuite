@@ -15,6 +15,7 @@
         "@types/jest": "29.5.14",
         "@types/node": "^22.13.10",
         "@types/open": "^6.1.0",
+        "@types/xlsx": "^0.0.35",
         "axios": "^1.8.4",
         "body-parser": "^2.2.0",
         "express": "^5.1.0",
@@ -28,9 +29,11 @@
         "@hitc/netsuite-upload": "^2.0.6",
         "@oracle/suitecloud-cli": "^3.0.0",
         "crypto-js": "^4.2.0",
+        "csv-parser": "^3.2.0",
         "dotenv": "^16.4.7",
         "kill-port": "^2.0.1",
         "netsuite-api-client": "^1.0.3",
-        "oauth-1.0a": "^2.2.6"
+        "oauth-1.0a": "^2.2.6",
+        "xlsx": "^0.18.5"
     }
 }

@@ -1,5 +1,4 @@
 /**
- * @incomplete
  * @file Address.ts
  * @description TypeScript definition for the Address record and related objects in NetSuite.
  * @module Address
@@ -17,7 +16,7 @@ import { NetSuiteCountryEnum } from "./Enums";
  * @property {string} [addr1] - Address 1 - (street address line 1) Enter the address the way it should appear on forms. For employees, customers, partners, and vendors, what you enter here autofills on forms if this address is marked default for Shipping or Billing. Enter up to 50 characters. This field is required for the Online Bill Pay feature.
  * @property {string} [addr2] - Address 2 - (street address line 2) Enter an optional second address line the way it should appear on forms. For employees, customers, partners, and vendors, what you enter here autofills on forms if this address is marked default for Shipping or Billing. Enter up to 50 characters.
  * @property {string} [addr3] - Address 3 - (street address line 3)
- * @property {string} [addressee] - Addressee - Enter the name of the entity that should appear on the shipping label here. This name appears on the shipping label below what you enter in the Attention field.
+ * @property {string} [addressee] - Addressee - Enter the name of the entity/company that should appear on the shipping label here. This name appears on the shipping label below what you enter in the Attention field.
  * @property {string} [addressformat] - Address Template
  * @property {string} [addrphone] - Phone - Enter the phone number.
  * @property {string} [attention] - Attention - Enter the name of the person to whom a shipment is addressed, as it should appear on shipping labels. This field is required for UPS Integration.
@@ -36,11 +35,11 @@ export interface Address {
     addr2?: string;
     addr3?: string;
     addressee: string;
+    attention?: string;
     addressformat?: string;
     addrphone?: string;
-    attention?: string;
     city?: string;
-    country?: NetSuiteCountryEnum;
+    country: NetSuiteCountryEnum;
     externalid?: string;
     internalid?: string;
     override?: boolean;
@@ -74,24 +73,7 @@ export interface AddressBookEntry {
 export type AddressBook = AddressBookEntry[];
 
 /*
-
-Search Columns
-Internal ID	Type	Label
-address	text	Address
-address1	text	Address 1
-address2	text	Address 2
-address3	text	Address 3
-addressee	text	Addressee
-attention	text	Attention
-city	text	City
-country	select	Country
-countrycode	text	Country Code
-externalid	select	External ID
-internalid	select	Internal ID
-override	text	Override
-phone	text	Phone
-state	text	State
-zip	text	Zip
+@reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html
 
 */
 /*

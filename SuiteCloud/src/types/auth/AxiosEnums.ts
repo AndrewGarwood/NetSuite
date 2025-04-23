@@ -3,6 +3,17 @@
  * @module AxiosEnums
  */
 
+/**
+ * @enum {string} GrantTypeEnum
+ * @description Enum for OAuth2 grant types.
+ * @property {string} AUTHORIZATION_CODE - Authorization code grant type.
+ * @property {string} REFRESH_TOKEN - Refresh token grant type.
+ */
+export enum GrantTypeEnum {
+    AUTHORIZATION_CODE='authorization_code',
+    REFRESH_TOKEN='refresh_token',
+}
+
 
 /**
  * @enum {string} AxiosCallEnum

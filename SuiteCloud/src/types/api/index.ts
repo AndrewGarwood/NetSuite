@@ -1,0 +1,43 @@
+import {
+    BatchCreateRecordRequest,
+    BatchCreateRecordResponse,
+    CreateRecordOptions,
+    CreateRecordResponse,
+    FieldDictionary,
+    SublistFieldDictionary,
+    SetSublistTextOptions,
+    SetSublistValueOptions,
+    SublistDictionary,
+    SetSubrecordOptions,
+    FieldValue,
+    SetFieldOptionsArrayTypes,
+    SetFieldTextOptions,
+    SetFieldValueOptions,
+    LogStatement,
+    LogTypeEnum,
+    FieldDictTypeEnum,
+    FieldOptionsTypeEnum,
+    OptionsArrayLabelEnum
+} from "./Api";
+
+export {
+    BatchCreateRecordRequest,
+    BatchCreateRecordResponse,
+    CreateRecordOptions,
+    CreateRecordResponse,
+    FieldDictionary,
+    SublistFieldDictionary,
+    SetSublistTextOptions,
+    SetSublistValueOptions,
+    SublistDictionary,
+    SetSubrecordOptions,
+    FieldValue,
+    SetFieldOptionsArrayTypes,
+    SetFieldTextOptions,
+    SetFieldValueOptions,
+    LogStatement,
+    LogTypeEnum,
+    FieldDictTypeEnum,
+    FieldOptionsTypeEnum,
+    OptionsArrayLabelEnum
+}

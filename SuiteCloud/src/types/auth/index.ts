@@ -1,6 +1,7 @@
 import {
     AxiosCallEnum,
-    AxiosContentTypeEnum
+    AxiosContentTypeEnum,
+    GrantTypeEnum
 } from './AxiosEnums';
 import { 
     TokenResponse 
@@ -8,6 +9,7 @@ import {
 export {
     AxiosCallEnum,
     AxiosContentTypeEnum,
+    GrantTypeEnum,
 
     TokenResponse
 };
