@@ -10,6 +10,7 @@
 3. In my use case, read data from csv files and map their columns to their corresponding NetSuite fields (see function parseDelimitedFileWithMapping from [src/utils/io/reading.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/io/reading.ts)), then store them into [payloads](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/samplePayloads.ts) for the API calls (determine proper mapping by using aforementioned [Record Browser](https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/account.html) )
 4. Use authorization tokens generated from authorization flow to make API calls, e.g. in [src/main.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/main.ts) using functions from [src/utils/api/callApi.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/callApi.ts)
 5. Keep writing more features and improvements.
+6. oh and type definitions.
 
 ### Guides I found useful: 
 - [NetSuite RESTlet Creation - SuiteScript 2.0 with OAuth 2 - YouTube](https://www.youtube.com/watch?v=MAOMQp5dh0U)
