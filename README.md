@@ -4,6 +4,7 @@
 - An essential reference for is NetSuite's [Record Browser](https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/account.html) 
 
 My current approach is as follows:
+
 0. Determine desired objective. For example, if I need to upload a substantial amount of data, I can create records through POST requests (see [POST_CreateRecord.js](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/FileCabinet/SuiteScripts/REST/POST_CreateRecord.js) and [POST_BatchCreateRecord.js](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/FileCabinet/SuiteScripts/REST/POST_BatchCreateRecord.js) ))
 1. Write API endpoints so I can make requests to them with paylaods, see [src/FileCabinet/SuiteScripts/REST](https://github.com/AndrewGarwood/NetSuite/tree/master/SuiteCloud/src/FileCabinet/SuiteScripts/REST)
 2. I wanted to use TypeScript in VSCode, so I set up an Oauth2.0 flow so that I can communicate with these endpoints, see [src/server/authServer.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/server/authServer.ts)
