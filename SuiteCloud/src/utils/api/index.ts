@@ -3,9 +3,8 @@ import {
     callPostRestletWithPayload,
 } from './callApi';
 import {
-    alternateSingleReq as alternateCreateRecordOptions,
-    singleReq as singleCreateRecordOptions,
-    subrecOptions as subrecordOptions
+    MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS,
+    UW_LIBRARIES_CREATE_VENDOR_OPTIONS,
 } from './samplePayloads';
 import {
     createUrlWithParams
@@ -16,9 +15,8 @@ export {
     callPostRestletWithPayload,
 
     // samplePayloads.ts
-    alternateCreateRecordOptions,
-    singleCreateRecordOptions,
-    subrecordOptions,
+    MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS,
+    UW_LIBRARIES_CREATE_VENDOR_OPTIONS,
 
     // url.ts
     createUrlWithParams,

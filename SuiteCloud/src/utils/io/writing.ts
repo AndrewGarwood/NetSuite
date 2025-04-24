@@ -52,7 +52,7 @@ export function writeListsToCsv(
 
 /**
  * Output JSON data to a file
- * @param {Record<string, any>} data Record.<string, any>
+ * @param {Record<string, any> | string} data Record.<string, any> | string - JSON data to write to file
  * @param {string} fileName string - optional, 'name.ext', default='' If fileName is not provided, it will be assumed the filePath contains the name and extension.
  * @param {string} filePath string 
  * @param {number} indent number - optional, default=4
@@ -61,7 +61,7 @@ export function writeListsToCsv(
  * @returns {void}
  */
 export function writeObjectToJson(
-    data: Record<string, any>, 
+    data: Record<string, any> | string, 
     fileName: string='',
     filePath: string,
     indent: number=4,
@@ -71,26 +71,33 @@ export function writeObjectToJson(
         console.error('No data to write to JSON file');
         return;
     }
-    data['lastUpdated'] = getCurrentPacificTime();
+    if (typeof data === 'string') {
+        try {
+            data = JSON.parse(data) as Record<string, any>;
+        } catch (e) {
+            console.error('Error parsing string to JSON', e);
+            return;
+        }
+    }
+    if (typeof data !== 'object') {
+        console.error('Data is not an object or string', data);
+        return;
+    }
     filePath = validateFileExtension(
         (fileName ? `${filePath}/${fileName}`: filePath), 
         'json'
     ).validatedFilePath;
-    const jsonData = JSON.stringify(data, null, indent);
-    if (enableOverwrite) {
-        fs.writeFile(filePath, jsonData, (err) => {
-            if (err) {
-                console.error('Error writing to JSON file', err);
-            }
-        });
-    } else {
-        fs.appendFile(filePath, jsonData, (err) => {
-            if (err) {
-                console.error('Error appending to JSON file', err);
-            }
-        });
-    };
-
+    try {
+        const jsonData = JSON.stringify(data, null, indent);
+        if (enableOverwrite) {
+            fs.writeFileSync(filePath, jsonData, { flag: 'w' });
+        } else {
+            fs.appendFileSync(filePath, jsonData, { flag: 'a' });
+        };
+        console.log(`JSON file has been saved to ${filePath}`);
+    } catch (e) {
+        console.error('Error writing to JSON file', e);
+    }
 }
 
 /**
