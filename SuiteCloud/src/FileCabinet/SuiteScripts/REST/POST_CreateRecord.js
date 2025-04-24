@@ -10,25 +10,23 @@
 
 define(['N/record', 'N/log'], (record, log) => {
     /**
-     * @TODO decide if want to take out N/log statements from writeLog() and uncomment them in main functions
-     * @type {LogStatement[]} - Array<{@link LogStatement}> = { timestamp: string, type: {@link LogTypeEnum}, title: string, details: any, message: string }[]
-     * @see {@link writeLog}(type, title, details)
+     * @type {LogStatement[]} - Array<{@link LogStatement}> = { `timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string }[]
+     * @see {@link writeLog}(type, title, ...details)
      * @description return logArray in post response so can process in client
      * e.g. in client write logArray to a json or txt file in a readable format
      * or use logArray to display in a UI component (e.g. table, list, etc.)
      * */
     const logArray = [];
-
     /**
      * @TODO decide if want to keep support for FieldDictionary.textFields and FieldDictionary.priorityFields or remove them for simplicity.
-     * @param {CreateRecordOptions} reqBody {@link CreateRecordOptions}
-     * @param {string} reqBody.recordType - The record type to create, see {@link RecordTypeEnum} (e.g., 'assemblyitem', 'bom', 'bomrevision', 'inventoryitem', 'salesorder', etc.)
-     * @param {boolean} [createReq.isDynamic=false] - Indicates if the record should be created in dynamic mode. Default is `false`.
+     * @param {CreateRecordOptions} reqBody {@link CreateRecordOptions} = { `recordType`: {@link RecordTypeEnum}, `isDynamic`: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary} }
+     * @param {string} reqBody.recordType - The record type to create, see {@link RecordTypeEnum}
+     * @param {boolean} [reqBody.isDynamic=false] - Indicates if the record should be created in dynamic mode. Default is false.
      * @param {FieldDictionary} [reqBody.fieldDict]
-     * - {@link FieldDictionary} = { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetFieldTextOptions}>, `valueFields`: Array<{@link SetFieldValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }.
+     * - {@link FieldDictionary} = { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetFieldTextOptions}>, `valueFields`: Array<{@link SetFieldValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }
      * - an object containing field IDs and their corresponding values.
      * @param {SublistDictionary} [reqBody.sublistDict]
-     * - {@link SublistDictionary} = Record<[`sublistId`: string], {@link SublistFieldDictionary}> = { `sublistId`: { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetSublistTextOptions}>, `valueFields`: Array<{@link SetSublistValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> } }.
+     * - {@link SublistDictionary} = Record<[`sublistId`: string], {@link SublistFieldDictionary}> = { `sublistId`: { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetSublistTextOptions}>, `valueFields`: Array<{@link SetSublistValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }.
      * - an object containing sublist IDs and their corresponding field IDs and values.
      * @returns {CreateRecordResponse} .{@link CreateRecordResponse}
      */
@@ -57,7 +55,7 @@ define(['N/record', 'N/log'], (record, log) => {
     }
 
     /**
-     * @param {CreateRecordOptions} createReq {@link CreateRecordOptions} = { recordType, isDynamic=false, fieldDict, sublistDict }
+     * @param {CreateRecordOptions} createReq {@link CreateRecordOptions} = { `recordType`, `isDynamic`=false, `fieldDict`, `sublistDict` }
      * @param {string} createReq.recordType - The record type to create, see {@link RecordTypeEnum} (e.g., 'assemblyitem', 'bom', 'bomrevision', 'inventoryitem', 'salesorder', etc.)
      * @param {boolean} [createReq.isDynamic=false] - Indicates if the record should be created in dynamic mode. Default is false.
      * @param {FieldDictionary} [createReq.fieldDict]
@@ -65,7 +63,7 @@ define(['N/record', 'N/log'], (record, log) => {
      * - an object containing field IDs and their corresponding values.
      * @param {SublistDictionary} [createReq.sublistDict]
      * - {@link SublistDictionary} = Record<[`sublistId`: string], {@link SublistFieldDictionary}> = { `sublistId`: { `priorityFields`: Array<{@link SetSublistValueOptions}>, `textFields`: Array<{@link SetSublistTextOptions}>, `valueFields`: Array<{@link SetSublistValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> } }.
-     * - an object containing sublist IDs with corresponding field IDs and values.
+     * - an object containing sublist IDs and their corresponding field IDs and values.
      * @returns {number|null} recordId or null if error
      */
     function processCreateRecordOptions(createReq) {
@@ -85,8 +83,8 @@ define(['N/record', 'N/log'], (record, log) => {
         }
         
         try {
-            let rec = record.create({ type: recordType, isDynamic: isDynamic ? isDynamic : false });
-            writeLog(LogTypeEnum.DEBUG, `Creating "${recordType}" record`, 
+            let rec = record.create({ type: recordType, isDynamic });
+            writeLog(LogTypeEnum.DEBUG, `processCreateRecordOptions().try Creating "${recordType}" record`, 
                 `record.create({ type: ${recordType}, isDynamic: ${isDynamic} });`
             );
             if (fieldDict) {
@@ -96,7 +94,6 @@ define(['N/record', 'N/log'], (record, log) => {
                 /**@type {string[]} */
                 const validSublistIds = rec.getSublists();
                 for (let [sublistId, sublistFieldDict] of Object.entries(sublistDict)) {
-                    writeLog(LogTypeEnum.DEBUG, `processCreateRecordOptions().try.if(sublistDict).for[index] sublistDict[${sublistId}]`);          
                     sublistId = sublistId.toLowerCase();
                     if (!validSublistIds.includes(sublistId)) {
                         writeLog(LogTypeEnum.ERROR, 
@@ -117,13 +114,12 @@ define(['N/record', 'N/log'], (record, log) => {
             writeLog(LogTypeEnum.AUDIT, `Successfully created ${recordType} record`, { recordId: recId });
             return recId;
         } catch (e) {
-            writeLog(LogTypeEnum.ERROR, `processCreateRecordOptions().catch(e) Error creating ${recordType} record`, e);
+            writeLog(LogTypeEnum.ERROR, `Error creating ${recordType} record`, e.message ? e.stack : e.toString());
             return null;
         }
     }
 
     /**
-     * called by {@link processFieldDictionary} to set field values on the record or subrecord.
      * @param {Object} rec - The current record or subrecord being processed.
      * @param {string} recordType - The record type {@link RecordTypeEnum} (e.g., 'assemblyitem', 'bom', 'bomrevision', 'inventoryitem', 'customer', 'salesorder', 'invoice', etc.)
      * @param {SetOptionsEnum} fieldType - The type of field to set ({@link SetOptionsEnum}) ( FIELD_TEXT, FIELD_VALUE, SUBLIST_TEXT, SUBLIST_VALUE).
@@ -138,69 +134,54 @@ define(['N/record', 'N/log'], (record, log) => {
         fieldOptions, 
         arrayLabel=OptionsArrayLabelEnum.DEFAULT_LABEL,
     ) {
-        // writeLog(LogTypeEnum.DEBUG, `Start setFieldsByOptionType()`, 
-        //     `{ recordType=${recordType}, fieldType=${fieldType}, fieldOptions, arrayLabel=${arrayLabel} }`);
-        if (!rec || !fieldType || !fieldOptions) {
-            writeLog(LogTypeEnum.ERROR, 'Invalid setFieldsByOptionType() parameters', 'rec, fieldType, fieldOptions are required');
-            return rec;
+        /**@type {string[]} */
+        let validFieldIds = undefined
+        if (fieldType === SetOptionsEnum.FIELD_TEXT) {
+            validFieldIds = rec.getFields();
+            fieldOptions.forEach(({fieldId, text}, index) => {
+                fieldId = fieldId.toLowerCase();
+                if (!validFieldIds.includes(fieldId)) {
+                    writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.FIELD_TEXT} fieldId: '${fieldId}'`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getFields()`);
+                    // return; // continue to next textField
+                } 
+                rec.setText({ fieldId, text });
+            });
+        } else if (fieldType === SetOptionsEnum.FIELD_VALUE) {
+            validFieldIds = rec.getFields();
+            fieldOptions.forEach(({fieldId, value}, index) => {
+                fieldId = fieldId.toLowerCase();
+                if (!validFieldIds.includes(fieldId)) {
+                    writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.FIELD_VALUE} fieldId: '${fieldId}'`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getFields()`);
+                    // return; // continue to next valueField
+                }
+                rec.setValue({ fieldId, value });
+            });
+        } else if (fieldType === SetOptionsEnum.SUBLIST_TEXT) {
+            fieldOptions.forEach(({sublistId, fieldId, line, text}, index) => {
+                fieldId = fieldId.toLowerCase();
+                validFieldIds = rec.getSublistFields({ sublistId });
+                if (!validFieldIds.includes(fieldId)) {
+                    writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.SUBLIST_TEXT} fieldId: ${fieldId}`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getSublistFields(${sublistId})`);
+                    // return; // continue to next textField
+                }
+                line = validateSublistLine(rec, sublistId, line);
+                rec.setSublistText({ sublistId, fieldId, line, text });
+            });
+        } else if (fieldType === SetOptionsEnum.SUBLIST_VALUE) {
+            fieldOptions.forEach(({sublistId, fieldId, line, value}, index) => {
+                fieldId = fieldId.toLowerCase();
+                validFieldIds = rec.getSublistFields({ sublistId });
+                if (!validFieldIds.includes(fieldId)) {
+                    writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.SUBLIST_VALUE} fieldId: '${fieldId}'`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getSublistFields(${sublistId})`);
+                    // return; // continue to next valueField
+                }
+                line = validateSublistLine(rec, sublistId, line);
+                rec.setSublistValue({ sublistId, fieldId, line, value });
+            });
+        } else {
+            writeLog(LogTypeEnum.ERROR, 'setFieldsByOptionType() Invalid field type', `Invalid field type: ${fieldType}`);
         }
-        try {
-            /**@type {string[]} */
-            let validFieldIds = undefined
-            if (fieldType === SetOptionsEnum.FIELD_TEXT) {
-                validFieldIds = rec.getFields();
-                fieldOptions.forEach(({fieldId, text}, index) => {
-                    fieldId = fieldId.toLowerCase();
-                    if (!validFieldIds.includes(fieldId)) {
-                        writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.FIELD_TEXT} fieldId: '${fieldId}'`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getFields()`);
-                        // return; // continue to next textField
-                    } 
-                    rec.setText({ fieldId, text });
-                });
-            } else if (fieldType === SetOptionsEnum.FIELD_VALUE) {
-                validFieldIds = rec.getFields();
-                fieldOptions.forEach(({fieldId, value}, index) => {
-                    fieldId = fieldId.toLowerCase();
-                    if (!validFieldIds.includes(fieldId)) {
-                        writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.FIELD_VALUE} fieldId: '${fieldId}'`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getFields()`);
-                        // return; // continue to next valueField
-                    }
-                    rec.setValue({ fieldId, value });
-                });
-            } else if (fieldType === SetOptionsEnum.SUBLIST_TEXT) {
-                fieldOptions.forEach(({sublistId, fieldId, line, text}, index) => {
-                    fieldId = fieldId.toLowerCase();
-                    validFieldIds = rec.getSublistFields({ sublistId });
-                    line = validateSublistLine(rec, sublistId, line);
-                    if (!validFieldIds.includes(fieldId)) {
-                        writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.SUBLIST_TEXT} fieldId: ${fieldId}`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getSublistFields(${sublistId})`);
-                        // return; // continue to next textField
-                    }
-                    rec.setSublistText({ sublistId, fieldId, line, text });
-                });
-            } else if (fieldType === SetOptionsEnum.SUBLIST_VALUE) {
-                fieldOptions.forEach(({sublistId, fieldId, line, value}, index) => {
-                    fieldId = fieldId.toLowerCase();
-                    validFieldIds = rec.getSublistFields({ sublistId });
-                    line = validateSublistLine(rec, sublistId, line);
-                    if (!validFieldIds.includes(fieldId)) {
-                        writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.SUBLIST_VALUE} fieldId: '${fieldId}'`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getSublistFields(${sublistId})`);
-                        // return; // continue to next valueField
-                    }
-                    rec.setSublistValue({ sublistId, fieldId, line, value });
-                });
-            } else {
-                writeLog(LogTypeEnum.ERROR, 
-                    `setFieldsByOptionType() Invalid field type: ${fieldType}`, 
-                    `setFieldsByOptionType(recordType=${recordType}, fieldType=${fieldType}, fieldOptions=${fieldOptions}, arrayLabel=${arrayLabel})`,
-                );
-            }
-            return rec;
-        } catch (e) {
-            // writeLog(LogTypeEnum.ERROR, `Error in setFieldsByOptionType()`, e.message ? e.stack : e.toString());
-            writeLog(LogTypeEnum.ERROR, `Error in setFieldsByOptionType()`, e);
-            return rec;
-        }
+        return rec;
     }
 
 
@@ -215,158 +196,163 @@ define(['N/record', 'N/log'], (record, log) => {
      * @returns {Object} rec - {Object} - The record with the field values set.
      */
     function processFieldDictionary(rec, recordType, dict, dictType) {
-        if (!rec || !recordType || !dict || !dictType) {
-            writeLog(LogTypeEnum.ERROR, 'Invalid processFieldDictionary() parameters', 'rec, recordType, dict, dictType are required');
-            return rec;
-        }
-        if (dictType !== FieldDictTypeEnum.FIELD_DICT && dictType !== FieldDictTypeEnum.SUBLIST_FIELD_DICT) {
-            writeLog(LogTypeEnum.ERROR, 'processFieldDictionary() Invalid dictType', `received dictType=${dictType} but dictType must be either ${FieldDictTypeEnum.FIELD_DICT} or ${FieldDictTypeEnum.SUBLIST_FIELD_DICT}`);
-            return rec;
-        }
-        try {
-            if (dictType === FieldDictTypeEnum.FIELD_DICT) {
-                if (isNonEmptyArray(dict.priorityFields)) {
-                    rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.FIELD_VALUE, dict.priorityFields, OptionsArrayLabelEnum.PRIORITY);
-                }
-                if (isNonEmptyArray(dict.textFields)) {
-                    rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.FIELD_TEXT, dict.textFields, OptionsArrayLabelEnum.TEXT);
-                }
-                if (isNonEmptyArray(dict.valueFields)) {
-                    rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.FIELD_VALUE, dict.valueFields, OptionsArrayLabelEnum.VALUE);
-                }
-                if (isNonEmptyArray(dict.subrecordFields)) {
-                    for (let [index, subrecordOptions] of dict.subrecordFields.entries()) {
-                        writeLog(LogTypeEnum.DEBUG, `Processing fieldDict.subrecordFields[${index}]`);
-                        rec = processSubrecordOptions(rec, recordType, subrecordOptions);
-                    }
-                }
-            } else if (dictType === FieldDictTypeEnum.SUBLIST_FIELD_DICT) {
-                if (isNonEmptyArray(dict.priorityFields)) {
-                    rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.SUBLIST_VALUE, dict.priorityFields, OptionsArrayLabelEnum.PRIORITY);
-                }
-                if (isNonEmptyArray(dict.textFields)) {
-                    rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.SUBLIST_TEXT, dict.textFields, OptionsArrayLabelEnum.TEXT);
-                }
-                if (isNonEmptyArray(dict.valueFields)) {
-                    rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.SUBLIST_VALUE, dict.valueFields, OptionsArrayLabelEnum.VALUE);
-                }
-                if (isNonEmptyArray(dict.subrecordFields)) {
-                    for (let [index, subrecordOptions] of dict.subrecordFields.entries()) {
-                        writeLog(LogTypeEnum.DEBUG, `Processing sublistFieldDict.subrecordFields[${index}]`);
-                        rec = processSubrecordOptions(rec, recordType, subrecordOptions);
-                    }
+        if (rec && dict && dictType === FieldDictTypeEnum.FIELD_DICT) {
+            if (isNonEmptyArray(dict.priorityFields)) {
+                rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.FIELD_VALUE, dict.priorityFields, OptionsArrayLabelEnum.PRIORITY);
+            }
+            if (isNonEmptyArray(dict.textFields)) {
+                rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.FIELD_TEXT, dict.textFields, OptionsArrayLabelEnum.TEXT);
+            }
+            if (isNonEmptyArray(dict.valueFields)) {
+                rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.FIELD_VALUE, dict.valueFields, OptionsArrayLabelEnum.VALUE);
+            }
+            if (isNonEmptyArray(dict.subrecordFields)) {
+                for (let [index, subrecOptions] of Object.entries(dict.subrecordFields)) {
+                    writeLog(LogTypeEnum.DEBUG, `Processing fieldDict.subrecordFields[${index}]`);
+                    rec = processSubrecordOptions(rec, recordType, subrecOptions);
                 }
             }
-            return rec;
-        } catch (e) {
-            // writeLog(LogTypeEnum.ERROR, `Error in processFieldDictionary()`, e.message ? e.stack : e.toString());
-            writeLog(LogTypeEnum.ERROR, `Error in processFieldDictionary()`, e);
-            return rec;
+        } else if (rec && dict && dictType === FieldDictTypeEnum.SUBLIST_FIELD_DICT) {
+            if (isNonEmptyArray(dict.priorityFields)) {
+                rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.SUBLIST_VALUE, dict.priorityFields, OptionsArrayLabelEnum.PRIORITY);
+            }
+            if (isNonEmptyArray(dict.textFields)) {
+                rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.SUBLIST_TEXT, dict.textFields, OptionsArrayLabelEnum.TEXT);
+            }
+            if (isNonEmptyArray(dict.valueFields)) {
+                rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.SUBLIST_VALUE, dict.valueFields, OptionsArrayLabelEnum.VALUE);
+            }
+            if (isNonEmptyArray(dict.subrecordFields)) {
+                for (let [index, subrecOptions] of Object.entries(dict.subrecordFields)) {
+                    writeLog(LogTypeEnum.DEBUG, `Processing sublistFieldDict.subrecordFields[${index}]`);
+                    rec = processSubrecordOptions(rec, recordType, subrecOptions);
+                }
+            }
         }
+        return rec;
     }
 
 
     /**
-     * @TODO determine if property for subrecord's sublist fields should be SublistFieldDictionary or SublistDictionary
-     * @note does not yet support `isDynamic` being true
+     * @note does not yet support isDynamic being true
      * @param {Object} rec - the parent record
      * @param {string} recordType {@link RecordTypeEnum} = record type of parent record
-     * @param {SetSubrecordOptions} subrecordOptions {@link SetSubrecordOptions} = { `sublistId`?: string, `line`?: number, `fieldId`: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}>.
+     * @param {SetSubrecordOptions} subrecordOptions {@link SetSubrecordOptions} = { `sublistId`?: string, `line`?: number, `fieldId`: string, `subrecordType`: string,  `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}>.
      * @param {string} subrecordOptions.sublistId - (optional) the sublist ID of the subrecord. If not provided, assume that the subrecord corresponds to a body field of the main record.
      * @param {string} subrecordOptions.fieldId - the field ID of the subrecord. This is a required property.
      * @param {string} subrecordOptions.subrecordType - the subrecord type
      * @param {number} subrecordOptions.line - (optional) the line index of the subrecord in the sublist. This is only used if `sublistId` is provided.
      * @param {FieldDictionary} subrecordOptions.fieldDict - (optional) a {@link FieldDictionary} for the subrecord's body fields.
-     * @param {SublistFieldDictionary} subrecordOptions.sublistFieldDict - (optional) a {@link SublistFieldDictionary} for the subrecord's sublist fields.
+     * @param {SublistDictionary} subrecordOptions.sublistDict - (optional) a {@link SublistDictionary} for the subrecord's sublist fields.
      * @returns {Object} rec - The record with the its subrecord values set.
      * @description (Option A and B are mutually exclusive)
-     * - `Option A:` sublistId is not provided, assume that the subrecord corresponds to a body field of the main record. 
-     *   - `1.` (maybe optional) verify `rec.getFields().includes(fieldId)` is true
-     *   - `2.` (maybe optional) `rec.hasSubrecord(fieldId)` is true -> there is an existing subrecord for the fieldId
-     *   - `3.` let `subrec = rec.getSubrecord({ fieldId })` to get a reference to the subrecord.
-     *   - `4.` if {@link hasNonTrivialKeys}(`subrecordOptions.fieldDict`),   set `subrec` = {@link processFieldDictionary}(`subrec`, `subrecordOptions.subrecordType`, `subrecordOptions.fieldDict`, {@link FieldDictTypeEnum.FIELD_DICT}) to set the subrecord's field values.
-     *   - `5.` if {@link hasNonTrivialKeys}(`subrecordOptions.sublistFieldDict`), 
-     *   - `6.` return rec
+     * - `Option A:` sublistId is not provided, assume that the subrecord is a subrecord of the main record. 
+     *   - `1.` let `subrec = rec.getSubrecord({ fieldId })` to get the subrecord. `if` subrec is `null` or `undefined`, `return` rec without processing subrecordOptions.
+     *   - `2.` `if` {@link hasNonTrivialKeys}(`subrecordOptions.fieldDict`): 
+     *      > `update` subrec = {@link processFieldDictionary}(`subrec`, `subrecordType`, `subrecordOptions.fieldDict`, {@link FieldDictTypeEnum.FIELD_DICT}) to set the subrecord's field values.
+     *   - `3.` `if` {@link hasNonTrivialKeys}(`subrecordOptions.sublistDict`):
+     *      > `for` each `[subrecSublistId, subrecSublistFieldDict]` in `subrecordOptions.sublistDict.entries()`:
+     *      > > `update` `subrec` = {@link processFieldDictionary}(`subrec`, `subrecordType`, `subrecSublistFieldDict`, {@link FieldDictTypeEnum.SUBLIST_FIELD_DICT}) to set the subrecord's sublist field values.
+     *   - `4.` `return` rec
      * - `Option B:` assume that the subrecord pertains to a sublistField in one of the main record's sublists.
-     *   - `1.` verify `rec.getSublists().includes(sublistId)` is true
-     *   - `2.` (maybe optional) verify `rec.getSublistFields({ sublistId }).includes(fieldId)` is true
-     *   - `3.` (maybe optional) `rec.hasSublistSubrecord({ fieldId })` is true -> there is an existing subrecord for the sublist fieldId
-     *   - `4.` validate that line index is valid for the sublistId i.e. within ( 0 <= line < rec.getLineCount(sublistId) ). 
-     *     - call `rec.insertLine({ sublistId, line: rec.getLineCount(sublistId) })` if necessary (insert new line at end of sublist).
-     *   - `5.` let subrec = `rec.getSublistSubrecord({ sublistId, fieldId, line })` to get a reference to the subrecord.
-     *   - `6.` if {@link hasNonTrivialKeys}(`subrecordOptions.fieldDict`),   set `subrec` =  {@link processFieldDictionary}(`subrec`, `subrecordOptions.subrecordType`, `subrecordOptions.sublistFieldDict`, {@link FieldDictTypeEnum.FIELD_DICT}) to set the subrecord's sublist field values.
-     *   - `7.` if {@link hasNonTrivialKeys}(`subrecordOptions.sublistFieldDict`), 
-     *   - `8.` return rec
+     *   - `1.` let `sublistSubrec = rec.getSublistSubrecord({ sublistId, fieldId, line })` to get the subrecord. `if` sublistSubrec is `null` or `undefined`, `return` rec without processing subrecordOptions.
+     *   - `2.` `if` {@link hasNonTrivialKeys}(`subrecordOptions.fieldDict`): 
+     *      > `update` sublistSubrec = {@link processFieldDictionary}(`sublistSubrec`, `subrecordType`, `subrecordOptions.fieldDict`, {@link FieldDictTypeEnum.FIELD_DICT}) to set the subrecord's field values.
+     *   - `3.` `if` {@link hasNonTrivialKeys}(`subrecordOptions.sublistDict`):
+     *      > `for` each `[subrecSublistId, subrecSublistFieldDict]` in `subrecordOptions.sublistDict.entries()`:
+     *      > > `update` `sublistSubrec` = {@link processFieldDictionary}(`sublistSubrec`, `subrecordType`, `subrecSublistFieldDict`, {@link FieldDictTypeEnum.SUBLIST_FIELD_DICT}) to set the subrecord's sublist field values.
+     *   - `4.` `return` rec
      */  
     function processSubrecordOptions(rec, recordType, subrecordOptions) {
         if (!rec || !subrecordOptions) {
             writeLog(LogTypeEnum.ERROR, `Invalid ${recordType} subrecordOptions`, 'rec and subrecordOptions are required');
             return rec;
         }
-        let { sublistId, fieldId, subrecordType, line, fieldDict, sublistFieldDict } = subrecordOptions;
-        if (!fieldId) {
-            writeLog(LogTypeEnum.ERROR, `Invalid ${recordType} subrecordOptions`, 'fieldId is required property of subrecordOptions');
+
+        let { parentSublistId, fieldId, subrecordType, line, fieldDict, sublistDict } = subrecordOptions;
+        if (!fieldId || typeof fieldId !== 'string') {
+            writeLog(LogTypeEnum.ERROR, `processSubrecordOptions() - Invalid ${recordType} processSubrecordOptions paramter`, '(fieldId: string) is required property of subrecordOptions');
             return rec;
         }
         fieldId = fieldId.toLowerCase();
-        try {
-            if (!sublistId) { // Option A - The subrecord corresponds to a body field of the main record.
-                let subrec = rec.getSubrecord({ fieldId }); // A.3
-                if (!subrec) {
-                    writeLog(LogTypeEnum.ERROR, 
-                        `Invalid fieldId: ${fieldId}`, 
-                        `subrecordOptions.fieldId: ${fieldId} not found in ${recordType}'s rec.getSubrecord({ fieldId }) -> return rec without processing subrecordOptions`
+        
+        if (!parentSublistId) { // Option A - The subrecord corresponds to a body field of the main record.
+            let subrec = rec.getSubrecord({ fieldId }); // A.3
+            if (!subrec) {
+                writeLog(LogTypeEnum.ERROR, 
+                    `processSubrecordOptions() - BODY SUBRECORD - Invalid rec.getSubrecord({fieldId}) parameter for recordType: ${recordType}`, 
+                    `subrec = rec.getSubrecord({ fieldId: ${fieldId} }) is null/undefined -> return rec without processing subrecordOptions`
+                );
+                return rec; // return rec without processing subrecord
+            }
+            if (hasNonTrivialKeys(fieldDict)) { // A.4 - rec.subrec.bodyFields - Process the body subrecord's body fields
+                subrec = processFieldDictionary(subrec, subrecordType, fieldDict, FieldDictTypeEnum.FIELD_DICT);
+            }
+            if (hasNonTrivialKeys(sublistDict)) { // A.5 - rec.subrec.sublists - Process the body subrecord's sublist fields
+                for (let [index, subrecordSublistId] of Object.entries(Object.keys(sublistDict))) {
+                    let sublistFieldDict = sublistDict[subrecordSublistId];
+                    subrecordSublistId = subrecordSublistId.toLowerCase();
+                    writeLog(LogTypeEnum.DEBUG, 
+                        `processSubrecordOptions() - BODY SUBRECORD - sublistDict.keys()[${index}] Processing body subrecord's sublist fields`, 
+                        `sublist's Grandparent's recordType=${recordType}, sublist's Parent's recordType=${subrecordType}, (subrecordSublistId: ${subrecordSublistId})`,
+                        `Attempting to set values in the following sublists of (subrecordType=${subrecordType}): ${Object.keys(sublistFieldDict)}`
                     );
-                    return rec; // return rec without processing subrecord
-                }
-                if (hasNonTrivialKeys(fieldDict)) { // A.4 - Process the subrecord's body fields
-                    subrec = processFieldDictionary(subrec, subrecordType, fieldDict, FieldDictTypeEnum.FIELD_DICT);
-                }
-                if (hasNonTrivialKeys(sublistFieldDict)) { // A.5 - Process the subrecord's sublist fields
-                    subrec = processFieldDictionary(subrec, subrecordType, sublistFieldDict, FieldDictTypeEnum.SUBLIST_FIELD_DICT);
-                }
-            } else if (sublistId && typeof sublistId === 'string') { // Option B - The subrecord pertains to a field in one of the main record's sublists.
-                sublistId = sublistId.toLowerCase();
-                if (!rec.getSublist({ sublistId })) {
-                    writeLog(LogTypeEnum.ERROR, 
-                        `processSubrecordOptions() Invalid rec.getSublistSubrecord() Parameter: sublistId`, 
-                        `rec.getSublist({sublistId: ${sublistId}}) did not return a sublist -> return rec without processing subrecordOptions`
-                    );
-                    return rec; // return rec without processing subrecord
-                }
-                line = validateSublistLine(rec, sublistId, line); // B.4
-                let subrec = rec.getSublistSubrecord({ sublistId, fieldId, line }); // B.5
-                if (!subrec) {
-                    writeLog(LogTypeEnum.ERROR, 
-                        `processSubrecordOptions() Invalid rec.getSublistSubrecord() Parameters`, 
-                        `getSublistRecord({sublistId: ${sublistId}, fieldId: ${fieldId}, line: ${line}}) did not return a subrecord -> return rec without processing subrecordOptions`
-                    );
-                    return rec; // return rec without processing subrecord
-                }
-                if (hasNonTrivialKeys(fieldDict)) { // B.6 - Process the sublist subrecord's body fields
-                    subrec = processFieldDictionary(subrec, subrecordType, fieldDict, FieldDictTypeEnum.FIELD_DICT);
-                }
-                if (hasNonTrivialKeys(sublistFieldDict)) { // B.7 - Process the sublist subrecord's sublist fields
                     subrec = processFieldDictionary(subrec, subrecordType, sublistFieldDict, FieldDictTypeEnum.SUBLIST_FIELD_DICT);
                 }
             }
-            return rec; // A.6 & B.8
-        } catch (e) {
-            writeLog(LogTypeEnum.ERROR, `Error in processSubrecordOptions()`, e);
-            return rec;
+        } else if (parentSublistId && typeof parentSublistId === 'string') { // Option B
+            let sublistSubrec = rec.getSublistSubrecord({ sublistId: parentSublistId, fieldId, line });
+            if (!sublistSubrec) {
+                writeLog(LogTypeEnum.ERROR, 
+                    `processSubrecordOptions() - SUBLIST SUBRECORD - Invalid rec.getSublistSubrecord(sublistId, fieldId, line) parameter(s) for recordType: ${recordType}`, 
+                    `sublistSubrec = rec.getSublistSubrecord({ sublistId: ${parentSublistId}, fieldId: ${fieldId}, line: ${line} }) is null/undefined -> return rec without processing subrecordOptions`
+                );
+                return rec; // return rec without processing subrecord
+            }
+            if (hasNonTrivialKeys(fieldDict)) { // rec.sublist.subrec.bodyFields - Process the parentSublistSubrecord's body fields
+                sublistSubrec = processFieldDictionary(sublistSubrec, subrecordType, fieldDict, FieldDictTypeEnum.FIELD_DICT);
+            }
+            if (hasNonTrivialKeys(sublistDict)) { // rec.sublist.subrec.sublists - Process the parentSublistSubrecord's sublistDict
+                for (let [index, subrecordSublistId] of Object.entries(Object.keys(sublistDict))) {
+                    let sublistFieldDict = sublistDict[subrecordSublistId];
+                    writeLog(LogTypeEnum.DEBUG, 
+                        `processSubrecordOptions() - SUBLIST SUBRECORD - sublistDict.keys()[${index}] Processing parentSublistSubrecord's sublist fields`, 
+                        `sublist's Grandparent recordType: ${recordType}, sublist's Parent recordType = subrecordType=${subrecordType}, (subrecordSublistId: ${subrecordSublistId})`,
+                        `Attempting to set values in the following sublist(s) of (subrecordType=${subrecordType}): ${Object.keys(sublistFieldDict)}`
+                    );
+                    sublistSubrec = processFieldDictionary(sublistSubrec, subrecordType, sublistFieldDict, FieldDictTypeEnum.SUBLIST_FIELD_DICT);
+                }
+            }
         }
+        return rec;
     }
 
+/**
+ * \@reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4687606306.html}
+ *  ~\node_modules\@hitc\netsuite-types\N\record.d.ts
+ * @typedef {Object} SetSubrecordOptions
+ * @property {string} [parentSublistId] - (If setting subrecord of a sublist) The internal ID of the parent record's sublist that contains a subrecord field. (e.g. vendor (the parent) has a sublist id 'addressbook')
+ * @property {string} fieldId - The internal ID of the field or sublistField that is a subrecord. (e.g. 'addressbookaddress'), 
+ * - If the subrecord is on the main record, use `rec.getSubrecord({fieldId})` = getSubrecord(options: GetFieldOptions): Omit<Record, "save">;
+ * - If the subrecord is in a sublist, use `rec.getSublistSubrecord({sublistId, fieldId})`
+ * @property {string} [subrecordType] - The record type of the subrecord. (e.g. 'address', 'inventorydetail', etc.)
+ * @property {number} [line] - The line number for the field. (i.e. index of the sublist row) defaults to new line. (can use record.getLineCount(sublistId) to get the number of lines in the sublist)
+ * @property {FieldDictionary} [fieldDict] - {@link FieldDictionary} = { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetFieldTextOptions}>, `valueFields`: Array<{@link SetFieldValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }.
+ * @property {SublistDictionary} [sublistDict] - {@link SublistDictionary} = Record<[`sublistId`: string], {@link SublistFieldDictionary}> = { `sublistId`: { `priorityFields`: Array<{@link SetSublistValueOptions}>, `textFields`: Array<{@link SetSublistTextOptions}>, `valueFields`: Array<{@link SetSublistValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> } }.
+ * - (if subrecord has own sublists) an object containing sublist IDs mapped to a dictionary of field IDs and values.
+ */
+
     /**
-     * @description Validate the line index for a sublist. 
-     * `If` the line index is out of bounds, `insert` a new line at the end 
-     * of the sublist and `return` it as the `new line index`.
+     * @description Validate the line index for a sublist. If the line index is out of bounds, insert a new line at the end of the sublist and return it as the new line index.
      * @param {any} rec a record or subrecord object
      * @param {string} sublistId id of rec's sublist
      * @param {number} line index in sublist
      * @returns {number} the input `line {number}` if valid, otherwise `insert` a new line at the end of the sublist and `return` it as the new line index. 
      */
     function validateSublistLine(rec, sublistId, line) {
+        if (!rec || !sublistId || (line === undefined || line === null || typeof line !== 'number')) {
+            writeLog(LogTypeEnum.ERROR, 'Invalid validateSublistLine() parameters', 'params (rec: Record, sublistId: string, and line: number) are required');
+        }
         const lineCount = rec.getLineCount({ sublistId });
         const lineIndexOutOfBounds = line < 0 || line >= lineCount;
         if (lineIndexOutOfBounds) {
@@ -381,9 +367,9 @@ define(['N/record', 'N/log'], (record, log) => {
     }
 
     /**
-     * @TODO - decide if this is necessary abstraction or if should just use Array.isArray() and arr.length > 0 everywhere
+     * @TODO decide if this function is necessary or if should be removed.
      * @param {any} arr 
-     * @returns {boolean} true if arr is an array and has at least one element, false otherwise.
+     * @returns {boolean} `true` if arr is an array and has at least one element, `false` otherwise.
      */
     const isNonEmptyArray = (arr) => {
         return Array.isArray(arr) && arr.length > 0;
@@ -423,7 +409,7 @@ define(['N/record', 'N/log'], (record, log) => {
         return false;
     }
     /**
-     * Calls NetSuite log module and pushes log with timestamp={@link getCurrentPacificTime}() to {@link logArray} to return at end of post request.
+     * Calls NetSuite log module and pushes log with timestamp to {@link logArray} to return at end of post request.
      * @reference ~\node_modules\@hitc\netsuite-types\N\log.d.ts
      * @param {LogTypeEnum} type {@link LogTypeEnum}
      * @param {string} title 
@@ -555,54 +541,55 @@ const OptionsArrayLabelEnum = {
  * \@notimplemented CreateRecordOptions.defaultValues - {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4267255811.html#bridgehead_4423371543:~:text=the%20sublist%20type.-,N/record%20Default%20Values,-You%20can%20specify}
  * 
  * @typedef {Object} CreateRecordOptions
- * @property {RecordTypeEnum} recordType - The record type to create, see {@link RecordTypeEnum} (e.g., 'assemblyitem', 'bom', 'inventoryitem', 'customer', 'salesorder', etc.)
+ * @property {RecordTypeEnum} recordType - The record type to create, see {@link RecordTypeEnum}
  * @property {boolean} [isDynamic=false] - (optional) Indicates if the record should be created in dynamic mode. Default is false. see {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4296707316.html}
  * @property {FieldDictionary} [fieldDict] a dictionary of field IDs and values.
- * - {@link FieldDictionary} = { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetFieldTextOptions}>, `valueFields`: Array<{@link SetFieldValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }.
+ * - {@link FieldDictionary} = { priorityFields: Array<{@link SetFieldValueOptions}>, textFields: Array<{@link SetFieldTextOptions}>, valueFields: Array<{@link SetFieldValueOptions}>, subrecordFields: Array<{@link SetSubrecordOptions}> }.
  * @property {SublistDictionary} [sublistDict] an object containing sublist IDs mapped to a dictionary of field IDs and values.
- * - {@link SublistDictionary} = Record<[sublistId: string], {@link SublistFieldDictionary}> = { `sublistId`: { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetSublistTextOptions}>, `valueFields`: Array<{@link SetSublistValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> } }.
+ * - Record<[sublistId: string], {@link SublistFieldDictionary}> = { sublistId: { priorityFields: Array<{@link SetFieldValueOptions}>, textFields: Array<{@link SetSublistTextOptions}>, valueFields: Array<{@link SetSublistValueOptions}>, subrecordFields: Array<{@link SetSubrecordOptions}> } }.
  */
 
 /**
- * @typedef {Record<string, SublistFieldDictionary>} SublistDictionary = Record\<[`sublistId`: string], {@link SublistFieldDictionary}> an object containing sublist IDs mapped to a dictionary of field IDs and values.
+ * @typedef {Record<string, SublistFieldDictionary>} SublistDictionary = Record\<[sublistId: string], {@link SublistFieldDictionary}> an object containing sublist IDs mapped to a dictionary of field IDs and values.
  */
+
 
 // FieldDictionary
 /**
  * Fields organized by the fields' value type
- * - priorityFields (optional) are set first
+ * - priorityFields (optional) are set first, then textFields, then valueFields
  * @typedef {Object} FieldDictionary
  * @property {Array.<SetFieldValueOptions>} [priorityFields] - priorityFields are set first. Useful if creating records in dynamic mode {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4296707316.html}
- * - Array<{@link SetFieldValueOptions}> = Array<{`fieldId`: string, `value`: {@link FieldValue}}>. 
+ * - Array<{@link SetFieldValueOptions}> = Array<{fieldId: string, value: {@link FieldValue}}>. 
  * - For record fields: record.setValue(fieldId, value)
  * @property {Array.<SetFieldTextOptions>} [textFields] 
- * - Array<{@link SetFieldTextOptions}> = Array<{`fieldId`: string, `text`: string}>. 
+ * - Array<{@link SetFieldTextOptions}> = Array<{fieldId: string, text: string}>. 
  * - For record fields: record.setText(fieldId, text)
  * @property {Array.<SetFieldValueOptions>} [valueFields] 
- * - Array<{@link SetFieldValueOptions}> = Array<{`fieldId`: string, `value`: {@link FieldValue}}>. 
+ * - Array<{@link SetFieldValueOptions}> = Array<{fieldId: string, value: {@link FieldValue}}>. 
  * - For record fields: record.setValue(fieldId, value)
  * @property {Array.<SetSubrecordOptions>} [subrecordFields] 
- * - Array<{@link SetSubrecordOptions}> = Array<{`sublistId`: string=undefined, `fieldId`: string, `subrecordType`: string, `line`: number=undefined, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}}>.
- * - subrecords corresponding to a body field in the main record
+ * - Array<{@link SetSubrecordOptions}> = Array<{sublistId: string=undefined, fieldId: string, subrecordType: string, line: number=undefined, fieldDict: {@link FieldDictionary}, sublistDict: {@link SublistDictionary}}>.
+ * - subrecords of the main record
  */
 
 // SublistFieldDictionary
 /**
  * Set a record's sublist's field values organized by field type
- * - priorityFields `(optional)` are set first
+ * - priorityFields (optional) are set first, then textFields, then valueFields
  * @typedef {Object} SublistFieldDictionary
- * @property {Array.<SetFieldValueOptions>} [priorityFields] - `(optional)` priorityFields are set first. Useful if creating records in dynamic mode {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4296707316.html}
- * - Array<{@link SetFieldValueOptions}> = Array<{`fieldId`: string, `value`: {@link FieldValue}}>. 
+ * @property {Array.<SetFieldValueOptions>} [priorityFields] - (optional) priorityFields are set first. Useful if creating records in dynamic mode {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4296707316.html}
+ * - Array<{@link SetFieldValueOptions}> = Array<{fieldId: string, value: {@link FieldValue}}>. 
  * - For record fields: record.setSublistValue(fieldId, value)
  * @property {Array.<SetSublistTextOptions>} [textFields] 
- * - Array<{@link SetSublistTextOptions}> = Array<{`sublistId`: string, `fieldId`: string, `line`: number, `text`: string}>. 
+ * - Array<{@link SetSublistTextOptions}> = Array<{sublistId: string, fieldId: string, line: number, text: string}>. 
  * - For record sublist fields: rec.setSublistText(sublistId, fieldId, line, text)
  * @property {Array.<SetSublistValueOptions>} [valueFields]  
- * - Array<{@link SetSublistValueOptions}> = Array<{`sublistId`: string, `fieldId`: string, `line`: number, `value`: {@link FieldValue}}>. 
+ * - Array<{@link SetSublistValueOptions}> = Array<{sublistId: string, fieldId: string, line: number, value: {@link FieldValue}}>. 
  * - For record sublist fields: rec.setSublistValue(sublistId, fieldId, line, value)
  * @property {Array.<SetSubrecordOptions>} [subrecordFields]
- * - Array<{@link SetSubrecordOptions}> = Array<{`sublistId`: string, `fieldId`: string, `subrecordType`: string, `line`: number, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}}>.
- * - subrecords corresponding to a field in a record's sublist
+ * - Array<{@link SetSubrecordOptions}> = Array<{sublistId: string, fieldId: string, subrecordType: string, line: number, fieldDict: {@link FieldDictionary}, sublistDict: {@link SublistDictionary}}>.
+ * - subrecords of a main record's sublist
  */
 
 // FieldValue
@@ -652,20 +639,6 @@ const OptionsArrayLabelEnum = {
  * - = {Date | number | number[] | string | string[] | boolean | null}
  */
 
-/**
- * \@reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4687606306.html}
- *  ~\node_modules\@hitc\netsuite-types\N\record.d.ts
- * @typedef {Object} SetSubrecordOptions
- * @property {string} [sublistId] - (If setting subrecord of a sublist) The internal ID of the parent record's sublist that contains a subrecord field. (e.g. 'addressbook')
- * @property {string} fieldId - The internal ID of the field or sublistField that is a subrecord. (e.g. 'addressbookaddress), 
- * - If the subrecord is on the main record, use getSubrecord({fieldId}) = getSubrecord(options: GetFieldOptions): Omit<Record, "save">;
- * - If the subrecord is in a sublist, use rec.getSublistSubrecord({sublistId, fieldId})
- * @property {string} [subrecordType] - The record type of the subrecord. (e.g. 'address', 'inventorydetail', etc.)
- * @property {number} [line] - The line number for the field. (i.e. index of the sublist row) defaults to new line. (can use record.getLineCount(sublistId) to get the number of lines in the sublist)
- * @property {FieldDictionary} [fieldDict] - {@link FieldDictionary} = { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetFieldTextOptions}>, `valueFields`: Array<{@link SetFieldValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }
- * @property {SublistFieldDictionary} [sublistFieldDict] - {@link SublistFieldDictionary} = { `priorityFields`: Array<{@link SetSublistValueOptions}>, `textFields`: Array<{@link SetSublistTextOptions}>, `valueFields`: Array<{@link SetSublistValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }
- * - (if subrecord has own sublists)
- */
 
 /**
  * @enum {string} RecordTypeEnum

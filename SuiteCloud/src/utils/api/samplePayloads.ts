@@ -36,7 +36,7 @@ export const MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS: CreateRecordOptions = 
             ],
             subrecordFields: [
                 {
-                    sublistId: 'addressbook',
+                    parentSublistId: 'addressbook',
                     line: 0,
                     fieldId: 'addressbookaddress',
                     subrecordType: 'address',
@@ -60,7 +60,7 @@ export const MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS: CreateRecordOptions = 
 
 
 const ODEGAARD_ADDRESS_SUBRECORD_OPTIONS: SetSubrecordOptions = {
-    sublistId: 'addressbook',
+    parentSublistId: 'addressbook',
     line: 0,
     fieldId: 'addressbookaddress',
     subrecordType: 'address',
@@ -79,7 +79,7 @@ const ODEGAARD_ADDRESS_SUBRECORD_OPTIONS: SetSubrecordOptions = {
 } as SetSubrecordOptions
 
 const SUZZALLO_ADDRESS_SUBRECORD_OPTIONS: SetSubrecordOptions = {
-    sublistId: 'addressbook',
+    parentSublistId: 'addressbook',
     line: 1,
     fieldId: 'addressbookaddress',
     subrecordType: 'address',
