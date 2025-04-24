@@ -35,9 +35,10 @@ async function main() {
             console.error('Access token is undefined. Cannot call RESTlet.');
             STOP_RUNNING();
         }
-    
-        const scriptId = REST_SCRIPTS.POST_BatchCreateRecord.scriptId as number;
-        const deployId = REST_SCRIPTS.POST_BatchCreateRecord.deployId as number;  
+
+        const currentScriptName = 'POST_BatchCreateRecord'; 
+        const currentScriptId = REST_SCRIPTS[currentScriptName].scriptId as number;
+        const currentDeployId = REST_SCRIPTS[currentScriptName].deployId as number;
         const vendorBatch: BatchCreateRecordRequest = {
             createRecordArray: [
                 MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS, 
@@ -46,11 +47,11 @@ async function main() {
         }
         let response = await callPostRestletWithPayload(
             accessToken,
-            scriptId,
-            deployId,
+            currentScriptId,
+            currentDeployId,
             vendorBatch
         );
-        writeObjectToJson(await response.data, 'BatchCreateRecordResponse.json', OUTPUT_DIR, 4, true);
+        writeObjectToJson(await response.data, `${currentScriptName}_Response.json`, OUTPUT_DIR, 4, true);
         // console.log('Response.data.length', await response.data.length);
     } catch (error) {
         console.error('Error in main.ts main()', error);
@@ -85,8 +86,8 @@ export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): bool
         const lastUpdatedTime = String(tokenResponse?.lastUpdated);
         const tokenLifespan = Number(tokenResponse?.expires_in);
         const msDiff = calculateDifferenceOfDateStrings(lastUpdatedTime, currentTime, TimeUnitEnum.MILLISECONDS, true) as number;
-        const haveExpired = (msDiff != 0 && msDiff >= tokenLifespan * 1000) ? true : false;
-        console.log(`(msDiff != 0 && msDiff >= tokenLifespan * 1000) ? true : false -> needToRefresh = ${haveExpired}`);
+        const haveExpired = (msDiff != 0 && msDiff >= tokenLifespan * 1000)
+        console.log(`\t(${msDiff} != 0 && ${msDiff} >= ${tokenLifespan} * 1000) = ${haveExpired}`);
         return haveExpired;
     } catch (error) {
         console.error('Error in localTokensHaveExpired(), return default (true):', error);

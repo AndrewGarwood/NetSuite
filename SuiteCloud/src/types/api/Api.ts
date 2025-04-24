@@ -223,7 +223,7 @@ export interface SetSublistValueOptions {
 
 /**
  * @interface SetSubrecordOptions
- * @property {string} [sublistId] - (If setting subrecord of a sublist) The internal ID of the parent record's sublist that contains a subrecord field. (e.g. 'addressbook')
+ * @property {string} [parentSublistId] - (If setting subrecord of a sublist) The internal ID of the parent record's sublist that contains a subrecord field. (e.g. 'addressbook')
  * @property {number} [line] - The line number for the field. (i.e. index of the sublist row) defaults to new line. (can use record.getLineCount(sublistId) to get the number of lines in the sublist)
  * @property {string} fieldId - The internal ID of the field or sublistField that is a subrecord. (e.g. 'addressbookaddress'), 
  * - If the subrecord is on the main record, use getSubrecord({fieldId}) = getSubrecord(options: GetFieldOptions): Omit<Record, "save">;
@@ -254,7 +254,7 @@ export interface SetSublistValueOptions {
  *   - `8.` return rec
  */  
 export interface SetSubrecordOptions {
-    sublistId?: string;
+    parentSublistId?: string;
     line?: number;
     fieldId: string;
     subrecordType: string;
