@@ -5,63 +5,106 @@
 import { 
     SublistDictionary, CreateRecordOptions, FieldDictionary, 
     SetSublistTextOptions, SetSubrecordOptions, SublistFieldDictionary, 
-    SetSublistValueOptions 
+    SetSublistValueOptions, 
+    SetFieldValueOptions
 } from "src/types/api/Api"
-import { NetSuiteCountryEnum } from "src/types/NS/Enums"
+import { NetSuiteCountryEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES } from "src/types/NS"
 import { RecordTypeEnum } from "src/types/NS/Record"
 
-export const subrecOptions: SetSubrecordOptions = {
-    sublistId: 'addressbook',
-    fieldId: 'addressbookaddress',
-    subrecordType: 'address',
-    fieldDict: {
-        valueFields: [
-            { fieldId: 'country', value: 'US'},//NetSuiteCountryEnum.UNITED_STATES },
-            { fieldId: 'addr1', value: 'test addr1' },
-            { fieldId: 'addressee', value: 'test addressee' },
-            { fieldId: 'city', value: 'test city' },
-            { fieldId: 'state', value: 'test state' },
-            { fieldId: 'zip', value: 'test zip' },
-        ]
-    } as FieldDictionary,
-    line: 0,
-}
-export const singleReq: CreateRecordOptions = {
+const NOT_INACTIVE = false;
+const NOT_DYNAMIC = false;
+// const IS_INACTIVE = true;
+
+export const MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS: CreateRecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
-    isDynamic: false,
+    isDynamic: NOT_DYNAMIC,
     fieldDict: {
-        textFields: [
-            { fieldId: 'companyname', text: 'test vendor company name' },
-            { fieldId: 'entityid', text: 'Test Vendor entityid' },
-            { fieldId: 'externalid', text: 'test vendor externalid' },
-        ],
         valueFields: [
-            { fieldId: 'isinactive', value: false },
-        ],
-    },
+            { fieldId: 'companyname', value: 'City of Mission Viejo' },
+            { fieldId: 'isinactive', value: NOT_INACTIVE },
+        ] as SetFieldValueOptions[],
+    } as FieldDictionary,
     sublistDict: {
         'addressbook': {
-            textFields: [
+            valueFields: [
                 { 
                     sublistId: 'addressbook', 
                     fieldId: 'label', 
                     line: 0, 
-                    text: 'test label from recOptions.sublistDict.addressbook.textFields[0].text' 
-                } as SetSublistTextOptions,
+                    value: 'Primary Address' 
+                } as SetSublistValueOptions,    
             ],
-            subrecordFields: [subrecOptions]
+            subrecordFields: [
+                {
+                    sublistId: 'addressbook',
+                    line: 0,
+                    fieldId: 'addressbookaddress',
+                    subrecordType: 'address',
+                    fieldDict: {
+                        valueFields: [
+                            { fieldId: 'country', value: COUNTRIES.UNITED_STATES},
+                            { fieldId: 'addr1', value: '100 Civic Center' },
+                            { fieldId: 'addressee', value: 'Library Addressee' },
+                            { fieldId: 'attention', value: 'Library Attention' },
+                            { fieldId: 'addrphone', value: '949-830-7100' },
+                            { fieldId: 'city', value: 'Mission Viejo' },
+                            { fieldId: 'state', value: STATES.CALIFORNIA },
+                            { fieldId: 'zip', value: '92691' },
+                        ]
+                    } as FieldDictionary,
+                } as SetSubrecordOptions
+            ] as SetSubrecordOptions[],
         } as SublistFieldDictionary
-    },
+    } as SublistDictionary,
 }
 
-export const alternateSingleReq: CreateRecordOptions = {
-    recordType: RecordTypeEnum.VENDOR,
-    isDynamic: false,
+
+const ODEGAARD_ADDRESS_SUBRECORD_OPTIONS: SetSubrecordOptions = {
+    sublistId: 'addressbook',
+    line: 0,
+    fieldId: 'addressbookaddress',
+    subrecordType: 'address',
     fieldDict: {
         valueFields: [
-            { fieldId: 'isinactive', value: false },
-            { fieldId: 'companyname', value: 'CoolTest Company' },
-            { fieldId: 'externalid', value: 'coolExternalId' },
+            { fieldId: 'country', value: COUNTRIES.UNITED_STATES },
+            { fieldId: 'addr1', value: '4060 George Washington Ln.' },
+            { fieldId: 'addr2', value: 'Room 326' },
+            { fieldId: 'addressee', value: 'dubs' },
+            { fieldId: 'addrphone', value: '206-543-2990' },
+            { fieldId: 'city', value: 'Seattle' },
+            { fieldId: 'state', value: STATES.WASHINGTON },
+            { fieldId: 'zip', value: '98105' },
+        ]
+    } as FieldDictionary,
+} as SetSubrecordOptions
+
+const SUZZALLO_ADDRESS_SUBRECORD_OPTIONS: SetSubrecordOptions = {
+    sublistId: 'addressbook',
+    line: 1,
+    fieldId: 'addressbookaddress',
+    subrecordType: 'address',
+    fieldDict: {
+        valueFields: [
+            { fieldId: 'country', value: COUNTRIES.UNITED_STATES},
+            { fieldId: 'addr1', value: '4000 15th Ave NE' },
+            { fieldId: 'addr2', value: 'Room 102' },
+            { fieldId: 'addressee', value: 'dubs' },
+            { fieldId: 'addrphone', value: '206-543-0242' },
+            { fieldId: 'city', value: 'Seattle' },
+            { fieldId: 'state', value: STATES.WASHINGTON },
+            { fieldId: 'zip', value: '98195' },
+        ]
+    } as FieldDictionary,
+}
+
+export const UW_LIBRARIES_CREATE_VENDOR_OPTIONS: CreateRecordOptions = {
+    recordType: RecordTypeEnum.VENDOR,
+    isDynamic: NOT_DYNAMIC,
+    fieldDict: {
+        valueFields: [
+            { fieldId: 'companyname', value: 'UW Libraries' },
+            { fieldId: 'isinactive', value: NOT_INACTIVE },
+            { fieldId: 'externalid', value: 'UW_LIBRARIES' },
         ],
     } as FieldDictionary,
     sublistDict: {
@@ -72,28 +115,18 @@ export const alternateSingleReq: CreateRecordOptions = {
                     fieldId: 'label', 
                     line: 0, 
                     value: 'Odegaard Library' 
+                } as SetSublistValueOptions,                
+                { 
+                    sublistId: 'addressbook', 
+                    fieldId: 'label', 
+                    line: 1, 
+                    value: 'Suzzallo and Allen Libraries' 
                 } as SetSublistValueOptions,
-            ],
+            ] as SetSublistValueOptions[],
             subrecordFields: [
-                {
-                    sublistId: 'addressbook',
-                    fieldId: 'addressbookaddress',
-                    subrecordType: 'address',
-                    line: 0,
-                    fieldDict: {
-                        valueFields: [
-                            { fieldId: 'country', value: 'US' },
-                            { fieldId: 'addr1', value: '4060 George Washington Ln.' },
-                            { fieldId: 'addr2', value: 'Room 326' },
-                            { fieldId: 'addressee', value: 'dubs' },
-                            { fieldId: 'addrphone', value: '999-999-9999' },
-                            { fieldId: 'city', value: 'Seattle' },
-                            { fieldId: 'state', value: 'WA' },
-                            { fieldId: 'zip', value: '98105' },
-                        ]
-                    } as FieldDictionary,
-                } as SetSubrecordOptions
-            ],
+                ODEGAARD_ADDRESS_SUBRECORD_OPTIONS, 
+                SUZZALLO_ADDRESS_SUBRECORD_OPTIONS
+            ] as SetSubrecordOptions[],
         } as SublistFieldDictionary
-    } as Record<string, SublistFieldDictionary>,
+    } as SublistDictionary,
 }

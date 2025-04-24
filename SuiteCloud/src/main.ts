@@ -1,9 +1,10 @@
 import { readJsonFileAsObject, writeObjectToJson, getCurrentPacificTime, calculateDifferenceOfDateStrings, TimeUnitEnum, printConsoleGroup } from "./utils/io";
-import { callPostRestletWithPayload, singleCreateRecordOptions, alternateCreateRecordOptions } from "./utils/api";
+import { callPostRestletWithPayload, MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS, UW_LIBRARIES_CREATE_VENDOR_OPTIONS } from "./utils/api";
 import { DATA_DIR, OUTPUT_DIR, STOP_RUNNING, SCRIPT_ENVIORNMENT as SE, CLOSE_SERVER } from "./config/env";
+import { RecordTypeEnum } from "./types/NS/Record";
 import { initiateAuthFlow, getAuthCode, exchangeAuthCodeForTokens, exchangeRefreshTokenForNewTokens } from "./server/authServer";
-import { TokenResponse } from "./types/auth";
-import { CreateRecordOptions, CreateRecordResponse, FieldDictionary, SublistFieldDictionary, SetSublistTextOptions, BatchCreateRecordRequest, BatchCreateRecordResponse, SetSubrecordOptions } from "./types/api/";
+import { TokenResponse } from "./types/auth/TokenResponse";
+import { CreateRecordOptions, CreateRecordResponse, FieldDictionary, SublistFieldDictionary, SetSublistTextOptions, BatchCreateRecordRequest, BatchCreateRecordResponse, SetSubrecordOptions } from "./types/api/Api";
 import { ScriptDictionary } from "./types/NS/SuiteScriptEnvironment";
 
 const REST_SCRIPTS = SE.sandbox?.restlet || {} as ScriptDictionary;
@@ -16,13 +17,13 @@ const NO_REFRESH_TOKEN_AVAILABLE = false;
 async function main() {
     let accessToken = readJsonFileAsObject(STEP3_TOKENS_PATH)?.access_token || readJsonFileAsObject(STEP2_TOKENS_PATH)?.access_token ||  '';
     let refreshToken = readJsonFileAsObject(STEP2_TOKENS_PATH)?.refresh_token || '';
-    let areTokensExpired = localTokensHaveExpired(STEP3_TOKENS_PATH) || localTokensHaveExpired(STEP2_TOKENS_PATH);
+    let areTokensExpired = localTokensHaveExpired(STEP3_TOKENS_PATH) && localTokensHaveExpired(STEP2_TOKENS_PATH);
     try {
-        if (!accessToken || (areTokensExpired && refreshToken)) {
-            console.log('Access token is expired or undefined. Initiating auth flow...');
+        if ((!accessToken || areTokensExpired) && refreshToken) {
+            console.log('Access token is expired or undefined. Initiating auth flow from exchangeRefreshTokenForNewTokens()...');
             let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_AVAILABLE, STEP2_TOKENS_PATH) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
-        } else if (areTokensExpired && !refreshToken) {
+        } else if ((!accessToken || areTokensExpired) && !refreshToken) {
             console.log('Access token is expired or undefined. Refresh token is also undefined. Initiating auth flow from the beginning...');
             let tokenRes: TokenResponse = await initiateAuthFlow(NO_REFRESH_TOKEN_AVAILABLE, STEP2_TOKENS_PATH) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
@@ -35,15 +36,22 @@ async function main() {
             STOP_RUNNING();
         }
     
-        const scriptId = REST_SCRIPTS.POST_CreateRecord.scriptId as number;
-        const deployId = REST_SCRIPTS.POST_CreateRecord.deployId as number;  
+        const scriptId = REST_SCRIPTS.POST_BatchCreateRecord.scriptId as number;
+        const deployId = REST_SCRIPTS.POST_BatchCreateRecord.deployId as number;  
+        const vendorBatch: BatchCreateRecordRequest = {
+            createRecordArray: [
+                MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS, 
+                UW_LIBRARIES_CREATE_VENDOR_OPTIONS
+            ],
+        }
         let response = await callPostRestletWithPayload(
             accessToken,
             scriptId,
             deployId,
-            alternateCreateRecordOptions
+            vendorBatch
         );
-        console.log('Response from RESTlet:', JSON.stringify(response.data, null, 4));
+        writeObjectToJson(await response.data, 'BatchCreateRecordResponse.json', OUTPUT_DIR, 4, true);
+        // console.log('Response.data.length', await response.data.length);
     } catch (error) {
         console.error('Error in main.ts main()', error);
         throw error;
