@@ -4,10 +4,10 @@
  * @module Csv
  */
 
-import { FieldValue } from "../api/";
+import { FieldValue } from "../api/Api";
 /** 
  * Mapping of original column names to NetSuite column names
- * - Record<string, string>, an entry = [originalKey, newKey] 
+ * - Record<string, string>, entry = [originalKey, newKey(s)] 
  */
 export type ColumnMapping = Record<string, string | string[]>;
 
@@ -39,7 +39,7 @@ export type ValueMapping = Record<string, FieldValue | ValueMappingEntry>;
  * @Notes
  * - `T extends ColumnMapping` - ensures that T is an object with string keys and string values, see {@link ColumnMapping}
  * Mapped Type Syntax: `{ [K in keyof T as T[K]]: string }`
- * - ` [K in keyof T` - iterates over the keys of T using "keyof T" and creates a new object type. 
+ * - ` [K in keyof T` - iterates over the keys of T using `keyof T` and creates a new object type. 
  *   - For each key K in T, the ` as T[K]` clause renames the key in the resulting type to the value of T[K]
  *   - ` as T[K]]}` transforms the keys of the resulting type. Instead of keeping the original keys from T, it uses the values of T as the new keys
  * - `: string`- specifies that the value type of the new object is always a string.

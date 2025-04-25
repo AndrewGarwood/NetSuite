@@ -14,8 +14,6 @@ import { writeObjectToJson, getCurrentPacificTime, readJsonFileAsObject, printCo
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
-// Add this line to serve static files from the public directory
-// app.use(express.static(path.join(__dirname, 'public')));
 
 /**@see {@link Server} */
 let server: any;

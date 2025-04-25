@@ -92,7 +92,6 @@ const idPropertyEnum = {
 
 /**
  * @enum {string} RecordTypeEnum
- * @readonly
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  * @property {string} ACCOUNT - account
  * @property {string} ACCOUNTING_BOOK - accountingbook
@@ -377,6 +376,7 @@ const idPropertyEnum = {
  * @property {string} WORK_ORDER_ISSUE - workorderissue
  * @property {string} WORKPLACE - workplace
  * @property {string} ZONE - zone
+ * @readonly
  */
 const RecordTypeEnum = { // As of 4 June 2024
     ACCOUNT: 'account',

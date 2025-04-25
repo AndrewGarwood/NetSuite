@@ -16,11 +16,20 @@ export const READLINE = readline.createInterface({ input, output });
 // const answer = await rl.question('What do you think of Node.js? ');
 
 
-/**@description Exit the program/script for debugging purposes @returns {void}*/
-export const STOP_RUNNING = (): void => {
-    process.exit(1);
+/**
+ * @description Exit the program/script for debugging purposes
+ * @param {number} exitCode - The exit code to use when exiting the program. Default is 0. Use 1 for error.
+ * @returns {void}
+ * */
+export const STOP_RUNNING = (exitCode: number=0): void => {
+    process.exit(exitCode);
 }
-/**@description Pause execution for specified amount of milliseconds @returns {Promise<void>}*/
+/**
+ * @description Pause execution for specified amount of milliseconds 
+ * * @param {number} ms - The number of milliseconds to pause execution for.
+ * @returns {Promise<void>}
+ * @example DELAY(1000) // pauses for 1 second
+ * */
 export const DELAY = (ms: number): Promise<void> => {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
