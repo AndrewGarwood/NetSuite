@@ -7,7 +7,7 @@ import { RecordRef } from './Record';
 import { ItemSourceEnum, UnitsEnum } from './Enums';
 
 /**
- * @reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/bomrevision.html
+ * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/bomrevision.html
  * @description Revision Components  belong to one Bill of Materials (BOM) Revision. A BOM Revision Component cannot exist without a BOM Revision. In NetSuite UI it’s represented as a Component sublist. The Advanced Bill of Materials feature must be enabled.
  * @interface BillOfMaterialsRevisionComponent
  * @property {RecordRef} item - ({@link RecordRef}) A reference to the component's associated Inventory Item record's internalId, externalId, or "Item Name/Number" field.

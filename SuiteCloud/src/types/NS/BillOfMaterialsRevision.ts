@@ -8,7 +8,7 @@ import { BillOfMaterialsRevisionComponent } from './BillOfMaterialsRevisionCompo
 
 /**
  * @interface BillOfMaterialsRevision
- * @reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/bomrevision.html
+ * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/bomrevision.html
  * @description Bill of Materials Revision record in NetSuite. A BOM Revision contains component items that are assembled to create another item. The Advanced Bill of Materials feature must be enabled.
  * @property {RecordRef} [billofmaterial] - ({@link RecordRef}) A reference to the Bill of Materials record.
  * @property {Date} [createddate] - The date this Bill of Materials was created.

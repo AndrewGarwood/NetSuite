@@ -2,7 +2,7 @@
  * @file Address.ts
  * @description TypeScript definition for the Address record and related objects in NetSuite.
  * @module Address
- * @reference {@link https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html}
+ * @reference {@link https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html}
 
  */
 
@@ -12,7 +12,7 @@ import { NetSuiteCountryEnum, CountryAbbreviationEnum, StateAbbreviationEnum } f
 /**
  * @interface Address
  * @description TypeScript definition for the Address record in NetSuite.
- * @reference {@link https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html}
+ * @reference {@link https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html}
  * 
  * @property {string} [addr1] - Address 1 - (street address line 1) Enter the address the way it should appear on forms. For employees, customers, partners, and vendors, what you enter here autofills on forms if this address is marked default for Shipping or Billing. Enter up to 50 characters. This field is required for the Online Bill Pay feature.
  * @property {string} [addr2] - Address 2 - (street address line 2) Enter an optional second address line the way it should appear on forms. For employees, customers, partners, and vendors, what you enter here autofills on forms if this address is marked default for Shipping or Billing. Enter up to 50 characters.
@@ -51,8 +51,8 @@ export interface Address {
 /**
  * @typedefn AddressBook
  * @description TypeScript definition for the Address Book record in NetSuite.
- * @reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/vendor.html#:~:text=addressbook%20%2D%20Address%20Book
- * @reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/other/vendoraddressbook.html?mode=package
+ * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/vendor.html#:~:text=addressbook%20%2D%20Address%20Book
+ * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/other/vendoraddressbook.html?mode=package
  * 
  * @property {Address} [addressbookaddress] - Address Book Address - The address book address.
  * @property {string} [addressid] - Address ID - The address ID.
@@ -74,7 +74,7 @@ export interface AddressBookEntry {
 export type AddressBook = AddressBookEntry[];
 
 /*
-@reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html
+@reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html
 
 */
 /*

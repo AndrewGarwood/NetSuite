@@ -181,7 +181,7 @@ export interface Vendor extends VendorBase {
 }
 
 export interface VendorSublists extends VendorBase {
-    /** @description addressbook sublist @reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/other/vendoraddressbooklist.html?mode=package*/
+    /** @description addressbook sublist @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/other/vendoraddressbooklist.html?mode=package*/
     addressbook?: AddressBook;
 }
 
