@@ -68,7 +68,7 @@ export enum EmailPreferenceEnum {
 /**
  * @enum {string} GlobalSubscriptionStatusEnum
  * @description Enum for global subscription status in NetSuite.
- * @reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/enum/globalsubscriptionstatus.html?mode=package
+ * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/enum/globalsubscriptionstatus.html?mode=package
  * @property {string} CONFIRMED_OPT_IN - Confirmed Opt In
  * @property {string} CONFIRMED_OPT_OUT - Confirmed Opt Out
  * @property {string} SOFT_OPT_IN - Soft Opt In
@@ -83,7 +83,7 @@ export enum GlobalSubscriptionStatusEnum {
 
 
 /**
- * @reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/enum/itemsource.html?mode=package
+ * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/enum/itemsource.html?mode=package
  * - Namespace: urn:types.common.platform.webservices.netsuite.com
  * @enum {string} ItemSourceEnum
  * @description Enum for item source types in NetSuite.
@@ -102,7 +102,7 @@ export enum ItemSourceEnum {
 
 
 /**
- * @reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/enum/country.html?mode=package
+ * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/enum/country.html?mode=package
  * - Namespace: urn:types.common.platform.webservices.netsuite.com
  * @enum {string} NetSuiteCountryEnum
  * @description Enum for country field in NetSuite records.
