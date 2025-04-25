@@ -2,8 +2,8 @@
  * @NApiVersion 2.1
  * @NScriptType Restlet
  * @NScriptName POST_BatchCreateRecord
- * @ProdNScriptId NOT_DEPLOYED
- * @ProdDeployId NOT_DEPLOYED
+ * @ProdNScriptId number
+ * @ProdDeployId number
  * @SbNScriptId number
  * @SbDeployId number
  */
@@ -122,8 +122,6 @@ define(['N/record', 'N/log'], (record, log) => {
                             `sublistDict[${sublistId}]: SublistFieldDictionary is undefined or null or not an object or empty.`);
                         continue; // continue to next sublist
                     }
-                    // writeLog(LogTypeEnum.DEBUG, `COMPARE 1 rec.getSublistFields({ sublistId})`, rec.getSublistFields({ sublistId }));
-                    // writeLog(LogTypeEnum.DEBUG, `COMPARE 2 rec.getSublist({ sublistId}).getFields()`, rec.getSublist({ sublistId }).getFields());
                     rec = processFieldDictionary(rec, recordType, sublistFieldDict, FieldDictTypeEnum.SUBLIST_FIELD_DICT);
                 }
             }

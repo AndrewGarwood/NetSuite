@@ -196,6 +196,14 @@ define(['N/record', 'N/log'], (record, log) => {
      * @returns {Object} rec - {Object} - The record with the field values set.
      */
     function processFieldDictionary(rec, recordType, dict, dictType) {
+        if (!rec || !recordType || !dict || !dictType) {
+            writeLog(LogTypeEnum.ERROR, 'Invalid processFieldDictionary() parameters', 'rec, recordType, dict, dictType are required');
+            return rec;
+        }
+        if (dictType !== FieldDictTypeEnum.FIELD_DICT && dictType !== FieldDictTypeEnum.SUBLIST_FIELD_DICT) {
+            writeLog(LogTypeEnum.ERROR, 'processFieldDictionary() Invalid dictType', `received dictType=${dictType} but dictType must be either ${FieldDictTypeEnum.FIELD_DICT} or ${FieldDictTypeEnum.SUBLIST_FIELD_DICT}`);
+            return rec;
+        }
         if (rec && dict && dictType === FieldDictTypeEnum.FIELD_DICT) {
             if (isNonEmptyArray(dict.priorityFields)) {
                 rec = setFieldsByOptionType(rec, recordType, SetOptionsEnum.FIELD_VALUE, dict.priorityFields, OptionsArrayLabelEnum.PRIORITY);
