@@ -30,51 +30,15 @@ import csv from 'csv-parser';
 import fs from 'fs';
 
 const NOT_DYNAMIC = false;
-// Example usage:
-const vendorParseOptions: ParseOptions[] = [{
-    recordType: RecordTypeEnum.VENDOR,
-    fieldDictParseOptions: {
-    fieldValueMapArray: [
-        { fieldId: 'entityid', colName: 'Vendor Name' },
-        { fieldId: 'email', colName: 'Primary Email' },
-        { fieldId: 'phone', colName: 'Main Phone' }
-    ],
-    subrecordMapArray: [] // No body subrecords
-    },
-    sublistDictParseOptions: {
-        addressbook: {
-            fieldValueMapArray: [
-                { 
-                    sublistId: 'addressbook', 
-                    line: 0, 
-                    fieldId: 'addr1', 
-                    colName: 'Street Address' 
-                },
-                { 
-                    sublistId: 'addressbook', 
-                    line: 0, 
-                    fieldId: 'city', 
-                    colName: 'City' 
-                }
-            ],
-            subrecordMapArray: []
-        }
-    }
-}];
 
-// Parse CSV with multiple record types in single file
-parseCsvToCreateOptions('vendors.csv', vendorParseOptions)
-    .then(createOptions => {
-        const batchRequest: BatchCreateRecordRequest = {
-            createRecordArray: createOptions
-        };
-        console.log('Generated batch request:', batchRequest);
-    })
-    .catch(console.error);
-
-
-
-
+/**
+ * 
+ * @param csvPath - The path to the CSV file.
+ * @param parseOptionsArray - `Array<`{@link ParseOptions}`>` 
+ * - = `{ recordType: `{@link RecordTypeEnum}, `fieldDictParseOptions: `{@link FieldDictionaryParseOptions}, `sublistDictParseOptions: `{@link SublistDictionaryParseOptions}` }[]`
+ * @returns `results` - `Promise<Array<`{@link CreateRecordOptions}`>>` 
+ * - = `{ recordType: `{@link RecordTypeEnum}, `isDynamic: boolean`, `fieldDict: `{@link FieldDictionary}, `sublistDict: `{@link SublistDictionary}` }[]`
+ */
 export async function parseCsvToCreateOptions(
     csvPath: string,
     parseOptionsArray: ParseOptions[]
@@ -114,6 +78,13 @@ export async function parseCsvToCreateOptions(
         });
 }
 
+/**
+ * @TODO maybe try to use {@link hasKeys} to validate the row object
+ * @param row - The CSV row to validate.
+ * @param fieldDict - {@link FieldDictionaryParseOptions} = `{ fieldValueMapArray: Array<`{@link FieldValueMapping}`>, subrecordMapArray: Array<`{@link FieldSubrecordMapping}`> }`
+ * @param sublistDict - {@link SublistDictionaryParseOptions} = `{ [sublistId: string]: { fieldValueMapArray: Array<`{@link SublistFieldValueMapping}`>, subrecordMapArray: Array<`{@link SublistSubrecordMapping}`> } }`
+ * @throws Error if any of the required fields are missing in the CSV row
+ */
 function validateFieldMappings(
     row: any,
     fieldDict: FieldDictionaryParseOptions,
@@ -140,9 +111,12 @@ function validateFieldMappings(
  * 
  * @param row 
  * @param recordType - {@link RecordTypeEnum}
- * @param fieldDictParseOptions - {@link FieldDictionaryParseOptions} = `{ fieldValueMapArray: Array<`{@link FieldValueMapping}`>, subrecordMapArray: Array<`{@link FieldSubrecordMapping}`> }`
- * @param sublistDictParseOptions - {@link SublistDictionaryParseOptions} = `{ [sublistId: string]: { fieldValueMapArray: Array<`{@link SublistFieldValueMapping}`>, subrecordMapArray: Array<`{@link SublistSubrecordMapping}`> } }`
- * @returns 
+ * @param fieldDictParseOptions - {@link FieldDictionaryParseOptions} 
+ * - = `{ fieldValueMapArray: Array<`{@link FieldValueMapping}`>, subrecordMapArray: Array<`{@link FieldSubrecordMapping}`> }`
+ * @param sublistDictParseOptions - {@link SublistDictionaryParseOptions} 
+ * - = `{ [sublistId: string]: { fieldValueMapArray: Array<`{@link SublistFieldValueMapping}`>, subrecordMapArray: Array<`{@link SublistSubrecordMapping}`> } }`
+ * @returns `createOptions` - {@link CreateRecordOptions} 
+ * - = `{ recordType: `{@link RecordTypeEnum}, `isDynamic: boolean`, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }`
  */
 export function generateCreateRecordOptions(
     row: Record<string, any>, 
@@ -209,7 +183,7 @@ export function generateSetSublistValueOptionsArray(
     row: Record<string, any>,
     sublistFieldValueMapArray: SublistFieldValueMapping[],
 ): SetSublistValueOptions[] {
-    let arr = [] as SetSublistValueOptions[];
+    const arr = [] as SetSublistValueOptions[];
     for (let [index, sublistFieldValueMap] of Object.entries(sublistFieldValueMapArray)) {
         let { sublistId, line, fieldId, colName } = sublistFieldValueMap;
         let rowValue: FieldValue = row[colName] || row[colName.toLowerCase()];
@@ -237,7 +211,7 @@ export function generateSetFieldValueOptionsArray(
     row: Record<string, any>, 
     fieldValueMapArray: FieldValueMapping[]
 ): SetFieldValueOptions[] {
-    let arr = [] as SetFieldValueOptions[];
+    const arr = [] as SetFieldValueOptions[];
     for (let fieldValueMap of fieldValueMapArray) {
         let { fieldId, colName } = fieldValueMap;
         let rowValue: FieldValue = row[colName] || row[colName.toLowerCase()];
@@ -261,7 +235,7 @@ export function generateSetSubrecordOptionsArray(
     parentType: FieldParentTypeEnum, 
     subrecordMapArray: FieldSubrecordMapping[] | SublistSubrecordMapping[]
 ): SetSubrecordOptions[] {
-    let arr = [] as SetSubrecordOptions[];    
+    const arr = [] as SetSubrecordOptions[];    
     if (parentType === FieldParentTypeEnum.BODY) {
         for (let subrecordMap of subrecordMapArray) {
             let { fieldId, subrecordType, fieldDictOptions, sublistDictOptions } = subrecordMap as FieldSubrecordMapping;
@@ -299,3 +273,47 @@ export function generateSetSubrecordOptionsArray(
     }
     return arr;
 }
+
+// Example usage:
+const vendorParseOptions: ParseOptions[] = [{
+    recordType: RecordTypeEnum.VENDOR,
+    fieldDictParseOptions: {
+    fieldValueMapArray: [
+        { fieldId: 'entityid', colName: 'Vendor Name' },
+        { fieldId: 'email', colName: 'Primary Email' },
+        { fieldId: 'phone', colName: 'Main Phone' }
+    ],
+    subrecordMapArray: [] // No body subrecords
+    },
+    sublistDictParseOptions: {
+        addressbook: {
+            fieldValueMapArray: [
+                { 
+                    sublistId: 'addressbook', 
+                    line: 0, 
+                    fieldId: 'addr1', 
+                    colName: 'Street Address' 
+                },
+                { 
+                    sublistId: 'addressbook', 
+                    line: 0, 
+                    fieldId: 'city', 
+                    colName: 'City' 
+                }
+            ],
+            subrecordMapArray: []
+        }
+    }
+}];
+
+// Parse CSV with multiple record types in single file
+parseCsvToCreateOptions('vendors.csv', vendorParseOptions)
+    .then(createOptions => {
+        const batchRequest: BatchCreateRecordRequest = {
+            createRecordArray: createOptions
+        };
+        console.log('Generated batch request:', batchRequest);
+    })
+    .catch(console.error);
+
+
