@@ -1,5 +1,5 @@
 /**
- * @file read_utils.ts
+ * @file src/utils/io/reading.ts
  */
 import fs from 'fs';
 import xlsx from 'xlsx';
@@ -8,7 +8,7 @@ import { Options as CsvOptions } from "csv-parser";
 import { Transform, pipeline, TransformOptions } from 'stream';
 import { FileExtensionResult } from '../../types/io/Reading';
 import { FieldValue } from 'src/types/api/';
-import {ValueMapping, ColumnMapping, isValueMappingEntry, DelimitedFileTypeEnum, MappedRow, DelimiterEnum } from '../../types/io/Csv';
+import {ValueMapping, ColumnMapping, isValueMappingEntry, DelimitedFileTypeEnum, MappedRow, DelimiterEnum } from '../../types/io/CsvMapping';
 
 /**
  * Parses a delimited text file (CSV/TSV) and maps columns to new names
@@ -135,7 +135,6 @@ export function transformValue(
     }
 }
 
-
 /**
  * Determines the proper delimiter based on file type or extension
  * @param filePath Path to the file
@@ -195,8 +194,6 @@ export function readJsonFileAsObject(filePath: string): { [s: string]: any; } | 
         return null;
     }
 }
-
-
 
 /**
  * @param {string} filePath string

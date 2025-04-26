@@ -1,10 +1,7 @@
 /**
- * @file Reading.ts
+ * @file src/types/io/Reading.ts
  * @description types for src/utils/io/reading.ts
  */
-
-
-
 
 /**
  * 

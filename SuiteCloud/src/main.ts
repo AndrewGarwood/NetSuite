@@ -52,7 +52,6 @@ async function main() {
             vendorBatch
         );
         writeObjectToJson(await response.data, `${currentScriptName}_Response.json`, OUTPUT_DIR, 4, true);
-        // console.log('Response.data.length', await response.data.length);
     } catch (error) {
         console.error('Error in main.ts main()', error);
         throw error;

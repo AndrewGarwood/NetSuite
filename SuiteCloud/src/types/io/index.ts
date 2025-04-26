@@ -9,18 +9,18 @@ import {
     isValueMappingEntry,
     DelimitedFileTypeEnum,
     DelimiterEnum
-} from './Csv'
+} from './CsvMapping'
 
 export {
     // Reading.ts
     FileExtensionResult,
     
-    // Csv.ts
+    // CsvMapping.ts
     ColumnMapping,
     MappedRow, 
     ValueMapping, 
     ValueMappingEntry, 
-    isValueMappingEntry,
     DelimitedFileTypeEnum,
-    DelimiterEnum
+    DelimiterEnum, 
+    isValueMappingEntry,
 }

@@ -1,7 +1,7 @@
 /**
  * @file src/types/NS/File.ts
  * @module File
- * @reference https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4205693274.html
+ * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4205693274.html}
  */
 
 /** 

@@ -21,7 +21,7 @@ export interface NetSuiteRecord {
 /**
  * @enum {string} RecordTypeEnum
  * @readonly
- * @reference NetSuiteDev\SuiteCloud\BenevACP\node_modules\@hitc\netsuite-types\N\record.d.ts
+ * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  * @reference {@link HITCRecord}
  * @property {string} ACCOUNT - account
  * @property {string} ACCOUNTING_BOOK - accountingbook
