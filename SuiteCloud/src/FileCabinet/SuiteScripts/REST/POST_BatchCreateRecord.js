@@ -19,23 +19,33 @@ define(['N/record', 'N/log'], (record, log) => {
     const logArray = [];
     
     /**
-     * @description POST function to create multiple records in NetSuite.
-     * @param {BatchCreateRecordRequest} reqBody {@link BatchCreateRecordRequest}
-     * @param {Array<CreateRecordOptions>} reqBody.createRecordArray
-     * Array<{@link CreateRecordOptions}> = { `recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary} }[]
+     * `createRecordArray` and `createRecordDict` are mutually exclusive
+     * @param {BatchCreateRecordRequest} reqBody - {@link BatchCreateRecordRequest} = `{ createRecordArray`: {@link CreateRecordOptions}`[], createRecordDict: {[K in `{@link RecordTypeEnum}`]?: Array<`{@link CreateRecordOptions}`>} }`
+     * @description POST function to create multiple records in NetSuite. Can create record in batches by defining the request's body, reqBody, in two ways: 
+     * @param {Array<CreateRecordOptions>} [reqBody.createRecordArray] `METHOD 1 —`
+     * `Array<`{@link CreateRecordOptions}`>` = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]`
      * - for `req` in `reqBody.createRecordArray`
      * > run function {@link processCreateRecordOptions}(`req`)
+     * @param {{[K in RecordTypeEnum]?: Array<CreateRecordOptions>}} [reqBody.createRecordDict] `METHOD 2 — `
+     * `Record<`[K in {@link RecordTypeEnum}]?: `Array<`{@link CreateRecordOptions}`>>`
+     * - for recordType in Object.keys(reqBody.createRecordDict)
+     * - - for req in reqBody.createRecordDict[recordType]
+     * - - - run function {@link processCreateRecordOptions}(`req`)
      * @returns {BatchCreateRecordResponse} .{@link BatchCreateRecordResponse}
      */
-    const post = (reqBody) => {
-        let createRecordArrayIsUndefined = !reqBody.createRecordArray || !Array.isArray(reqBody.createRecordArray);
-        if (createRecordArrayIsUndefined) {
-            writeLog(LogTypeEnum.ERROR, 'Invalid request body', 'Body must contain  "createRecordArray"?: Array<CreateRecordOptions>;');
-            throw new Error('Invalid request body: Body must contain  "createRecordArray"?: Array<CreateRecordOptions>;');
+    const post = (/**@description request body of {@link post}*/reqBody) => {
+        let { createRecordArray, createRecordDict } = reqBody;
+        let createRecordArrayIsInvalid = !createRecordArray || !Array.isArray(createRecordArray);
+        let createRecordDictIsInvalid = !createRecordDict || typeof createRecordDict !== 'object';
+        if (createRecordArrayIsInvalid && createRecordDictIsInvalid) {
+            writeLog(LogTypeEnum.ERROR, 'Invalid request body', 'Body must contain either "createRecordArray"?: Array<CreateRecordOptions>; or "createRecordDict"?: {[K in RecordTypeEnum]?: Array<CreateRecordOptions>;};');
+            throw new Error('Invalid request body: Body must contain either "createRecordArray"?: Array<CreateRecordOptions>; or "createRecordDict"?: {[K in RecordTypeEnum]?: Array<CreateRecordOptions>;};.');
+        } else if (!createRecordArrayIsInvalid && !createRecordDictIsInvalid) {
+            writeLog(LogTypeEnum.ERROR, 'Invalid request body, createRecordArray and createRecordDict are mutually exclusive', 'Body must contain either "createRecordArray"?: Array<CreateRecordOptions>; or "createRecordDict"?: {[K in RecordTypeEnum]?: Array<CreateRecordOptions>;}; but not both.');
+            throw new Error('Invalid request body: Body must contain either "createRecordArray"?: Array<CreateRecordOptions>; or "createRecordDict"?: {[K in RecordTypeEnum]?: Array<CreateRecordOptions>;}; but not both.');
         }
         /**@type {number[]} */
         let recIdArray = [];
-        let createRecordArray = reqBody.createRecordArray || [];
         try {
             writeLog(LogTypeEnum.AUDIT, 'reqBody.createRecordArray.length:', createRecordArray.length);
             if (createRecordArray.length > 0) {
@@ -48,7 +58,35 @@ define(['N/record', 'N/log'], (record, log) => {
                     } 
                     recIdArray.push(result);
                 }
-            }         
+            }   
+            writeLog(LogTypeEnum.AUDIT, 'Object.keys(reqBody.createRecordDict).length:', Object.keys(createRecordDict).length);
+            if (Object.keys(createRecordDict).length > 0) {
+                for (let [index, recordType] in Object.entries(Object.keys(createRecordDict))) {
+                    if (Object.keys(RecordTypeEnum).includes(recordType.toUpperCase())) {
+                        recordType = RecordTypeEnum[recordType.toUpperCase()];
+                    } else if (!Object.values(RecordTypeEnum).includes(recordType.toLowerCase())) {
+                        writeLog(LogTypeEnum.ERROR, 
+                            `Invalid recordType in createRecordDict[${recordType}] i.e. createRecordDict.keys()[${index}]`, 
+                            `Invalid recordType: "${recordType}". Must be a RecordTypeEnum key or one of RecordTypeEnum's values: [${Object.values(RecordTypeEnum).join(', ')}].`);
+                        continue;
+                    }
+                    let reqArray = createRecordDict[recordType];
+                    writeLog(LogTypeEnum.AUDIT, `createRecordDict[${recordType}].length:`, reqArray.length);
+                    if (!Array.isArray(reqArray)) {
+                        writeLog(LogTypeEnum.ERROR, `Invalid createRecordDict[${recordType}]`, 'createReqArray is not an array or is empty');
+                        continue;
+                    }
+                    for (let i = 0; i < reqArray.length; i++) {
+                        let createReq = reqArray[i];
+                        let result = processCreateRecordOptions(createReq);
+                        if (!result) {
+                            writeLog(LogTypeEnum.ERROR, `Error Processing createRecordDict[${recordType}][${i}]`, `value.element ${i} CreateRecordOptions`);
+                            continue;
+                        } 
+                        recIdArray.push(result);
+                    }
+                }
+            }      
             writeLog(LogTypeEnum.DEBUG, 'POST (BatchCreateRecordRequest) End', { recIdArrayLength: recIdArray.length });
             /**@type {BatchCreateRecordResponse}*/
             return { 
@@ -502,9 +540,10 @@ const FieldDictTypeEnum = {
  * Definition of Request body for the POST function in POST_BatchCreateRecord.js
  * @typedef {Object} BatchCreateRecordRequest
  * @property {Array<CreateRecordOptions>} [createRecordArray] 
- * `Array`<{@link CreateRecordOptions}> to create records in NetSuite.
+ * `Array<`{@link CreateRecordOptions}`>` to create records in NetSuite.
+ * @property {{[K in RecordTypeEnum]?: Array<CreateRecordOptions>}} [createRecordDict] 
+ * `Record<`[K in {@link RecordTypeEnum}]?: `Array<`{@link CreateRecordOptions}`>>` to create records in NetSuite.
 */
-
 /**
  * Definition of Response for the POST function in POST_BatchCreateRecord.js
  * @typedef {Object} BatchCreateRecordResponse
