@@ -1,3 +1,6 @@
+/**
+ * @file src/utils/io/writing.ts
+ */
 import fs from 'fs';
 import { OUTPUT_DIR } from 'src/config/env';
 import { getCurrentPacificTime } from './dateTime';

@@ -6,7 +6,7 @@
 
  */
 
-import { NetSuiteCountryEnum, CountryAbbreviationEnum, StateAbbreviationEnum } from "./Enums";
+import { NetSuiteCountryEnum, CountryAbbreviationEnum, StateAbbreviationEnum } from "../Enums";
 
 
 /**

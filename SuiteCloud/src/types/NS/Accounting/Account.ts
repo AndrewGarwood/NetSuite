@@ -4,7 +4,7 @@
  * @description TypeScript definitions for Accounting fields in NetSuite.
  * @module Accounting
  */
-import { RecordRef } from './Record';
+import { RecordRef } from '../Record';
 export type ItemAccountingBookDetail = {
     accountingBook?: RecordRef;
     amortizationTemplate?: RecordRef;

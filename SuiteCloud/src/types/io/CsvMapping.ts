@@ -1,10 +1,16 @@
 /**
- * @file src/types/io/Csv.ts
+ * @deprecated
+ * @file src/types/io/CsvMapping.ts
  * @description Types and Enums for handling CSV files, including column mappings and delimiters.
- * @module Csv
+ * @module CsvMapping
  */
+import { 
+    FieldValue,
+} from "../api/Api";
+import { parseDelimitedFileWithMapping } from "src/utils/io/reading";
+// --------------------------------------------------------------------
+/** types for the {@link parseDelimitedFileWithMapping}`()` function */
 
-import { FieldValue } from "../api/Api";
 /** 
  * Mapping of original column names to NetSuite column names
  * - Record<string, string>, entry = [originalKey, newKey(s)] 

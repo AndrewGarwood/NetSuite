@@ -4,16 +4,20 @@
  */
 
 import { RecordTypeEnum } from '../NS/Record';
+import { hasKeys } from '../../utils/typeValidation';
 
 /**
- * Definition of Request body for the POST function in POST_BatchCreateRecord.js
- * @typedefn {Object} `BatchCreateRecordRequest`
- * @property {Array\<CreateRecordOptions>} [createRecordArray] 
- * `Array`<{@link CreateRecordOptions}> = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`?: {@link FieldDictionary}, `sublistDict`?: {@link SublistDictionary}> `}[]`.
- * array to create multiple records in NetSuite.
- */
+ * - `createRecordArray` and `createRecordDict` are mutually exclusive
+ * - Definition of Request body for the POST function in POST_BatchCreateRecord.js - Can create record in batches by defining the request's body, reqBody, in two ways. 
+ * @typedefn {Object} BatchCreateRecordRequest
+ * @property {Array\<CreateRecordOptions>} [createRecordArray]
+ * `Array<`{@link CreateRecordOptions}`>` = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]` 
+ * @property {{[K in RecordTypeEnum]?: Array\<CreateRecordOptions>}} [createRecordDict] 
+     * `Record<`[K in {@link RecordTypeEnum}]?: `Array<`{@link CreateRecordOptions}`>>`
+*/
 export type BatchCreateRecordRequest = {
     createRecordArray?: CreateRecordOptions[];
+    createRecordDict?: Record<RecordTypeEnum, CreateRecordOptions[]>;
 };
 
 
@@ -136,7 +140,7 @@ export type FieldDictionary = {
  * @property {Array\<SetSublistValueOptions>} [valueFields]  
  * - Array<{@link SetSublistValueOptions}> = Array<{`sublistId`: string, `fieldId`: string, `line`: number, `value`: {@link FieldValue}}>. 
  * - For record sublist fields: rec.setSublistValue(sublistId, fieldId, line, value)
- * * @property {Array\<SetSubrecordOptions>} [subrecordFields]
+ * @property {Array\<SetSubrecordOptions>} [subrecordFields]
  * - Array<{@link SetSubrecordOptions}> = Array<{`sublistId`?: string, `line`?: number, `fieldId`: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}}>.
  * - array of subrecord fields in the main record's sublist
  */
@@ -224,7 +228,7 @@ export interface SetSublistValueOptions {
 /**
  * @interface SetSubrecordOptions
  * @property {string} [parentSublistId] - (If setting subrecord of a sublist) The internal ID of the parent record's sublist that contains a subrecord field. (e.g. 'addressbook')
- * @property {number} [line] - The line number for the field. (i.e. index of the sublist row) defaults to new line. (can use record.getLineCount(sublistId) to get the number of lines in the sublist)
+ * @property {number} [line] - `The line number` for the field. (i.e. index of the sublist row) defaults to new line. (can use record.getLineCount(sublistId) to get the number of lines in the sublist)
  * @property {string} fieldId - The internal ID of the field or sublistField that is a subrecord. (e.g. 'addressbookaddress'), 
  * - If the subrecord is on the main record, use getSubrecord({fieldId}) = getSubrecord(options: GetFieldOptions): Omit<Record, "save">;
  * - If the subrecord is in a sublist, use rec.getSublistSubrecord({sublistId, fieldId})
