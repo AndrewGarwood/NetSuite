@@ -7,8 +7,97 @@ import csv from 'csv-parser'; // ~\node_modules\csv-parser\index.d.ts
 import { Options as CsvOptions } from "csv-parser"; 
 import { Transform, pipeline, TransformOptions } from 'stream';
 import { FileExtensionResult } from '../../types/io/Reading';
-import { FieldValue } from 'src/types/api/';
+import { FieldValue } from 'src/types/api/Api';
 import {ValueMapping, ColumnMapping, isValueMappingEntry, DelimitedFileTypeEnum, MappedRow, DelimiterEnum } from '../../types/io/CsvMapping';
+import { stripChar } from './regex';
+
+/**
+ * 
+ * @param {string} filePath string
+ * @returns {Array<string>} jsonData — Array\<string>
+ */
+export function readFileLinesIntoArray(filePath: string): Array<string> {
+    const result = [];
+    try {
+        const data = fs.readFileSync(filePath, 'utf8');
+        const lines = data.split('\n');
+        for (const line of lines) {
+            if (line.trim()) {
+                result.push(line.trim());
+            }
+        }
+    } catch (err) {
+        console.error('Error reading the file:', err);
+    }
+    return result;
+}
+
+/**
+ * 
+ * @param {string} filePath string
+ * @returns {Object.<string, any> | null} jsonData — Object.<string, any>
+ */
+export function readJsonFileAsObject(filePath: string): { [s: string]: any; } | null {
+    filePath = validateFileExtension(filePath, 'json').validatedFilePath;
+    try {
+        const data = fs.readFileSync(filePath, 'utf8');
+        const jsonData = JSON.parse(data);
+        return jsonData;
+    } catch (err) {
+        console.error('Error reading or parsing the JSON file:', err);
+        console.error('\tGiven File Path:', '"' + filePath + '"');
+        return null;
+    }
+}
+
+
+/**
+ * @param {string} filePath string
+ * @param {string} expectedExtension string
+ * @returns {FileExtensionResult} .{@link FileExtensionResult} = { isValid: boolean, validatedFilePath: string }
+ */
+export function validateFileExtension(filePath: string, expectedExtension: string): FileExtensionResult {
+    let isValid = false;
+    let validatedFilePath = filePath;
+    if (filePath && filePath.endsWith(`.${expectedExtension}`)) {
+        isValid = true;
+    } else {
+        validatedFilePath = `${filePath}.${stripChar(expectedExtension, '.', true)}`;
+    }
+    return { isValid, validatedFilePath };
+}
+
+/**
+ * @param {string} filePath string
+ * @param {string} sheetName string
+ * @param {string} keyColumn string
+ * @param {string} valueColumn string
+ * @returns {Object.<string, Array<string>>} dict: Object.<string, Array\<string>> — key-value pairs where key is from keyColumn and value is an array of values from valueColumn
+ */
+export function parseExcelForOneToMany(filePath: string, sheetName: string, keyColumn: string, valueColumn: string): { [s: string]: Array<string>; } {
+    filePath = validateFileExtension(
+        filePath, 
+        'xlsx'
+    ).validatedFilePath;
+    const workbook = xlsx.readFile(filePath);
+    const sheet = workbook.Sheets[sheetName];
+    const jsonData: any[] = xlsx.utils.sheet_to_json(sheet);
+    /**@type {Object.<string, Array<string>>} */
+    const dict: { [s: string]: Array<string>; } = {};
+    jsonData.forEach(row => {
+        let key = row[keyColumn];
+        key = `${key}`.trim().replace(/\.$/, '');
+        let val = row[valueColumn];
+        val = `${val}`.trim().replace(/\.$/, '').padStart(5, '0');
+        if (!dict[key]) {
+            dict[key] = [];
+        }
+        if (!dict[key].includes(val)) {
+            dict[key].push(val);
+        }
+    });
+    return dict;
+}
 
 /**
  * Parses a delimited text file (CSV/TSV) and maps columns to new names
@@ -54,7 +143,10 @@ export async function parseDelimitedFileWithMapping<T extends ColumnMapping>(
                         [originalKey, newKeys]
                     ) => {
                         const rawValue = row[originalKey]?.trim() || '';
-                        const transformedValue = transformValue(rawValue, originalKey, valueMapping);
+                        let transformedValue = transformValue(rawValue, originalKey, valueMapping) || '';
+                        transformedValue = typeof transformedValue === 'string' 
+                            ? transformedValue.replace(/(\s{2,})/g, ' ').replace(/(\.{2,})/g, '.')
+                            : transformedValue; 
                         /** mappedRow[d] = transformedValue for d in destinations */
                         const destinations = Array.isArray(newKeys) ? newKeys : [newKeys];
                         
@@ -120,10 +212,12 @@ export function transformValue(
             return mapping;
         }
     }
+    const BOOLEAN_TRUE_VALUES = ['true', 'yes', 'y'];
+    const BOOLEAN_FALSE_VALUES = ['false', 'no', 'n'];
     // Fallback to automatic type conversion
     try {
-        if (['true', 'yes', 'y'].includes(trimmedValue.toLowerCase())) return true;
-        if (['false', 'no', 'n'].includes(trimmedValue.toLowerCase())) return false;
+        if (BOOLEAN_TRUE_VALUES.includes(trimmedValue.toLowerCase())) return true;
+        if (BOOLEAN_FALSE_VALUES.includes(trimmedValue.toLowerCase())) return false;
         
         const parsedDate = new Date(trimmedValue);
         if (!isNaN(parsedDate.getTime())) return parsedDate;
@@ -135,13 +229,15 @@ export function transformValue(
     }
 }
 
+
+
 /**
  * Determines the proper delimiter based on file type or extension
  * @param filePath Path to the file
  * @param fileType Explicit file type or 'auto' for detection
- * @returns The delimiter character
+ * @returns `extension` `{`{@link DelimiterEnum}` | string}` The delimiter character
  */
-export function getDelimiterFromFilePath(filePath: string, fileType?: DelimitedFileTypeEnum): string {
+export function getDelimiterFromFilePath(filePath: string, fileType?: DelimitedFileTypeEnum): DelimiterEnum | string {
     if (fileType && fileType === DelimitedFileTypeEnum.CSV) return DelimiterEnum.COMMA;
     if (fileType && fileType === DelimitedFileTypeEnum.TSV) return DelimiterEnum.TAB;
     
@@ -154,106 +250,4 @@ export function getDelimiterFromFilePath(filePath: string, fileType?: DelimitedF
     } else {
         throw new Error(`Unsupported file extension: ${extension}`);
     }
-}
-
-/**
- * 
- * @param {string} filePath string
- * @returns {Array<string>} jsonData — Array\<string>
- */
-export function readFileLinesIntoArray(filePath: string): Array<string> {
-    const result = [];
-    try {
-        const data = fs.readFileSync(filePath, 'utf8');
-        const lines = data.split('\n');
-        for (const line of lines) {
-            if (line.trim()) {
-                result.push(line.trim());
-            }
-        }
-    } catch (err) {
-        console.error('Error reading the file:', err);
-    }
-    return result;
-}
-
-/**
- * 
- * @param {string} filePath string
- * @returns {Object.<string, any> | null} jsonData — Object.<string, any>
- */
-export function readJsonFileAsObject(filePath: string): { [s: string]: any; } | null {
-    filePath = validateFileExtension(filePath, 'json').validatedFilePath;
-    try {
-        const data = fs.readFileSync(filePath, 'utf8');
-        const jsonData = JSON.parse(data);
-        return jsonData;
-    } catch (err) {
-        console.error('Error reading or parsing the JSON file:', err);
-        console.error('\tGiven File Path:', '"' + filePath + '"');
-        return null;
-    }
-}
-
-/**
- * @param {string} filePath string
- * @param {string} expectedExtension string
- * @returns {FileExtensionResult} .{@link FileExtensionResult} = { isValid: boolean, validatedFilePath: string }
- */
-export function validateFileExtension(filePath: string, expectedExtension: string): FileExtensionResult {
-    let isValid = false;
-    let validatedFilePath = filePath;
-    if (filePath && filePath.endsWith(`.${expectedExtension}`)) {
-        isValid = true;
-    } else {
-        validatedFilePath = `${filePath}.${stripChar(expectedExtension, '.', true)}`;
-    }
-    return { isValid, validatedFilePath };
-}
-
-/**
- * @param {string} filePath string
- * @param {string} sheetName string
- * @param {string} keyColumn string
- * @param {string} valueColumn string
- * @returns {Object.<string, Array<string>>} dict: Object.<string, Array\<string>> — key-value pairs where key is from keyColumn and value is an array of values from valueColumn
- */
-export function parseExcelForOneToMany(filePath: string, sheetName: string, keyColumn: string, valueColumn: string): { [s: string]: Array<string>; } {
-    filePath = validateFileExtension(
-        filePath, 
-        'xlsx'
-    ).validatedFilePath;
-    const workbook = xlsx.readFile(filePath);
-    const sheet = workbook.Sheets[sheetName];
-    const jsonData: any[] = xlsx.utils.sheet_to_json(sheet);
-    /**@type {Object.<string, Array<string>>} */
-    const dict: { [s: string]: Array<string>; } = {};
-    jsonData.forEach(row => {
-        let key = row[keyColumn];
-        key = `${key}`.trim().replace(/\.$/, '');
-        let val = row[valueColumn];
-        val = `${val}`.trim().replace(/\.$/, '').padStart(5, '0');
-        if (!dict[key]) {
-            dict[key] = [];
-        }
-        if (!dict[key].includes(val)) {
-            dict[key].push(val);
-        }
-    });
-    return dict;
-}
-
-/**
- * @TODO if escape === true, escape all special characters in char (i.e. append \\ to them)
- * @param {string} s string
- * @param {string} char string
- * @param {boolean} escape boolean
- * @returns {string}
- */
-export function stripChar(s: string, char: string, escape: boolean=false): string {
-    if (escape) {
-        char = '\\' + char;
-    }
-    const regex = new RegExp(`^${char}+|${char}+$`, 'g');
-    return s.replace(regex, '');
 }

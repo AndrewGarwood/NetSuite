@@ -16,3 +16,7 @@ export const TERM_COLUMN_MAPPING: ColumnMapping = {
     'Description': 'name',
     'Preferred': 'preferred',
 };
+
+export const TERM_VALUE_MAPPING: ValueMapping = {
+    "ORIGINAL_TERM_VALUE": "TERM_VALUE_WITH_STANDARDIZED_SYNTAX",
+}

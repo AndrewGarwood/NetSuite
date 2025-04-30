@@ -77,14 +77,3 @@ export type AddressBook = AddressBookEntry[];
 @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html
 
 */
-/*
-addressbook - Address Book
-Internal ID	Type	Label	Required	Help
-addressbookaddress	summary	Edit	false	
-addressid	text		false	
-defaultbilling	checkbox	Default Billing	false	
-defaultshipping	checkbox	Default Shipping	false	
-id	integer	ID	false	
-internalid	integer		false	
-label	text	Label	false	
-*/
