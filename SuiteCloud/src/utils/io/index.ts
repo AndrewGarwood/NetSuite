@@ -12,11 +12,13 @@ import {
     TimeUnitEnum,
 } from './dateTime'
 import {
+    parseDelimitedFileWithMapping,
+    transformValue,
+    getDelimiterFromFilePath,
     readFileLinesIntoArray,
     validateFileExtension,
     parseExcelForOneToMany,
     readJsonFileAsObject,
-    stripChar
 } from './reading'
 import {
     writeListsToCsv,
@@ -24,7 +26,16 @@ import {
     printConsoleGroup,
     printJson
 } from './writing'
-
+import {
+    stripChar,
+    stringEndsWithAnyOf,
+    stringContainsAnyOf,
+    stringStartsWithAnyOf,
+    EMAIL_REGEX,
+    PHONE_REGEX,
+    BOOLEAN_FIELD_ID_REGEX,
+    RegExpFlagsEnum,
+} from './regex'
 export {
     // dateTime.ts
     getCurrentPacificTime,
@@ -40,11 +51,23 @@ export {
     TimeUnitEnum,
 
     // reading.ts
+    parseDelimitedFileWithMapping,
+    transformValue,
+    getDelimiterFromFilePath,
     readFileLinesIntoArray,
     validateFileExtension,
     parseExcelForOneToMany,
     readJsonFileAsObject,
+
+    // regex.ts
     stripChar,
+    stringEndsWithAnyOf,
+    stringContainsAnyOf,
+    stringStartsWithAnyOf,
+    EMAIL_REGEX,
+    PHONE_REGEX,
+    BOOLEAN_FIELD_ID_REGEX,
+    RegExpFlagsEnum,
 
     // writing.ts
     writeListsToCsv,

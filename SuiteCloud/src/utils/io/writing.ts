@@ -5,6 +5,7 @@ import fs from 'fs';
 import { OUTPUT_DIR } from 'src/config/env';
 import { getCurrentPacificTime } from './dateTime';
 import { validateFileExtension } from './reading';
+import { DelimitedFileTypeEnum } from 'src/types/io/CsvMapping';
 
 
 /**
@@ -23,9 +24,9 @@ export function writeListsToCsv(
 ) {
     let fileExtension = '';
     if (delimiter === ',') {
-        fileExtension = 'csv';
+        fileExtension = DelimitedFileTypeEnum.CSV;
     } else if (delimiter === '\t') {
-        fileExtension = 'tsv';
+        fileExtension = DelimitedFileTypeEnum.TSV;
     }
     const outputAddress = `${filePath}/${fileName}.${fileExtension}`;
     const listNames = Object.keys(listData);
@@ -54,7 +55,7 @@ export function writeListsToCsv(
 
 
 /**
- * Output JSON data to a file
+ * Output JSON data to a file with `fs.writeFileSync` or `fs.appendFileSync`.
  * @param {Record<string, any> | string} data Record.<string, any> | string - JSON data to write to file
  * @param {string} fileName string - optional, 'name.ext', default='' If fileName is not provided, it will be assumed the filePath contains the name and extension.
  * @param {string} filePath string 
@@ -101,6 +102,7 @@ export function writeObjectToJson(
     } catch (e) {
         console.error('Error writing to JSON file', e);
     }
+
 }
 
 /**
@@ -118,19 +120,19 @@ export function printJson(data:Record<string, any>, indent: number=4) {
 
 /**
  * @typedefn {Object} ConsoleGroup
- * @property {string} label string - label for the console group
- * @property {Array<string>} logStatements string[] - log each string in arr on new line
- * @property {boolean} collapse boolean - optional, default=false
- * @property {number} numTabs number - optional, default=1
- * @property {boolean} printToConsole boolean - optional, default=true
- * @property {boolean} printToFile boolean - optional, default=true
- * @property {string} filePath string - optional, 
- * @property {boolean} enableOverwrite boolean - optional, default=true
+ * @property {string} label `string` - label for the console group
+ * @property {Array<string>} details `string[]` - log each string in arr on new line
+ * @property {boolean} collapse `boolean` - `optional`, default=`false`
+ * @property {number} numTabs `number` - `optional`, default=`1`
+ * @property {boolean} printToConsole `boolean` - `optional`, default=`true`
+ * @property {boolean} printToFile `boolean` - `optional`, default=`true`
+ * @property {string} filePath `string` - `optional`, default=`${OUTPUT_DIR}/DEFAULT_LOG.txt`
+ * @property {boolean} enableOverwrite `boolean` - `optional`, default=`true`
  * @description Print a console group with the given label and log statements. Optionally print to file.
  */
 export type ConsoleGroup = {
     label: string,
-    logStatements: Array<string>,
+    details?: Array<string>,
     collapse?: boolean,
     numTabs?: number,
     printToConsole?: boolean,
@@ -141,22 +143,22 @@ export type ConsoleGroup = {
 
 
 /**
- * 
+ * @TODO phase this function out in favor of a logging library
  * @param {ConsoleGroup} consoleGroup {@link ConsoleGroup}
- * @param {string} consoleGroup.label string
- * @param {Array<string>} consoleGroup.logStatements string[] - log each string in arr on new line
- * @param {boolean} consoleGroup.collapse boolean - optional, default=false
- * @param {number} consoleGroup.numTabs number - optional, default=1
- * @param {boolean} consoleGroup.printToConsole boolean - optional, default=true
- * @param {boolean} consoleGroup.printToFile boolean - optional, default=true
- * @param {string} consoleGroup.filePath string -
- * @param {boolean} consoleGroup.enableOverwrite boolean - optional, default=true
+ * @param {string} consoleGroup.label `string`
+ * @param {Array<string>} consoleGroup.details `string[]` - log each string in arr on new line
+ * @param {boolean} consoleGroup.collapse `boolean` - `optional`, default=false
+ * @param {number} consoleGroup.numTabs `number` - `optional`, default=1
+ * @param {boolean} consoleGroup.printToConsole `boolean` - `optional`, default=true
+ * @param {boolean} consoleGroup.printToFile `boolean` - `optional`, default=true
+ * @param {string} consoleGroup.filePath `string` - `${OUTPUT_DIR}/DEFAULT_LOG.txt`
+ * @param {boolean} consoleGroup.enableOverwrite `boolean` - `optional`, default=true
  * @returns {void}
  * @description Print a console group with the given label and log statements. Optionally print to file.
  */
 export function printConsoleGroup({
     label = 'Group Name', 
-    logStatements = [],
+    details = [],
     collapse = false,
     numTabs = 0,
     printToConsole = true,
@@ -173,7 +175,7 @@ export function printConsoleGroup({
         } else {
             console.group(label);
         }
-        logStatements.forEach(statement => console.log(statement));
+        details.forEach(statement => console.log(statement));
         console.groupEnd();
     }
     if (printToFile) {
@@ -181,7 +183,7 @@ export function printConsoleGroup({
         if (enableOverwrite) {
             fs.writeFile(
                 filePath, 
-                '\n' + labelOffset + label + '\n' + bodyOffset + logStatements.join('\n' + bodyOffset), 
+                '\n' + labelOffset + label + '\n' + bodyOffset + details.join('\n' + bodyOffset), 
                 (err) => {
                     if (err) {
                         console.error('Error writing to file', err);
@@ -191,7 +193,7 @@ export function printConsoleGroup({
         } else {
             fs.appendFile(
                 filePath, 
-                '\n' + labelOffset + label + '\n' + bodyOffset + logStatements.join('\n' + bodyOffset), 
+                '\n' + labelOffset + label + '\n' + bodyOffset + details.join('\n' + bodyOffset), 
                 (err) => {
                     if (err) {
                         console.error('Error appending to file', err);

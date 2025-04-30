@@ -12,8 +12,18 @@ import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 
 
+/** 
+ * @example 
+ * // import READLINE as rl;
+ * const answer = await rl.question('What do you think of Node.js?')
+ * */
 export const READLINE = readline.createInterface({ input, output });
-// const answer = await rl.question('What do you think of Node.js? ');
+
+/** = the directory where the node_modules folder lives, I think*/
+export const NODE_HOME_DIR = process.cwd();
+/** = `NODE_ROOT_DIR/src` = `process.cwd()/src`*/
+export const SRC_DIR = `${NODE_HOME_DIR}/src` as string;
+
 
 
 /**
@@ -137,6 +147,8 @@ console.log('USER:'.padEnd(13), USER);
 
 /** ~/OneDrive - ENTITY_NAME */
 export const ONE_DRIVE_DIR = `C:/Users/${USER}/OneDrive - ENTITY_NAME`;
+
+//@TODO: use process.cwd() instead ?
 
 /** ~/NetSuite/data */
 export const DATA_DIR = `C:/Users/${USER}/path/to/NetSuite/data`;

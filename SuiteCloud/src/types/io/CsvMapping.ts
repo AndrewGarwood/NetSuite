@@ -1,5 +1,4 @@
 /**
- * @deprecated
  * @file src/types/io/CsvMapping.ts
  * @description Types and Enums for handling CSV files, including column mappings and delimiters.
  * @module CsvMapping
@@ -28,7 +27,7 @@ export type ValueMappingEntry = {
 };
 
 /**
- * @description Checks if the given value is a ValueMappingEntry.
+ * @description Checks if the given value is a {@link ValueMappingEntry} = `{ newValue`: {@link FieldValue}, `validColumns`: `string | string[] }`.
  * @param value - The value to check.
  */
 export function isValueMappingEntry(value: any): value is ValueMappingEntry {
@@ -36,8 +35,15 @@ export function isValueMappingEntry(value: any): value is ValueMappingEntry {
 }
 
 
-
+/**
+ * @description
+ * - `keys` - an explicit value that you want to override
+ * - `value` can be: 
+ * - - a {@link FieldValue} -> override occurrences of `key` in any column it's found in with the `FieldValue`
+ * - - a {@link ValueMappingEntry} -> override occurences of `key` only in specified columns (see {@link ValueMappingEntry.validColumns}) with {@link ValueMappingEntry.newValue}.
+ */
 export type ValueMapping = Record<string, FieldValue | ValueMappingEntry>;
+
 /**
  * @description The MappedRow type remaps the keys of the input 
  * type T (a {@link ColumnMapping}) to its values, and assigns the type string to all 

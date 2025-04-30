@@ -5,6 +5,12 @@ import { RecordTypeEnum } from "./types/NS/Record";
 import { initiateAuthFlow, getAuthCode, exchangeAuthCodeForTokens, exchangeRefreshTokenForNewTokens } from "./server/authServer";
 import { TokenResponse } from "./types/auth/TokenResponse";
 import { CreateRecordOptions, CreateRecordResponse, FieldDictionary, SublistFieldDictionary, SetSublistTextOptions, BatchCreateRecordRequest, BatchCreateRecordResponse, SetSubrecordOptions } from "./types/api/Api";
+import { parseCsvToCreateOptions } from './parseCsvToRequestBody';
+import { 
+    PARSE_VENDOR_FROM_VENDOR_CSV_OPTIONS as VENDOR_OPTIONS, 
+    PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS as CONTACT_OPTIONS
+} from "./vendorParseOptions";
+import { logger as log } from "./config/logging";
 import { ScriptDictionary } from "./types/NS/SuiteScriptEnvironment";
 
 const REST_SCRIPTS = SE.sandbox?.restlet || {} as ScriptDictionary;
@@ -15,6 +21,49 @@ const NO_REFRESH_TOKEN_AVAILABLE = false;
 
 
 async function main() {
+    const VENDOR_DIR = `${DATA_DIR}/vendors` as string;
+    const SINGLE_COMPANY_FILE = `${VENDOR_DIR}/single_company_vendor.tsv` as string;
+    const SINGLE_HUMAN_FILE = `${VENDOR_DIR}/single_human_vendor.tsv` as string;
+    await parseVendor(SINGLE_COMPANY_FILE);
+    STOP_RUNNING();
+}
+main().catch(error => {
+    console.error('Error executing main.ts main() function:', error);
+});
+
+async function parseVendor(vendorFile: string): Promise<void> {
+    const parseOptionsArray = [VENDOR_OPTIONS, CONTACT_OPTIONS];
+    try {
+        const result: CreateRecordOptions[] = 
+            await parseCsvToCreateOptions(vendorFile, parseOptionsArray);
+        writeObjectToJson(
+            {createRecordArray: result}, 
+            undefined, 
+            `${OUTPUT_DIR}/parsedVendorOptions.json`, 
+            4, 
+            true
+        );
+    } catch (error) {
+        log.error('Error parsing CSV to CreateRecordOptions:', error);
+        return;
+    }
+}
+
+const currentScriptName = 'POST_BatchCreateRecord'; 
+const currentScriptId = REST_SCRIPTS[currentScriptName].scriptId as number;
+const currentDeployId = REST_SCRIPTS[currentScriptName].deployId as number;
+const payload: BatchCreateRecordRequest = {
+    createRecordArray: [
+        MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS, 
+        UW_LIBRARIES_CREATE_VENDOR_OPTIONS
+    ]
+}  
+async function callBatchCreateRecord(
+    payload: CreateRecordOptions[], 
+    scriptName: string, 
+    scriptId: number, 
+    deployId: number
+): Promise<void> {
     let accessToken = readJsonFileAsObject(STEP3_TOKENS_PATH)?.access_token || readJsonFileAsObject(STEP2_TOKENS_PATH)?.access_token ||  '';
     let refreshToken = readJsonFileAsObject(STEP2_TOKENS_PATH)?.refresh_token || '';
     let areTokensExpired = localTokensHaveExpired(STEP3_TOKENS_PATH) && localTokensHaveExpired(STEP2_TOKENS_PATH);
@@ -35,33 +84,19 @@ async function main() {
             console.error('Access token is undefined. Cannot call RESTlet.');
             STOP_RUNNING();
         }
-
-        const currentScriptName = 'POST_BatchCreateRecord'; 
-        const currentScriptId = REST_SCRIPTS[currentScriptName].scriptId as number;
-        const currentDeployId = REST_SCRIPTS[currentScriptName].deployId as number;
-        const vendorBatch: BatchCreateRecordRequest = {
-            createRecordArray: [
-                MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS, 
-                UW_LIBRARIES_CREATE_VENDOR_OPTIONS
-            ],
-        }
         let response = await callPostRestletWithPayload(
             accessToken,
-            currentScriptId,
-            currentDeployId,
-            vendorBatch
+            scriptId,
+            deployId,
+            payload,
         );
-        writeObjectToJson(await response.data, `${currentScriptName}_Response.json`, OUTPUT_DIR, 4, true);
+        writeObjectToJson(await response.data, `${scriptName}_Response.json`, OUTPUT_DIR, 4, true);
     } catch (error) {
         console.error('Error in main.ts main()', error);
         throw error;
     }
-    STOP_RUNNING();
 }
 
-main().catch(error => {
-    console.error('Error executing main.ts main() function:', error);
-});
 
 /**
  * 

@@ -3,6 +3,7 @@
  * @module CsvToApiMapping
  */
 import { RecordTypeEnum } from "../NS";
+import { ValueMapping, ValueMappingEntry } from "../io";
 import { 
     CreateRecordOptions, 
     FieldDictionary,
@@ -20,11 +21,13 @@ import {
  * @property {RecordTypeEnum} recordType - {@link RecordTypeEnum} The type of the NetSuite record.
  * @property {FieldDictionaryParseOptions} fieldDictParseOptions - {@link FieldDictionaryParseOptions} The field dictionary parse options for the record.
  * @property {SublistDictionaryParseOptions} sublistDictParseOptions - {@link SublistDictionaryParseOptions} The sublist dictionary parse options for the record.
+ * @property {ValueMapping} valueOverrides - {@link ValueMapping} The value overrides for specific field values used in 
  */
 export interface ParseOptions {
     recordType: RecordTypeEnum;
     fieldDictParseOptions: FieldDictionaryParseOptions;
     sublistDictParseOptions: SublistDictionaryParseOptions;
+    valueOverrides?: ValueMapping;
 }
 
 /**
@@ -41,7 +44,7 @@ export type FieldSubrecordMapping = {
     sublistDictOptions?: SublistDictionaryParseOptions;
 }
 /**
- * @typedefn {object} SublistSubrecordMapping
+ * @typedefn `{object}` `SublistSubrecordMapping`
  * @property {string} parentSublistId - The Id of the sublist in the parent record containing a subrecord field.
  * @property {number} line - The line number (index) of the sublist in the parent record containing a subrecord field.
  * @property {string} fieldId - The field ID of the subrecord in the sublist of the parent record.
@@ -54,22 +57,22 @@ export type SublistSubrecordMapping = {
     line: number;
     fieldId: string;
     subrecordType: string;
-    fieldDictOptions?: FieldDictionaryParseOptions;
-    sublistDictOptions?: SublistDictionaryParseOptions;
+    fieldDictParseOptions?: FieldDictionaryParseOptions;
+    sublistDictParseOptions?: SublistDictionaryParseOptions;
 }
 
 /**
- * @typedefn {object} FieldDictionaryParseOptions
- * @property {Array\<FieldValueMapping>} fieldValueMapArray - `Array<`{@link FieldValueMapping}`>` - keys are fieldIds of body fields a NetSuite record, values are corresponding column names in the csv file
- * @property {Array\<FieldSubrecordMapping>} subrecordMapArray - `Array<`{@link FieldSubrecordMapping}`>` - keys are fieldIds of body fields a NetSuite record
+ * @typedefn `{object}` `FieldDictionaryParseOptions`
+ * @property {Array\<FieldValueMapping>} fieldValueMapArray - `Array<`{@link FieldValueMapping}`>` - `keys` are `fieldIds` of body fields a NetSuite record, values are corresponding column names in the csv file
+ * @property {Array\<FieldSubrecordMapping>} [subrecordMapArray] - `Array<`{@link FieldSubrecordMapping}`>` - `keys` are `fieldIds` of body subrecord fields a NetSuite record
  */
 export type FieldDictionaryParseOptions = {
     fieldValueMapArray: FieldValueMapping[]; // keys are fieldIds of body fields a NetSuite record, values are corresponding column names in the csv file
-    subrecordMapArray: FieldSubrecordMapping[];
+    subrecordMapArray?: FieldSubrecordMapping[];
 }
 
 /**
- * @typedefn {object} SublistDictionaryParseOptions
+ * @typedefn `{object}` `SublistDictionaryParseOptions`
  * = { [`sublistId`: string]: {@link SublistFieldDictionaryParseOptions} } 
  * = { [`sublistId`: string]: { `fieldValueMapArray`: `Array<`{@link SublistFieldValueMapping}`>`, `subrecordMapArray`: `Array<`{@link SublistSubrecordMapping}`>` } }
  */
@@ -79,22 +82,24 @@ export type SublistDictionaryParseOptions = {
 };
 /**
  * @typedefn {object} SublistFieldDictionaryParseOptions
- * @property {Array\<SublistFieldValueMapping>} fieldValueMapArray - `Array<`{@link SublistFieldValueMapping}`>` - keys are fieldIds of sublist fields a NetSuite record, values are corresponding column names in the csv file
- * @property {Array\<SublistSubrecordMapping>} subrecordMapArray - `Array<`{@link SublistSubrecordMapping}`>` keys are fieldIds of sublist fields a NetSuite record
+ * @property {Array\<SublistFieldValueMapping>} fieldValueMapArray - `Array<`{@link SublistFieldValueMapping}`>` - `keys` are `fieldIds` of sublist fields a NetSuite record, values are corresponding column names in the csv file
+ * @property {Array\<SublistSubrecordMapping>} [subrecordMapArray] - `Array<`{@link SublistSubrecordMapping}`>` `keys` are `fieldIds` of a sublist's subrecord fields a NetSuite record
  */
 export type SublistFieldDictionaryParseOptions = {
     fieldValueMapArray: SublistFieldValueMapping[];
-    subrecordMapArray: SublistSubrecordMapping[];
+    subrecordMapArray?: SublistSubrecordMapping[];
 }
 
 //@property {string | string[]} fieldId  string[] implies that the value in row[colName] should be mapped to all fieldIds in the array.
 
 /**
- * @typedefn {object} FieldValueMapping
- * @property {string} fieldId - The fieldId of a body field of the NetSuite record.
- * @property {string} colName - The column name in the CSV file containing the value for the body field.
- * @description Associates a NetSuite record's fieldId with a column name in a csv file. 
- * so that the value, row[colName] in the csv file can be mapped to the fieldId of the NetSuite record in a {@link SetFieldValueOptions} object.
+ * @typedefn {object} `FieldValueMapping`
+ * @property {string} fieldId - The `fieldId` of a body field of the NetSuite record.
+ * @property {FieldValue} [defaultValue] - The default value to set if `row[colName]` or `rowEvaluator(row)` is `undefined`.
+ * @property {string} [colName] - The column name in the CSV file containing the value for the body field.
+ * @property {function} [rowEvaluator] - A function that takes a `row` object and returns the value for the `fieldId`. This is used when the value is not in the CSV file or is determined by the contents of the `row`.
+ * @description Associates a NetSuite record's `fieldId` with a column name in a csv file. 
+ * so that the value, `row[colName]` in the csv file can be mapped to the `fieldId` of the NetSuite record in a {@link SetFieldValueOptions} object.
  * @example
  * const row = { Vendor: 'coolVendor', ... };
  * const fieldValueMap = { fieldId: 'companyname', colName: 'Vendor' };
@@ -102,15 +107,20 @@ export type SublistFieldDictionaryParseOptions = {
  */
 export type FieldValueMapping = {
     fieldId: string;
-    colName: string;
-}
+    defaultValue?: FieldValue; // default value to set if row[colName] or rowEvaluator(row) is undefined
+} & (
+    | { colName: string; rowEvaluator?: never }
+    | { colName?: never; rowEvaluator: (row: Record<string, any>) => FieldValue }
+);
 
 /**
  * @typedefn {object} SublistFieldValueMapping
  * @property {string} sublistId - The sublist ID of a sublist in a NetSuite record.
  * @property {number} line - The line number of the sublist.
  * @property {string} fieldId - The field ID of the sublist field.
- * @property {string} colName - The column name in the CSV file containing the value for the sublist field.
+ * @property {FieldValue} [defaultValue] - The default value to set if row[colName] or rowEvaluator(row) is undefined.
+ * @property {string} [colName] - The column name in the CSV file containing the value for the sublist field.
+ * @property {function} [rowEvaluator] - A function that takes a row object and returns the value for the fieldId. This is used when the value is not in the CSV file or is determined by the contents of the row.
  * @description Associates a NetSuite record's sublist's fieldId with a column name in a csv file.
  * so that the value, row[colName] in the csv file can be mapped to the sublistFieldId of the NetSuite record in a {@link SetSublistValueOptions} object. 
  */
@@ -118,8 +128,11 @@ export type SublistFieldValueMapping = {
     sublistId: string;
     line: number;
     fieldId: string;
-    colName: string;
-}
+    defaultValue?: FieldValue; // default value to set if row[colName] or rowEvaluator(row) is undefined
+} & (
+    | { colName: string; rowEvaluator?: never }
+    | { colName?: never; rowEvaluator: (row: Record<string, any>) => FieldValue }
+);
 
 /**
  * @enum {string} FieldParentTypeEnum

@@ -4,9 +4,9 @@
  * @module Vendor
  * @NetSuiteInternalId vendor
  */
-import { RecordRef } from './Record';
+import { RecordRef } from '../Record';
 import { Address, AddressBook } from './Address';
-import { NetSuiteCountryEnum, EmailPreferenceEnum, GlobalSubscriptionStatusEnum } from './Enums';
+import { NetSuiteCountryEnum, EmailPreferenceEnum, GlobalSubscriptionStatusEnum } from '../Enums';
 
 export interface VendorBase {
     /** @description entityid Required on Add.*/
