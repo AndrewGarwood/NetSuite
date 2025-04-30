@@ -11,9 +11,9 @@
 4. Determine proper mapping by using aforementioned [Record Browser](https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/account.html) and store it into ParseOption objects (types defined in [SuiteCloud/src/types/api/CsvToApiMapping.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/types/api/CsvToApiMapping.ts)) (see [SuiteCloud/src/vendorParseOptions.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/vendorParseOptions.ts) for an example).
 5. Then use ParseOptions[] as a parameter of [parseCsvToRequestBody](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parseCsvToRequestBody.ts) 
 6. Use authorization tokens generated from authorization flow to make API calls, e.g. in [SuiteCloud/src/main.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/main.ts) using functions from [SuiteCloud/src/utils/api/callApi.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/callApi.ts)
-7. Keep writing more features and improvements. refactoring.
+7. Write more features/improvements and refactor as work continues.
 8. oh and type definitions + docmentation.
 
-### Guides I found useful: 
+#### Guides I found useful: 
 - [NetSuite RESTlet Creation - SuiteScript 2.0 with OAuth 2 - YouTube](https://www.youtube.com/watch?v=MAOMQp5dh0U)
 - [The SuiteScript Developer's Guide on NetSuite Subrecords - NetSuite Insights](https://netsuite.smash-ict.com/suitescript-developers-guide-on-netsuite-subrecords-part-1/)
