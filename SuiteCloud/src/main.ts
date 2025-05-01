@@ -1,80 +1,83 @@
 import { readJsonFileAsObject, writeObjectToJson, getCurrentPacificTime, calculateDifferenceOfDateStrings, TimeUnitEnum, printConsoleGroup } from "./utils/io";
 import { callPostRestletWithPayload, MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS, UW_LIBRARIES_CREATE_VENDOR_OPTIONS } from "./utils/api";
 import { DATA_DIR, OUTPUT_DIR, STOP_RUNNING, SCRIPT_ENVIORNMENT as SE, CLOSE_SERVER } from "./config/env";
-import { RecordTypeEnum } from "./types/NS/Record";
+import { RecordTypeEnum } from "./utils/api/types/NS/Record";
 import { initiateAuthFlow, getAuthCode, exchangeAuthCodeForTokens, exchangeRefreshTokenForNewTokens } from "./server/authServer";
-import { TokenResponse } from "./types/auth/TokenResponse";
-import { CreateRecordOptions, CreateRecordResponse, FieldDictionary, SublistFieldDictionary, SetSublistTextOptions, BatchCreateRecordRequest, BatchCreateRecordResponse, SetSubrecordOptions } from "./types/api/Api";
+import { TokenResponse } from "./server/types";
+import { CreateRecordOptions, CreateRecordResponse, FieldDictionary, SublistFieldDictionary, SetSublistTextOptions, BatchCreateRecordRequest, BatchCreateRecordResponse, SetSubrecordOptions } from "./utils/api/types/Api";
 import { parseCsvToCreateOptions } from './parseCsvToRequestBody';
 import { 
     PARSE_VENDOR_FROM_VENDOR_CSV_OPTIONS as VENDOR_OPTIONS, 
     PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS as CONTACT_OPTIONS
 } from "./vendorParseOptions";
 import { logger as log } from "./config/logging";
-import { ScriptDictionary } from "./types/NS/SuiteScriptEnvironment";
+import { ScriptDictionary } from "./utils/api/types/NS/SuiteScriptEnvironment";
 
-const REST_SCRIPTS = SE.sandbox?.restlet || {} as ScriptDictionary;
+const SB_REST_SCRIPTS = SE.sandbox?.restlet || {} as ScriptDictionary;
 const STEP2_TOKENS_PATH = `${OUTPUT_DIR}/STEP2_tokens.json`;
 const STEP3_TOKENS_PATH = `${OUTPUT_DIR}/STEP3_tokens.json`;
-const REFRESH_TOKEN_AVAILABLE = true;
-const NO_REFRESH_TOKEN_AVAILABLE = false;
+const REFRESH_TOKEN_IS_AVAILABLE = true;
+const REFRESH_TOKEN_IS_NOT_AVAILABLE = false;
 
 
 async function main() {
     const VENDOR_DIR = `${DATA_DIR}/vendors` as string;
     const SINGLE_COMPANY_FILE = `${VENDOR_DIR}/single_company_vendor.tsv` as string;
     const SINGLE_HUMAN_FILE = `${VENDOR_DIR}/single_human_vendor.tsv` as string;
-    await parseVendor(SINGLE_COMPANY_FILE);
+    const SUBSET_FILE = `${VENDOR_DIR}/vendor_subset.tsv` as string;
+    const { vendors, contacts } = await parseVendorFile(SINGLE_HUMAN_FILE);
+    const payload: BatchCreateRecordRequest = {
+        createRecordDict: {
+            [RecordTypeEnum.VENDOR]: vendors,
+            [RecordTypeEnum.CONTACT]: contacts,
+        }
+    }
+    const res = await callBatchCreateRecord(payload);
+    writeObjectToJson(await res.data, `single_human_vendor_Response.json`, OUTPUT_DIR, 4, true);
     STOP_RUNNING();
 }
 main().catch(error => {
     console.error('Error executing main.ts main() function:', error);
 });
 
-async function parseVendor(vendorFile: string): Promise<void> {
-    const parseOptionsArray = [VENDOR_OPTIONS, CONTACT_OPTIONS];
+async function parseVendorFile(
+    filePath: string
+): Promise<{vendors: CreateRecordOptions[], contacts: CreateRecordOptions[]}> {
     try {
-        const result: CreateRecordOptions[] = 
-            await parseCsvToCreateOptions(vendorFile, parseOptionsArray);
-        writeObjectToJson(
-            {createRecordArray: result}, 
-            undefined, 
-            `${OUTPUT_DIR}/parsedVendorOptions.json`, 
-            4, 
-            true
-        );
+        const vendorResult: CreateRecordOptions[] = 
+            await parseCsvToCreateOptions(filePath, [VENDOR_OPTIONS]);
+        const contactResult: CreateRecordOptions[] = 
+            await parseCsvToCreateOptions(filePath, [CONTACT_OPTIONS]);
+        return { vendors: vendorResult, contacts: contactResult };
     } catch (error) {
-        log.error('Error parsing CSV to CreateRecordOptions:', error);
-        return;
+        console.error('Error parsing CSV to CreateRecordOptions:', error);
+        return { vendors: [], contacts: [] };
     }
 }
 
-const currentScriptName = 'POST_BatchCreateRecord'; 
-const currentScriptId = REST_SCRIPTS[currentScriptName].scriptId as number;
-const currentDeployId = REST_SCRIPTS[currentScriptName].deployId as number;
-const payload: BatchCreateRecordRequest = {
-    createRecordArray: [
-        MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS, 
-        UW_LIBRARIES_CREATE_VENDOR_OPTIONS
-    ]
-}  
 async function callBatchCreateRecord(
-    payload: CreateRecordOptions[], 
-    scriptName: string, 
-    scriptId: number, 
-    deployId: number
-): Promise<void> {
+    payload: BatchCreateRecordRequest, 
+    scriptId: number=Number(SB_REST_SCRIPTS.POST_BatchCreateRecord.scriptId), 
+    deployId: number=Number(SB_REST_SCRIPTS.POST_BatchCreateRecord.deployId),
+): Promise<any> {
     let accessToken = readJsonFileAsObject(STEP3_TOKENS_PATH)?.access_token || readJsonFileAsObject(STEP2_TOKENS_PATH)?.access_token ||  '';
     let refreshToken = readJsonFileAsObject(STEP2_TOKENS_PATH)?.refresh_token || '';
-    let areTokensExpired = localTokensHaveExpired(STEP3_TOKENS_PATH) && localTokensHaveExpired(STEP2_TOKENS_PATH);
+    const accessTokenIsExpired = localTokensHaveExpired(STEP3_TOKENS_PATH);
+    const refreshTokenIsExpired = localTokensHaveExpired(STEP2_TOKENS_PATH);
     try {
-        if ((!accessToken || areTokensExpired) && refreshToken) {
-            console.log('Access token is expired or undefined. Initiating auth flow from exchangeRefreshTokenForNewTokens()...');
-            let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_AVAILABLE, STEP2_TOKENS_PATH) as TokenResponse;
+        if ((!accessToken || accessTokenIsExpired) && refreshToken && !refreshTokenIsExpired) {
+            console.log(
+                'Access token is expired or undefined, Refresh token is available.',
+                'Initiating auth flow from exchangeRefreshTokenForNewTokens()...'
+            );
+            let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_IS_AVAILABLE) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
-        } else if ((!accessToken || areTokensExpired) && !refreshToken) {
-            console.log('Access token is expired or undefined. Refresh token is also undefined. Initiating auth flow from the beginning...');
-            let tokenRes: TokenResponse = await initiateAuthFlow(NO_REFRESH_TOKEN_AVAILABLE, STEP2_TOKENS_PATH) as TokenResponse;
+        } else if ((!accessToken || accessTokenIsExpired) && (!refreshToken || refreshTokenIsExpired)) {
+            console.log(
+                'Access token is expired or undefined. Refresh token is also undefined.', 
+                'Initiating auth flow from the beginning...'
+            );
+            let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_IS_NOT_AVAILABLE) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
         } else {
             console.log('Access token is valid. Proceeding with RESTlet call...');
@@ -84,15 +87,14 @@ async function callBatchCreateRecord(
             console.error('Access token is undefined. Cannot call RESTlet.');
             STOP_RUNNING();
         }
-        let response = await callPostRestletWithPayload(
+        return await callPostRestletWithPayload(
             accessToken,
             scriptId,
             deployId,
             payload,
         );
-        writeObjectToJson(await response.data, `${scriptName}_Response.json`, OUTPUT_DIR, 4, true);
     } catch (error) {
-        console.error('Error in main.ts main()', error);
+        console.error('Error in main.ts callBatchCreateRecord()', error);
         throw error;
     }
 }
@@ -102,8 +104,8 @@ async function callBatchCreateRecord(
  * 
  * @param filePath - path to the local json file containing the {@link TokenResponse}, defaults to {@link STEP2_TOKENS_PATH} = `${OUTPUT_DIR}/STEP2_tokens.json`
  * @description Checks if the TokenResponse stored locally in a json file have expired by comparing the current time with the last updated time and the expiration time.
- * - TokenResponse.expires_in's default value is 3600 seconds (1 hour) as per OAuth2.0 standard.
- * @returns {boolean} true if a duration greater than or equal to the token lifespan (TokenResponse.expires_in) has passed since the last updated time, false otherwise.
+ * - `TokenResponse.expires_in`'s default value is `3600 seconds` (1 hour) as per OAuth2.0 standard.
+ * @returns {boolean} `true` if a duration greater than or equal to the token lifespan (`TokenResponse.expires_in`) has passed since the last updated time, `false` otherwise.
  */
 export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): boolean {
     try {
@@ -127,4 +129,18 @@ export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): bool
         console.error('Error in localTokensHaveExpired(), return default (true):', error);
         return true;
     } 
+}
+
+/**
+ * 
+ * @param {Array<any>} arr `Array<any>`
+ * @param {number} batchSize `number`
+ * @returns {Array<Array<any>>} `batches` — `Array<Array\<any>>`
+ */
+function partitionArrayBySize(arr: Array<any>, batchSize: number): Array<Array<any>> {
+    let batches = [];
+    for (let i = 0; i < arr.length; i += batchSize) {
+        batches.push(arr.slice(i, i + batchSize));
+    }
+    return batches;
 }

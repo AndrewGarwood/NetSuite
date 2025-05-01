@@ -6,9 +6,9 @@ import xlsx from 'xlsx';
 import csv from 'csv-parser'; // ~\node_modules\csv-parser\index.d.ts
 import { Options as CsvOptions } from "csv-parser"; 
 import { Transform, pipeline, TransformOptions } from 'stream';
-import { FileExtensionResult } from '../../types/io/Reading';
-import { FieldValue } from 'src/types/api/Api';
-import {ValueMapping, ColumnMapping, isValueMappingEntry, DelimitedFileTypeEnum, MappedRow, DelimiterEnum } from '../../types/io/CsvMapping';
+import { FileExtensionResult } from './types/Reading';
+import { FieldValue } from 'src/utils/api/types/Api';
+import {ValueMapping, ColumnMapping, isValueMappingEntry, DelimitedFileTypeEnum, MappedRow, DelimiterEnum } from './types/CsvMapping';
 import { stripChar } from './regex';
 
 /**

@@ -7,9 +7,9 @@
  * @module mappings
  */
 import { parseDelimitedFileWithMapping } from "src/utils/io/reading"
-import { RecordRef } from "src/types/NS/Record"
-import { FieldValue } from "src/types/api/Api";
-import {ValueMapping, ColumnMapping, MappedRow } from '../../types/io/CsvMapping';
+import { RecordRef } from "src/utils/api/types/NS/Record"
+import { FieldValue } from "src/utils/api/types/Api";
+import {ValueMapping, ColumnMapping, MappedRow } from "src/utils/io/types/CsvMapping";
 
 export const TERM_COLUMN_MAPPING: ColumnMapping = {
     'Inactive': 'isinactive',

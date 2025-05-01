@@ -5,7 +5,8 @@ import fs from 'fs';
 import { OUTPUT_DIR } from 'src/config/env';
 import { getCurrentPacificTime } from './dateTime';
 import { validateFileExtension } from './reading';
-import { DelimitedFileTypeEnum } from 'src/types/io/CsvMapping';
+import { DelimitedFileTypeEnum } from 'src/utils/io/types/CsvMapping';
+
 
 
 /**

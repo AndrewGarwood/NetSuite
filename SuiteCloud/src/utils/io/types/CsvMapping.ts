@@ -5,7 +5,7 @@
  */
 import { 
     FieldValue,
-} from "../api/Api";
+} from "../../api/types/Api";
 import { parseDelimitedFileWithMapping } from "src/utils/io/reading";
 // --------------------------------------------------------------------
 /** types for the {@link parseDelimitedFileWithMapping}`()` function */

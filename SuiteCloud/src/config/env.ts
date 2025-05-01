@@ -6,10 +6,11 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import { AccountEnvironmentEnum, SuiteScriptEnvironment, ScriptDictionary, ScriptDetails } from '../types/NS/SuiteScriptEnvironment';
+import { AccountEnvironmentEnum, SuiteScriptEnvironment, ScriptDictionary, ScriptDetails } from '../utils/api/types/NS/SuiteScriptEnvironment';
 
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
+import path from 'node:path';
 
 
 /** 
@@ -19,10 +20,10 @@ import { stdin as input, stdout as output } from 'node:process';
  * */
 export const READLINE = readline.createInterface({ input, output });
 
-/** = the directory where the node_modules folder lives, I think*/
+/** = the directory where the node_modules folder lives*/
 export const NODE_HOME_DIR = process.cwd();
 /** = `NODE_ROOT_DIR/src` = `process.cwd()/src`*/
-export const SRC_DIR = `${NODE_HOME_DIR}/src` as string;
+export const SRC_DIR = path.join(NODE_HOME_DIR, 'src') as string;
 
 
 
@@ -31,9 +32,11 @@ export const SRC_DIR = `${NODE_HOME_DIR}/src` as string;
  * @param {number} exitCode - The exit code to use when exiting the program. Default is 0. Use 1 for error.
  * @returns {void}
  * */
-export const STOP_RUNNING = (exitCode: number=0): void => {
+export const STOP_RUNNING = (exitCode: number=0, ...msg: any[]): void => {
+    console.log('STOP_RUNNING() called with exitCode:', exitCode, ...(msg || []));
     process.exit(exitCode);
 }
+
 /**
  * @description Pause execution for specified amount of milliseconds 
  * * @param {number} ms - The number of milliseconds to pause execution for.
@@ -43,6 +46,7 @@ export const STOP_RUNNING = (exitCode: number=0): void => {
 export const DELAY = (ms: number): Promise<void> => {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+
 export { CLOSE_SERVER } from 'src/server/authServer';
 
 export const BASE_ACCOUNT_ID = (process.env.ACCOUNT_ID || 'MISSING_ENV_VARIABLE-ACCOUNT_ID') as string;
@@ -109,7 +113,7 @@ nlauth_application_id=${REST_APPLICATION_ID}\
 export const SCOPE = 'restlets'; //,rest_webservices,webservices,suiteanalytics,full,offline';
 
 /**
- * @reference https://9866738-sb1.app.netsuite.com/app/help/helpcenter.nl?fid=section_158081944642.html 
+ * @reference https://system.netsuite.com/app/help/helpcenter.nl?fid=section_158081944642.html 
  * @description (from reference)
  * - The length of the state parameter must be between 22 and 1024 characters. 
  * - Valid characters are all printable ASCII characters.

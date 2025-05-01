@@ -8,7 +8,7 @@ import {
     ValueMappingEntry, 
     isValueMappingEntry,
     DelimitedFileTypeEnum,
-    DelimiterEnum
+    DelimiterEnum,
 } from './CsvMapping'
 
 export {

@@ -3,7 +3,7 @@
  */
 import axios from "axios";
 import { RESTLET_URL_STEM } from "../../config/env";
-import { AxiosCallEnum, AxiosContentTypeEnum } from "../../types/auth/AxiosEnums";
+import { AxiosCallEnum, AxiosContentTypeEnum } from "src/server/types";
 
 /**
  * 

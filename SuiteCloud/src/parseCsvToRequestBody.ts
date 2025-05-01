@@ -18,25 +18,20 @@ import {
     SublistFieldDictionaryParseOptions, 
     SublistFieldValueMapping, 
     SublistSubrecordMapping 
-} from "./types/api";
-import { RecordTypeEnum } from "./types/NS";
+} from "./utils/api/types";
+import { RecordTypeEnum } from "./utils/api/types/NS";
 import {
-    hasKeys, isBooleanFieldId, isNullLike
+    hasKeys, isBooleanFieldId, isNullLike,
 } from "./utils/typeValidation";
 import { stripChar, printConsoleGroup as print, getDelimiterFromFilePath} from "./utils/io";
 import { DATA_DIR, OUTPUT_DIR, STOP_RUNNING } from "./config/env";
 import csv from 'csv-parser';
 import fs from 'fs';
-import { ColumnMapping, ValueMapping, ValueMappingEntry, isValueMappingEntry } from "./types/io";
-import { logger as log } from "./config/logging";
+import { ValueMapping, ValueMappingEntry, isValueMappingEntry } from "./utils/io/types";
 import { BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES } from "./config/constants";
+
 const NOT_DYNAMIC = false;
-/** NOT_INACTIVE = `false` -> `active` = `true` -> NetSuite's `isinactive` = `false` */
-const NOT_INACTIVE = false;
-
-
 let rowIndex = 0;
-
 
 /**
  * 
@@ -48,14 +43,13 @@ let rowIndex = 0;
  */
 export async function parseCsvToCreateOptions(
     csvPath: string,
-    parseOptionsArray: ParseOptions[]
+    parseOptionsArray: ParseOptions[],
 ): Promise<CreateRecordOptions[]> {
     if (!fs.existsSync(csvPath)) {
         throw new Error(`parseCsvToCreateOptions() Unable to Start: File not found: ${csvPath}`);
     }
     return new Promise((resolve, reject) => {
         const results: CreateRecordOptions[] = [];
-        // Validate parse options first
         if (!parseOptionsArray?.length) {
             throw new Error('parseOptionsArray must contain at least one ParseOptions configuration');
         }
@@ -65,21 +59,25 @@ export async function parseCsvToCreateOptions(
             .on('data', (row: Record<string, any>) => {
                 try {
                     // Process each parse configuration for every row
-                    for (const options of parseOptionsArray) {
-                        const { recordType, fieldDictParseOptions, sublistDictParseOptions, valueOverrides } = options;
+                    for (const [index, options] of Object.entries(parseOptionsArray)) {
+                        const { recordType, fieldDictParseOptions, sublistDictParseOptions, valueOverrides, pruneFunc } = options;
                         
                         // Validate required fields exist in CSV row
                         validateFieldMappings(row, fieldDictParseOptions, sublistDictParseOptions);
-
-                        // Generate the CreateRecordOptions for this record type
-                        const createOptions = generateCreateRecordOptions(
+                        let createOptions: CreateRecordOptions | null = generateCreateRecordOptions(
                             row,
                             recordType,
                             fieldDictParseOptions,
                             sublistDictParseOptions,
                             valueOverrides
                         );
-
+                        if (pruneFunc) {
+                            createOptions = pruneFunc(createOptions);
+                        }
+                        if (!createOptions) {
+                            console.log(`parseCsvToCreateOptions() rowIndex ${rowIndex}, parseOptionsArray[${index}], recordType ${recordType} was pruned by pruneOptions() and will not be included in the batch request`);
+                            continue;
+                        }
                         results.push(createOptions);
                     }
                 } catch (error) {
@@ -105,7 +103,6 @@ function validateFieldMappings(
     fieldDict: FieldDictionaryParseOptions,
     sublistDict: SublistDictionaryParseOptions
 ): void {
-    log.info(`rowIndex: ${rowIndex}, row:`, row);
     // Validate body field mappings
     fieldDict.fieldValueMapArray?.forEach(mapping => {
         if ('colName' in mapping && mapping.colName && !(mapping.colName in row)) {
@@ -164,7 +161,7 @@ export function generateFieldDictionary(
 ): FieldDictionary {
     const fieldDict = {
         valueFields: generateSetFieldValueOptionsArray(row, fieldDictParseOptions.fieldValueMapArray, valueOverrides) as SetFieldValueOptions[],
-        subrecordFields: generateSetSubrecordOptionsArray(row, FieldParentTypeEnum.BODY, fieldDictParseOptions.subrecordMapArray || []) as SetSubrecordOptions[],
+        subrecordFields: generateSetSubrecordOptionsArray(row, FieldParentTypeEnum.BODY, fieldDictParseOptions.subrecordMapArray || [], valueOverrides) as SetSubrecordOptions[],
     } as FieldDictionary;
     return fieldDict;
 }
@@ -188,10 +185,62 @@ export function generateSublistDictionary(
         let sublistFieldDictOptions: SublistFieldDictionaryParseOptions = sublistDictParseOptions[sublistId];
         sublistDict[sublistId] = {
             valueFields: generateSetSublistValueOptionsArray(row, sublistFieldDictOptions.fieldValueMapArray, valueOverrides) as SetSublistValueOptions[],
-            subrecordFields: generateSetSubrecordOptionsArray(row, FieldParentTypeEnum.SUBLIST, sublistFieldDictOptions.subrecordMapArray || []) as SetSubrecordOptions[],
+            subrecordFields: generateSetSubrecordOptionsArray(row, FieldParentTypeEnum.SUBLIST, sublistFieldDictOptions.subrecordMapArray || [], valueOverrides) as SetSubrecordOptions[],
         } as SublistFieldDictionary;
     }
     return sublistDict;
+}
+
+/**
+ * 
+ * @param row `Record<string, any>`
+ * @param parentType {@link FieldParentTypeEnum} 
+ * @param subrecordMapArray `Array<`{@link FieldSubrecordMapping}`> | Array<`{@link SublistSubrecordMapping}`>`
+ * @returns `arr` — `Array<`{@link SetSubrecordOptions}`>` = `{ parentSublistId`?: string, `line`?: string, `fieldId`: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]`
+ */
+export function generateSetSubrecordOptionsArray(
+    row: Record<string, any>, 
+    parentType: FieldParentTypeEnum, 
+    subrecordMapArray: FieldSubrecordMapping[] | SublistSubrecordMapping[],
+    valueOverrides?: ValueMapping
+): SetSubrecordOptions[] {
+    let arr = [] as SetSubrecordOptions[];    
+    if (parentType === FieldParentTypeEnum.BODY) {
+        for (let subrecordMap of subrecordMapArray) {
+            let { fieldId, subrecordType, fieldDictOptions, sublistDictOptions } = subrecordMap as FieldSubrecordMapping;
+            let fieldSubrecOptions: SetSubrecordOptions = {
+                fieldId: fieldId,
+                subrecordType: subrecordType,
+            }
+            if (fieldDictOptions) {
+                fieldSubrecOptions.fieldDict = generateFieldDictionary(row, fieldDictOptions, valueOverrides);
+            }
+            if (sublistDictOptions) {
+                fieldSubrecOptions.sublistDict = generateSublistDictionary(row, sublistDictOptions, valueOverrides);
+            }
+            arr.push(fieldSubrecOptions);
+        }
+    } else if (parentType === FieldParentTypeEnum.SUBLIST) {
+        for (let [index, subrecordMap] of Object.entries(subrecordMapArray)) {
+            let { parentSublistId, line, fieldId, subrecordType, fieldDictParseOptions: fieldDictOptions, sublistDictParseOptions: sublistDictOptions } = subrecordMap as SublistSubrecordMapping;
+            let sublistSubrecOptions: SetSubrecordOptions = {
+                parentSublistId: parentSublistId,
+                line: line === undefined || line === null ? parseInt(index) : line,
+                fieldId: fieldId,
+                subrecordType: subrecordType,
+            }
+            if (fieldDictOptions) {
+                sublistSubrecOptions.fieldDict = generateFieldDictionary(row, fieldDictOptions, valueOverrides);
+            }
+            if (sublistDictOptions) {
+                sublistSubrecOptions.sublistDict = generateSublistDictionary(row, sublistDictOptions, valueOverrides);
+            }
+            arr.push(sublistSubrecOptions);
+        }
+    } else {
+        throw new Error(`generateSetSubrecordOptionsArray() Invalid parentType: ${parentType}`);
+    }
+    return arr;
 }
 
 /**
@@ -209,22 +258,26 @@ export function generateSetSublistValueOptionsArray(
     let arr = [] as SetSublistValueOptions[];
     for (let [index, sublistFieldValueMap] of Object.entries(sublistFieldValueMapArray)) {
         let { sublistId, line, fieldId, defaultValue, colName, rowEvaluator } = sublistFieldValueMap;
-        let rowValue: FieldValue;    
+        if (!fieldId || (isNullLike(defaultValue) && !colName && !rowEvaluator)) {
+            throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or rowEvaluator or defaultValue`);
+        }     
+        let rowValue: FieldValue = null;    
         if (rowEvaluator) {
             rowValue = rowEvaluator(row);
         } else if (colName) {
             rowValue = transformValue(String(row[colName]), colName, fieldId, valueOverrides);
-        } else if (defaultValue) {
+        } 
+        
+        if (defaultValue !== undefined && isNullLike(rowValue)) {
             rowValue = defaultValue;
-        } else {
-            throw new Error(`generateSetSublistValueOptionsArray(), sublistFieldValueMapArray[${index}], invalid mapping for ${sublistId}.${fieldId} must have defaultValue, colName, or rowEvaluator`);
         }
+
         if (isNullLike(rowValue)) {
             print({
                 label: `generateSetSublistValueOptionsArray(), row=${rowIndex} rowValue after transformValue or rowEvaluator is null or undefined`, 
                 details: [
-                    `sublistFieldValueMap[${index}]: { sublistId: ${sublistId}, fieldId: ${fieldId}, defaultValue: ${defaultValue}, colName: ${colName} }`,
-                    `rowValue="${rowValue}" -> continue to next sublistFieldValueMap`
+                `sublistFieldValueMap[${index}]: { sublistId: ${sublistId}, fieldId: ${fieldId}, defaultValue: ${defaultValue}, colName: ${colName} }`,
+                `rowValue="${rowValue}" -> continue to next sublistFieldValueMap`
                 ], printToConsole: false, printToFile: true, enableOverwrite: false
             });
             continue;
@@ -255,23 +308,26 @@ export function generateSetFieldValueOptionsArray(
     for (let [index, fieldValueMap] of Object.entries(fieldValueMapArray)) {
         try {
             let { fieldId, defaultValue, colName, rowEvaluator } = fieldValueMap;
-            let rowValue: FieldValue;
+            if (!fieldId || (isNullLike(defaultValue) && !colName && !rowEvaluator)) {
+                throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or rowEvaluator or defaultValue`);
+            }     
+            let rowValue: FieldValue = null;
             if (rowEvaluator) {
                 rowValue = rowEvaluator(row);
             } else if (colName) {
                 rowValue = transformValue(String(row[colName]), colName, fieldId, valueOverrides);
-            } else if (defaultValue) {
+            }
+
+            if (defaultValue !== undefined && isNullLike(rowValue)) {
                 rowValue = defaultValue;
-            } else {
-                throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have either defaultValue, colName, or rowEvaluator`);
-            }       
+            }   
             
             if (isNullLike(rowValue)) {
                 print({
                     label: `rowIndex ${rowIndex}: generateSetFieldValueOptionsArray() rowValue is null or undefined.`, 
                     details: [
-                        `fieldValueMap[${index}]: { fieldId: ${fieldId}, defaultValue: ${defaultValue}, colName: ${colName}}`,
-                        `rowValue="${rowValue}" -> continue to next fieldValueMap`
+                    `fieldValueMap[${index}]: { fieldId: ${fieldId}, defaultValue: ${defaultValue}, colName: ${colName}}`,
+                    `rowValue="${rowValue}" -> continue to next fieldValueMap`
                     ], printToConsole: false, printToFile: true, enableOverwrite: false
                 });
                 continue;
@@ -335,55 +391,4 @@ export function transformValue(
         console.warn(`transformValue() for a value in row ${rowIndex} Could not parse value: ${trimmedValue}`);
         return trimmedValue;
     }
-}
-
-/**
- * 
- * @param row `Record<string, any>`
- * @param parentType {@link FieldParentTypeEnum} 
- * @param subrecordMapArray `Array<`{@link FieldSubrecordMapping}`> | Array<`{@link SublistSubrecordMapping}`>`
- * @returns `arr` — `Array<`{@link SetSubrecordOptions}`>` = `{ parentSublistId`?: string, `line`?: string, `fieldId`: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]`
- */
-export function generateSetSubrecordOptionsArray(
-    row: Record<string, any>, 
-    parentType: FieldParentTypeEnum, 
-    subrecordMapArray: FieldSubrecordMapping[] | SublistSubrecordMapping[]
-): SetSubrecordOptions[] {
-    let arr = [] as SetSubrecordOptions[];    
-    if (parentType === FieldParentTypeEnum.BODY) {
-        for (let subrecordMap of subrecordMapArray) {
-            let { fieldId, subrecordType, fieldDictOptions, sublistDictOptions } = subrecordMap as FieldSubrecordMapping;
-            let fieldSubrecOptions: SetSubrecordOptions = {
-                fieldId: fieldId,
-                subrecordType: subrecordType,
-            }
-            if (fieldDictOptions) {
-                fieldSubrecOptions.fieldDict = generateFieldDictionary(row, fieldDictOptions);
-            }
-            if (sublistDictOptions) {
-                fieldSubrecOptions.sublistDict = generateSublistDictionary(row, sublistDictOptions);
-            }
-            arr.push(fieldSubrecOptions);
-        }
-    } else if (parentType === FieldParentTypeEnum.SUBLIST) {
-        for (let [index, subrecordMap] of Object.entries(subrecordMapArray)) {
-            let { parentSublistId, line, fieldId, subrecordType, fieldDictParseOptions: fieldDictOptions, sublistDictParseOptions: sublistDictOptions } = subrecordMap as SublistSubrecordMapping;
-            let sublistSubrecOptions: SetSubrecordOptions = {
-                parentSublistId: parentSublistId,
-                line: line === undefined || line === null ? parseInt(index) : line,
-                fieldId: fieldId,
-                subrecordType: subrecordType,
-            }
-            if (fieldDictOptions) {
-                sublistSubrecOptions.fieldDict = generateFieldDictionary(row, fieldDictOptions);
-            }
-            if (sublistDictOptions) {
-                sublistSubrecOptions.sublistDict = generateSublistDictionary(row, sublistDictOptions);
-            }
-            arr.push(sublistSubrecOptions);
-        }
-    } else {
-        throw new Error(`generateSetSubrecordOptionsArray() Invalid parentType: ${parentType}`);
-    }
-    return arr;
 }

@@ -9,7 +9,7 @@
  * /(?:company|corp|inc|co\.?,? ltd\.?|ltd|\.?l\.?lc|plc . . ./ 
  * */
 export const COMPANY_KEYWORDS_PATTERN: RegExp = 
-/(?:company|corp|inc|co\.?,? ltd\.?|ltd|\.?l\.?lc|plc|group|consulting|consultants|packaging|print|associates|partners|practice|service(s)?|health|healthcare|medical| spa|spa |surgeons|aesthetic|America|USA|\.com)\s*$/i;
+/(?:company|corp|inc|co\.?,? ltd\.?|ltd|\.?l\.?lc|plc|group|consulting|consultants|packaging|print|associates|partners|practice|service(s)?|America|USA|\.com)\s*$/i;
 
 
 

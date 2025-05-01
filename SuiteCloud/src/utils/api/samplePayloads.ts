@@ -7,9 +7,9 @@ import {
     SetSublistTextOptions, SetSubrecordOptions, SublistFieldDictionary, 
     SetSublistValueOptions, 
     SetFieldValueOptions
-} from "src/types/api/Api"
-import { NetSuiteCountryEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES } from "src/types/NS"
-import { RecordTypeEnum } from "src/types/NS/Record"
+} from "src/utils/api/types/Api"
+import { NetSuiteCountryEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES } from "src/utils/api/types/NS"
+import { RecordTypeEnum } from "src/utils/api/types/NS/Record"
 
 const NOT_INACTIVE = false;
 const NOT_DYNAMIC = false;
