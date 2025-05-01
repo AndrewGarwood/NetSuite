@@ -1,9 +1,9 @@
 /**
- * @file src/types/api/CsvToApiMapping.ts
+ * @file src/utils/api/types/CsvToApiMapping.ts
  * @module CsvToApiMapping
  */
-import { RecordTypeEnum } from "../NS";
-import { ValueMapping, ValueMappingEntry } from "../io";
+import { RecordTypeEnum } from "./NS";
+import { ValueMapping, ValueMappingEntry } from "../../io/types";
 import { 
     CreateRecordOptions, 
     FieldDictionary,
@@ -16,26 +16,32 @@ import {
     SetSubrecordOptions  
 } from "./Api";
 
+
 /**
  * @interface ParseOptions
  * @property {RecordTypeEnum} recordType - {@link RecordTypeEnum} The type of the NetSuite record.
  * @property {FieldDictionaryParseOptions} fieldDictParseOptions - {@link FieldDictionaryParseOptions} The field dictionary parse options for the record.
  * @property {SublistDictionaryParseOptions} sublistDictParseOptions - {@link SublistDictionaryParseOptions} The sublist dictionary parse options for the record.
  * @property {ValueMapping} valueOverrides - {@link ValueMapping} The value overrides for specific field values used in 
+ * @property {function} [pruneFunc] - A `function` that takes a {@link CreateRecordOptions} object and returns either a {@link CreateRecordOptions} object or `null`.
  */
 export interface ParseOptions {
     recordType: RecordTypeEnum;
     fieldDictParseOptions: FieldDictionaryParseOptions;
     sublistDictParseOptions: SublistDictionaryParseOptions;
     valueOverrides?: ValueMapping;
+    /**
+     * @property {function} [pruneOptions] - A `function` that takes a {@link CreateRecordOptions} object and returns either a {@link CreateRecordOptions} or `null`.
+     */
+    pruneFunc?: (options: CreateRecordOptions) => CreateRecordOptions | null;
 }
 
 /**
- * @typedefn {object} SetSubrecordOptions
+ * @typedefn `{object}` `SetSubrecordOptions`
  * @property {string} fieldId - The field ID of the body subrecord in the parent record.
  * @property {string} subrecordType - The type of the subrecord.
- * @property {FieldDictionaryParseOptions} fieldDict - {@link FieldDictionaryParseOptions} - The field dictionary parse options for the subrecord.
- * @property {SublistDictionaryParseOptions} sublistDict - {@link SublistDictionaryParseOptions} - The sublist dictionary parse options for the subrecord.
+ * @property {FieldDictionaryParseOptions} fieldDictOptions - {@link FieldDictionaryParseOptions} - The field dictionary parse options for the subrecord.
+ * @property {SublistDictionaryParseOptions} sublistDictOptions - {@link SublistDictionaryParseOptions} - The sublist dictionary parse options for the subrecord.
  */
 export type FieldSubrecordMapping = {
     fieldId: string;
@@ -93,6 +99,7 @@ export type SublistFieldDictionaryParseOptions = {
 //@property {string | string[]} fieldId  string[] implies that the value in row[colName] should be mapped to all fieldIds in the array.
 
 /**
+ * `rowEvaluator` and `colName` are mutually exclusive.
  * @typedefn {object} `FieldValueMapping`
  * @property {string} fieldId - The `fieldId` of a body field of the NetSuite record.
  * @property {FieldValue} [defaultValue] - The default value to set if `row[colName]` or `rowEvaluator(row)` is `undefined`.
@@ -107,13 +114,13 @@ export type SublistFieldDictionaryParseOptions = {
  */
 export type FieldValueMapping = {
     fieldId: string;
-    defaultValue?: FieldValue; // default value to set if row[colName] or rowEvaluator(row) is undefined
 } & (
-    | { colName: string; rowEvaluator?: never }
-    | { colName?: never; rowEvaluator: (row: Record<string, any>) => FieldValue }
+    | { defaultValue?: FieldValue; colName?: string; rowEvaluator?: never; }
+    | { defaultValue?: FieldValue; colName?: never; rowEvaluator?: (row: Record<string, any>) => FieldValue; }
 );
 
 /**
+ * `rowEvaluator` and `colName` are mutually exclusive.
  * @typedefn {object} SublistFieldValueMapping
  * @property {string} sublistId - The sublist ID of a sublist in a NetSuite record.
  * @property {number} line - The line number of the sublist.
@@ -128,10 +135,9 @@ export type SublistFieldValueMapping = {
     sublistId: string;
     line: number;
     fieldId: string;
-    defaultValue?: FieldValue; // default value to set if row[colName] or rowEvaluator(row) is undefined
 } & (
-    | { colName: string; rowEvaluator?: never }
-    | { colName?: never; rowEvaluator: (row: Record<string, any>) => FieldValue }
+    | { defaultValue?: FieldValue; colName?: string; rowEvaluator?: never; }
+    | { defaultValue?: FieldValue; colName?: never; rowEvaluator?: (row: Record<string, any>) => FieldValue; }
 );
 
 /**

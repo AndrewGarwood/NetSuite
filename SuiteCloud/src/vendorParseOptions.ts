@@ -6,6 +6,11 @@
  */
 import { 
     FieldValue,
+    CreateRecordOptions,
+    SetFieldValueOptions,
+    SetSublistValueOptions,
+    SetSubrecordOptions,
+    SublistFieldDictionary,
 
     ParseOptions,
     FieldDictionaryParseOptions, 
@@ -15,16 +20,20 @@ import {
     SublistDictionaryParseOptions, 
     SublistFieldDictionaryParseOptions, 
     SublistFieldValueMapping, 
-    SublistSubrecordMapping 
-} from "./types/api";
-import { parseCsvToCreateOptions } from './parseCsvToRequestBody'
-import { ValueMapping, isValueMappingEntry } from "./types/io";
+    SublistSubrecordMapping,
+} from "./utils/api/types";
+import { isNullLike } from "./utils/typeValidation";
+import { ValueMapping, isValueMappingEntry } from "./utils/io/types";
 import { stripChar, printConsoleGroup as print, stringEndsWithAnyOf } from "./utils/io";
 import { READLINE as rl } from "src/config/env";
 import { HUMAN_VENDORS_ORIGINAL_TEXT,  } from './config/constants'
 import { TERM_VALUE_MAPPING } from "./utils/io/mappings";
-import { RecordTypeEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES, CountryAbbreviationEnum, StateAbbreviationEnum } from "./types/NS";
+import { RecordTypeEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES, CountryAbbreviationEnum, StateAbbreviationEnum } from "./utils/api/types/NS";
 import { COMPANY_KEYWORDS_PATTERN } from "./utils/io/regex";
+
+
+
+
 
 const VENDOR_VALUE_OVERRIDES: ValueMapping = {
     'VENDOR_NAME_WITH_SPELLING_ERROR_THAT_THEY_NEVER_FIXED': 'VENDOR_NAME_CORRECTED' as FieldValue  
@@ -32,8 +41,8 @@ const VENDOR_VALUE_OVERRIDES: ValueMapping = {
 // see if there exist ways to redundancy in rowEvaluator functions... 
 // also maybe move all the evaluator functions to their own file
 
-const HUMAN_VENDORS_TRIMMED = HUMAN_VENDORS_ORIGINAL_TEXT.map((name) => cleanString(name));
-function cleanString(s: string, toUpper: boolean = false, toLower: boolean = false): string {
+export const HUMAN_VENDORS_TRIMMED = HUMAN_VENDORS_ORIGINAL_TEXT.map((name) => cleanString(name));
+export function cleanString(s: string, toUpper: boolean = false, toLower: boolean = false): string {
     if (!s) return '';
     s = s.replace(/\s+/g, ' ').replace(/\.{2,}/g, '.').trim();
     if (!s.endsWith('Ph.D.') && !stringEndsWithAnyOf(s, COMPANY_KEYWORDS_PATTERN)) {
@@ -43,7 +52,7 @@ function cleanString(s: string, toUpper: boolean = false, toLower: boolean = fal
     return s;
 }
 
-function checkForOverride(initialValue: string, valueOverrides: ValueMapping): FieldValue {
+export function checkForOverride(initialValue: string, valueOverrides: ValueMapping): FieldValue {
     print({label: `checkForOverride: ${initialValue}`, details: [
         `is "${initialValue}" a value we want to override? = ${Object.keys(valueOverrides).includes(initialValue)}`
         ], printToConsole: false, enableOverwrite: false
@@ -60,7 +69,7 @@ function checkForOverride(initialValue: string, valueOverrides: ValueMapping): F
 }
 
 const evaluateVendorIsPerson = (row: Record<string, any>): boolean => {
-    let vendor = checkForOverride(cleanString(row['Vendor']), VENDOR_VALUE_OVERRIDES) as string;
+    let vendor = checkForOverride(row['Vendor'], VENDOR_VALUE_OVERRIDES) as string;
     if (HUMAN_VENDORS_TRIMMED.includes(vendor)) {
         print({label: `evaluateVendorIsPerson: ${vendor} -> true`, printToConsole: false, enableOverwrite: false});
         return true; // vendor is a person
@@ -71,7 +80,7 @@ const evaluateVendorIsPerson = (row: Record<string, any>): boolean => {
 
 const evaluateVendorCompanyName = (row: Record<string, any>): string => {
     if (!evaluateVendorIsPerson(row)) {
-        return checkForOverride(cleanString(row['Vendor']), VENDOR_VALUE_OVERRIDES) as string;
+        return checkForOverride(row['Vendor'], VENDOR_VALUE_OVERRIDES) as string;
     } else {
         return '';
     }
@@ -114,21 +123,39 @@ const evaluateVendorSalutation = (row: Record<string, any>): string => {
     }
 }
 
+const evaluateAlternateEmail = (row: Record<string, any>): string => {
+    let ccEmail: string = String(row['CC Email']).trim();
+    let invalidEmailPattern = new RegExp(/(\s*;\s*)?[a-zA-Z0-9._%+-]+@benev\.com(\s*;\s*)?/, 'ig')
+    if (ccEmail && !invalidEmailPattern.test(ccEmail)) {
+        return ccEmail;
+    } else if (ccEmail && invalidEmailPattern.test(ccEmail)) {
+        print({label: `evaluateAlternateEmail: ${ccEmail} -> ${ccEmail.replace(invalidEmailPattern, '').trim()}`, printToConsole: false, enableOverwrite: false});
+        return ccEmail.replace(invalidEmailPattern, '').trim();
+    } 
+    return '';
+}
+
 const evaluateVendorTerms = (row: Record<string, any>): string => {
     let termsRowValue = String(row['Terms']).trim();
     if (termsRowValue && Object.keys(TERM_VALUE_MAPPING).includes(termsRowValue)) {
         return TERM_VALUE_MAPPING[termsRowValue as keyof typeof TERM_VALUE_MAPPING] as string;
     } else if (termsRowValue && Object.values(TERM_VALUE_MAPPING).includes(termsRowValue as string)) {
         return termsRowValue;
-    } else {
-        console.log(`Invalid terms: ${termsRowValue}`);
+    } else if (!termsRowValue){
         return '';
     }
+    console.log(`Invalid terms: "${termsRowValue}"`);
+    return '';
 }
+
 const evaluateVendorAttention = (row: Record<string, any>): string => {
+    let vendor = checkForOverride(row['Vendor'], VENDOR_VALUE_OVERRIDES) as string;
     let attn: string = '';
+    if (row['Mr./Ms./...']) {
+        attn += `${row['Mr./Ms./...']}`;
+    }
     if (row['First Name']) {
-        attn += `${row['First Name']}`;
+        attn += ` ${row['First Name']}`;
     }
     if (row['M.I.']) {
         attn += ` ${row['M.I.']}`;
@@ -136,8 +163,8 @@ const evaluateVendorAttention = (row: Record<string, any>): string => {
     if (row['Last Name']) {
         attn += ` ${row['Last Name']}`;
     }
-    attn = attn === '' && row['Primary Contact'] ? row['Primary Contact'] : attn;
-    return attn.trim();
+    attn = (attn === '' && row['Primary Contact'] ? row['Primary Contact'] : attn).trim();
+    return attn === vendor ? '' : attn;
 }
 
 const evaluateVendorBillingCountry = (row: Record<string, any>): string => {
@@ -178,7 +205,6 @@ const evaluateVendorShippingState = (row: Record<string, any>): string => {
         return '';
     }
 }
-
 
 const evaluateVendorShippingCountry = (row: Record<string, any>): string => {
     let shipFromCountry: string = String(row['Ship from Country']).trim().toUpperCase();
@@ -241,17 +267,55 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
         ] as SublistSubrecordMapping[],
     } as SublistFieldDictionaryParseOptions,
 };
+
+
+const pruneAddressBookSublistOfRecordOptions = (
+    options: CreateRecordOptions
+): CreateRecordOptions | null => {
+    const REQUIRED_ADDRESS_FIELDS = ['addr1']
+    try {
+        let addressbook = options?.sublistDict?.addressbook as SublistFieldDictionary;
+        let valueFields = addressbook?.valueFields as SetSublistValueOptions[];
+        let subrecordFields = addressbook?.subrecordFields as SetSubrecordOptions[];
+        subrecordFields?.forEach((subrecOps, index) => {
+            let subrecValueFields = subrecOps?.fieldDict?.valueFields as SetFieldValueOptions[];
+            for (const requiredField of REQUIRED_ADDRESS_FIELDS) {
+                if (!subrecValueFields?.some((field) => field.fieldId === requiredField)) {
+                    print({
+                        label: `subrecordFields[${index}]: SetSubrecordOptions is missing address field "${requiredField}", removing it from subrecordFields`, 
+                        printToConsole: false, enableOverwrite: false
+                    });
+                    valueFields?.splice(index, 1);
+                    subrecordFields?.splice(index, 1);
+                    return options;
+                }
+                print({
+                    label: `All required fields found. Keeping addressbook subrecordFields[${index}]`, 
+                    printToConsole: false, enableOverwrite: false
+                });
+            }
+        });
+        return options;
+    } catch (error) {
+        console.error(`Error in pruneAddressBookSublistOfRecordOptions: ${error}`);
+    }
+    return null;
+};
+
+/** NOT_INACTIVE = `false` -> `active` === `true` -> NetSuite's `isinactive` = `false` */
+const NOT_INACTIVE = false;
 const CONTACT_VENDOR_SHARED_FIELD_VALUE_MAP_ARRAY: FieldValueMapping[] = [
     { fieldId: 'entityid', colName: 'Vendor' },
+    { fieldId: 'isinactive', defaultValue: NOT_INACTIVE },
     { fieldId: 'email', colName: 'Main Email' },
-    { fieldId: 'altemail', colName: 'CC Email' },
+    { fieldId: 'altemail', rowEvaluator: evaluateAlternateEmail },
     { fieldId: 'phone', colName: 'Main Phone' },
     { fieldId: 'mobilephone', colName: 'Mobile' },
     { fieldId: 'homephone', colName: 'Work Phone' },
     { fieldId: 'fax', colName: 'Fax' },
     { fieldId: 'salutation', rowEvaluator: evaluateVendorSalutation },
     { fieldId: 'title', colName: 'Job Title' },
-    { fieldId: 'comments', colName: 'Notes' },
+    { fieldId: 'comments', colName: 'Note' },
 ]
 
 export const PARSE_VENDOR_FROM_VENDOR_CSV_OPTIONS: ParseOptions = {
@@ -273,7 +337,8 @@ export const PARSE_VENDOR_FROM_VENDOR_CSV_OPTIONS: ParseOptions = {
         subrecordMapArray: [] // No body subrecords
     } as FieldDictionaryParseOptions,
     sublistDictParseOptions: ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,
-    valueOverrides: VENDOR_VALUE_OVERRIDES
+    valueOverrides: VENDOR_VALUE_OVERRIDES,
+    pruneFunc: pruneAddressBookSublistOfRecordOptions,
 };
 
 export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
@@ -288,5 +353,6 @@ export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
         ] as FieldValueMapping[],
     } as FieldDictionaryParseOptions,
     sublistDictParseOptions: ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,
-    valueOverrides: VENDOR_VALUE_OVERRIDES
+    valueOverrides: VENDOR_VALUE_OVERRIDES,
+    pruneFunc: pruneAddressBookSublistOfRecordOptions,
 }

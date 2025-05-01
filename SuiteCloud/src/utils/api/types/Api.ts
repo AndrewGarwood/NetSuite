@@ -3,8 +3,8 @@
  * @module Api
  */
 
-import { RecordTypeEnum } from '../NS/Record';
-import { hasKeys } from '../../utils/typeValidation';
+import { RecordTypeEnum } from './NS/Record';
+import { hasKeys } from '../../typeValidation';
 
 /**
  * - `createRecordArray` and `createRecordDict` are mutually exclusive
@@ -13,12 +13,12 @@ import { hasKeys } from '../../utils/typeValidation';
  * @property {Array\<CreateRecordOptions>} [createRecordArray]
  * `Array<`{@link CreateRecordOptions}`>` = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]` 
  * @property {{[K in RecordTypeEnum]?: Array\<CreateRecordOptions>}} [createRecordDict] 
-     * `Record<`[K in {@link RecordTypeEnum}]?: `Array<`{@link CreateRecordOptions}`>>`
+     * `{` [K in {@link RecordTypeEnum}]?: `Array<`{@link CreateRecordOptions}`> }`
 */
 export type BatchCreateRecordRequest = {
     createRecordArray?: CreateRecordOptions[];
-    createRecordDict?: Record<RecordTypeEnum, CreateRecordOptions[]>;
-};
+    createRecordDict?: { [K in RecordTypeEnum]?: CreateRecordOptions[] };
+}
 
 
 

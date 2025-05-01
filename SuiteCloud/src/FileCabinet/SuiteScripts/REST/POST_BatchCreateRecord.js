@@ -10,7 +10,7 @@
 
 define(['N/record', 'N/log'], (record, log) => {
     /**
-     * @type {LogStatement[]} - Array<{@link LogStatement}> = { `timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string }[]
+     * @type {LogStatement[]} - Array<{@link LogStatement}> = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
      * @see {@link writeLog}(type, title, ...details)
      * @description return logArray in post response so can process in client
      * e.g. in client write logArray to a json or txt file in a readable format
@@ -19,7 +19,7 @@ define(['N/record', 'N/log'], (record, log) => {
     const logArray = [];
     
     /**
-     * `createRecordArray` and `createRecordDict` are mutually exclusive
+     * createRecordArray and createRecordDict are mutually exclusive
      * @param {BatchCreateRecordRequest} reqBody - {@link BatchCreateRecordRequest} = `{ createRecordArray`: {@link CreateRecordOptions}`[], createRecordDict: {[K in `{@link RecordTypeEnum}`]?: Array<`{@link CreateRecordOptions}`>} }`
      * @description POST function to create multiple records in NetSuite. Can create record in batches by defining the request's body, reqBody, in two ways: 
      * @param {Array<CreateRecordOptions>} [reqBody.createRecordArray] `METHOD 1 —`
@@ -47,8 +47,8 @@ define(['N/record', 'N/log'], (record, log) => {
         /**@type {number[]} */
         let recIdArray = [];
         try {
-            writeLog(LogTypeEnum.AUDIT, 'reqBody.createRecordArray.length:', createRecordArray.length);
-            if (createRecordArray.length > 0) {
+            if (createRecordArray && createRecordArray.length > 0) {
+                writeLog(LogTypeEnum.AUDIT, 'reqBody.createRecordArray.length:', createRecordArray.length);
                 for (let i = 0; i < createRecordArray.length; i++) {
                     let createReq = createRecordArray[i];
                     let result = processCreateRecordOptions(createReq);
@@ -58,24 +58,24 @@ define(['N/record', 'N/log'], (record, log) => {
                     } 
                     recIdArray.push(result);
                 }
-            }   
-            writeLog(LogTypeEnum.AUDIT, 'Object.keys(reqBody.createRecordDict).length:', Object.keys(createRecordDict).length);
-            if (Object.keys(createRecordDict).length > 0) {
-                for (let [index, recordType] in Object.entries(Object.keys(createRecordDict))) {
+            }
+            if (createRecordDict && Object.keys(createRecordDict).length > 0) {   
+                writeLog(LogTypeEnum.AUDIT, 'Object.keys(reqBody.createRecordDict).length:', Object.keys(createRecordDict).length, Object.keys(createRecordDict));
+                Object.keys(createRecordDict).forEach((recordType, index) => {
                     if (Object.keys(RecordTypeEnum).includes(recordType.toUpperCase())) {
                         recordType = RecordTypeEnum[recordType.toUpperCase()];
                     } else if (!Object.values(RecordTypeEnum).includes(recordType.toLowerCase())) {
                         writeLog(LogTypeEnum.ERROR, 
                             `Invalid recordType in createRecordDict[${recordType}] i.e. createRecordDict.keys()[${index}]`, 
                             `Invalid recordType: "${recordType}". Must be a RecordTypeEnum key or one of RecordTypeEnum's values: [${Object.values(RecordTypeEnum).join(', ')}].`);
-                        continue;
+                        return;
                     }
                     let reqArray = createRecordDict[recordType];
-                    writeLog(LogTypeEnum.AUDIT, `createRecordDict[${recordType}].length:`, reqArray.length);
                     if (!Array.isArray(reqArray)) {
                         writeLog(LogTypeEnum.ERROR, `Invalid createRecordDict[${recordType}]`, 'createReqArray is not an array or is empty');
-                        continue;
+                        return;
                     }
+                    writeLog(LogTypeEnum.AUDIT, `createRecordDict[key=${recordType}, keyIndex=${index}].length:`, reqArray.length);
                     for (let i = 0; i < reqArray.length; i++) {
                         let createReq = reqArray[i];
                         let result = processCreateRecordOptions(createReq);
@@ -85,7 +85,7 @@ define(['N/record', 'N/log'], (record, log) => {
                         } 
                         recIdArray.push(result);
                     }
-                }
+                });
             }      
             writeLog(LogTypeEnum.DEBUG, 'POST (BatchCreateRecordRequest) End', { recIdArrayLength: recIdArray.length });
             /**@type {BatchCreateRecordResponse}*/
@@ -96,7 +96,7 @@ define(['N/record', 'N/log'], (record, log) => {
                 logArray: logArray
             }
         } catch (/**@type {Error}*/e) {
-            writeLog(LogTypeEnum.ERROR, 'post.catch(e): Error processing request in POST_BatchCreateRecord', e);
+            writeLog(LogTypeEnum.ERROR, 'post.catch(e): Error processing request in POST_BatchCreateRecord', JSON.stringify(e, null, 4));
             /**@type {BatchCreateRecordResponse}*/
             return { 
                 success: false,
@@ -109,9 +109,9 @@ define(['N/record', 'N/log'], (record, log) => {
     }
 
     /**
-     * @param {CreateRecordOptions} createReq {@link CreateRecordOptions} = { `recordType`, `isDynamic`=false, `fieldDict`, `sublistDict` }
-     * @param {string} createReq.recordType - The record type to create, see {@link RecordTypeEnum} (e.g., 'assemblyitem', 'bom', 'bomrevision', 'inventoryitem', 'salesorder', etc.)
-     * @param {boolean} [createReq.isDynamic=false] - Indicates if the record should be created in dynamic mode. Default is false.
+     * @param {CreateRecordOptions} createReq {@link CreateRecordOptions} = { `recordType`, `isDynamic`=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary} }.
+     * @param {string} createReq.recordType - The record type to create, see {@link RecordTypeEnum} (e.g. 'assemblyitem')
+     * @param {boolean} [createReq.isDynamic=false] - Indicates if the record should be created in dynamic mode. Default is `false`.
      * @param {FieldDictionary} [createReq.fieldDict]
      * - {@link FieldDictionary} = { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetFieldTextOptions}>, `valueFields`: Array<{@link SetFieldValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }.
      * - an object containing field IDs and their corresponding values.
@@ -163,7 +163,6 @@ define(['N/record', 'N/log'], (record, log) => {
                     rec = processFieldDictionary(rec, recordType, sublistFieldDict, FieldDictTypeEnum.SUBLIST_FIELD_DICT);
                 }
             }
-            // writeLog(LogTypeEnum.DEBUG, `AFTER PROCESS fieldDict and sublistDict in processCreateRecordOptions() rec`, rec);
             /**@type {number} */
             const recId = rec.save();
             writeLog(LogTypeEnum.AUDIT, `Successfully created ${recordType} record`, { recordId: recId });
@@ -544,6 +543,7 @@ const FieldDictTypeEnum = {
  * @property {{[K in RecordTypeEnum]?: Array<CreateRecordOptions>}} [createRecordDict] 
  * `Record<`[K in {@link RecordTypeEnum}]?: `Array<`{@link CreateRecordOptions}`>>` to create records in NetSuite.
 */
+
 /**
  * Definition of Response for the POST function in POST_BatchCreateRecord.js
  * @typedef {Object} BatchCreateRecordResponse
