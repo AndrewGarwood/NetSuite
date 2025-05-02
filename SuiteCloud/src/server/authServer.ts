@@ -9,14 +9,14 @@ import {
     SCOPE, STATE, RESTLET_URL_STEM, OUTPUT_DIR, READLINE as rl
 } from '../config/env';
 import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from './types';
-import { writeObjectToJson, getCurrentPacificTime, readJsonFileAsObject, printConsoleGroup } from 'src/utils/io';
+import { writeObjectToJson, getCurrentPacificTime, readJsonFileAsObject, printConsoleGroup as print } from 'src/utils/io';
 
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 
-/**@see {@link Server} */
-let server: any;
+/**@see {@link Server} from ~\node_modules\@types\node\http.d.ts*/
+let server: Server | any | undefined;
 
 /**
  * @description close the {@link server}: {@link Server} listening for oauth 2.0 callback if it is running.
@@ -31,7 +31,7 @@ export const CLOSE_SERVER = (): void => {
 }
 
 /**  
- * @description OAUTH2 STEP 1. use {@link AUTH_URL}, with search params {{@link REDIRECT_URI}, 
+ * @description `OAUTH2 STEP 1`. use {@link AUTH_URL}, with search params {{@link REDIRECT_URI}, 
  * {@link CLIENT_ID}, {@link SCOPE}, {@link STATE}} to form authorization link and 
  * initiate OAuth callback to be resolved with the callback response's authorization code. 
  */
@@ -39,8 +39,6 @@ export async function getAuthCode(): Promise<string> {
     return new Promise((resolve, reject) => {
         app.get('/callback', (req: Request, res: Response) => {
             const authCode = req.query.code as string;
-            // console.log('getAuthCode() req', req);
-
             if (authCode) {
                 res.send('Authorization code received. You can close this window.');
                 resolve(authCode);
@@ -54,7 +52,6 @@ export async function getAuthCode(): Promise<string> {
             console.log(`Server is listening on port ${SERVER_PORT} for oauth callback...`);
             const authLink = `${AUTH_URL}?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${CLIENT_ID}&scope=${SCOPE}&state=${STATE}`;
             console.log(`Opening authURL: ${authLink}`);
-            // open(authLink, {app: {name: 'chrome', arguments: ['--incognito']}}).catch((err) => {
             open(authLink).catch((err) => {    
                 console.error('Error in authServer.ts getAuthCode() when opening authURL:', err);
                 reject(err);
@@ -63,14 +60,13 @@ export async function getAuthCode(): Promise<string> {
     });
 }
 /**
- * @description OAUTH2 STEP 2. Exchange the authorization code for {@link TokenResponse}
+ * @description `OAUTH2 STEP 2`. Exchange the authorization code for {@link TokenResponse}
  * @param {string} authCode - The authorization code received from the OAuth callback.
  * @returns {Promise<TokenResponse>} .{@link TokenResponse} containing the access token and refresh token.
  */
 export async function exchangeAuthCodeForTokens(authCode: string): Promise<TokenResponse> {
-    console.log(`Begin exchangeAuthCodeForTokens() with authCode: ${authCode}`);
+    // console.log(`Begin exchangeAuthCodeForTokens() with authCode: ${authCode}`);
     const params = generateAxiosParams(authCode, undefined, REDIRECT_URI);
-    console.log('\texchangeAuthCodeForToken() params:', params);
     try {
         const response = await axios.post(TOKEN_URL, params.toString(), {
             headers: { 
@@ -81,7 +77,6 @@ export async function exchangeAuthCodeForTokens(authCode: string): Promise<Token
                 password: CLIENT_SECRET 
             },
         });
-        // console.log('\texchangeAuthCodeForTokens() response:', response);
         if (!response || !response.data) {
             console.error('Error in authServer.ts exchangeAuthCodeForTokens(): No response data received');
             throw new Error('No response data received after axios.post(...) in authServer.ts exchangeAuthCodeForTokens()');
@@ -94,7 +89,7 @@ export async function exchangeAuthCodeForTokens(authCode: string): Promise<Token
 }
 
 /** 
- * @description OAUTH2 STEP 3. Use the refresh token to get a new {@link TokenResponse} with a new access token.
+ * @description `OAUTH2 STEP 3`. Use the refresh token to get a new {@link TokenResponse} with a new access token.
  * @param {string} refreshToken - The refresh token received from the initial token response.
  * @returns {Promise<TokenResponse>} .{@link TokenResponse} containing the new access token and refresh token.
  */
@@ -111,7 +106,6 @@ export async function exchangeRefreshTokenForNewTokens(refreshToken: string): Pr
                 password: CLIENT_SECRET 
             },
         });
-        // console.log('\t exchangeRefreshTokenForNewTokens() response.data:', response.data);
         return response.data as TokenResponse;
     } catch (error) {
         console.error('Error in authServer.ts exchangeRefreshTokenForNewTokens():', error);
@@ -124,7 +118,7 @@ export async function exchangeRefreshTokenForNewTokens(refreshToken: string): Pr
  * @param refreshToken - The refresh token received from the initial token response. is defined when this function is called in {@link exchangeRefreshTokenForNewTokens}`(refreshToken)` refreshToken != undefined -> grant_type=refresh_token
  * @param redirectUri - The redirect URI used in the OAuth flow. Default is {@link REDIRECT_URI}.
  * @returns {URLSearchParams} params, see {@link URLSearchParams}
- * @reference https://nodejs.org/api/url.html#class-urlsearchparams
+ * @reference {@link https://nodejs.org/api/url.html#class-urlsearchparams}
  */
 function generateAxiosParams(
     code?: string, 
@@ -149,13 +143,13 @@ function generateAxiosParams(
 
 // --- Main Flow ---
 /**
- * @description Initiates the OAuth 2.0 authorization flow using localhost server. 
+ * @description Initiates the OAuth 2.0 authorization flow using localhost {@link server}: {@link Server}. 
  * - use refreshedTokens.access_token in REST calls to deployed RESTlets.
- * @property {boolean} [initiateToRefresh] - If `true`, refresh the access token using the refresh token from the previous token response. Default is `false`.
- * - `false`: first call {@link getAuthCode}`()` to get the authorization code, then call {@link exchangeAuthCodeForTokens}`(code)` to get the access token.
- * - `true`: store return value of {@link readJsonFileAsObject}`(pathToOriginalTokens).refresh_token`, then call {@link exchangeRefreshTokenForNewTokens}`(refreshToken)` to get the new access token.
- * @property {string} [pathToOriginalTokens] - The file path to the original token response JSON file. Default is `'tokens.json'`.
- * @returns {Promise<TokenResponse | null>} `refreshedTokens` @see {@link TokenResponse}
+ * @property {boolean} [initiateToRefresh] - If true, refresh the access token using the refresh token from the previous token response. Default is false.
+ * - `false`: first call {@link getAuthCode}() to get the authorization code, then call {@link exchangeAuthCodeForTokens}(code) to get the access token.
+ * - `true`: store return value of {@link readJsonFileAsObject}(`pathToOriginalTokens`).refresh_token, then call {@link exchangeRefreshTokenForNewTokens}`(refreshToken)` to get the new access token.
+ * @property {string} [pathToOriginalTokens] - The file path to the original token response JSON file. Default is 'tokens.json'.
+ * @returns {Promise<TokenResponse | null>} `refreshedTokens`: {@link TokenResponse}
  * 
  */
 export async function initiateAuthFlow(
@@ -182,13 +176,7 @@ export async function initiateAuthFlow(
                 'STEP2_tokens.json',
                 OUTPUT_DIR
             );
-            printConsoleGroup({
-                label: `Step 2 Complete!`, 
-                details: [
-                    `Refreshed TokenResponse received at ${getCurrentPacificTime()}`, 
-                    `and saved to '${OUTPUT_DIR}/STEP2_tokens.json'`
-                ]
-            });
+            print({label: `Step 2 Complete!`});
             return tokenResponse;        
         } else { // Step 3: Refresh the token
             const tokenResponse = readJsonFileAsObject(pathToOriginalTokens) as TokenResponse;
@@ -207,13 +195,7 @@ export async function initiateAuthFlow(
                 'STEP3_tokens.json',
                 OUTPUT_DIR
             );
-            printConsoleGroup({
-                label: `Step 3 Complete!`, 
-                details: [
-                    `Refreshed TokenResponse received at ${getCurrentPacificTime()}`, 
-                    `and saved to '${OUTPUT_DIR}/STEP3_tokens.json'`
-                ]
-            });
+            print({label: `Step 3 Complete!`});
             return refreshedTokens;
         }
         // Step 4: Call RESTlet with the access token

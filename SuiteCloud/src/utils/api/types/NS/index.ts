@@ -4,7 +4,7 @@
  */
 
 import { Address, AddressBook } from './Relationships/Address';
-import { RecordTypeEnum } from './Record';
+import { RecordTypeEnum, RecordRef } from './Record';
 import { Vendor } from './Relationships/Vendor';
 import { BillOfMaterialsRevisionComponent } from './Supply/BillOfMaterialsRevisionComponent';
 import { BillOfMaterialsRevision } from './Supply/BillOfMaterialsRevision';
@@ -23,7 +23,7 @@ export {
     UnitsEnum, UnitsTypeEnum, EmailPreferenceEnum, GlobalSubscriptionStatusEnum,
     ItemSourceEnum, NetSuiteCountryEnum, CountryAbbreviationEnum, StateAbbreviationEnum,
 
-    RecordTypeEnum,
+    RecordTypeEnum, RecordRef,
 
     Address, AddressBook,
 

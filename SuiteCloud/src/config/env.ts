@@ -25,8 +25,6 @@ export const NODE_HOME_DIR = process.cwd();
 /** = `NODE_ROOT_DIR/src` = `process.cwd()/src`*/
 export const SRC_DIR = path.join(NODE_HOME_DIR, 'src') as string;
 
-
-
 /**
  * @description Exit the program/script for debugging purposes
  * @param {number} exitCode - The exit code to use when exiting the program. Default is 0. Use 1 for error.
@@ -109,7 +107,7 @@ nlauth_role=${NLAUTH_ADMIN}, \
 nlauth_application_id=${REST_APPLICATION_ID}\
 ` as string;
 
-/** restlets */
+/** restlets //,rest_webservices,webservices,suiteanalytics,full,offline */
 export const SCOPE = 'restlets'; //,rest_webservices,webservices,suiteanalytics,full,offline';
 
 /**
@@ -163,5 +161,5 @@ export const OUTPUT_DIR =`C:/Users/${USER}/path/to/NetSuite/SuiteCloud/.output`;
 // Check if OUTPUT_DIR is a valid path
 if (!fs.existsSync(OUTPUT_DIR)) {
     console.error(`ERROR: OUTPUT_DIR path does not exist: ${OUTPUT_DIR}, please check your .env file.`);
-    STOP_RUNNING();
+    STOP_RUNNING(1);
 }
