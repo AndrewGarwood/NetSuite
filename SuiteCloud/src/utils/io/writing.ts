@@ -10,7 +10,7 @@ import { DelimitedFileTypeEnum } from 'src/utils/io/types/CsvMapping';
 
 
 /**
- * @param {Record.<string, Array<string>>} listData Object.<string, Array\<string>> map col names to col values
+ * @param {Record<string, Array<string>>} listData Record<string, Array\<string>> map col names to col values
  * @param {string} fileName string
  * @param {string} filePath string
  * @param {string} delimiter string - optional, default=','
@@ -108,7 +108,7 @@ export function writeObjectToJson(
 
 /**
  * Output JSON data to the console
- * @param {Record<string, any>} data Object.<string, any>
+ * @param {Record<string, any>} data Record<string, any>
  * @param {number} indent number - optional, default=4 
  */
 export function printJson(data:Record<string, any>, indent: number=4) {

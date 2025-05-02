@@ -9,7 +9,7 @@ import { parseCsvToCreateOptions } from './parseCsvToRequestBody';
 import { 
     PARSE_VENDOR_FROM_VENDOR_CSV_OPTIONS as VENDOR_OPTIONS, 
     PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS as CONTACT_OPTIONS
-} from "./vendorParseOptions";
+} from "./vendorParseDefinition";
 import { logger as log } from "./config/logging";
 import { ScriptDictionary } from "./utils/api/types/NS/SuiteScriptEnvironment";
 
