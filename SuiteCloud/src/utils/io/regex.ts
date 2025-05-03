@@ -15,11 +15,11 @@ export const COMPANY_KEYWORDS_PATTERN: RegExp =
 
 
 
-/** `/(^(is|give|send|fax|email)[a-z0-9]{2,}$)/` */
+/** = `/(^(is|give|send|fax|email)[a-z0-9]{2,}$)/` */
 export const BOOLEAN_FIELD_ID_REGEX = new RegExp(/(^(is|give|send|fax|email)[a-z0-9]{2,}$)/)
 
 /** = `/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/` */
-export const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+export const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
 
 /** 
  * @TODO see if the non digit non capturing part is needed
@@ -60,6 +60,56 @@ export const KOREA_PHONE_REGEX: RegExp = /(82)[-.\s]?(\d{2})[-.\s]?(\d{3})[-.\s]
 
 // https://en.wikipedia.org/wiki/List_of_telephone_country_codes
 
+/**
+ * @param {string} phone - `string` - phone number to test
+ * @param {string} label - `string` - `optional` label to print in the console
+ * @returns {string} `phone` - formatted phone number or empty string if unable to format it
+ * @description test phone on regex in this order:
+ * 1. {@link JAPAN_PHONE_REGEX} = `/(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]?(\d{4})/`
+ * 2. {@link KOREA_PHONE_REGEX} = `/(82)[-.\s]?(\d{2})[-.\s]?(\d{3})[-.\s]?(\d{4})/`
+ * 3. GENERIC_{@link PHONE_REGEX} = `/(?:^\D*(\d{1,3})[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})( ?ext ?(\d{3,4}))?(?:\D*$)/`
+ * 4. `\d{10}` (i.e. is a string of 10 digits), `return` as `\d{3}-\d{3}-\d{4}`
+ * 5. `\d{11}` and `startsWith('1')` (i.e. is a USA phone number), `return` as `1-\d{3}-\d{3}-\d{4}`
+ * 6. `else` return as is * 
+ * @note Valid formats for NetSuite Phone Number fields are: 
+ * 1. `999-999-9999`
+ * 2. `1-999-999-9999`
+ * 3. `(999) 999-9999`
+ * 4. `1(999) 999-9999`
+ * 5. `999-999-9999 ext 9999`
+ */
+export function applyPhoneRegex(phone: string, label?: string): string {
+    if (!phone) {
+        return '';
+    }
+    const originalPhone = String(phone);
+    phone = String(phone).trim();
+    if (JAPAN_PHONE_REGEX.test(phone)) {
+        print({label:`Valid Phone Found!`, details: `JAPAN_PHONE_REGEX.test(${phone}) == true`, printToConsole: false});
+        phone = phone.replace(JAPAN_PHONE_REGEX, '$1-$2-$3-$4');
+    } else if (KOREA_PHONE_REGEX.test(phone)) {
+        print({label:`Valid Phone Found!`, details: `KOREA_PHONE_REGEX.test(${phone}) == true`, printToConsole: false});
+        phone = phone.replace(KOREA_PHONE_REGEX, '$1-$2-$3-$4');
+    } else if (PHONE_REGEX.test(phone)) {
+        print({label:`Valid Phone Found!`, details: `PHONE_REGEX.test(${phone}) == true`, printToConsole: false});
+        phone = phone.replace(PHONE_REGEX, '$1-$2-$3-$4 ext $5');
+    } else if (phone.length === 10 && /^\d{10}$/.test(phone)) {
+        print({label:`Valid Phone Found!`, details: `PHONE_REGEX.test(${phone}) == false and phone.length == 10`, printToConsole: false});
+        phone = phone.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+    } else if (phone.length === 11 && /^\d{11}$/.test(phone) && phone.startsWith('1')) {
+        print({label:`Valid Phone Found!`, details: `PHONE_REGEX.test(${phone}) == false and phone.length == 11`, printToConsole: false});
+        phone = phone.replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '$1-$2-$3-$4');
+    } 
+    phone = stripChar(phone, '-', false).replace(/\s{2,}/, ' ').replace(/ext(?=\D*$)/,'').trim();
+    print({
+        label: `applyPhoneRegex()` + (label ? ` ${label}` : ''), 
+        details: [
+            `originalPhone: "${originalPhone}"`, 
+            `finalPhone:    "${phone}"`
+        ], printToConsole: false
+    });
+    return phone;
+}
 
 /**
  * @param {string} s `string`
@@ -73,53 +123,6 @@ export function stripChar(s: string, char: string, escape: boolean=false): strin
     }
     const regex = new RegExp(`^${char}+|${char}+$`, 'g');
     return s.replace(regex, '');
-}
-
-/**
- * @param {string} phone - `string` - phone number to test
- * @param {string} label - `string` - `optional` label to print in the console
- * @returns {string} `phone` - formatted phone number
- * @description test phone on regex in this order:
- * 1. {@link JAPAN_PHONE_REGEX}
- * 2. {@link KOREA_PHONE_REGEX}
- * 3. GENERIC_{@link PHONE_REGEX}
- * 4. `\d{10}` (i.e. is a string of 10 digits), `return` as `\d{3}-\d{3}-\d{4}`
- * 5. `\d{11}` and `startsWith('1')` (i.e. is a USA phone number), `return` as `1-\d{3}-\d{3}-\d{4}`
- * 6. `else` return as is * 
- * @note Valid formats for NetSuite Phone Number fields are: 
- * 1. `999-999-9999`
- * 2. `1-999-999-9999`
- * 3. `(999) 999-9999`
- * 4. `1(999) 999-9999`
- * 5. `999-999-9999 ext 9999`
- */
-export function applyPhoneRegex(phone: string, label?: string): string {
-    const originalPhone = String(phone);
-    phone = String(phone).trim();
-    if (JAPAN_PHONE_REGEX.test(phone)) {
-        console.log(`JAPAN_PHONE_REGEX.test(${phone}) == true`);
-        phone = phone.replace(JAPAN_PHONE_REGEX, '$1-$2-$3-$4');
-    } else if (KOREA_PHONE_REGEX.test(phone)) {
-        console.log(`KOREA_PHONE_REGEX.test(${phone}) == true`);
-        phone = phone.replace(KOREA_PHONE_REGEX, '$1-$2-$3-$4');
-    } else if (PHONE_REGEX.test(phone)) {
-        console.log(`PHONE_REGEX.test(${phone}) == true`);
-        phone = phone.replace(PHONE_REGEX, '$1-$2-$3-$4 ext $5');
-    } else if (phone.length === 10 && /^\d{10}$/.test(phone)) {
-        console.log(`PHONE_REGEX.test(${phone}) == false and phone.length == 10`);
-        phone = phone.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
-    } else if (phone.length === 11 && /^\d{11}$/.test(phone) && phone.startsWith('1')) {
-        console.log(`PHONE_REGEX.test(${phone}) == false and phone.length == 11 and phone.startsWith('1')`);
-        phone = phone.replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '$1-$2-$3-$4');
-    } 
-    phone = stripChar(phone, '-', false).replace(/\s{2,}/, ' ').replace(/ext(?=\D*$)/,'').trim();
-    print({
-        label: `testPhoneRegex()` + (label ? ` ${label}` : ''), 
-        details: [`originalPhone: "${originalPhone}"`, `finalPhone:    "${phone}"`], 
-        printToConsole: false, 
-        enableOverwrite: false
-    });
-    return phone;
 }
 
 /**

@@ -2,6 +2,11 @@
  * @file src/utils/api/url.ts
  */
 
+import { REDIRECT_URI } from "src/config/env";
+import { GrantTypeEnum } from "src/server/types";
+import { exchangeAuthCodeForTokens, exchangeRefreshTokenForNewTokens } from "src/server/authServer";
+
+
 export type SearchParamValue = string | number | boolean;
 /**
  * Creates a URL object with search parameters from a dictionary.
@@ -33,4 +38,33 @@ export function createUrlWithParams(
         }
     }
     return url;
+}
+
+
+/**
+ * @param code - The authorization code received from the OAuth callback. is defined when this function is called in {@link exchangeAuthCodeForTokens}`(authCode)` 
+ * - code !== undefined -> grant_type=authorization_code
+ * @param refreshToken - The refresh token received from the initial token response. is defined when this function is called in {@link exchangeRefreshTokenForNewTokens}`(refreshToken)` 
+ * - refreshToken !== undefined -> grant_type=refresh_token
+ * @param redirectUri - The redirect URI used in the OAuth flow. Default is {@link REDIRECT_URI}.
+ * @returns {URLSearchParams} params, see {@link URLSearchParams}
+ * @reference {@link https://nodejs.org/api/url.html#class-urlsearchparams}
+ */
+export function generateAxiosParams(
+    code?: string, 
+    refreshToken?: string, 
+    redirectUri: string=REDIRECT_URI
+): URLSearchParams {
+    if (code && refreshToken) {
+        throw new Error('Both code and refreshToken cannot be provided at the same time. Please provide only one.');
+    }
+    const params = new URLSearchParams({redirect_uri: redirectUri});
+    if (code) {
+        params.append('code', code);
+        params.append('grant_type', GrantTypeEnum.AUTHORIZATION_CODE);
+    } else if (refreshToken) {
+        params.append('refresh_token', refreshToken);
+        params.append('grant_type', GrantTypeEnum.REFRESH_TOKEN);
+    }
+    return params;
 }

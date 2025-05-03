@@ -5,7 +5,7 @@
  * @NetSuiteInternalId serviceitem
  */
 
-import { UnitsTypeEnum, UnitsEnum } from "../Enums";
+import { UnitsTypeEnum, UnitsEnum } from "../../Enums";
 
 export interface ServiceItem  {
     itemid: string;

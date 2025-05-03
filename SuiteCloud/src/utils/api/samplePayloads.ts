@@ -9,7 +9,7 @@ import {
     SetFieldValueOptions
 } from "src/utils/api/types/Api"
 import { NetSuiteCountryEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES } from "src/utils/api/types/NS"
-import { RecordTypeEnum } from "src/utils/api/types/NS/Record"
+import { RecordTypeEnum } from "src/utils/api/types/NS/Record/Record"
 
 const NOT_INACTIVE = false;
 const NOT_DYNAMIC = false;

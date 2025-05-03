@@ -3,8 +3,7 @@
  * @module Api
  */
 
-import { RecordTypeEnum } from './NS/Record';
-import { hasKeys } from '../../typeValidation';
+import { RecordTypeEnum } from './NS/Record/Record';
 
 /**
  * - `createRecordArray` and `createRecordDict` are mutually exclusive
@@ -14,27 +13,38 @@ import { hasKeys } from '../../typeValidation';
  * `Array<`{@link CreateRecordOptions}`>` = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]` 
  * @property {{[K in RecordTypeEnum]?: Array\<CreateRecordOptions>}} [createRecordDict] 
      * `{` [K in {@link RecordTypeEnum}]?: `Array<`{@link CreateRecordOptions}`> }`
+ * @property {string | string[]} [responseProps] - `string | string[]` - The properties to include in the response in addition to the records' internal IDs.
 */
 export type BatchCreateRecordRequest = {
     createRecordArray?: CreateRecordOptions[];
     createRecordDict?: { [K in RecordTypeEnum]?: CreateRecordOptions[] };
+    responseProps?: string | string[];
 }
 
-
+/**
+ * Definition of the results returned in the response for each record created in the POST function in POST_BatchCreateRecord.js
+ * @typedefn {Record<string, FieldValue>} `CreateRecordResults`
+ * @property {number} recordId - The internal ID of the created record.
+ * @property {FieldValue} [fieldId] - (optional) optionally include other fields of the record's body that you want included in the response.
+ */
+export type CreateRecordResults = { 
+    recordId: number; 
+    [fieldId: string]: FieldValue; 
+};
 
 /**
  * Definition of Response for the POST function in POST_BatchCreateRecord.js
  * @typedefn {Object} `BatchCreateRecordResponse`
  * @property {boolean} success - Indicates if the request was successful.
  * @property {string} message - A message indicating the result of the request.
- * @property {number[]} recordIds - An array of record IDs created.
+ * @property {CreateRecordResults[]} resultsArray - an `Array<`{@link CreateRecordResults}`>` containing the record ids and any additional properties specified in the request for all the records successfully created.
  * @property {string} [error] - An error message if the request was not successful.
- * @property {LogStatement[]} logArray - An array of log entries generated during the request processing.
+ * @property {LogStatement[]} logArray - an `Array<`{@link LogStatement}`>` generated during the request processing.
  */
 export type BatchCreateRecordResponse = {
     success: boolean;
     message: string;
-    recordIds: number[];
+    resultsArray: CreateRecordResults[];
     error?: string;
     logArray: LogStatement[];
 };
@@ -160,27 +170,34 @@ export type SublistFieldDictionary = {
 export type SublistDictionary = Record<string, SublistFieldDictionary>;
 
 /**
+ * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html}
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  * The value type must correspond to the field type being set. For example:
- * - Text, Radio and Select fields accept string values.
- * - Checkbox fields accept Boolean values.
- * - Date and DateTime fields accept Date values.
- * - Integer, Float, Currency and Percent fields accept number values.
- * @typedefn {Date | number | number[] | string | string[] | boolean | null} FieldValue 
+ * - `Text` and `Radio` fields accept `string` values.
+ * - `Select` fields accept `string` and `number` values.
+ * - `Multi-Select` fields accept `arrays` of `string` or `number` values.
+ * - `Checkbox` fields accept `boolean` values.
+ * - `Date` and `DateTime` fields accept {@link Date} values.
+ * - `Integer`, `Float`, `Currency` and `Percent` fields accept `number` values.
+ * - `Inline HTML` fields accept `strings`. Strings containing HTML tags are represented as HTML entities in UI. {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html#:~:text=The%20following%20code%20sample%20shows%20the%20syntax%20for%20INLINEHTML%20fields%20and%20what%20is%20returned.}
+ * @typedefn `{Date | number | number[] | string | string[] | boolean | null}` `FieldValue` 
  */
 export type FieldValue = Date | number | number[] | string | string[] | boolean | null;
 
 /**
+ * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html}
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  * @interface SetFieldValueOptions
  * @property {string} fieldId - The internal ID of a standard or custom field.
  * @property {FieldValue} value 
  * - The {@link FieldValue} to set the field to. 
- * - = {Date | number | number[] | string | string[] | boolean | null}
+ * - = `{Date | number | number[] | string | string[] | boolean | null}`
+ * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
  */
 export interface SetFieldValueOptions {
     fieldId: string;
     value: FieldValue;
+    inputType?: FieldInputTypeEnum;
 }
 
 /**
@@ -188,10 +205,12 @@ export interface SetFieldValueOptions {
  * @interface SetFieldTextOptions
  * @property {string} fieldId - The internal ID of a standard or custom field.
  * @property {string} text - The text to set the value to.
+ * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
  */
 export interface SetFieldTextOptions {
     fieldId: string;
     text: string;
+    inputType?: FieldInputTypeEnum;
 }
 
 /**
@@ -201,12 +220,14 @@ export interface SetFieldTextOptions {
  * @property {string} fieldId - (i.e. sublistFieldId) The internal ID of a standard or custom sublist field.
  * @property {number} [line] - The line number for the field.
  * @property {string} text - The text to set the value to.
+ * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
  */
 export interface SetSublistTextOptions {
     sublistId: string;
     fieldId: string;
     line?: number;
     text: string;
+    inputType?: FieldInputTypeEnum;
 }
 
 /**
@@ -217,12 +238,14 @@ export interface SetSublistTextOptions {
  * @property {number} [line] - The line number for the field.
  * @property {FieldValue} value - The {@link FieldValue} to set the sublist field to.
  * = {Date | number | number[] | string | string[] | boolean | null}
+ * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
  */
 export interface SetSublistValueOptions {
     sublistId: string;
     fieldId: string;
     line?: number;
     value: FieldValue;
+    inputType?: FieldInputTypeEnum;
 }
 
 /**
@@ -281,7 +304,7 @@ export enum FieldOptionsTypeEnum {
 }
 
 /**
- * @typedefn {Object} SetFieldOptionsArrayTypes 
+ * @typedefn {Object} `SetFieldOptionsArrayTypes` 
  * */
 export type SetFieldOptionsArrayTypes = SetFieldTextOptions | SetFieldValueOptions | SetSublistTextOptions | SetSublistValueOptions;
 
@@ -308,4 +331,84 @@ export enum OptionsArrayLabelEnum {
 export enum FieldDictTypeEnum {
     FIELD_DICT = 'fieldDict',
     SUBLIST_FIELD_DICT = 'sublistFieldDict',
+}
+/** 
+ * @enum {string} FieldInputTypeEnum
+ * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html}
+ * @property {string} TEXT `Text` fields accept `string` values. 
+ * @property {string} RADIO `Radio` fields accept `string` values.
+ * @property {string} SELECT `Select` fields accept `string` and `number` values.
+ * @property {string} MULTISELECT `Multi-Select` fields accept `arrays` of `string` or `number` values.
+ * @property {string} CHECKBOX `Checkbox` fields accept `boolean` values.
+ * @property {string} DATE `Date` and `DateTime` fields accept {@link Date} values.
+ * @property {string} INTEGER `Integer` fields accept `number` values.
+ * @property {string} FLOAT `Float` fields accept `number` values.
+ * @property {string} CURRENCY `Currency` fields accept `number` values.
+ * @property {string} PERCENT `Percent` fields accept `number` values.
+ * @property {string} INLINE_HTML `Inline HTML` fields accept `strings`. Strings containing HTML tags are represented as HTML entities in UI. {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html#:~:text=The%20following%20code%20sample%20shows%20the%20syntax%20for%20INLINEHTML%20fields%20and%20what%20is%20returned.}
+ */
+export enum FieldInputTypeEnum {
+    /** `Text` fields accept `string` values. */
+    TEXT = 'text',
+    /** `Radio` fields accept `string` values. */
+    RADIO = 'radio',
+    /** `Select` fields accept `string` and `number` values. */
+    SELECT = 'select',
+    /** `Multi-Select` fields accept `arrays` of `string` or `number` values. */
+    MULTISELECT = 'multiselect',
+    /** `Checkbox` fields accept `boolean` values. */
+    CHECKBOX = 'checkbox',
+    /** `Date` and `DateTime` fields accept {@link Date} values. */
+    DATE = 'date',
+    /** `Integer` fields accept `number` values. */
+    INTEGER = 'integer',
+    /** `Float` fields accept `number` values. */
+    FLOAT = 'float',
+    /** `Currency` fields accept `number` values. */
+    CURRENCY = 'currency',
+    /** `Percent` fields accept `number` values. */
+    PERCENT = 'percent',
+    /** `Inline HTML` fields accept `strings`. Strings containing HTML tags are represented as HTML entities in UI. {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html#:~:text=The%20following%20code%20sample%20shows%20the%20syntax%20for%20INLINEHTML%20fields%20and%20what%20is%20returned.} */
+    INLINE_HTML = 'inlinehtml',
+}
+
+
+/**
+ * @typedefn `{Object}` `RetrieveRecordByIdRequest`
+ * @property {RecordTypeEnum} recordType - The type of the record to retrieve. see {@link RecordTypeEnum}
+ * @property {idPropertyEnum} idProperty - The property to search for the record. see {@link idPropertyEnum}
+ * @property {string} searchTerm - The name of the record to search for.
+ */
+export type RetrieveRecordByIdRequest = {
+    recordType: RecordTypeEnum;
+    idProperty: idPropertyEnum;
+    searchTerm: string;
+};
+
+
+/**
+ * @typedefn `{Object}` `RetrieveRecordByIdResponse`
+ * @property {boolean} success - Whether the record was found or not.
+ * @property {string} message - The message to return.
+ * @property {string | number} [internalId] - The internal ID of the record, if found.
+ */
+export type RetrieveRecordByIdResponse ={
+    success: boolean;
+    message: string;
+    internalId?: string | number;
+};
+
+/**
+ * @enum {string} `idPropertyEnum`
+ * @property {string} INTERNAL_ID - The internal ID of the record. fieldId = `internalid`
+ * @property {string} EXTERNAL_ID - The external ID of the record. fieldId = `externalid`
+ * @property {string} ENTITY_ID - The entity ID of the record. appears on vendor records. fieldId = `entityid`
+ * @property {string} NAME - The name of the record.
+ * @readonly
+ */
+export enum idPropertyEnum {
+    INTERNAL_ID = 'internalid',
+    EXTERNAL_ID = 'externalid',
+    ENTITY_ID = 'entityid',
+    NAME = 'name'
 }

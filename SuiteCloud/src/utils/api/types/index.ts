@@ -18,6 +18,10 @@ import {
     LogStatement,
     LogTypeEnum,
     OptionsArrayLabelEnum,
+    FieldInputTypeEnum,
+    RetrieveRecordByIdRequest,
+    RetrieveRecordByIdResponse,
+    idPropertyEnum,
 } from "./Api";
 import {
     ParseOptions,
@@ -52,6 +56,10 @@ export {
     LogStatement,
     LogTypeEnum,
     OptionsArrayLabelEnum,
+    FieldInputTypeEnum,
+    RetrieveRecordByIdRequest,
+    RetrieveRecordByIdResponse,
+    idPropertyEnum,
 
     // CsvToApiMapping.ts
     ParseOptions,

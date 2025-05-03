@@ -3,38 +3,19 @@
  */
 import { FieldValue } from "src/utils/api/types";
 import { BOOLEAN_FIELD_ID_REGEX, EMAIL_REGEX } from "./io/regex";
-import { BOOLEAN_FIELD_ID_LIST } from "src/config/constants";
+
+
+export const BOOLEAN_TRUE_VALUES = ['true', 'yes', 'y'];
+export const BOOLEAN_FALSE_VALUES = ['false', 'no', 'n'];
+
+export const BOOLEAN_FIELD_ID_LIST = [
+    'isinactive', 'isprivate', 'giveaccess', 'emailtransactions', 'faxtransactions', 
+    'is1099eligible', 'isdefaultbilling', 'isdefaultshipping', 'isprimary', 'isprimaryshipto', 
+    'isprimarybilling', 'isprimaryshipping'
+];
 
 export const isBooleanFieldId = (fieldId: string): boolean => {
     return BOOLEAN_FIELD_ID_LIST.includes(fieldId) || BOOLEAN_FIELD_ID_REGEX.test(fieldId);
-}
-/**
- * @note maybe redundant with the syntax `key in obj` ? but able to check more than one
- * @param obj the object to check
- * @param keys the list of keys that obj must have
- * @returns {boolean} `true` if the object has all the keys, `false` otherwise
- * @throws {TypeError} if `keys` is not an array
- */
-export function hasKeys<T extends Object>(obj: T, keys: Array<keyof T>): boolean {
-    if (!obj || typeof obj !== 'object') {
-        return false;
-    }
-    if (typeof keys === 'string') {
-        keys = [keys] as Array<keyof T>; // Convert string (assumed to be single key) to array of keys
-    }
-    if (!keys || !Array.isArray(keys)) {
-        throw new TypeError('hasKeys() param `keys` must be an array');
-    }
-    if (keys.length === 0) {
-        return false; // No keys to check
-    }
-    for (const key of keys) {
-        if (!obj.hasOwnProperty(key)) {
-            console.warn(`hasKeys() Key "${String(key)}" not found in the object`);
-            return false; // Key not found in the object
-        }
-    }
-    return true; // All keys found in the object
 }
 
 /**
@@ -100,7 +81,34 @@ export function hasNonTrivialKeys(obj: any): boolean {
     return false;
 }
 
-
+/**
+ * @note maybe redundant with the syntax `key in obj` ? but able to check more than one
+ * @param obj the object to check
+ * @param keys the list of keys that obj must have
+ * @returns {boolean} `true` if the object has all the keys, `false` otherwise
+ * @throws {TypeError} if `keys` is not an array
+ */
+export function hasKeys<T extends Object>(obj: T, keys: Array<keyof T>): boolean {
+    if (!obj || typeof obj !== 'object') {
+        return false;
+    }
+    if (typeof keys === 'string') {
+        keys = [keys] as Array<keyof T>; // Convert string (assumed to be single key) to array of keys
+    }
+    if (!keys || !Array.isArray(keys)) {
+        throw new TypeError('hasKeys() param `keys` must be an array');
+    }
+    if (keys.length === 0) {
+        return false; // No keys to check
+    }
+    for (const key of keys) {
+        if (!obj.hasOwnProperty(key)) {
+            console.warn(`hasKeys() Key "${String(key)}" not found in the object`);
+            return false; // Key not found in the object
+        }
+    }
+    return true; // All keys found in the object
+}
 
 /** Helper to check if an object has all required, non-null/undefined properties */
 function hasRequiredProps(obj: any, props: string[]): boolean {

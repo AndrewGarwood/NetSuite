@@ -7,9 +7,12 @@ https://<accountID>.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/toke
 /*
 from website
 define Object
-The define object is an overloaded function that is used to create entry point scripts and custom modules in SuiteScript 2.x. This function executes asynchronously on the client and synchronously on the server. The define object conforms to the Asynchronous Module Definition (AMD) specification.
+The define object is an overloaded function that is used to create entry point scripts and custom modules in SuiteScript 2.x. 
+This function executes asynchronously on the client and synchronously on the server. 
+The define object conforms to the Asynchronous Module Definition (AMD) specification.
 
-Note: An overloaded function has multiple signatures. A signature is the function name and all available parameters.
+Note: An overloaded function has multiple signatures. A signature is the function 
+name and all available parameters.
 SuiteScript 2.x supports the following define() signatures:
 
 Type
@@ -26,7 +29,8 @@ define(moduleObject)
 
     object
 
-    Returns a module object based on the supplied moduleObject argument. The moduleObject argument can be any JavaScript object, including a function.
+    Returns a module object based on the supplied moduleObject argument. 
+    The moduleObject argument can be any JavaScript object, including a function.
 
     Use this define() signature if your entry point script or custom module requires no dependencies.
 
@@ -38,11 +42,15 @@ define(id, [dependencies,] moduleObject)
 
     Use the define() function to do the following:
 
-    Create a SuiteScript script file. Load the required dependent modules and define the functionality for the SuiteScript script type in the callback function. The return statement in the callback function must include at least one entry point and entry point function. All entry points must belong to the same script type.
+    Create a SuiteScript script file. Load the required dependent modules and define the functionality for the 
+    SuiteScript script type in the callback function. The return statement in the callback function must include 
+    at least one entry point and entry point function. All entry points must belong to the same script type.
 
     Any implementation of a SuiteScript script type that returns an entry point must use the define() function.
 
-    Create and return a custom module. The custom module can then be used as dependency in another script. Use the define(id, [dependencies,] moduleObject) signature if your module requires dependencies. If the custom module does not require any dependencies, use the define(moduleObject) signature.
+    Create and return a custom module. The custom module can then be used as dependency in another script. 
+    Use the define(id, [dependencies,] moduleObject) signature if your module requires dependencies. If the custom 
+    module does not require any dependencies, use the define(moduleObject) signature.
 
     For more information about custom modules, see SuiteScript 2.x Custom Modules.
 
@@ -51,13 +59,18 @@ define(id, [dependencies,] moduleObject)
 define() Function Guidelines
     Use the following guidelines with the define() function:
 
-    SuiteScript API calls can be executed only after the define callback's return statement has executed. Consequently, you cannot use native SuiteScript 2.x module methods when you create a custom module. You can make SuiteScript API calls after the Module Loader creates and loads the custom module.
+    SuiteScript API calls can be executed only after the define callback's return statement has executed. 
+    Consequently, you cannot use native SuiteScript 2.x module methods when you create a custom module. 
+    You can make SuiteScript API calls after the Module Loader creates and loads the custom module.
 
-    If you need to debug your code on demand in the SuiteScript Debugger, you must use a require() Function. The SuiteScript Debugger cannot step though a define() function.
+    If you need to debug your code on demand in the SuiteScript Debugger, you must use a require() Function. 
+    The SuiteScript Debugger cannot step though a define() function.
 
     All dependencies used in the define() function are loaded before the callback function executes.
 
-    You can load only modules that are stored in the NetSuite File Cabinet. Do not attempt to import scripts using HTTP or HTTPS.
+    You can load only modules that are stored in the NetSuite File Cabinet. Do not attempt to 
+    import scripts using HTTP or HTTPS.
 
-    For example, if you specify define(['http://somewebsite.com/purchaseTotal.js'], function(purchaseTotal){...});, the purchaseTotal dependency is not valid.
+    For example, if you specify define(['http://somewebsite.com/purchaseTotal.js'], function(purchaseTotal){...});, 
+    the purchaseTotal dependency is not valid.
 */

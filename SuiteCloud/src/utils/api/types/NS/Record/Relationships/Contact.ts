@@ -7,7 +7,7 @@
  */
 import { RecordRef } from '../Record';
 import { Address, AddressBook } from './Address';
-import { GlobalSubscriptionStatusEnum } from '../Enums';
+import { GlobalSubscriptionStatusEnum } from '../../Enums';
 
 /**
  * @interface ContactBase
