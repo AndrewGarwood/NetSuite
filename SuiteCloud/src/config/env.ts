@@ -13,18 +13,6 @@ import { stdin as input, stdout as output } from 'node:process';
 import path from 'node:path';
 
 
-/** 
- * @example 
- * // import READLINE as rl;
- * const answer = await rl.question('What do you think of Node.js?')
- * */
-export const READLINE = readline.createInterface({ input, output });
-
-/** = the directory where the node_modules folder lives*/
-export const NODE_HOME_DIR = process.cwd();
-/** = `NODE_ROOT_DIR/src` = `process.cwd()/src`*/
-export const SRC_DIR = path.join(NODE_HOME_DIR, 'src') as string;
-
 /**
  * @description Exit the program/script for debugging purposes
  * @param {number} exitCode - The exit code to use when exiting the program. Default is 0. Use 1 for error.
@@ -37,7 +25,7 @@ export const STOP_RUNNING = (exitCode: number=0, ...msg: any[]): void => {
 
 /**
  * @description Pause execution for specified amount of milliseconds 
- * * @param {number} ms - The number of milliseconds to pause execution for.
+ * @param {number} ms - The number of milliseconds to pause execution for.
  * @returns {Promise<void>}
  * @example DELAY(1000) // pauses for 1 second
  * */
@@ -45,13 +33,26 @@ export const DELAY = (ms: number): Promise<void> => {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export { CLOSE_SERVER } from 'src/server/authServer';
+/** 
+ * @example 
+ * // import READLINE as rl;
+ * const answer = await rl.question('What do you think of Node.js?')
+ * */
+export const READLINE = readline.createInterface({ input, output });
+
+/** `./SuiteCloud/` = the directory where the node_modules folder lives*/
+export const NODE_HOME_DIR = process.cwd();
+/** = {@link NODE_HOME_DIR}`/src` = `SuiteCloud/src` = `process.cwd()/src`*/
+export const SRC_DIR = path.join(NODE_HOME_DIR, 'src') as string;
+/** = {@link SRC_DIR}`/server/tokens` */
+export const TOKEN_DIR = path.join(SRC_DIR, 'server', 'tokens') as string;
+
 
 export const BASE_ACCOUNT_ID = (process.env.ACCOUNT_ID || 'MISSING_ENV_VARIABLE-ACCOUNT_ID') as string;
 
-/** .env NODE_ENV */
+/** set by `NODE_ENV` in .env file */
 export const inSandbox = (process.env.NODE_ENV === AccountEnvironmentEnum.SANDBOX) as boolean;
-/** .env NODE_ENV */
+/** set by `NODE_ENV` in .env file */
 export const inProduction = (process.env.NODE_ENV === AccountEnvironmentEnum.PRODUCTION) as boolean;
 
 /** Dependent on NODE_ENV value set in .env file */
@@ -121,7 +122,7 @@ export const STATE = require('crypto').randomBytes(32).toString('hex'); // 64 ch
 
 /** 
  * see {@link SuiteScriptEnvironment}
- * @description instantiate known script deployments 
+ * @description instantiate known script deployments from your NetSuite production and sandbox accounts.
  * */
 export const SCRIPT_ENVIORNMENT: SuiteScriptEnvironment = {
     production: {},
@@ -139,24 +140,24 @@ export const SCRIPT_ENVIORNMENT: SuiteScriptEnvironment = {
                 scriptId: 169,
                 deployId: 1,
             },
+            GET_RetrieveRecordById: {
+                scriptId: 171,
+                deployId: 1,
+            },
         } as ScriptDictionary,
     }
 }
 
-/**Define in .env use in path stem C:/Users/${USER} */
+/** Define in .env to use as path stem `C:/Users/${USER}` */
 export const USER = process.env.CURRENT_USER || 'MISSING_ENV_VARIABLE-CURRENT_USER';
 console.log('USER:'.padEnd(13), USER);
 
-/** ~/OneDrive - ENTITY_NAME */
+/** = `C:/Users/${USER}/OneDrive - ${ENTITY_NAME}` */
 export const ONE_DRIVE_DIR = `C:/Users/${USER}/OneDrive - ENTITY_NAME`;
-
-//@TODO: use process.cwd() instead ?
-
-/** ~/NetSuite/data */
-export const DATA_DIR = `C:/Users/${USER}/path/to/NetSuite/data`;
-
-/** ~/NetSuiteDev/SuiteCloud/.output */
-export const OUTPUT_DIR =`C:/Users/${USER}/path/to/NetSuite/SuiteCloud/.output`;
+/** = {@link NODE_HOME_DIR}`/../data` = `root/data` */
+export const DATA_DIR = path.join(NODE_HOME_DIR, '../data') as string;
+/** = {@link NODE_HOME_DIR}`/.output` = `/SuiteCloud/.output` */
+export const OUTPUT_DIR = path.join(NODE_HOME_DIR, '.output') as string;
 
 // Check if OUTPUT_DIR is a valid path
 if (!fs.existsSync(OUTPUT_DIR)) {

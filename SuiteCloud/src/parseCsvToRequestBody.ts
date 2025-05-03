@@ -21,14 +21,13 @@ import {
 } from "./utils/api/types";
 import { RecordTypeEnum } from "./utils/api/types/NS";
 import {
-    hasKeys, isBooleanFieldId, isNullLike,
+    hasKeys, isBooleanFieldId, isNullLike, BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES
 } from "./utils/typeValidation";
 import { stripChar, printConsoleGroup as print, getDelimiterFromFilePath} from "./utils/io";
 import { DATA_DIR, OUTPUT_DIR, STOP_RUNNING } from "./config/env";
 import csv from 'csv-parser';
 import fs from 'fs';
 import { ValueMapping, ValueMappingEntry, isValueMappingEntry } from "./utils/io/types";
-import { BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES } from "./config/constants";
 
 const NOT_DYNAMIC = false;
 let rowIndex = 0;
@@ -60,7 +59,7 @@ export async function parseCsvToCreateOptions(
                 try {
                     // Process each parse configuration for every row
                     for (const [index, options] of Object.entries(parseOptionsArray)) {
-                        const { recordType, fieldDictParseOptions, sublistDictParseOptions, valueOverrides, pruneFunc } = options;
+                        const { recordType, fieldDictParseOptions, sublistDictParseOptions, valueOverrides, pruneFunc } = options as ParseOptions;
                         
                         // Validate required fields exist in CSV row
                         validateFieldMappings(row, fieldDictParseOptions, sublistDictParseOptions);
@@ -72,16 +71,16 @@ export async function parseCsvToCreateOptions(
                             valueOverrides
                         );
                         if (pruneFunc) {
-                            createOptions = pruneFunc(createOptions);
+                            createOptions = pruneFunc(createOptions, `{ parseOptionsArray[${index}], rowIndex ${rowIndex}, recordType ${recordType} }`);
                         }
                         if (!createOptions) {
-                            console.log(`parseCsvToCreateOptions() rowIndex ${rowIndex}, parseOptionsArray[${index}], recordType ${recordType} was pruned by pruneOptions() and will not be included in the batch request`);
+                            console.log(`parseCsvToCreateOptions().forLoop { parseOptionsArray[${index}], rowIndex ${rowIndex}, recordType ${recordType} } was pruned by pruneOptions() and will not be included in the batch request`);
                             continue;
                         }
                         results.push(createOptions);
                     }
                 } catch (error) {
-                    console.error(`Error processing row ${rowIndex}:`, error);
+                    console.trace(`Error processing row ${rowIndex}:`, error);
                     reject(error);
                 }
                 rowIndex++;
@@ -108,7 +107,6 @@ function validateFieldMappings(
         if ('colName' in mapping && mapping.colName && !(mapping.colName in row)) {
             throw new Error(`Missing CSV column for field mapping: ${mapping.colName}`);
         }
-      // No validation needed for rowEvaluator-based mappings
     });
 
     // Validate sublist field mappings
@@ -257,13 +255,13 @@ export function generateSetSublistValueOptionsArray(
 ): SetSublistValueOptions[] {
     let arr = [] as SetSublistValueOptions[];
     for (let [index, sublistFieldValueMap] of Object.entries(sublistFieldValueMapArray)) {
-        let { sublistId, line, fieldId, defaultValue, colName, rowEvaluator } = sublistFieldValueMap;
+        let { sublistId, line, fieldId, defaultValue, colName, rowEvaluator, rowEvaluatorArgs } = sublistFieldValueMap;
         if (!fieldId || (isNullLike(defaultValue) && !colName && !rowEvaluator)) {
             throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or rowEvaluator or defaultValue`);
         }     
         let rowValue: FieldValue = null;    
         if (rowEvaluator) {
-            rowValue = rowEvaluator(row);
+            rowValue = rowEvaluator(row, ...(rowEvaluatorArgs || []));
         } else if (colName) {
             rowValue = transformValue(String(row[colName]), colName, fieldId, valueOverrides);
         } 
@@ -307,13 +305,13 @@ export function generateSetFieldValueOptionsArray(
     let arr = [] as SetFieldValueOptions[];
     for (let [index, fieldValueMap] of Object.entries(fieldValueMapArray)) {
         try {
-            let { fieldId, defaultValue, colName, rowEvaluator } = fieldValueMap;
+            let { fieldId, defaultValue, colName, rowEvaluator, rowEvaluatorArgs } = fieldValueMap;
             if (!fieldId || (isNullLike(defaultValue) && !colName && !rowEvaluator)) {
                 throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or rowEvaluator or defaultValue`);
             }     
             let rowValue: FieldValue = null;
             if (rowEvaluator) {
-                rowValue = rowEvaluator(row);
+                rowValue = rowEvaluator(row, ...(rowEvaluatorArgs || []));
             } else if (colName) {
                 rowValue = transformValue(String(row[colName]), colName, fieldId, valueOverrides);
             }

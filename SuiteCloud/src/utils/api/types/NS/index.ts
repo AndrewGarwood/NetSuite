@@ -3,13 +3,13 @@
  * @description barrel file for type files in ~/src/types/NS
  */
 
-import { Address, AddressBook } from './Relationships/Address';
-import { RecordTypeEnum, RecordRef } from './Record';
-import { Vendor } from './Relationships/Vendor';
-import { BillOfMaterialsRevisionComponent } from './Supply/BillOfMaterialsRevisionComponent';
-import { BillOfMaterialsRevision } from './Supply/BillOfMaterialsRevision';
-import { BillOfMaterials } from './Supply/BillOfMaterials';
-import { TermBase } from './Accounting/Term';
+import { Address, AddressBook } from './Record/Relationships/Address';
+import { RecordTypeEnum, RecordRef } from './Record/Record';
+import { Vendor } from './Record/Relationships/Vendor';
+import { BillOfMaterialsRevisionComponent } from './Record/Supply/BillOfMaterialsRevisionComponent';
+import { BillOfMaterialsRevision } from './Record/Supply/BillOfMaterialsRevision';
+import { BillOfMaterials } from './Record/Supply/BillOfMaterials';
+import { TermBase } from './Record/Accounting/Term';
 import { UnitsEnum, UnitsTypeEnum, EmailPreferenceEnum, 
     GlobalSubscriptionStatusEnum, ItemSourceEnum, NetSuiteCountryEnum, CountryAbbreviationEnum, StateAbbreviationEnum 
 } from './Enums';

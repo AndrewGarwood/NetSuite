@@ -1,6 +1,7 @@
 import {
     callRestlet,
     callPostRestletWithPayload,
+    callGetRestletWithParams,
 } from './callApi';
 import {
     MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS,
@@ -13,6 +14,7 @@ export {
     // callApi.ts
     callRestlet,
     callPostRestletWithPayload,
+    callGetRestletWithParams,
 
     // samplePayloads.ts
     MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS,

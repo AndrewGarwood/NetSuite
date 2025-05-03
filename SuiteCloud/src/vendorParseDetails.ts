@@ -15,12 +15,20 @@ import { ValueMapping, isValueMappingEntry } from "./utils/io/types";
 import { printConsoleGroup as print, stringEndsWithAnyOf } from "./utils/io";
 import { READLINE as rl } from "src/config/env";
 import { HUMAN_VENDORS_ORIGINAL_TEXT,  } from './config/constants'
-import { SB_TERM_DICTIONARY } from "./utils/io/mappings";
-import { RecordTypeEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES, CountryAbbreviationEnum, StateAbbreviationEnum } from "./utils/api/types/NS";
-import { COMPANY_KEYWORDS_PATTERN, PHONE_REGEX, JAPAN_PHONE_REGEX, KOREA_PHONE_REGEX, applyPhoneRegex, stripChar } from "./utils/io/regex";
+import { RecordTypeEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES, CountryAbbreviationEnum, StateAbbreviationEnum, TermBase as Term } from "./utils/api/types/NS";
+import { COMPANY_KEYWORDS_PATTERN, applyPhoneRegex, stripChar } from "./utils/io/regex";
+
+/**
+ * Represents the `boolean` value `true` for a radio field in NetSuite.
+ */
+const RADIO_FIELD_TRUE = 'T';
+/**
+ * Represents the `boolean` value `false` for a radio field in NetSuite.
+ */
+const RADIO_FIELD_FALSE = 'F';
 
 export const VENDOR_VALUE_OVERRIDES: ValueMapping = {
-    'A Q Skin Solutions, Inc.': 'AQ Skin Solutions, Inc.' as FieldValue  
+    'NAME_WITH_SPELLING_ERROR_THAT_WAS_NEVER_FIXED': 'NAME_WITH_SPELLING_FIXED' as FieldValue  
 }
 
 export const HUMAN_VENDORS_TRIMMED = 
@@ -57,50 +65,42 @@ export function checkForOverride(initialValue: string, valueOverrides: ValueMapp
 }
 
 /**
- * the `isperson` field in NeSuite is a `radio` field, which only accepts `string` values
+ * the `isperson` field in NeSuite is a `radio` field, which only accepts `string` values,
+ * so we must `return` a `string` value of either `T` ({@link RADIO_FIELD_TRUE}) or `F` ({@link RADIO_FIELD_FALSE}) instead of a `boolean` value.
  */
 export const evaluateVendorIsPerson = (row: Record<string, any>): string => {
     let vendor = checkForOverride(row['Vendor'], VENDOR_VALUE_OVERRIDES) as string;
     if (HUMAN_VENDORS_TRIMMED.includes(vendor)) {
         print({label: `evaluateVendorIsPerson: ${vendor} -> true`, printToConsole: false, enableOverwrite: false});
-        return 'T'; // vendor is a person
+        return RADIO_FIELD_TRUE; // vendor is a person
     }
     print({label: `evaluateVendorIsPerson: ${vendor} -> false`, printToConsole: false, enableOverwrite: false});
-    return 'F'; // return false as default (not a person, so a company)
+    return RADIO_FIELD_FALSE; // return false as default (not a person, so a company)
 }
 
 /**
  * calls {@link evaluateVendorIsPerson} to determine if the vendor is a person or not.
- * @note the `isperson` field in NeSuite is a `radio` field, which only accepts `string` values
+ * @returns the first name of the contact if the vendor is a person, otherwise returns an empty string.
+ * @see {@link evaluateVendorIsPerson}
  */
 export const evaluateVendorFirstName = (row: Record<string, any>): string => {
-    if (evaluateVendorIsPerson(row) === 'T') { // if vendor is a person, return the first name
-        return evaluateContactFirstName(row);
-    } else {
-        return '';
-    }
+    return evaluateVendorIsPerson(row) === RADIO_FIELD_TRUE ? evaluateContactFirstName(row) : '';
 }
 /**
  * calls {@link evaluateVendorIsPerson} to determine if the vendor is a person or not.
- * @note the `isperson` field in NeSuite is a `radio` field, which only accepts `string` values
+ * @returns the middle name/initial of the contact if the vendor is a person, otherwise returns an empty string.
+ * @see {@link evaluateVendorIsPerson}
  */
 export const evaluateVendorMiddleName = (row: Record<string, any>): string => {
-    if (evaluateVendorIsPerson(row) === 'T') { // if vendor is a person, return the middle name/initial
-        return evaluateContactMiddleName(row);
-    } else {
-        return '';
-    }
+    return evaluateVendorIsPerson(row) === RADIO_FIELD_TRUE ? evaluateContactMiddleName(row) : '';
 }
 /**
  * calls {@link evaluateVendorIsPerson} to determine if the vendor is a person or not.
- * @note the `isperson` field in NeSuite is a `radio` field, which only accepts `string` values
+ * @returns the last name of the contact if the vendor is a person, otherwise returns an empty string.
+ * @see {@link evaluateVendorIsPerson}
  */
 export const evaluateVendorLastName = (row: Record<string, any>): string => {
-    if (evaluateVendorIsPerson(row) === 'T') { // if vendor is a person, return the last name
-        return evaluateContactLastName(row);
-    } else {
-        return '';
-    }
+    return evaluateVendorIsPerson(row) === RADIO_FIELD_TRUE ? evaluateContactLastName(row) : '';
 }
 
 export const evaluateVendorSalutation = (row: Record<string, any>): string => {
@@ -116,14 +116,19 @@ export const evaluateVendorSalutation = (row: Record<string, any>): string => {
     }
 }
 
-export const evaluateVendorTerms = (row: Record<string, any>): FieldValue => {
+export const evaluateVendorTerms = (row: Record<string, any>, ...termArgs: any[]): FieldValue => {
+    const termDict = termArgs[0] as Record<string, Term> || null;
+    if (!termDict) {
+        console.error('evaluateVendorTerms: termDict is undefined. Cannot evaluate terms.');
+        return null;
+    }
     let termsRowValue = String(row['Terms']).trim();
-    if (termsRowValue && Object.keys(SB_TERM_DICTIONARY).includes(termsRowValue)) {
-        return SB_TERM_DICTIONARY[termsRowValue].internalid as number;
-    } else if (termsRowValue && Object.keys(SB_TERM_DICTIONARY).some((key) => SB_TERM_DICTIONARY[key].name === termsRowValue)) {
-        let key = Object.keys(SB_TERM_DICTIONARY)
-            .find((key) => SB_TERM_DICTIONARY[key].name === termsRowValue);
-        return key ? SB_TERM_DICTIONARY[key].internalid as number: null;
+    if (termsRowValue && Object.keys(termDict).includes(termsRowValue)) {
+        return termDict[termsRowValue].internalid as number;
+    } else if (termsRowValue && Object.keys(termDict).some((key) => termDict[key].name === termsRowValue)) {
+        let key = Object.keys(termDict)
+            .find((key) => termDict[key].name === termsRowValue);
+        return key ? termDict[key].internalid as number: null;
     } else if (!termsRowValue){
         return null;
     }
@@ -203,48 +208,29 @@ export const evaluateVendorShippingCountry = (row: Record<string, any>): string 
         return '';
     }
 }
+
 /**
- * Check for phone in this column order: 'Bill from 4', 'Bill from 5', 'Main Phone', 'Work Phone', 'Mobile', 'Alt. Phone'
- * @param row - `Record<string, any>` - the row to evaluate
- * @returns `billingPhone` - `string` - the first valid phone number found in the row
- * @see {@link applyPhoneRegex}
+ * 
+ * @param row - the `row` of data to look for a phone number in
+ * @param phoneColumns the columns of the `row` to look for a phone number in
+ * @returns `phone` - `{string}` - the formatted version of the first valid phone number found in the `row`, or an empty string if none is found.
+ * @see {@link applyPhoneRegex} for the regex used to validate the phone number.
  */
-export const evaluateBillingPhone = (row: Record<string, any>): string => {
-    const billingPhoneColumns = [
-        'Bill from 4', 'Bill from 5', 'Main Phone', 'Work Phone', 'Mobile', 'Alt. Phone'
-    ];
-    let billingPhone: string = '';
-    for (const col of billingPhoneColumns) {
+export const evaluatePhone = (row: Record<string, any>, ...phoneColumns: string[]): string => {
+    // console.trace(`evaluatePhone(row, ${phoneColumns})`);
+    let phone: string = '';
+    for (const col of phoneColumns) {
         let initialVal = cleanString(row[col]);
         if (!initialVal) {
             continue;
         }
-        billingPhone = applyPhoneRegex(initialVal, row['Vendor']);
+        phone = applyPhoneRegex(initialVal, `vendor="${row['Vendor']}"`);
+        if (phone) { return phone; }// return the first valid phone number found
     }
-    return billingPhone;
+    // print({label: `evaluatePhone: No valid phone number found in columns: ${phoneColumns.join(', ')}`});
+    return ''
 }
 
-
-/**
- * @description Check for phone in this column order: 'Ship from 4', 'Ship from 5', 'Main Phone', 'Work Phone', 'Mobile', 'Alt. Phone'
- * @param row - `Record<string, any>` - the row to evaluate
- * @returns `shippingPhone` - `string` - the first valid phone number found in the row
- * @see {@link applyPhoneRegex} for regex validation
- */
-export const evaluateShippingPhone = (row: Record<string, any>): string => {
-    const shippingPhoneColumns = [
-        'Ship from 4', 'Ship from 5', 'Main Phone', 'Work Phone', 'Mobile', 'Alt. Phone'
-    ];
-    let shippingPhone: string = '';
-    for (const col of shippingPhoneColumns) {
-        let initialVal = cleanString(row[col]);
-        if (!initialVal) {
-            continue;
-        }
-        shippingPhone = applyPhoneRegex(initialVal, row['Vendor']);
-    }
-    return shippingPhone;
-}
 
 export const evaluateAlternateEmail = (row: Record<string, any>): string => {
     let ccEmail: string = String(row['CC Email']).trim();
@@ -304,35 +290,69 @@ export const evaluateCompanyName = (row: Record<string, any>): string => {
     return company;
 }
 
-/** make sure contact has a firstname. then call {@link pruneAddressBookSublistOfRecordOptions} */
-export const pruneContact = (
-    contactOptions: CreateRecordOptions
+
+// TODO: maybe refactor pruneVendor and pruneContact into a single function that takes a record type and requireFields as arguments
+
+export const pruneVendor = (
+    vendorOptions: CreateRecordOptions,
+    label?: string
 ): CreateRecordOptions | null => {
-    if (isNullLike(contactOptions)) {
+    if (isNullLike(vendorOptions)) {
+        console.log(`pruneVendor(${(label || '')}): vendorOptions is null or undefined, returning null`);
         return null;
     }
-    const REQUIRED_ADDRESS_FIELDS = ['firstname']
+    const REQUIRED_VENDOR_FIELDS = ['entityid']
     try {
-        let fieldDict = contactOptions.fieldDict as FieldDictionary;
-        for (const requiredField of REQUIRED_ADDRESS_FIELDS) {
-            if (!fieldDict?.valueFields?.some((field) => field.fieldId === requiredField && !field.value)) {
+        let fieldDict = vendorOptions.fieldDict as FieldDictionary;
+        for (const requiredField of REQUIRED_VENDOR_FIELDS) {
+            if (!fieldDict?.valueFields?.some((field) => field.fieldId === requiredField && field.value)) {
                 print({
-                    label: `pruneContact: SetFieldValueOptions is missing field "${requiredField}", returning null`, 
+                    label: `pruneVendor(${(label || '')}): SetFieldValueOptions is missing field "${requiredField}", returning null`, 
                     printToConsole: false, enableOverwrite: false
                 });
                 return null;
             }
         }
-        contactOptions = pruneAddressBookSublistOfRecordOptions(contactOptions) as CreateRecordOptions;
+        vendorOptions = pruneAddressBook(vendorOptions, `${(label || '')}, pruneVendor calling pruneAddressBook `) as CreateRecordOptions;
+        return vendorOptions;
+    } catch (error) {
+        console.error(`Error in pruneVendor(${(label || '')}):`, error);
+        return vendorOptions;
+    }
+}
+
+/** make sure contact has a firstname and entityid. then call {@link pruneAddressBook} */
+export const pruneContact = (
+    contactOptions: CreateRecordOptions,
+    label?: string
+): CreateRecordOptions | null => {
+    if (isNullLike(contactOptions)) {
+        console.log(`pruneContact(${(label || '')}): contactOptions is null or undefined, returning null`);
+        return null;
+    }
+    const REQUIRED_CONTACT_FIELDS = ['entityid', 'firstname']
+    try {
+        let fieldDict = contactOptions.fieldDict as FieldDictionary;
+        for (const requiredField of REQUIRED_CONTACT_FIELDS) {
+            if (!fieldDict?.valueFields?.some((field) => field.fieldId === requiredField && field.value)) {
+                print({
+                    label: `pruneContact(${(label || '')}): SetFieldValueOptions is missing field "${requiredField}", returning null`, 
+                    printToConsole: false, enableOverwrite: false
+                });
+                return null;
+            }
+        }
+        contactOptions = pruneAddressBook(contactOptions, `${(label || '')}, pruneContact calling pruneAddressBook `) as CreateRecordOptions;
         return contactOptions;
     } catch (error) {
-        console.error(`Error in pruneContact():`, error);
+        console.error(`Error in pruneContact(${(label || '')}):`, error);
         return contactOptions;
     }
 }
 
-export const pruneAddressBookSublistOfRecordOptions = (
-    options: CreateRecordOptions
+export const pruneAddressBook = (
+    options: CreateRecordOptions,
+    label?: string
 ): CreateRecordOptions | null => {
     if (isNullLike(options)) {
         return null;
@@ -347,7 +367,7 @@ export const pruneAddressBookSublistOfRecordOptions = (
             for (const requiredField of REQUIRED_ADDRESS_FIELDS) {
                 if (!subrecValueFields?.some((field) => field.fieldId === requiredField)) {
                     print({
-                        label: `subrecordFields[${index}]: SetSubrecordOptions is missing address field "${requiredField}", removing it from subrecordFields`, 
+                        label: `pruneAddressBook(${(label || '')}):`, details: `subrecordFields[${index}]: SetSubrecordOptions is missing address field "${requiredField}", removing it from subrecordFields`, 
                         printToConsole: false, enableOverwrite: false
                     });
                     valueFields?.splice(index, 1);
@@ -355,14 +375,14 @@ export const pruneAddressBookSublistOfRecordOptions = (
                     return options;
                 }
                 print({
-                    label: `All required fields found. Keeping addressbook subrecordFields[${index}]`, 
+                    label: `pruneAddressBook(${(label || '')}):`, details: `All required fields found. Keeping addressbook subrecordFields[${index}]`, 
                     printToConsole: false, enableOverwrite: false
                 });
             }
         });
         return options;
     } catch (error) {
-        console.error(`Error in pruneAddressBookSublistOfRecordOptions: ${error}`);
+        console.error(`pruneAddressBook(${(label || '')}): Error in pruneAddressBook: ${error}`);
     }
     return null;
 };

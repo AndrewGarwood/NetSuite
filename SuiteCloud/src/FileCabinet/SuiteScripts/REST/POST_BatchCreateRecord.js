@@ -8,7 +8,7 @@
  * @SbDeployId number
  */
 
-define(['N/record', 'N/log'], (record, log) => {
+define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     /**
      * @type {LogStatement[]} - Array<{@link LogStatement}> = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
      * @see {@link writeLog}(type, title, ...details)
@@ -31,10 +31,11 @@ define(['N/record', 'N/log'], (record, log) => {
      * - for recordType in Object.keys(reqBody.createRecordDict)
      * - - for req in reqBody.createRecordDict[recordType]
      * - - - run function {@link processCreateRecordOptions}(`req`)
+     * @param {string | string[]} reqBody.responseProps - (optional) the properties to include in the response in addition to the created records' IDs.
      * @returns {BatchCreateRecordResponse} .{@link BatchCreateRecordResponse}
      */
     const post = (/**@description request body of {@link post}*/reqBody) => {
-        let { createRecordArray, createRecordDict } = reqBody;
+        let { createRecordArray, createRecordDict, responseProps } = reqBody;
         let createRecordArrayIsInvalid = !createRecordArray || !Array.isArray(createRecordArray);
         let createRecordDictIsInvalid = !createRecordDict || typeof createRecordDict !== 'object';
         if (createRecordArrayIsInvalid && createRecordDictIsInvalid) {
@@ -45,7 +46,7 @@ define(['N/record', 'N/log'], (record, log) => {
             throw new Error('Invalid request body: Body must contain either "createRecordArray"?: Array<CreateRecordOptions>; or "createRecordDict"?: {[K in RecordTypeEnum]?: Array<CreateRecordOptions>;}; but not both.');
         }
         /**@type {number[]} */
-        let recIdArray = [];
+        let resultsArray = [];
         try {
             if (createRecordArray && createRecordArray.length > 0) {
                 writeLog(LogTypeEnum.AUDIT, 'reqBody.createRecordArray.length:', createRecordArray.length);
@@ -56,7 +57,7 @@ define(['N/record', 'N/log'], (record, log) => {
                         writeLog(LogTypeEnum.ERROR, `Error Processing createRecordArray[${i}]`, `element ${i} CreateRecordOptions`);
                         continue;
                     } 
-                    recIdArray.push(result);
+                    resultsArray.push(result);
                 }
             }
             if (createRecordDict && Object.keys(createRecordDict).length > 0) {   
@@ -78,21 +79,21 @@ define(['N/record', 'N/log'], (record, log) => {
                     writeLog(LogTypeEnum.AUDIT, `createRecordDict[key=${recordType}, keyIndex=${index}].length:`, reqArray.length);
                     for (let i = 0; i < reqArray.length; i++) {
                         let createReq = reqArray[i];
-                        let result = processCreateRecordOptions(createReq);
-                        if (!result) {
+                        let results = processCreateRecordOptions(createReq);
+                        if (!results) {
                             writeLog(LogTypeEnum.ERROR, `Error Processing createRecordDict[${recordType}][${i}]`, `value.element ${i} CreateRecordOptions`);
                             continue;
                         } 
-                        recIdArray.push(result);
+                        resultsArray.push(results);
                     }
                 });
             }      
-            writeLog(LogTypeEnum.DEBUG, 'POST (BatchCreateRecordRequest) End', { recIdArrayLength: recIdArray.length });
+            writeLog(LogTypeEnum.DEBUG, 'POST (BatchCreateRecordRequest) End', { recIdArrayLength: resultsArray.length });
             /**@type {BatchCreateRecordResponse}*/
             return { 
                 success: true,
                 message: 'Records created successfully',
-                recordIds: recIdArray,
+                results: resultsArray,
                 logArray: logArray
             }
         } catch (/**@type {Error}*/e) {
@@ -101,7 +102,7 @@ define(['N/record', 'N/log'], (record, log) => {
             return { 
                 success: false,
                 message: 'Error processing POST_BatchCreateRecord request',
-                recordIds: recIdArray,
+                results: resultsArray,
                 error: e.toString(),
                 logArray: logArray
             }
@@ -118,9 +119,11 @@ define(['N/record', 'N/log'], (record, log) => {
      * @param {SublistDictionary} [createReq.sublistDict]
      * - {@link SublistDictionary} = Record<[`sublistId`: string], {@link SublistFieldDictionary}> = { `sublistId`: { `priorityFields`: Array<{@link SetSublistValueOptions}>, `textFields`: Array<{@link SetSublistTextOptions}>, `valueFields`: Array<{@link SetSublistValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> } }.
      * - an object containing sublist IDs and their corresponding field IDs and values.
-     * @returns {number|null} recordId or null if error
+     * @param {string|string[]} [responseProps] - (optional) the properties to include in the response in addition to the created record ID.
+     * @returns {null | CreateRecordResults} `results` {@link CreateRecordResults} = 
+     * or `null` if error
      */
-    function processCreateRecordOptions(createReq) {
+    function processCreateRecordOptions(createReq, responseProps) {
         let {recordType, isDynamic, fieldDict, sublistDict} = createReq;
         if (!recordType || (!fieldDict && !sublistDict)) {
             writeLog(LogTypeEnum.ERROR, 'Input Error in Post_BatchCreateRecordRequest.processRecordRequest(createReq)', 
@@ -163,12 +166,32 @@ define(['N/record', 'N/log'], (record, log) => {
                     rec = processFieldDictionary(rec, recordType, sublistFieldDict, FieldDictTypeEnum.SUBLIST_FIELD_DICT);
                 }
             }
+            /**@type {CreateRecordResults} */
+            const results = {};
             /**@type {number} */
             const recId = rec.save();
             writeLog(LogTypeEnum.AUDIT, `Successfully created ${recordType} record`, { recordId: recId });
-            return recId;
+            results.recordId = recId;
+            if (responseProps) {
+                if (isNonEmptyArray(responseProps)) {
+                    responseProps.forEach((fieldId, index) => {
+                        try {
+                            fieldId = fieldId.toLowerCase();
+                            results[fieldId] = rec.getValue({ fieldId });
+                        } catch(e) {
+                            writeLog(LogTypeEnum.ERROR, `Invalid responseProps[${index}]`, `responseProps[${index}]: ${fieldId} not found in ${recordType} record.`, e);
+                            return;
+                        }
+                    });
+                } else if (typeof responseProps === 'string') {
+                    results[responseProps] = rec.getValue({ fieldId: responseProps });
+                } else {
+                    writeLog(LogTypeEnum.ERROR, 'Invalid responseProps', `responseProps must be a string or an array of strings.`);
+                }
+            }
+            return results;
         } catch (e) {
-            writeLog(LogTypeEnum.ERROR, `processCreateRecordOptions().catch(e) Error creating ${recordType} record`, e);
+            writeLog(LogTypeEnum.ERROR, `processCreateRecordOptions().catch(e) Error creating "${recordType} record"`, e);
             return null;
         }
     }
@@ -178,7 +201,7 @@ define(['N/record', 'N/log'], (record, log) => {
      * @param {Object} rec - The current record or subrecord being processed.
      * @param {string} recordType - The record type {@link RecordTypeEnum} (e.g., 'assemblyitem', 'bom', 'bomrevision', 'inventoryitem', 'customer', 'salesorder', 'invoice', etc.)
      * @param {SetOptionsEnum} fieldType - The type of field to set ({@link SetOptionsEnum}) ( FIELD_TEXT, FIELD_VALUE, SUBLIST_TEXT, SUBLIST_VALUE).
-     * @param {Array<SetFieldOptionsArrayType>} fieldOptions - {@link SetFieldOptionsArrayType} = Array<{@link SetFieldTextOptions} | {@link SetFieldValueOptions} | {@link SetSublistTextOptions} | {@link SetSublistValueOptions}>.
+     * @param {Array<SetFieldOptionsType>} fieldOptions - {@link SetFieldOptionsType} = Array<{@link SetFieldTextOptions} | {@link SetFieldValueOptions} | {@link SetSublistTextOptions} | {@link SetSublistValueOptions}>.
      * @param {OptionsArrayLabelEnum} [arrayLabel=OptionsArrayLabelEnum.DEFAULT_LABEL] The label of the field options array ("priorityFields", "textFields", "valueFields").
      * @returns {Object} rec - The record with the field values set.
      */
@@ -424,10 +447,10 @@ define(['N/record', 'N/log'], (record, log) => {
         const lineCount = rec.getLineCount({ sublistId });
         const lineIndexOutOfBounds = line < 0 || line >= lineCount;
         if (lineIndexOutOfBounds) {
-            writeLog(LogTypeEnum.DEBUG, `validateSublistLine(rec, sublistId=${sublistId}, line=${line})`, 
-                `line: ${line} is out of bounds for sublistId: ${sublistId} with lineCount: ${lineCount}`,
-                `inserting a new line at index ${lineCount}`
-            );
+            // writeLog(LogTypeEnum.DEBUG, `validateSublistLine(rec, sublistId=${sublistId}, line=${line})`, 
+            //     `line: ${line} is out of bounds for sublistId: ${sublistId} with lineCount: ${lineCount}`,
+            //     `inserting a new line at index ${lineCount}`
+            // );
             rec.insertLine({ sublistId, line: lineCount });
             return lineCount; // return the new line index
         }
@@ -542,16 +565,22 @@ const FieldDictTypeEnum = {
  * `Array<`{@link CreateRecordOptions}`>` to create records in NetSuite.
  * @property {{[K in RecordTypeEnum]?: Array<CreateRecordOptions>}} [createRecordDict] 
  * `Record<`[K in {@link RecordTypeEnum}]?: `Array<`{@link CreateRecordOptions}`>>` to create records in NetSuite.
-*/
+ * @property {string | string[]} [responseProps] - `string | string[]` - The properties to include in the response in addition to the records' internal IDs.
+ */
+
+
+/**
+ * @typedef {{recordId: number; [fieldId: string]: FieldValue;}} CreateRecordResults
+ */
 
 /**
  * Definition of Response for the POST function in POST_BatchCreateRecord.js
  * @typedef {Object} BatchCreateRecordResponse
  * @property {boolean} success - Indicates if the request was successful.
  * @property {string} message - A message indicating the result of the request.
- * @property {number[]} recordIds - An array of record IDs created.
+ * @property {CreateRecordResults[]} resultsArray - an `Array<`{@link CreateRecordResults}`>` containing the record ids and any additional properties specified in the request for all the records successfully created.
  * @property {string} [error] - An error message if the request was not successful.
- * @property {LogStatement[]} logArray - An array of {@link LogStatement}s generated during the request processing.
+ * @property {LogStatement[]} logArray - an `Array<`{@link LogStatement}`>` generated during the request processing.
  */
 
 // CreateRecordOptions
@@ -628,7 +657,7 @@ const SetOptionsEnum = {
 }
 
 /**
- * @typedef {SetFieldTextOptions | SetFieldValueOptions | SetSublistTextOptions | SetSublistValueOptions | SetSubrecordOptions} SetFieldOptionsArrayType 
+ * @typedef {SetFieldTextOptions | SetFieldValueOptions | SetSublistTextOptions | SetSublistValueOptions | SetSubrecordOptions} SetFieldOptionsType 
  * */
 
 /**
@@ -646,7 +675,45 @@ const OptionsArrayLabelEnum = {
     SUBRECORD: 'subrecordFields',
     DEFAULT_LABEL: 'optionsArray'
 }
-
+/** 
+ * @enum {string} FieldInputTypeEnum
+ * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html}
+ * @property {string} TEXT `Text` fields accept `string` values. 
+ * @property {string} RADIO `Radio` fields accept `string` values.
+ * @property {string} SELECT `Select` fields accept `string` and `number` values.
+ * @property {string} MULTISELECT `Multi-Select` fields accept `arrays` of `string` or `number` values.
+ * @property {string} CHECKBOX `Checkbox` fields accept `boolean` values.
+ * @property {string} DATE `Date` and `DateTime` fields accept {@link Date} values.
+ * @property {string} INTEGER `Integer` fields accept `number` values.
+ * @property {string} FLOAT `Float` fields accept `number` values.
+ * @property {string} CURRENCY `Currency` fields accept `number` values.
+ * @property {string} PERCENT `Percent` fields accept `number` values.
+ * @property {string} INLINE_HTML `Inline HTML` fields accept `strings`. Strings containing HTML tags are represented as HTML entities in UI. {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html#:~:text=The%20following%20code%20sample%20shows%20the%20syntax%20for%20INLINEHTML%20fields%20and%20what%20is%20returned.}
+ */
+const FieldInputTypeEnum = {
+    /** `Text` fields accept `string` values. */
+    TEXT: 'text',
+    /** `Radio` fields accept `string` values. */
+    RADIO: 'radio',
+    /** `Select` fields accept `string` and `number` values. */
+    SELECT: 'select',
+    /** `Multi-Select` fields accept `arrays` of `string` or `number` values. */
+    MULTISELECT: 'multiselect',
+    /** `Checkbox` fields accept `boolean` values. */
+    CHECKBOX: 'checkbox',
+    /** `Date` and `DateTime` fields accept {@link Date} values. */
+    DATE: 'date',
+    /** `Integer` fields accept `number` values. */
+    INTEGER: 'integer',
+    /** `Float` fields accept `number` values. */
+    FLOAT: 'float',
+    /** `Currency` fields accept `number` values. */
+    CURRENCY: 'currency',
+    /** `Percent` fields accept `number` values. */
+    PERCENT: 'percent',
+    /** `Inline HTML` fields accept `strings`. Strings containing HTML tags are represented as HTML entities in UI. {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html#:~:text=The%20following%20code%20sample%20shows%20the%20syntax%20for%20INLINEHTML%20fields%20and%20what%20is%20returned.} */
+    INLINE_HTML: 'inlinehtml',
+}
 
 // FieldDictionary
 /**
@@ -705,6 +772,7 @@ const OptionsArrayLabelEnum = {
  * @property {FieldValue} value 
  * - The {@link FieldValue} to set the field to. 
  * - = {Date | number | number[] | string | string[] | boolean | null}
+ * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
  */
 
 /**
@@ -713,6 +781,7 @@ const OptionsArrayLabelEnum = {
  * @typedef {Object} SetFieldTextOptions
  * @property {string} fieldId - The internal ID of a standard or custom field.
  * @property {string} text - The text to set the value to.
+ * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
  */
 
 /**
@@ -723,6 +792,7 @@ const OptionsArrayLabelEnum = {
  * @property {string} fieldId - (i.e. sublistFieldId) The internal ID of a standard or custom sublist field.
  * @property {number} line - The line number for the field. (i.e. index of the sublist row) (can use record.getLineCount(sublistId) to get the number of lines in the sublist)
  * @property {string} text - The text to set the value to.
+ * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
  */
 
 /**
@@ -734,6 +804,7 @@ const OptionsArrayLabelEnum = {
  * @property {FieldValue} value 
  * - The {@link FieldValue} to set the sublist field to.
  * - = {Date | number | number[] | string | string[] | boolean | null}
+ * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
  */
 
 

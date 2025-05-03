@@ -66,7 +66,7 @@ export enum Type {
 }
 
 /** 
- * @enum {string} FileEncodingEnum
+ * @enum {string} `FileEncodingEnum`
  * @description Enumeration that holds the string values for supported character encoding.
  * @property {string} UTF_8 - UTF-8 encoding.
  * @property {string} WINDOWS_1252 - Windows 1252 encoding.
@@ -78,7 +78,7 @@ export enum Type {
  * @property {string} BIG5 - Big5 encoding.
  */
 const FileEncodingEnum = {
-    UTF_8 : 'UTF-8',
+    UTF_8 : 'UTF_8',
     WINDOWS_1252 : 'WINDOWS_1252',
     ISO_8859_1 : 'ISO_8859_1',
     GB18030 : 'GB18030',
@@ -89,7 +89,7 @@ const FileEncodingEnum = {
 }
 
 /** 
- * @enum {string} FileTypeEnum
+ * @enum {string} `FileTypeEnum`
  * @description Enumeration that holds the string values for supported file types.
  * @property {string} APPCACHE - Application Cache file.
  * @property {string} AUTOCAD - AutoCAD file.
