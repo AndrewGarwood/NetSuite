@@ -1,5 +1,5 @@
 # Overview:
-- A collection of scripts using [NetSuite's](https://www.netsuite.com/portal/home.shtml) [SuiteScript 2.0](https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/article_4140956840.html) to facilitate implementation of NetSuite as company's ERP.
+- A collection of scripts using [NetSuite's](https://www.netsuite.com/portal/home.shtml) [SuiteScript 2.0](https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/article_4140956840.html) to implement NetSuite as company's ERP.
 - There are multiple entry points to create/update/delete data from one's NetSuite account/instance. I prefer the REST entry point: [NetSuite Applications Suite - SuiteScript 2.x RESTlet Script Type](https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4387799403.html)
 - An essential reference for is NetSuite's [Record Browser](https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/account.html) 
 
