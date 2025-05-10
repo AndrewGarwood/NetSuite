@@ -20,10 +20,11 @@ import {
     SublistSubrecordMapping 
 } from "./utils/api/types";
 import { RecordTypeEnum } from "./utils/api/types/NS";
+import { mainLogger as log } from "./config/setupLog";
 import {
     hasKeys, isBooleanFieldId, isNullLike, BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES
 } from "./utils/typeValidation";
-import { stripChar, printConsoleGroup as print, getDelimiterFromFilePath} from "./utils/io";
+import { printConsoleGroup as print, getDelimiterFromFilePath} from "./utils/io";
 import { DATA_DIR, OUTPUT_DIR, STOP_RUNNING } from "./config/env";
 import csv from 'csv-parser';
 import fs from 'fs';
@@ -31,7 +32,7 @@ import { ValueMapping, ValueMappingEntry, isValueMappingEntry } from "./utils/io
 
 const NOT_DYNAMIC = false;
 let rowIndex = 0;
-
+let pruneCount: Record<string, number> = {};
 /**
  * 
  * @param csvPath - The path to the CSV file.
@@ -74,20 +75,26 @@ export async function parseCsvToCreateOptions(
                             createOptions = pruneFunc(createOptions, `{ parseOptionsArray[${index}], rowIndex ${rowIndex}, recordType ${recordType} }`);
                         }
                         if (!createOptions) {
-                            console.log(`parseCsvToCreateOptions().forLoop { parseOptionsArray[${index}], rowIndex ${rowIndex}, recordType ${recordType} } was pruned by pruneOptions() and will not be included in the batch request`);
+                            // log.debug(`{ parseOptionsArray[${index}], rowIndex ${rowIndex}, recordType ${recordType} } was pruned by pruneOptions() and will not be included in the batch request`);
+                            pruneCount[recordType] = (pruneCount[recordType] || 0) + 1;
                             continue;
                         }
                         results.push(createOptions);
                     }
                 } catch (error) {
-                    console.trace(`Error processing row ${rowIndex}:`, error);
+                    log.error(`Error processing row ${rowIndex}:`, error);
                     reject(error);
                 }
                 rowIndex++;
             })
-            .on('end', () => resolve(results))
+            .on('end', () => {
+                log.debug(`rowIndex: ${rowIndex} - Finished processing CSV file with results.length=${results.length}\n`,
+                    `pruneCount=`, pruneCount, `parseOptionsArray.length=${parseOptionsArray.length}, csvPath=${csvPath}`
+                );
+                resolve(results)
+            })
             .on('error', reject);
-        });
+    });
 }
 
 /**

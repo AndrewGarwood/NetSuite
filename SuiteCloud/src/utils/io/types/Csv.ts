@@ -1,7 +1,7 @@
 /**
- * @file src/types/io/CsvMapping.ts
+ * @file src/types/io/Csv.ts
  * @description Types and Enums for handling CSV files, including column mappings and delimiters.
- * @module CsvMapping
+ * @module Csv
  */
 import { 
     FieldValue,
@@ -82,31 +82,12 @@ export enum DelimitedFileTypeEnum {
 }
 
 /**
- * @enum {string} DelimiterEnum
+ * @enum {string} `DelimiterCharacterEnum`
  * @property {string} TAB  `\t` - Tab character used as a delimiter.
  * @property {string} COMMA  `,` - Comma character used as a delimiter.
  * @description The DelimiterEnum enum defines the possible delimiters for CSV files.
  */
-export enum DelimiterEnum {
+export enum DelimiterCharacterEnum {
     TAB = '\t',
     COMMA = ',',
 }
-
-
-/*
-~\node_modules\csv-parser\index.d.ts
- * interface Options // CSV parser.
- * @property {string} separator - {@link separator} Specifies a single-character string to use as the column separator for each row.
- * @property {string} escape - {@link escape} A single-character string used to specify the character used to escape strings in a CSV row.
- * @property {ReadonlyArray<string> | boolean} headers - {@link headers} Specifies the headers to use. Headers define the property key for each value in a CSV row. If no `headers` option is provided, `csv-parser` will use the first line in a CSV file as the header specification.
- * @property {(args: { header: string; index: number }): string | null} mapHeaders - {@link mapHeaders} A function that can be used to modify the values of each header. Return `null` to remove the header, and it's column, from the results.
- * @property {(args: { header: string; index: number; value: any }): any} mapValues - {@link mapValues} A function that can be used to modify the value of each column value.
- * @property {string} newline - {@link newline} Specifies a single-character string to denote the end of a line in a CSV file.
- * @property {string} quote - {@link quote} Specifies a single-character string to denote a quoted string.
- * @property {boolean} raw - {@link raw} If `true`, instructs the parser not to decode UTF-8 strings.
- * @property {boolean} skipComments - {@link skipComments} Instructs the parser to ignore lines which represent comments in a CSV file.
- * @property {number} skipLines - {@link skipLines} Specifies the number of lines at the beginning of a data file that the parser should skip over, prior to parsing headers.
- * @property {Number.MAX_SAFE_INTEGER} maxRowBytes - {@link maxRowBytes} Maximum number of bytes per row. An error is thrown if a line exceeds this value.
- * @property {boolean} strict - {@link strict} If `true`, instructs the parser that the number of columns in each row must match the number of `headers` specified.
- * @property {boolean} outputByteOffset - {@link outputByteOffset} If `true`, instructs the parser to emit each row with a `byteOffset` property.
- */

@@ -1,10 +1,11 @@
 import { readJsonFileAsObject, writeObjectToJson, getCurrentPacificTime, calculateDifferenceOfDateStrings, TimeUnitEnum, printConsoleGroup as print } from "./utils/io";
 import { callPostRestletWithPayload, callGetRestletWithParams } from "./utils/api";
 import { TOKEN_DIR, DATA_DIR, OUTPUT_DIR, STOP_RUNNING, SCRIPT_ENVIORNMENT as SE } from "./config/env";
+import { mainLogger as log } from "./config/setupLog";
 import { RecordTypeEnum } from "./utils/api/types/NS/Record/Record";
-import { initiateAuthFlow, getAuthCode, exchangeAuthCodeForTokens, exchangeRefreshTokenForNewTokens, CLOSE_SERVER } from "./server/authServer";
+import { initiateAuthFlow, CLOSE_SERVER } from "./server/authServer";
 import { TokenResponse } from "./server/types/TokenResponse";
-import { CreateRecordOptions, CreateRecordResponse, BatchCreateRecordRequest, RetrieveRecordByIdRequest, RetrieveRecordByIdResponse, idPropertyEnum } from "./utils/api/types/Api";
+import { CreateRecordOptions, BatchCreateRecordRequest, RetrieveRecordByIdRequest, RetrieveRecordByIdResponse, idPropertyEnum, BatchCreateRecordResponse, CreateRecordResult, SetFieldValueOptions } from "./utils/api/types/Api";
 import { parseCsvToCreateOptions } from './parseCsvToRequestBody';
 import { 
     PARSE_VENDOR_FROM_VENDOR_CSV_OPTIONS as VENDOR_OPTIONS, 
@@ -12,6 +13,11 @@ import {
 } from "./vendorParseDefinition";
 import { ScriptDictionary } from "./utils/api/types/NS/SuiteScriptEnvironment";
 import path from 'node:path';
+
+const VENDOR_DIR = `${DATA_DIR}/vendors` as string;
+const SINGLE_COMPANY_FILE = `${VENDOR_DIR}/single_company_vendor.tsv` as string;
+const SINGLE_HUMAN_FILE = `${VENDOR_DIR}/single_human_vendor.tsv` as string;
+const SUBSET_FILE = `${VENDOR_DIR}/vendor_subset.tsv` as string;
 
 const SB_REST_SCRIPTS = SE.sandbox?.restlet || {} as ScriptDictionary;
 const STEP2_TOKENS_PATH = path.join(TOKEN_DIR, 'STEP2_tokens.json') as string;
@@ -22,30 +28,70 @@ const REFRESH_TOKEN_IS_NOT_AVAILABLE = false;
 
 
 async function main() {
-    const VENDOR_DIR = `${DATA_DIR}/vendors` as string;
-    const SINGLE_COMPANY_FILE = `${VENDOR_DIR}/single_company_vendor.tsv` as string;
-    const SINGLE_HUMAN_FILE = `${VENDOR_DIR}/single_human_vendor.tsv` as string;
-    const SUBSET_FILE = `${VENDOR_DIR}/vendor_subset.tsv` as string;
     const { vendors, contacts } = await parseVendorFile(SINGLE_COMPANY_FILE);
+    writeObjectToJson({ vendors: vendors}, 'vendors_option_array.json', OUTPUT_DIR, 4, true);
+    writeObjectToJson({ contacts: contacts}, 'contacts_option_array.json', OUTPUT_DIR, 4, true);
+    STOP_RUNNING(0, "let's see what they look like");
+    log.info(`vendors.length: ${vendors.length}, contacts.length: ${contacts.length}`)
     if (vendors.length === 0 || contacts.length === 0) {
-        print({label: 'main.ts main() No vendors and/or no contacts were parsed from the CSV file. Exiting...', details:`vendors.length: ${vendors.length}, contacts.length: ${contacts.length}`});
+        log.error('No vendors and no contacts were parsed from the CSV file. Exiting...');
         STOP_RUNNING(1);
     }
-    // contact creation has field dependencies on vendor creation, so we need to create the vendors first.
     const vendorPayload: BatchCreateRecordRequest = {
         createRecordArray: vendors,
+        responseProps: ['entityid', 'isperson']
     }
-    const res1 = await callBatchCreateRecord(vendorPayload);
-    writeObjectToJson(await res1.data, `single_vendor_Response.json`, OUTPUT_DIR, 4, true);
+    const vendorRes = await callBatchCreateRecord(vendorPayload);
+    const vendorResData = await vendorRes.data as BatchCreateRecordResponse;
+    if(!vendorResData) {
+        log.error('vendorRes.data is undefined. Exiting...');
+        STOP_RUNNING(1);
+    }
+    log.debug(`vendorResData.results.length `, vendorResData.results.length);
+    writeObjectToJson(vendorResData, `subset_vendor_Response.json`, OUTPUT_DIR, 4, true);
+    const vendorResults: CreateRecordResult[] = vendorResData?.results as CreateRecordResult[];
+    const removedContacts: CreateRecordOptions[] = [];
+    contacts.forEach((contact: CreateRecordOptions, index: number) => {
+        let contactCompanyField = contact.fieldDict?.valueFields?.find(
+            field => field.fieldId === 'company') as SetFieldValueOptions;
+        let contactCompany = contactCompanyField?.value as string;
+        if (!contactCompany) {
+            log.debug(`contactCompany is undefined (vendor is a person). continuing...`);
+            return
+        }
+        let vendorInternalId = vendorResults.find(
+            vendorResult => vendorResult?.entityid === contactCompany
+        )?.recordId;
+        if (!vendorInternalId) {
+            // log.error(`vendorInternalId is undefined for contact at index=${index}.`, 
+            //     `removing contacts[${index}]. continuing...`);
+            removedContacts.push(...contacts.splice(index, 1));
+            return
+        }
+        contactCompanyField.value = vendorInternalId;
+    });
+    log.debug(`removedContacts.length: ${removedContacts.length}`);
     const contactsPayload: BatchCreateRecordRequest = {
         createRecordArray: contacts,
+        responseProps: ['entityid', 'firstname', 'lastname']
     }
-    STOP_RUNNING(0, 'main.ts main() completed successfully.');
+    const contactRes = await callBatchCreateRecord(contactsPayload);
+    const contactResData = await contactRes.data as BatchCreateRecordResponse;
+    if(!contactResData) {
+        log.debug('contactRes.data is undefined. Exiting...');
+        STOP_RUNNING(1);
+    }
+    log.debug(`contactResData.results.length `, contactResData.results.length);
+    writeObjectToJson({removed: removedContacts}, `subset_removed_contact.json`, OUTPUT_DIR, 4, true);
+    writeObjectToJson(contactResData, `subset_contact_Response.json`, OUTPUT_DIR, 4, true);
+    STOP_RUNNING(0);
 }
 main().catch(error => {
-    console.error('Error executing main.ts main() function:', error);
+    log.error('Error executing main() function:', error);
 });
 
+
+// contact creation has field dependencies on vendor creation, so we need to create the vendors first.
 async function parseVendorFile(
     filePath: string
 ): Promise<{vendors: CreateRecordOptions[], contacts: CreateRecordOptions[]}> {
@@ -56,7 +102,7 @@ async function parseVendorFile(
             await parseCsvToCreateOptions(filePath, [CONTACT_OPTIONS]);
         return { vendors: vendorResult, contacts: contactResult };
     } catch (error) {
-        console.error('Error parsing CSV to CreateRecordOptions:', error);
+        log.error('Error parsing CSV to CreateRecordOptions:', error);
         return { vendors: [], contacts: [] };
     }
 }
@@ -68,7 +114,7 @@ async function callBatchCreateRecord(
 ): Promise<any> {
     let accessToken = await getAccessToken();
     if (!accessToken) {
-        console.error('callBatchCreateRecord() getAccessToken() is undefined. Cannot call RESTlet.');
+        log.error('callBatchCreateRecord() getAccessToken() is undefined. Cannot call RESTlet.');
         STOP_RUNNING();
     }
     try {
@@ -80,7 +126,7 @@ async function callBatchCreateRecord(
         );
         return res;
     } catch (error) {
-        console.error('Error in main.ts callBatchCreateRecord()', error);
+        log.error('Error in main.ts callBatchCreateRecord()', error);
         throw error;
     }
 }
@@ -99,7 +145,7 @@ async function callRetrieveRecordById(
 ): Promise<any> {
     const accessToken = await getAccessToken();
     if (!accessToken) {
-        console.error('callRetrieveRecordById() getAccessToken()is undefined. Cannot call RESTlet.');
+        log.error('accessToken is undefined. Cannot call RESTlet.');
         STOP_RUNNING();
     }
     try {
@@ -111,7 +157,7 @@ async function callRetrieveRecordById(
         )
         return res;
     } catch (error) {
-        console.error('Error in main.ts callRetrieveRecordById()', error);
+        log.error('Error in main.ts callRetrieveRecordById()', error);
         throw error;
     }
 }
@@ -123,47 +169,46 @@ export async function getAccessToken(): Promise<string> {
     const refreshTokenIsExpired = localTokensHaveExpired(STEP2_TOKENS_PATH);
     try {
         if ((!accessToken || accessTokenIsExpired) && refreshToken && !refreshTokenIsExpired) {
-            console.log(
+            log.info(
                 'Access token is expired or undefined, Refresh token is available.',
                 'Initiating auth flow from exchangeRefreshTokenForNewTokens()...'
             );
             let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_IS_AVAILABLE) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
         } else if ((!accessToken || accessTokenIsExpired) && (!refreshToken || refreshTokenIsExpired)) {
-            console.log(
+            log.info(
                 'Access token is expired or undefined. Refresh token is also undefined.', 
                 'Initiating auth flow from the beginning...'
             );
             let tokenRes: TokenResponse = await initiateAuthFlow() as TokenResponse;
             accessToken = tokenRes?.access_token || '';
         } else {
-            console.log('Access token is valid. Proceeding with RESTlet call...');
+            log.info('Access token is valid. Proceeding with RESTlet call...');
         }
         CLOSE_SERVER();
-        return accessToken;
+        return accessToken as string;
     } catch (error) {
-        console.error('Error in main.ts getAccessToken()', error);
+        log.error('Error in main.ts getAccessToken()', error);
         throw error;
     }
 }
-
 
 /**
  * 
  * @param filePath - path to the local json file containing the {@link TokenResponse}, defaults to {@link STEP2_TOKENS_PATH} = `${OUTPUT_DIR}/STEP2_tokens.json`
  * @description Checks if the TokenResponse stored locally in a json file have expired by comparing the current time with the last updated time and the expiration time.
- * - `TokenResponse.expires_in`'s default value is `3600 seconds` (1 hour) as per OAuth2.0 standard.
+ * - `TokenResponse.expires_in`'s default value is 3600 seconds (1 hour) as per OAuth2.0 standard.
  * @returns {boolean} `true` if a duration greater than or equal to the token lifespan (`TokenResponse.expires_in`) has passed since the last updated time, `false` otherwise.
  */
 export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): boolean {
     try {
         const tokenResponse = readJsonFileAsObject(filePath) as TokenResponse;
         if (!tokenResponse) {
-            console.error('Token response is undefined. Cannot check expiration.');
+            log.error('tokenResponse is undefined. Cannot check expiration.');
             return true;
         }
         if (!tokenResponse?.lastUpdated || !tokenResponse?.expires_in) {
-            console.error('lastUpdated or expires_in key in local json file is undefined. Cannot check expiration.');
+            log.error('lastUpdated or expires_in key in local json file is undefined. Cannot check expiration.');
             return true;
         }
         const currentTime: string = getCurrentPacificTime();
@@ -171,10 +216,10 @@ export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): bool
         const tokenLifespan = Number(tokenResponse?.expires_in);
         const msDiff = calculateDifferenceOfDateStrings(lastUpdatedTime, currentTime, TimeUnitEnum.MILLISECONDS, true) as number;
         const haveExpired = (msDiff != 0 && msDiff >= tokenLifespan * 1000)
-        console.log(`\t(${msDiff} != 0 && ${msDiff} >= ${tokenLifespan} * 1000) = ${haveExpired}`);
+        // print({label: 'localTokensHaveExpired()', details: `(${msDiff} != 0 && ${msDiff} >= ${tokenLifespan} * 1000) = ${haveExpired}`});
         return haveExpired;
     } catch (error) {
-        console.error('Error in localTokensHaveExpired(), return default (true):', error);
+        log.error('Error in localTokensHaveExpired(), return default (true):', error);
         return true;
     } 
 }

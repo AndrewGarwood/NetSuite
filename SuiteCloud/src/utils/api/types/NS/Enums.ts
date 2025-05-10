@@ -5,8 +5,9 @@
  */
 
 
+export { VendorCategoryEnum } from './Record/Relationships/Vendor'
 /**
- * @enum {string} UnitsTypeEnum
+ * @enum {string} `UnitsTypeEnum`
  * @description Enum for unit types in NetSuite. (defined by account user)
  * @property {string} QUANTITY - Quantity unit type.
  * @property {string} WEIGHT - Weight unit type.
@@ -24,7 +25,7 @@ export enum UnitsTypeEnum {
 
 /**
  * @TODO make enums for each of the unit types in {@link UnitsTypeEnum}
- * @enum {string} UnitsEnum
+ * @enum {string} `UnitsEnum`
  * @description Enum for unit types in NetSuite. (defined by account user)
  * @property {string} EACH - Each unit.
  * @property {string} DOZEN - Dozen unit.

@@ -9,7 +9,7 @@
 import { parseDelimitedFileWithMapping } from "src/utils/io/reading"
 import { RecordRef, TermBase as Term } from "src/utils/api/types/NS"
 import { FieldValue } from "src/utils/api/types/Api";
-import {ValueMapping, ColumnMapping, MappedRow } from "src/utils/io/types/CsvMapping";
+import {ValueMapping, ColumnMapping, MappedRow } from "src/utils/io/types/Csv";
 
 export const TERM_COLUMN_MAPPING: ColumnMapping = {
     'Inactive': 'isinactive',
