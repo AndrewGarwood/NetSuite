@@ -10,13 +10,19 @@ import {
     SetSubrecordOptions,
     SublistFieldDictionary,
 } from "./utils/api/types";
-import { isNullLike } from "./utils/typeValidation";
-import { ValueMapping, isValueMappingEntry } from "./utils/io/types";
-import { printConsoleGroup as print, stringEndsWithAnyOf } from "./utils/io";
+import { mainLogger as log } from 'src/config/setupLog';
+import { isNullLike, BOOLEAN_TRUE_VALUES } from "./utils/typeValidation";
+import { printConsoleGroup as print, stringEndsWithAnyOf, COMPANY_KEYWORDS_PATTERN, 
+    applyPhoneRegex, stripCharFromString, 
+    conditionalStripDotOptions, cleanString, 
+    extractEmail, EMAIL_REGEX, ValueMapping, isValueMappingEntry } from "./utils/io";
 import { READLINE as rl } from "src/config/env";
 import { HUMAN_VENDORS_ORIGINAL_TEXT,  } from './config/constants'
-import { RecordTypeEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES, CountryAbbreviationEnum, StateAbbreviationEnum, TermBase as Term } from "./utils/api/types/NS";
-import { COMPANY_KEYWORDS_PATTERN, applyPhoneRegex, stripChar } from "./utils/io/regex";
+import { RecordTypeEnum, 
+    CountryAbbreviationEnum as COUNTRIES, 
+    StateAbbreviationEnum as STATES, 
+    TermBase as Term, VendorCategoryEnum 
+} from "./utils/api/types/NS";
 
 /**
  * Represents the `boolean` value `true` for a radio field in NetSuite.
@@ -31,22 +37,8 @@ export const VENDOR_VALUE_OVERRIDES: ValueMapping = {
     'NAME_WITH_SPELLING_ERROR_THAT_WAS_NEVER_FIXED': 'NAME_WITH_SPELLING_FIXED' as FieldValue  
 }
 
-export const HUMAN_VENDORS_TRIMMED = 
-    HUMAN_VENDORS_ORIGINAL_TEXT.map((name) => cleanString(name));
-
-export function cleanString(
-    s: string, 
-    toUpper: boolean=false, 
-    toLower: boolean=false
-): string {
-    if (!s) return '';
-    s = s.replace(/\s+/g, ' ').replace(/\.{2,}/g, '.').trim();
-    if (!s.endsWith('Ph.D.') && !stringEndsWithAnyOf(s, COMPANY_KEYWORDS_PATTERN)) {
-        s = stripChar(s, '.', true).trim();
-    }
-    s = toUpper ? s.toUpperCase() : toLower ? s.toLowerCase() : s;
-    return s;
-}
+export const HUMAN_VENDORS_TRIMMED = HUMAN_VENDORS_ORIGINAL_TEXT.map(
+    (name) => cleanString(name, conditionalStripDotOptions));
 
 export function checkForOverride(initialValue: string, valueOverrides: ValueMapping): FieldValue {
     print({label: `checkForOverride: ${initialValue}`, details: [
@@ -160,9 +152,9 @@ export const evaluateVendorBillingCountry = (row: Record<string, any>): string =
     let billFromState: string = String(row['Bill from State']).trim().toUpperCase();
     if (Object.keys(COUNTRIES).includes(billFromCountry)) {
         return COUNTRIES[billFromCountry as keyof typeof COUNTRIES];
-    } else if (Object.values(COUNTRIES).includes(billFromCountry as CountryAbbreviationEnum)) {
+    } else if (Object.values(COUNTRIES).includes(billFromCountry as COUNTRIES)) {
         return billFromCountry;
-    } else if (Object.keys(STATES).includes(billFromState) || Object.values(STATES).includes(billFromState as StateAbbreviationEnum)) {
+    } else if (Object.keys(STATES).includes(billFromState) || Object.values(STATES).includes(billFromState as STATES)) {
         return COUNTRIES.UNITED_STATES; // Default to United States if state is valid but country is not
     } else {
         print({label: `Invalid Billing country: ${billFromCountry} or state: ${billFromState}`, printToConsole: false, enableOverwrite: false});
@@ -171,10 +163,10 @@ export const evaluateVendorBillingCountry = (row: Record<string, any>): string =
 }
 
 export const evaluateVendorBillingState = (row: Record<string, any>): string => {
-    let billFromState: string = String(row['Bill from State']).trim().toUpperCase();
+    let billFromState = String(row['Bill from State']).trim().toUpperCase();
     if (Object.keys(STATES).includes(billFromState)) {
         return STATES[billFromState as keyof typeof STATES];
-    } else if (Object.values(STATES).includes(billFromState as StateAbbreviationEnum)) {
+    } else if (Object.values(STATES).includes(billFromState as STATES)) {
         return billFromState;
     } else {
         print({label: `Invalid Billing state: ${billFromState}`, printToConsole: false, enableOverwrite: false});
@@ -183,10 +175,10 @@ export const evaluateVendorBillingState = (row: Record<string, any>): string => 
 }
 
 export const evaluateVendorShippingState = (row: Record<string, any>): string => {
-    let shipFromState: string = String(row['Ship from State']).trim().toUpperCase();
+    let shipFromState = String(row['Ship from State']).trim().toUpperCase();
     if (Object.keys(STATES).includes(shipFromState)) {
         return STATES[shipFromState as keyof typeof STATES];
-    } else if (Object.values(STATES).includes(shipFromState as StateAbbreviationEnum)) {
+    } else if (Object.values(STATES).includes(shipFromState as STATES)) {
         return shipFromState;
     } else {
         print({label: `Invalid Shipping state: ${shipFromState}`, printToConsole: false, enableOverwrite: false});
@@ -195,18 +187,31 @@ export const evaluateVendorShippingState = (row: Record<string, any>): string =>
 }
 
 export const evaluateVendorShippingCountry = (row: Record<string, any>): string => {
-    let shipFromCountry: string = String(row['Ship from Country']).trim().toUpperCase();
-    let shipFromState: string = String(row['Ship from State']).trim().toUpperCase();
+    let shipFromCountry = String(row['Ship from Country']).trim().toUpperCase();
+    let shipFromState = String(row['Ship from State']).trim().toUpperCase();
     if (Object.keys(COUNTRIES).includes(shipFromCountry)) {
         return COUNTRIES[shipFromCountry as keyof typeof COUNTRIES];
-    } else if (Object.values(COUNTRIES).includes(shipFromCountry as CountryAbbreviationEnum)) {
+    } else if (Object.values(COUNTRIES).includes(shipFromCountry as COUNTRIES)) {
         return shipFromCountry;
-    } else if (Object.keys(STATES).includes(shipFromState) || Object.values(STATES).includes(shipFromState as StateAbbreviationEnum)) {
+    } else if (Object.keys(STATES).includes(shipFromState) || Object.values(STATES).includes(shipFromState as STATES)) {
         return COUNTRIES.UNITED_STATES; // Default to United States if state is valid but country is not
     } else {
         print({label: `Invalid Shipping country: ${shipFromCountry} or state: ${shipFromState}`, printToConsole: false, enableOverwrite: false});
         return '';
     }
+}
+
+
+/** {@link VendorCategoryEnum}, {@link HUMAN_VENDORS_TRIMMED} */
+export const evaluateVendorCategory = (row: Record<string, any>): number | string => {
+    let vendor = cleanString(row['Vendor'] as string, conditionalStripDotOptions);
+    let eligibleFor1099: string = String(row['Eligible for 1099']).trim().toLowerCase();
+    if (BOOLEAN_TRUE_VALUES.includes(eligibleFor1099)) {
+        return VendorCategoryEnum._1099;
+    } else if (!BOOLEAN_TRUE_VALUES.includes(eligibleFor1099) && HUMAN_VENDORS_TRIMMED.includes(vendor)) {
+        return VendorCategoryEnum.CONSULTANT;
+    }
+    return '';
 }
 
 /**
@@ -217,7 +222,6 @@ export const evaluateVendorShippingCountry = (row: Record<string, any>): string 
  * @see {@link applyPhoneRegex} for the regex used to validate the phone number.
  */
 export const evaluatePhone = (row: Record<string, any>, ...phoneColumns: string[]): string => {
-    // console.trace(`evaluatePhone(row, ${phoneColumns})`);
     let phone: string = '';
     for (const col of phoneColumns) {
         let initialVal = cleanString(row[col]);
@@ -231,21 +235,35 @@ export const evaluatePhone = (row: Record<string, any>, ...phoneColumns: string[
     return ''
 }
 
+export const evaluateEmail = (row: Record<string, any>, ...emailColumns: string[]): string => {
+    let email: string = '';
+    for (const col of emailColumns) {
+        let initialVal = cleanString(row[col]);
+        if (!initialVal) {
+            continue;
+        }
+        email = extractEmail(initialVal);
+        if (email) { return email; }// return the first valid email number found
+    }
+    // print({label: `evaluateEmail: No valid email number found in columns: ${emailColumns.join(', ')}`});
+    return ''
+}
+
 
 export const evaluateAlternateEmail = (row: Record<string, any>): string => {
-    let ccEmail: string = String(row['CC Email']).trim();
+    let ccEmail = String(row['CC Email']).trim();
     let invalidEmailPattern = new RegExp(/(\s*;\s*)?[a-zA-Z0-9._%+-]+@benev\.com(\s*;\s*)?/, 'ig')
     if (ccEmail && !invalidEmailPattern.test(ccEmail)) {
-        return ccEmail;
+        return extractEmail(ccEmail);
     } else if (ccEmail && invalidEmailPattern.test(ccEmail)) {
         print({label: `evaluateAlternateEmail: ${ccEmail} -> ${ccEmail.replace(invalidEmailPattern, '').trim()}`, printToConsole: false, enableOverwrite: false});
-        return ccEmail.replace(invalidEmailPattern, '').trim();
+        return extractEmail(ccEmail.replace(invalidEmailPattern, '').replace(/[,;:]*/g, '').trim());
     } 
     return '';
 }
 
 export const evaluateContactFirstName = (row: Record<string, any>): string => {
-    let firstName: string = String(row['First Name']).trim();
+    let firstName = cleanString(String(row['First Name']).trim(), conditionalStripDotOptions);
     if (firstName) return firstName;
     let primaryContact: string = String(row['Primary Contact']).trim();
     let contactSplit = primaryContact.split(' ');
@@ -256,9 +274,9 @@ export const evaluateContactFirstName = (row: Record<string, any>): string => {
 }
 
 export const evaluateContactMiddleName = (row: Record<string, any>): string => {
-    let middleInitial: string = String(row['M.I.']).trim();
+    let middleInitial = String(row['M.I.']).trim();
     if (middleInitial) return middleInitial;
-    let primaryContact: string = String(row['Primary Contact']).trim();
+    let primaryContact = String(row['Primary Contact']).trim();
     let contactSplit = primaryContact.split(' ');
     if (contactSplit.length > 2) {
         return contactSplit[1].trim();
@@ -268,9 +286,9 @@ export const evaluateContactMiddleName = (row: Record<string, any>): string => {
 
 export const evaluateContactLastName = (row: Record<string, any>): string => {
     const middleInitialPattern = new RegExp(/^[A-Z]\.$/, 'i');
-    let lastName: string = String(row['Last Name']).trim();
+    let lastName = cleanString(String(row['Last Name']).trim(), conditionalStripDotOptions);
     if (lastName) return lastName;
-    let primaryContact: string = String(row['Primary Contact']).trim();
+    let primaryContact = String(row['Primary Contact']).trim();
     let contactSplit = primaryContact.split(' ');
     if (contactSplit.length === 2) {
         return cleanString(contactSplit[1]);
@@ -283,14 +301,59 @@ export const evaluateContactLastName = (row: Record<string, any>): string => {
     return '';
 }
 
+// @TODO : refactor evaluateCompanyName, evaluateContactCompany, and evaluateEntityId -------------------------------------
 export const evaluateCompanyName = (row: Record<string, any>): string => {
-    let company = row['Company'] ? cleanString(row['Company']) 
-        : row['Vendor'] ? cleanString(row['Vendor']) : '';
-    company = checkForOverride(company, VENDOR_VALUE_OVERRIDES) as string;
-    return company;
+    // let company = row['Company'] ? cleanString(row['Company']) 
+    //     : row['Vendor'] ? cleanString(row['Vendor']) : '';
+    // company = checkForOverride(company, VENDOR_VALUE_OVERRIDES) as string;
+    // return company;
+    let company = cleanString(row['Company'] as string, conditionalStripDotOptions);
+    let vendor = cleanString(row['Vendor'] as string, conditionalStripDotOptions);
+    let printOnCheckAs = cleanString(row['Print on Check As'] as string, conditionalStripDotOptions);
+    let result: string = vendor;
+    if (company !== vendor && printOnCheckAs && company === printOnCheckAs) {
+        result = company;
+    } 
+    // else if (vendor !== company && printOnCheckAs && vendor === printOnCheckAs) {
+    //     result = vendor;
+    // } else if (!company && HUMAN_VENDORS_TRIMMED.includes(vendor)) {
+    //     return getFullName(row);
+    // }
+    return checkForOverride(result, VENDOR_VALUE_OVERRIDES) as string;
+}
+/** If contact's corresponding vendor record has `isperson` == `true`, 
+ * then the vendor is not able to be selected as the contact's company */
+export const evaluateContactCompany = (row: Record<string, any>): string => {
+    let vendor = cleanString(row['Vendor'] as string, conditionalStripDotOptions);
+    if (HUMAN_VENDORS_TRIMMED.includes(vendor)) {
+        return '';
+    }
+    return evaluateCompanyName(row);
 }
 
-
+export const evaluateEntityId = (row: Record<string, any>): string => {
+    let vendor = cleanString(row['Vendor'] as string, conditionalStripDotOptions);
+    // if (HUMAN_VENDORS_TRIMMED.includes(vendor)) {
+    //     return getFullName(row);
+    // }
+    // let company = cleanString(row['Company'] as string, conditionalStripDotOptions);
+    // let printOnCheckAs = cleanString(row['Print on Check As'] as string, conditionalStripDotOptions);
+    return checkForOverride(vendor, VENDOR_VALUE_OVERRIDES) as string;
+    
+}
+/** `fullName = `${salutation} ${firstName} ${middleName} ${lastName}`.trim();` only includes salutation if it's a doctor */
+export const getFullName = (row: Record<string, any>): string => {
+    let salutation = evaluateVendorSalutation(row) === 'Dr.' ? 'Dr.' : '';
+    let firstName = evaluateContactFirstName(row);
+    let middleName = evaluateContactMiddleName(row);
+    let lastName = evaluateContactLastName(row);
+    let fullName = `${salutation} ${firstName} ${middleName} ${lastName}`.trim();
+    if (fullName === '') {
+        log.debug(`No valid name found in row: ${JSON.stringify(row)}`);
+        return '';
+    }
+    return fullName;
+}
 // TODO: maybe refactor pruneVendor and pruneContact into a single function that takes a record type and requireFields as arguments
 
 export const pruneVendor = (
@@ -301,14 +364,21 @@ export const pruneVendor = (
         console.log(`pruneVendor(${(label || '')}): vendorOptions is null or undefined, returning null`);
         return null;
     }
-    const REQUIRED_VENDOR_FIELDS = ['entityid']
+    const REQUIRED_VENDOR_FIELDS = ['entityid'];//, 'companyname']
     try {
         let fieldDict = vendorOptions.fieldDict as FieldDictionary;
+        if (fieldDict.valueFields?.some((field) => field.fieldId === 'isperson' && field.value === RADIO_FIELD_TRUE)) {
+            // if vendor is a person, then we need to check for the first name and last name
+            REQUIRED_VENDOR_FIELDS.push('firstname', 'lastname');
+        } else {
+            // if vendor is a company, then we need to check for the company name
+            REQUIRED_VENDOR_FIELDS.push('companyname');
+        }
         for (const requiredField of REQUIRED_VENDOR_FIELDS) {
             if (!fieldDict?.valueFields?.some((field) => field.fieldId === requiredField && field.value)) {
                 print({
-                    label: `pruneVendor(${(label || '')}): SetFieldValueOptions is missing field "${requiredField}", returning null`, 
-                    printToConsole: false, enableOverwrite: false
+                    label: `pruneVendor(${(label || '')}):\n\tSetFieldValueOptions is missing field "${requiredField}", returning null`, 
+                    printToConsole: true, enableOverwrite: false
                 });
                 return null;
             }
@@ -330,13 +400,13 @@ export const pruneContact = (
         console.log(`pruneContact(${(label || '')}): contactOptions is null or undefined, returning null`);
         return null;
     }
-    const REQUIRED_CONTACT_FIELDS = ['entityid', 'firstname']
+    const REQUIRED_CONTACT_FIELDS = ['firstname']
     try {
         let fieldDict = contactOptions.fieldDict as FieldDictionary;
         for (const requiredField of REQUIRED_CONTACT_FIELDS) {
             if (!fieldDict?.valueFields?.some((field) => field.fieldId === requiredField && field.value)) {
                 print({
-                    label: `pruneContact(${(label || '')}): SetFieldValueOptions is missing field "${requiredField}", returning null`, 
+                    label: `pruneContact(${(label || '')}):\n\tSetFieldValueOptions is missing field "${requiredField}", returning null`, 
                     printToConsole: false, enableOverwrite: false
                 });
                 return null;
@@ -362,24 +432,27 @@ export const pruneAddressBook = (
         let addressbook = options?.sublistDict?.addressbook as SublistFieldDictionary;
         let valueFields = addressbook?.valueFields as SetSublistValueOptions[];
         let subrecordFields = addressbook?.subrecordFields as SetSubrecordOptions[];
-        subrecordFields?.forEach((subrecOps, index) => {
+        for (let index = 0; index < subrecordFields.length; index++) {
+            let subrecOps = subrecordFields[index];
             let subrecValueFields = subrecOps?.fieldDict?.valueFields as SetFieldValueOptions[];
             for (const requiredField of REQUIRED_ADDRESS_FIELDS) {
                 if (!subrecValueFields?.some((field) => field.fieldId === requiredField)) {
                     print({
-                        label: `pruneAddressBook(${(label || '')}):`, details: `subrecordFields[${index}]: SetSubrecordOptions is missing address field "${requiredField}", removing it from subrecordFields`, 
-                        printToConsole: false, enableOverwrite: false
+                        label: `pruneAddressBook(${(label || '')}):`,
+                        details: `subrecordFields[${index}]: SetSubrecordOptions is missing address field "${requiredField}", removing it from subrecordFields`,
+                        printToConsole: false,
+                        enableOverwrite: false
                     });
                     valueFields?.splice(index, 1);
-                    subrecordFields?.splice(index, 1);
-                    return options;
+                    subrecordFields.splice(index, 1);
+                    index--; // Adjust index after removing an element
+                    break;
                 }
-                print({
-                    label: `pruneAddressBook(${(label || '')}):`, details: `All required fields found. Keeping addressbook subrecordFields[${index}]`, 
-                    printToConsole: false, enableOverwrite: false
-                });
             }
-        });
+        }
+        if (subrecordFields.length === 0) {
+            delete options.sublistDict?.addressbook;
+        }
         return options;
     } catch (error) {
         console.error(`pruneAddressBook(${(label || '')}): Error in pruneAddressBook: ${error}`);

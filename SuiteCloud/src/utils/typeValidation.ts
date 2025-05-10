@@ -42,11 +42,6 @@ export function isNullLike(value: any): boolean {
     return false;
 }
 
-/** test input string on `/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/` */
-export function isValidEmail(email: string): boolean {
-    return EMAIL_REGEX.test(email);
-}
-
 /**
  * @param {any} arr 
  * @returns {boolean} `true` if arr is an array and has at least one element, `false` otherwise.

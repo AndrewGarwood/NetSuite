@@ -8,6 +8,22 @@ import { RecordRef } from '../Record';
 import { Address, AddressBook } from './Address';
 import { NetSuiteCountryEnum, EmailPreferenceEnum, GlobalSubscriptionStatusEnum } from '../../Enums';
 
+/**
+ * @description enum for internal id of the Vendor Category Accounting List.
+ * - `Setup -> Accounting -> Accounting Lists`
+ * @enum `VendorCategoryEnum`
+ * @property {number} _1099 `1` - 1099 contractor
+ * @property {number} CONSULTANT `2` - Consultant
+ * @property {number} SUPPLIES `3` - Supplies
+ * @property {number} TAX_AGENCY `4` - Tax Agency
+ */
+export enum VendorCategoryEnum {
+    _1099 = 1,
+    CONSULTANT = 2,
+    SUPPLIES = 3,
+    TAX_AGENCY = 4,
+}
+
 export interface VendorBase {
     /** @description entityid Required on Add.*/
     entityid: string;

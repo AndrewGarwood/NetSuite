@@ -1,31 +1,15 @@
 /**
- * @file index.ts
- * @description barrel file for type files in ~/src/types/NS
+ * @file src/utils/api/types/NS/index.ts
  */
 
-import { Address, AddressBook } from './Record/Relationships/Address';
-import { RecordTypeEnum, RecordRef } from './Record/Record';
-import { Vendor } from './Record/Relationships/Vendor';
-import { BillOfMaterialsRevisionComponent } from './Record/Supply/BillOfMaterialsRevisionComponent';
-import { BillOfMaterialsRevision } from './Record/Supply/BillOfMaterialsRevision';
-import { BillOfMaterials } from './Record/Supply/BillOfMaterials';
-import { TermBase } from './Record/Accounting/Term';
-import { UnitsEnum, UnitsTypeEnum, EmailPreferenceEnum, 
-    GlobalSubscriptionStatusEnum, ItemSourceEnum, NetSuiteCountryEnum, CountryAbbreviationEnum, StateAbbreviationEnum 
-} from './Enums';
-
-export {
-    TermBase,
-    BillOfMaterialsRevisionComponent, 
-    BillOfMaterialsRevision, 
-    BillOfMaterials,
-
-    UnitsEnum, UnitsTypeEnum, EmailPreferenceEnum, GlobalSubscriptionStatusEnum,
-    ItemSourceEnum, NetSuiteCountryEnum, CountryAbbreviationEnum, StateAbbreviationEnum,
-
-    RecordTypeEnum, RecordRef,
-
-    Address, AddressBook,
-
-    Vendor,
-}
+export * from './Record/Relationships/Address';
+export * from './Record/Relationships/Contact';
+export * from './Record/Relationships/Vendor';
+export * from './Record/Record';
+export * from './Record/Accounting/Term';
+export * from './Record/Supply/BillOfMaterialsRevisionComponent';
+export * from './Record/Supply/BillOfMaterialsRevision';
+export * from './Record/Supply/BillOfMaterials';
+export * from './Enums';
+export * from './File';
+export * from './SuiteScriptEnvironment';

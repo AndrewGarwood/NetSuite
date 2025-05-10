@@ -1,5 +1,5 @@
 /**
- * @file src/types/api/Api.ts
+ * @file src/utils/api/types/Api.ts
  * @module Api
  */
 
@@ -8,49 +8,52 @@ import { RecordTypeEnum } from './NS/Record/Record';
 /**
  * - `createRecordArray` and `createRecordDict` are mutually exclusive
  * - Definition of Request body for the POST function in POST_BatchCreateRecord.js - Can create record in batches by defining the request's body, reqBody, in two ways. 
- * @typedefn {Object} BatchCreateRecordRequest
+ * @typedefn `BatchCreateRecordRequest`
  * @property {Array\<CreateRecordOptions>} [createRecordArray]
- * `Array<`{@link CreateRecordOptions}`>` = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]` 
+ * `Array<`{@link CreateRecordOptions}`>` = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]`
  * @property {{[K in RecordTypeEnum]?: Array\<CreateRecordOptions>}} [createRecordDict] 
      * `{` [K in {@link RecordTypeEnum}]?: `Array<`{@link CreateRecordOptions}`> }`
  * @property {string | string[]} [responseProps] - `string | string[]` - The properties to include in the response in addition to the records' internal IDs.
 */
 export type BatchCreateRecordRequest = {
+    /** = `Array<`{@link CreateRecordOptions}`>` = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]` */
     createRecordArray?: CreateRecordOptions[];
+    /** = `{` [K in {@link RecordTypeEnum}]?: `Array<`{@link CreateRecordOptions}`> }` */
     createRecordDict?: { [K in RecordTypeEnum]?: CreateRecordOptions[] };
+    /** = `string | string[]` - The properties to include in the response in addition to the records' internal IDs. */
     responseProps?: string | string[];
 }
 
 /**
- * Definition of the results returned in the response for each record created in the POST function in POST_BatchCreateRecord.js
- * @typedefn {Record<string, FieldValue>} `CreateRecordResults`
+ * Definition of the return value for `processCreateRecordOptions()` in in POST_BatchCreateRecord.js
+ * @typedefn {`Record<string`, {@link FieldValue}`>}` `CreateRecordResults`
  * @property {number} recordId - The internal ID of the created record.
  * @property {FieldValue} [fieldId] - (optional) optionally include other fields of the record's body that you want included in the response.
  */
-export type CreateRecordResults = { 
+export type CreateRecordResult = { 
     recordId: number; 
     [fieldId: string]: FieldValue; 
 };
 
 /**
  * Definition of Response for the POST function in POST_BatchCreateRecord.js
- * @typedefn {Object} `BatchCreateRecordResponse`
+ * @typedefn `BatchCreateRecordResponse`
  * @property {boolean} success - Indicates if the request was successful.
  * @property {string} message - A message indicating the result of the request.
- * @property {CreateRecordResults[]} resultsArray - an `Array<`{@link CreateRecordResults}`>` containing the record ids and any additional properties specified in the request for all the records successfully created.
+ * @property {CreateRecordResults[]} results - an `Array<`{@link CreateRecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully created.
  * @property {string} [error] - An error message if the request was not successful.
  * @property {LogStatement[]} logArray - an `Array<`{@link LogStatement}`>` generated during the request processing.
  */
 export type BatchCreateRecordResponse = {
     success: boolean;
     message: string;
-    resultsArray: CreateRecordResults[];
+    results: CreateRecordResult[];
     error?: string;
     logArray: LogStatement[];
 };
 
 /**
- * @typedefn {Object} `CreateRecordOptions`
+ * @typedefn `CreateRecordOptions`
  * @property {RecordTypeEnum} recordType - The record type to create, see {@link RecordTypeEnum}
  * @property {boolean} [isDynamic=false] - Indicates if the record should be created in dynamic mode. (defaults to false)
  * @property {FieldDictionary} [fieldDict] 
@@ -68,15 +71,26 @@ export type CreateRecordOptions = {
 };
 
 /**
- * @typedefn {Object} `CreateRecordResponse`
+ * Definition of the request body for the POST function in POST_CreateRecord.js
+ * @typedefn `CreateRecordRequest`
+ * @property {CreateRecordOptions} options - The options for creating the record. {@link CreateRecordOptions} = { `recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary} }.
+ * @property {string | string[]} [responseProps] - The properties to include in the response in addition to the record's internal ID.
+ */
+export type CreateRecordRequest = {
+    options: CreateRecordOptions;
+    responseProps?: string | string[];
+}
+
+/**
+ * @typedefn `CreateRecordResponse`
  * @property {boolean} success - Indicates if the record was created successfully.
- * @property {number} [recordId] - The ID of the created record. (does not exist if success is false)
+ * @property {CreateRecordResult} result - The result of the record creation, including the internal ID and any other properties specified in {@link CreateRecordRequest.responseProps}.
  * @property {string} message - A message indicating the result of the operation.
- * @property {Array<LogStatement>} logArray - Array<{@link LogStatement}> generated during the POST requeset.
+ * @property {Array<LogStatement>} logArray - `Array<`{@link LogStatement}`>` generated by logs written during the POST requeset.
  */
 export type CreateRecordResponse = {
     success: boolean;
-    recordId?: number;
+    result: CreateRecordResult;
     message: string;
     logArray: Array<LogStatement>;
 }
@@ -99,7 +113,7 @@ export enum LogTypeEnum {
 
 /**
  * Definition of elements in the {@link logArray} array
- * @typedefn {Object} `LogStatement`
+ * @typedefn `LogStatement`
  * @property {string} timestamp - The timestamp of the log entry.
  * @property {LogTypeEnum} type - The type of log entry (see {@link LogTypeEnum}).
  * @property {string} title - The title of the log entry.
@@ -119,7 +133,7 @@ export type LogStatement = {
 
 /**
  * Fields organized by the fields' value type
- * @typedefn {Object} `FieldDictionary`
+ * @typedefn `FieldDictionary`
  * @property {Array\<SetFieldValueOptions>} [priorityFields]
  * - Array<{@link SetFieldValueOptions}> = Array<{`fieldId`: string, `value`: {@link FieldValue}}>. 
  * @property {Array\<SetFieldTextOptions>} [textFields] 
@@ -129,7 +143,7 @@ export type LogStatement = {
  * - Array<{@link SetFieldValueOptions}> = Array<{`fieldId`: string, `value`: {@link FieldValue}}>. 
  * - For record fields: record.setValue(fieldId, value)
  * @property {Array\<SetSubrecordOptions>} [subrecordFields]
- * - Array<{@link SetSubrecordOptions}> = Array<{ `sublistId`?: string, `line`?: number, fieldId: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}}>.
+ * - Array<{@link SetSubrecordOptions}> = Array<{ `parentSublistId`?: string, `line`?: number, fieldId: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}}>.
  * - array of subrecord fields in the main record
  */
 export type FieldDictionary = {
@@ -141,7 +155,7 @@ export type FieldDictionary = {
 
 /**
  * Set a record's sublist's field values organized by field type
- * @typedefn {Object} `SublistFieldDictionary`
+ * @typedefn `SublistFieldDictionary`
  * @property {Array\<SetFieldValueOptions>} [priorityFields]
  * - Array<{@link SetFieldValueOptions}> = Array<{`sublistId`: string, `fieldId`: string, `line`: number, `value`: {@link FieldValue}}>.
  * @property {Array\<SetSublistTextOptions>} [textFields] 
@@ -151,7 +165,7 @@ export type FieldDictionary = {
  * - Array<{@link SetSublistValueOptions}> = Array<{`sublistId`: string, `fieldId`: string, `line`: number, `value`: {@link FieldValue}}>. 
  * - For record sublist fields: rec.setSublistValue(sublistId, fieldId, line, value)
  * @property {Array\<SetSubrecordOptions>} [subrecordFields]
- * - Array<{@link SetSubrecordOptions}> = Array<{`sublistId`?: string, `line`?: number, `fieldId`: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}}>.
+ * - Array<{@link SetSubrecordOptions}> = Array<{`parentSublistId`?: string, `line`?: number, `fieldId`: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}}>.
  * - array of subrecord fields in the main record's sublist
  */
 export type SublistFieldDictionary = {
@@ -163,7 +177,7 @@ export type SublistFieldDictionary = {
 
 
 /**
- * @typedefn {Object} SublistDictionary
+ * @typedefn SublistDictionary
  * - a key in `SublistDictionary` is a `sublistId {string}` (e.g. 'addressbook', 'item', etc.)
  * - values are {@link SublistFieldDictionary} = { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetSublistTextOptions}>, `valueFields`: Array<{@link SetSublistValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }.
  */
@@ -304,7 +318,7 @@ export enum FieldOptionsTypeEnum {
 }
 
 /**
- * @typedefn {Object} `SetFieldOptionsArrayTypes` 
+ * @typedefn `SetFieldOptionsArrayTypes` 
  * */
 export type SetFieldOptionsArrayTypes = SetFieldTextOptions | SetFieldValueOptions | SetSublistTextOptions | SetSublistValueOptions;
 
@@ -333,7 +347,7 @@ export enum FieldDictTypeEnum {
     SUBLIST_FIELD_DICT = 'sublistFieldDict',
 }
 /** 
- * @enum {string} FieldInputTypeEnum
+ * @enum {string} `FieldInputTypeEnum`
  * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html}
  * @property {string} TEXT `Text` fields accept `string` values. 
  * @property {string} RADIO `Radio` fields accept `string` values.
@@ -374,7 +388,7 @@ export enum FieldInputTypeEnum {
 
 
 /**
- * @typedefn `{Object}` `RetrieveRecordByIdRequest`
+ * @typedefn `RetrieveRecordByIdRequest`
  * @property {RecordTypeEnum} recordType - The type of the record to retrieve. see {@link RecordTypeEnum}
  * @property {idPropertyEnum} idProperty - The property to search for the record. see {@link idPropertyEnum}
  * @property {string} searchTerm - The name of the record to search for.
@@ -387,7 +401,7 @@ export type RetrieveRecordByIdRequest = {
 
 
 /**
- * @typedefn `{Object}` `RetrieveRecordByIdResponse`
+ * @typedefn `RetrieveRecordByIdResponse`
  * @property {boolean} success - Whether the record was found or not.
  * @property {string} message - The message to return.
  * @property {string | number} [internalId] - The internal ID of the record, if found.

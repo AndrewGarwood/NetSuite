@@ -18,11 +18,10 @@ import {
 import { printConsoleGroup as print } from "./utils/io";
 import { READLINE as rl } from "src/config/env";
 import { RecordTypeEnum } from "./utils/api/types/NS";
-import { applyPhoneRegex, stripChar } from "./utils/io/regex";
 import { SB_TERM_DICTIONARY } from "./utils/io/mappings";
 import { 
-    evaluatePhone,
-    evaluateAlternateEmail, evaluateCompanyName, 
+    evaluatePhone, evaluateEntityId, evaluateEmail, evaluateVendorCategory,
+    evaluateAlternateEmail, evaluateCompanyName, evaluateContactCompany,
     evaluateContactFirstName, evaluateContactLastName, evaluateContactMiddleName, 
     evaluateVendorAttention, evaluateVendorBillingCountry, 
     evaluateVendorBillingState, evaluateVendorFirstName, evaluateVendorIsPerson, 
@@ -31,14 +30,13 @@ import {
     VENDOR_VALUE_OVERRIDES, pruneVendor, pruneContact, 
 } from "./vendorParseDetails";
 
-
 /** NOT_INACTIVE = `false` -> `active` === `true` -> NetSuite's `isinactive` = `false` */
 export const NOT_INACTIVE = false;
 export const BILLING_PHONE_COLUMNS = [
-    'Bill from 4', 'Bill from 5', 'Main Phone', 'Work Phone', 'Mobile', 'Alt. Phone'
+    'Bill from 4', 'Bill from 5', 'Main Phone', 'Work Phone', 'Mobile', 'Alt. Phone', 'Ship from 4', 'Ship from 5', 
 ];
 export const SHIPPING_PHONE_COLUMNS = [
-    'Ship from 4', 'Ship from 5', 'Main Phone', 'Work Phone', 'Mobile', 'Alt. Phone'
+    'Ship from 4', 'Ship from 5', 'Main Phone', 'Work Phone', 'Mobile', 'Alt. Phone', 'Bill from 4', 'Bill from 5', 
 ];
 
 export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions = {
@@ -56,7 +54,7 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
                 fieldDictParseOptions: {
                     fieldValueMapArray: [
                         { fieldId: 'country', rowEvaluator: evaluateVendorBillingCountry },
-                        { fieldId: 'addressee', colName: 'Vendor'},
+                        { fieldId: 'addressee', rowEvaluator: evaluateEntityId },
                         { fieldId: 'attention', rowEvaluator: evaluateVendorAttention},
                         { fieldId: 'addr1', colName: 'Bill from Street 1' },
                         { fieldId: 'addr2', colName: 'Bill from Street 2' },
@@ -75,7 +73,7 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
                 fieldDictParseOptions: {
                     fieldValueMapArray: [
                         { fieldId: 'country', rowEvaluator: evaluateVendorShippingCountry },
-                        { fieldId: 'addressee', colName: 'Vendor'},
+                        { fieldId: 'addressee', rowEvaluator: evaluateEntityId },
                         { fieldId: 'attention', rowEvaluator: evaluateVendorAttention},
                         { fieldId: 'addr1', colName: 'Ship from Street1' },
                         { fieldId: 'addr2', colName: 'Ship from Street2' },
@@ -92,9 +90,9 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
 
 
 export const CONTACT_VENDOR_SHARED_FIELD_VALUE_MAP_ARRAY: FieldValueMapping[] = [
-    { fieldId: 'entityid', colName: 'Vendor' },
+    { fieldId: 'entityid', rowEvaluator: evaluateEntityId },
     { fieldId: 'isinactive', defaultValue: NOT_INACTIVE },
-    { fieldId: 'email', colName: 'Main Email' },
+    { fieldId: 'email', rowEvaluator: evaluateEmail, rowEvaluatorArgs: ['Main Email'] },
     { fieldId: 'altemail', rowEvaluator: evaluateAlternateEmail },
     { fieldId: 'phone', rowEvaluator: evaluatePhone, rowEvaluatorArgs: ['Main Phone'] },
     { fieldId: 'mobilephone', rowEvaluator: evaluatePhone, rowEvaluatorArgs: ['Mobile'] },
@@ -111,7 +109,8 @@ export const PARSE_VENDOR_FROM_VENDOR_CSV_OPTIONS: ParseOptions = {
         fieldValueMapArray: [
             { fieldId: 'isperson', rowEvaluator: evaluateVendorIsPerson },
             ...CONTACT_VENDOR_SHARED_FIELD_VALUE_MAP_ARRAY,
-            { fieldId: 'companyname', rowEvaluator: evaluateCompanyName },
+            { fieldId: 'category', rowEvaluator: evaluateVendorCategory },  
+            { fieldId: 'companyname', rowEvaluator: evaluateEntityId },
             { fieldId: 'firstname', rowEvaluator: evaluateContactFirstName },
             { fieldId: 'middlename', rowEvaluator: evaluateContactMiddleName },
             { fieldId: 'lastname', rowEvaluator: evaluateContactLastName },
@@ -137,7 +136,7 @@ export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
             { fieldId: 'firstname', rowEvaluator: evaluateContactFirstName },
             { fieldId: 'middlename', rowEvaluator: evaluateContactMiddleName },
             { fieldId: 'lastname', rowEvaluator: evaluateContactLastName },
-            { fieldId: 'company', rowEvaluator: evaluateCompanyName },
+            { fieldId: 'company', rowEvaluator: evaluateEntityId },
         ] as FieldValueMapping[],
     } as FieldDictionaryParseOptions,
     sublistDictParseOptions: ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,
