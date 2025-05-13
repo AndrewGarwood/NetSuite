@@ -143,12 +143,16 @@ export function stripCharFromString(
     if (!stripLeftCondition && !stripRightCondition) { // assume strip both sides
         regexSource = `^${char}+|${char}+$`;
     }
-    log.debug(
-        `          s: "${s}"`,
-        `\nleftSideUnconditionalOrMeetsCondition: ${leftSideUnconditionalOrMeetsCondition}`,
-        `\nrightSideUnconditionalOrMeetsCondition: ${rightSideUnconditionalOrMeetsCondition}`,
-        `\nregexSource: "${regexSource}"`
-    ); 
+    // log.debug(
+    //     `          s: "${s}"`,
+    //     `\n!stripLeftCondition: ${!stripLeftCondition}`,
+    //     `\n(stripLeftCondition && stripLeftCondition(s, leftArgs)): ${stripLeftCondition && stripLeftCondition(s, leftArgs)}`,
+    //     `\n\t -> leftSideUnconditionalOrMeetsCondition: = !stripLeftCondition || (stripLeftCondition && stripLeftCondition(s, leftArgs)) = ${leftSideUnconditionalOrMeetsCondition}`,
+    //     `\n!stripRightCondition: ${!stripRightCondition}`,
+    //     `\n(stripRightCondition && stripRightCondition(s, rightArgs)): ${stripRightCondition && stripRightCondition(s, rightArgs)}`,
+    //     `\n\t -> rightSideUnconditionalOrMeetsCondition: = !stripRightCondition || (stripRightCondition && stripRightCondition(s, rightArgs)) = ${rightSideUnconditionalOrMeetsCondition}`,
+    //     `\n -> regexSource: "${regexSource}"`
+    // ); 
     const regex = new RegExp(regexSource, 'g');
     return s.replace(regex, '');
 }
@@ -158,24 +162,25 @@ export function stripCharFromString(
  * - `re` = `/(?:company|corp|inc|co\.?,? ltd\.?|ltd|\.?l\.?lc|plc . . ./ `
  * */
 export const COMPANY_KEYWORDS_PATTERN: RegExp = 
-/(?:company|corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|plc|group|consulting|consultants|packaging|print|associates|partners|practice|service(s)?|America|USA|\.com)\s*$/i;
-/** - `re` =  `/(?:|corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc)\s*$/i` */
+/\b(?:company|corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|plc|group|consulting|consultants|packaging|print|associates|partners|practice|service(s)?|health|healthcare|medical| spa|spa |surgeons|aesthetic|America|USA|\.com)\s*$/i;
+/** - `re` =  `/\b(?:corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc)\.?\s*$/i` */
 export const COMPANY_ABBREVIATION_PATTERN: RegExp =
-/(?:|corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc)\s*$/i;
-
+/\b(?:corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc)\.?\s*$/i;
+/** @returns `!s.endsWith('Ph.D.') && !`{@link stringEndsWithAnyOf}`(s, `COMPANY_ABBREVIATION_PATTERN` as RegExp, [`{@link RegExpFlagsEnum.IGNORE_CASE}`]) && !stringEndsWithAnyOf(s, singleInitialPattern, [RegExpFlagsEnum.IGNORE_CASE]);` */
 export function doesNotEndWithKnownAbbreviation(s: string): boolean {
     if (!s) return false;
     s = s.trim();
-    log.debug(
-        `\ns: "${s}"`,
-        `\n!s.endsWith('Ph.D.'): ${!s.endsWith('Ph.D.')}`,
-        `\n!stringEndsWithAnyOf(s, COMPANY_ABBREVIATION_PATTERN): ${!stringEndsWithAnyOf(s, COMPANY_ABBREVIATION_PATTERN)}`,
-        )
-    return !s.endsWith('Ph.D.') && !stringEndsWithAnyOf(s, COMPANY_ABBREVIATION_PATTERN as RegExp);
+    // log.debug(
+    //     `s: "${s}"`,
+    //     `\n doesNotEndWithPHD = !s.endsWith('Ph.D.'): ${!s.endsWith('Ph.D.')}`,
+    //     `\n doesNotEndWithAbbrev = !stringEndsWithAnyOf(s, COMPANY_ABBREVIATION_PATTERN): ${!stringEndsWithAnyOf(s, COMPANY_ABBREVIATION_PATTERN)}`,
+    // );
+    const singleInitialPattern = /\b[A-Z]\.?\b/;
+    return !s.endsWith('Ph.D.') && !stringEndsWithAnyOf(s, COMPANY_ABBREVIATION_PATTERN as RegExp, [RegExpFlagsEnum.IGNORE_CASE]) && !stringEndsWithAnyOf(s, singleInitialPattern, [RegExpFlagsEnum.IGNORE_CASE]);
 }
 
 /** `stripRightCondition`: {@link doesNotEndWithKnownAbbreviation} */
-export const conditionalStripDotOptions: StringStripOptions = {
+export const STRIP_DOT_IF_NOT_ABBREVIATION: StringStripOptions = {
     char: '.',
     escape: true,
     stripLeftCondition: undefined,
@@ -183,7 +188,8 @@ export const conditionalStripDotOptions: StringStripOptions = {
     stripRightCondition: doesNotEndWithKnownAbbreviation,
 }
 
-export const unconditionalStripDotOptions: StringStripOptions = {
+/** always strip leading and trailing `.` from a `string` */
+export const UNCONDITIONAL_STRIP_DOT_OPTIONS: StringStripOptions = {
     char: '.',
     escape: true,
     stripLeftCondition: undefined,
@@ -191,6 +197,7 @@ export const unconditionalStripDotOptions: StringStripOptions = {
     stripRightCondition: undefined,
     rightArgs: undefined
 }
+
 
 /** `/(^(is|give|send|fax|email)[a-z0-9]{2,}$)/` */
 export const BOOLEAN_FIELD_ID_REGEX = new RegExp(/(^(is|give|send|fax|email)[a-z0-9]{2,}$)/)
@@ -215,7 +222,30 @@ export function extractEmail(email: string): string {
     return '';
 }
 
-
+export const MIDDLE_INITIAL_REGEX = new RegExp(/^[A-Z]{1}\.?$/, 'i');
+/**
+ * 
+ * @param name `string` - the full name from which to extract 3 parts: the first, middle, and last names
+ * @returns `{first: string, middle?: string, last?: string}` - the first, middle, and last names
+ * @example
+ * let name = 'John Doe';
+ * console.log(extractName(name)); // { first: 'John', middle: '', last: 'Doe' }
+ * let name = 'John A. Doe';
+ * console.log(extractName(name)); // { first: 'John', middle: 'A.', last: 'Doe' }
+ */
+export function extractName(name: string): {first: string, middle?: string, last?: string} {
+    if (!name || typeof name !== 'string') return { first: '', middle: '', last: '' };
+    const nameSplit = name.split(/\s+/);
+    nameSplit.map((namePart) => cleanString(namePart, STRIP_DOT_IF_NOT_ABBREVIATION));
+    if (nameSplit.length == 1) {
+        return { first: nameSplit[0], middle: '', last: '' };
+    } else if (nameSplit.length == 2) {
+        return { first: nameSplit[0], middle: '', last: nameSplit[1] };
+    } else if (nameSplit.length > 2) {
+        return { first: nameSplit[0], middle: nameSplit[1], last: nameSplit.slice(2).join(' ') };
+    } 
+    return { first: '', middle: '', last: '' }; 
+}
 /** 
  * @TODO see if the non digit non capturing part is needed
  * @description 
@@ -291,25 +321,25 @@ export function applyPhoneRegex(phone: string, label?: string): string {
     phone = String(phone).trim();
     if (JAPAN_PHONE_REGEX.test(phone)) {
         // print({label:`Valid Phone Found!`, details: `JAPAN_PHONE_REGEX.test(${phone}) == true`, printToConsole: false});
-        phone = extractPhone(phone,JAPAN_PHONE_REGEX).replace(JAPAN_PHONE_REGEX, '$1-$2-$3-$4');
+        phone = extractPhone(phone, JAPAN_PHONE_REGEX, '$1-$2-$3-$4');
     } else if (KOREA_PHONE_REGEX.test(phone)) {
         // print({label:`Valid Phone Found!`, details: `KOREA_PHONE_REGEX.test(${phone}) == true`, printToConsole: false});
-        phone = extractPhone(phone, KOREA_PHONE_REGEX).replace(KOREA_PHONE_REGEX, '$1-$2-$3-$4');
+        phone = extractPhone(phone, KOREA_PHONE_REGEX, '$1-$2-$3-$4');
     }  else if (HONG_KONG_PHONE_REGEX.test(phone)) {
         // print({label:`Valid Phone Found!`, details: `HONG_KONG_PHONE_REGEX.test(${phone}) == true`, printToConsole: false});
-        phone = extractPhone(phone, HONG_KONG_PHONE_REGEX).replace(HONG_KONG_PHONE_REGEX, '$1-$2-$3');
+        phone = extractPhone(phone, HONG_KONG_PHONE_REGEX, '$1-$2-$3');
     } else if (CHINA_PHONE_REGEX.test(phone)) {
         // print({label:`Valid Phone Found!`, details: `CHINA_PHONE_REGEX.test(${phone}) == true`, printToConsole: false});
-        phone = extractPhone(phone, CHINA_PHONE_REGEX).replace(CHINA_PHONE_REGEX, '$1-$2-$3-$4');
+        phone = extractPhone(phone, CHINA_PHONE_REGEX, '$1-$2-$3-$4');
     } else if (PHONE_REGEX.test(phone)) {
         // print({label:`Valid Phone Found!`, details: `PHONE_REGEX.test(${phone}) == true`, printToConsole: false});
-        phone = extractPhone(phone, PHONE_REGEX).replace(PHONE_REGEX, '$1-$2-$3-$4 ext $5');
+        phone = extractPhone(phone, PHONE_REGEX, '$1-$2-$3-$4 ext $5');
     } else if (phone.length === 10 && /^\d{10}$/.test(phone)) {
         // print({label:`Valid Phone Found!`, details: `PHONE_REGEX.test(${phone}) == false and phone.length == 10`, printToConsole: false});
-        phone = extractPhone(phone, /(\d{3})(\d{3})(\d{4})/).replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+        phone = extractPhone(phone, /(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
     } else if (phone.length === 11 && /^\d{11}$/.test(phone) && phone.startsWith('1')) {
         // print({label:`Valid Phone Found!`, details: `PHONE_REGEX.test(${phone}) == false and phone.length == 11`, printToConsole: false});
-        phone = extractPhone(phone, /(\d{1})(\d{3})(\d{3})(\d{4})/).replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '$1-$2-$3-$4');
+        phone = extractPhone(phone, /(\d{1})(\d{3})(\d{3})(\d{4})/, '$1-$2-$3-$4');
     } 
     phone = stripCharFromString(phone, {
         char: '-', 
@@ -330,14 +360,31 @@ export function applyPhoneRegex(phone: string, label?: string): string {
     return phone;
 }
 
-export function extractPhone(phone: string, re: RegExp, groupFormat?: string): string {
+/**
+ * 
+ * @param phone `string` - the phone number to extract from
+ * @param re {@link RegExp} - the regex to use to extract the phone number
+ * @param groupFormat `string` - the groups of re as placeholders in a format string
+ * - `optional` - if not provided, the phone number is returned as is 
+ * @returns `phone`: `string` - the extracted phone number
+ */
+export function extractPhone(
+    phone: string, 
+    re: RegExp, 
+    groupFormat?: string
+): string {
     if (!phone) return '';
+    let result: string = '';
     const match = phone.match(PHONE_REGEX);
     if (match) {
-        return match[0];
+        result = match[0];
     }
-    return '';
+    if (groupFormat) {
+        result = result.replace(re, groupFormat);
+    }
+    return result;
 }
+
 
 /**
  * @reference {@link https://javascript.info/regexp-introduction}
@@ -345,7 +392,7 @@ export function extractPhone(phone: string, re: RegExp, groupFormat?: string): s
  * @property {string} IGNORE_CASE - `i` - case insensitive "the search is case-insensitive: no difference between `A` and `a`"
  * @property {string} MULTI_LINE - `m` - multi-line "Multiline mode" see {@link https://javascript.info/regexp-multiline-mode}
  * @property {string} GLOBAL - `g` - global search "With this flag the search looks for all matches, without it – only the first match is returned."
- * @property {string} DOT_MATCHES_NEWLINE - `s` - dot matches newline "By default, a dot doesn’t match the newline character `n`."
+ * @property {string} DOT_MATCHES_NEWLINE - `s` - dot matches newline "By default, a dot doesn’t match the newline character `\n`."
  * @property {string} UNICODE - `u` - unicode "Enables full Unicode support. The flag enables correct processing of surrogate pairs." see {@link https://javascript.info/regexp-unicode}
  * @property {string} STICKY - `y` - sticky search "searching at the exact position in the text." see {@link https://javascript.info/regexp-sticky}
  */
@@ -360,9 +407,9 @@ export enum RegExpFlagsEnum {
 
 /**
  * Checks if a string ends with any of the specified suffixes.
- * @param str The string to check.
+ * @param str The `string` to check.
  * @param suffixes An array of possible ending strings.
- * @param flags Optional regex flags to use when creating the RegExp object. see {@link RegExpFlagsEnum}
+ * @param flags `Optional` regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}
  * @returns `true` if the string ends with any of the suffixes, `false` otherwise.
  * @example
  * const myString = "hello world";
@@ -401,9 +448,9 @@ export function stringEndsWithAnyOf(str: string, suffixes: string | string[] | R
 
 /**
  * 
- * @param str The string to check.
+ * @param str The `string` to check.
  * @param prefixes possible starting string(s).
- * @param flags Optional regex flags to use when creating the RegExp object. see {@link RegExpFlagsEnum}
+ * @param flags `Optional` regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}
  * @returns 
  */
 export function stringStartsWithAnyOf(str: string, prefixes: string | string[] | RegExp, flags?: string[]): boolean {
@@ -432,9 +479,9 @@ export function stringStartsWithAnyOf(str: string, prefixes: string | string[] |
 
 /**
  * 
- * @param str The string to check.
+ * @param str The `string` to check.
  * @param substrings possible substring(s).
- * @param flags Optional regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}
+ * @param flags `Optional` regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}
  * @returns 
  */
 export function stringContainsAnyOf(str: string, substrings: string | string[] | RegExp, flags?: string[]): boolean {

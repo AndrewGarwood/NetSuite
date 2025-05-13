@@ -9,7 +9,7 @@ import { Transform, pipeline, TransformOptions } from 'stream';
 import { FileExtensionResult, ParseOneToManyOptions } from './types/Reading';
 import { FieldValue } from 'src/utils/api/types/Api';
 import {ValueMapping, ColumnMapping, isValueMappingEntry, DelimitedFileTypeEnum, MappedRow, DelimiterCharacterEnum } from './types/Csv';
-import { stripCharFromString, cleanString, unconditionalStripDotOptions } from './regex';
+import { stripCharFromString, cleanString, UNCONDITIONAL_STRIP_DOT_OPTIONS } from './regex';
 
 
 
@@ -339,7 +339,7 @@ export function validateFileExtension(filePath: string, expectedExtension: strin
     if (filePath && filePath.endsWith(`.${expectedExtension}`)) {
         isValid = true;
     } else {
-        validatedFilePath = `${filePath}.${stripCharFromString(expectedExtension, unconditionalStripDotOptions)}`;
+        validatedFilePath = `${filePath}.${stripCharFromString(expectedExtension, UNCONDITIONAL_STRIP_DOT_OPTIONS)}`;
     }
     return { isValid, validatedFilePath };
 }
