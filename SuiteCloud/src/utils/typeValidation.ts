@@ -4,7 +4,14 @@
 import { FieldValue } from "src/utils/api/types";
 import { BOOLEAN_FIELD_ID_REGEX, EMAIL_REGEX } from "./io/regex";
 
-
+/**
+ * Represents the `boolean` value `true` for a radio field in NetSuite.
+ */
+export const RADIO_FIELD_TRUE = 'T';
+/**
+ * Represents the `boolean` value `false` for a radio field in NetSuite.
+ */
+export const RADIO_FIELD_FALSE = 'F';
 export const BOOLEAN_TRUE_VALUES = ['true', 'yes', 'y'];
 export const BOOLEAN_FALSE_VALUES = ['false', 'no', 'n'];
 

@@ -20,7 +20,7 @@ define(['N/record', 'N/log'], (record, log) => {
     const logArray = [];
     
     /**
-     * createRecordArray and createRecordDict are mutually exclusive
+     * `createRecordArray` and `createRecordDict` are mutually exclusive
      * @param {BatchCreateRecordRequest} reqBody - {@link BatchCreateRecordRequest} = `{ createRecordArray`: {@link CreateRecordOptions}`[], createRecordDict: {[K in `{@link RecordTypeEnum}`]?: Array<`{@link CreateRecordOptions}`>} }`
      * @description POST function to create multiple records in NetSuite. Can create record in batches by defining the request's body, reqBody, in two ways: 
      * @param {Array<CreateRecordOptions>} [reqBody.createRecordArray] `METHOD 1 —`
@@ -32,7 +32,7 @@ define(['N/record', 'N/log'], (record, log) => {
      * - for recordType in Object.keys(reqBody.createRecordDict)
      * - - for req in reqBody.createRecordDict[recordType]
      * - - - run function {@link processCreateRecordOptions}(`req`)
-     * @param {string | string[]} reqBody.responseProps - (optional) the properties to include in the response in addition to the created records' IDs.
+     * @param {string | string[]} reqBody.responseProps - (`optional`) the properties to include in the response in addition to the created records' IDs.
      * @returns {BatchCreateRecordResponse} .{@link BatchCreateRecordResponse}
      */
     const post = (/**@description request body of {@link post}*/reqBody) => {
@@ -55,14 +55,14 @@ define(['N/record', 'N/log'], (record, log) => {
                     let createReq = createRecordArray[i];
                     let result = processCreateRecordOptions(createReq, responseProps);
                     if (!result) {
-                        writeLog(LogTypeEnum.ERROR, `Error Processing createRecordArray[${i}]`, `element ${i} CreateRecordOptions`);
+                        writeLog(LogTypeEnum.ERROR, `Error Processing createRecordArray[${i}]`, `element ${i} CreateRecordOptions with recordType: ${createReq.recordType}`);
                         continue;
                     } 
                     results.push(result);
                 }
             }
             if (createRecordDict && Object.keys(createRecordDict).length > 0) {   
-                writeLog(LogTypeEnum.AUDIT, 'Object.keys(reqBody.createRecordDict).length:', Object.keys(createRecordDict).length, Object.keys(createRecordDict));
+                writeLog(LogTypeEnum.AUDIT, 'Object.keys(reqBody):', Object.keys(createRecordDict), 'Object.keys(reqBody.createRecordDict).length:', Object.keys(createRecordDict).length);
                 Object.keys(createRecordDict).forEach((recordType, index) => {
                     if (Object.keys(RecordTypeEnum).includes(recordType.toUpperCase())) {
                         recordType = RecordTypeEnum[recordType.toUpperCase()];
@@ -102,7 +102,7 @@ define(['N/record', 'N/log'], (record, log) => {
             /**@type {BatchCreateRecordResponse}*/
             return { 
                 success: false,
-                message: 'Error processing POST_BatchCreateRecord request',
+                message: 'post.catch(e): Error processing POST_BatchCreateRecord request',
                 results: results,
                 error: e.toString(),
                 logArray: logArray
@@ -142,9 +142,9 @@ define(['N/record', 'N/log'], (record, log) => {
         
         try {
             let rec = record.create({ type: recordType, isDynamic });
-            writeLog(LogTypeEnum.DEBUG, `processCreateRecordOptions().try Creating '${recordType}' record`, 
-                `record.create({ type: ${recordType}, isDynamic: ${isDynamic} });`
-            );
+            // writeLog(LogTypeEnum.DEBUG, `processCreateRecordOptions().try Creating '${recordType}' record`, 
+            //     `record.create({ type: ${recordType}, isDynamic: ${isDynamic} });`
+            // );
             if (fieldDict) {
                 rec = processFieldDictionary(rec, recordType, fieldDict, FieldDictTypeEnum.FIELD_DICT);
             }
@@ -169,9 +169,9 @@ define(['N/record', 'N/log'], (record, log) => {
             }
             /**@type {CreateRecordResult} */
             const result = {recordId: rec.save()};
-            writeLog(LogTypeEnum.AUDIT, `Successfully created ${recordType} record`, `recordId: ${result.recordId}`);
+            // writeLog(LogTypeEnum.AUDIT, `Successfully created ${recordType} record`, `recordId: ${result.recordId}`);
             if (responseProps) {
-                writeLog(LogTypeEnum.DEBUG, `processCreateRecordOptions().try.if(responseProps)`, `responseProps: ${responseProps}`);
+                // writeLog(LogTypeEnum.DEBUG, `processCreateRecordOptions().try.if(responseProps)`, `responseProps: ${responseProps}`);
                 if (isNonEmptyArray(responseProps)) {
                     responseProps.forEach((fieldId, index) => {
                         try {
@@ -215,63 +215,73 @@ define(['N/record', 'N/log'], (record, log) => {
             writeLog(LogTypeEnum.ERROR, 'Invalid setFieldsByOptionType() parameters', 'rec, fieldType, fieldOptions are required');
             return rec;
         }
-        try {
-            /**@type {string[]} */
-            let validFieldIds = undefined
-            if (fieldType === SetOptionsEnum.FIELD_TEXT) {
-                validFieldIds = rec.getFields();
-                fieldOptions.forEach(({fieldId, text}, index) => {
-                    fieldId = fieldId.toLowerCase();
-                    if (!validFieldIds.includes(fieldId)) {
-                        writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.FIELD_TEXT} fieldId: '${fieldId}'`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getFields()`);
-                        // return; // continue to next textField
-                    } 
-                    rec.setText({ fieldId, text });
-                });
-            } else if (fieldType === SetOptionsEnum.FIELD_VALUE) {
-                validFieldIds = rec.getFields();
-                fieldOptions.forEach(({fieldId, value}, index) => {
-                    fieldId = fieldId.toLowerCase();
-                    if (!validFieldIds.includes(fieldId)) {
-                        writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.FIELD_VALUE} fieldId: '${fieldId}'`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getFields()`);
-                        // return; // continue to next valueField
-                    }
-                    rec.setValue({ fieldId, value });
-                });
-            } else if (fieldType === SetOptionsEnum.SUBLIST_TEXT) {
-                fieldOptions.forEach(({sublistId, fieldId, line, text}, index) => {
-                    fieldId = fieldId.toLowerCase();
-                    validFieldIds = rec.getSublistFields({ sublistId });
-                    if (!validFieldIds.includes(fieldId)) {
-                        writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.SUBLIST_TEXT} fieldId: ${fieldId}`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getSublistFields(${sublistId})`);
-                        // return; // continue to next textField
-                    }
-                    line = validateSublistLine(rec, sublistId, line);
-                    rec.setSublistText({ sublistId, fieldId, line, text });
-                });
-            } else if (fieldType === SetOptionsEnum.SUBLIST_VALUE) {
-                fieldOptions.forEach(({sublistId, fieldId, line, value}, index) => {
-                    fieldId = fieldId.toLowerCase();
-                    validFieldIds = rec.getSublistFields({ sublistId });
-                    if (!validFieldIds.includes(fieldId)) {
-                        writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.SUBLIST_VALUE} fieldId: '${fieldId}'`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getSublistFields(${sublistId})`);
-                        // return; // continue to next valueField
-                    }
-                    line = validateSublistLine(rec, sublistId, line);
-                    rec.setSublistValue({ sublistId, fieldId, line, value });
-                });
-            } else {
-                writeLog(LogTypeEnum.ERROR, 
-                    `setFieldsByOptionType() Invalid field type: ${fieldType}`, 
-                    `setFieldsByOptionType(recordType=${recordType}, fieldType=${fieldType}, fieldOptions=${fieldOptions}, arrayLabel=${arrayLabel})`,
-                );
-            }
-            return rec;
-        } catch (e) {
-            // writeLog(LogTypeEnum.ERROR, `Error in setFieldsByOptionType()`, e.message ? e.stack : e.toString());
-            writeLog(LogTypeEnum.ERROR, `Error in setFieldsByOptionType()`, e);
-            return rec;
+        /**@type {string[]} */
+        let validFieldIds = undefined
+        if (fieldType === SetOptionsEnum.FIELD_TEXT) {
+            validFieldIds = rec.getFields();
+            fieldOptions.forEach(({fieldId, text}, index) => {
+                fieldId = fieldId.toLowerCase();
+                if (!validFieldIds.includes(fieldId)) {
+                    writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.FIELD_TEXT} fieldId: '${fieldId}'`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getFields()`);
+                    // return; // continue to next textField
+                } 
+                try { rec.setText({ fieldId, text });
+                } catch (e) {
+                    writeLog(LogTypeEnum.ERROR, `Error setting ${recordType} fieldId: '${fieldId}'`, `rec.setText({ fieldId: ${fieldId}, text: ${text} })`, e);
+                    return;
+                }
+            });
+        } else if (fieldType === SetOptionsEnum.FIELD_VALUE) {
+            validFieldIds = rec.getFields();
+            fieldOptions.forEach(({fieldId, value}, index) => {
+                fieldId = fieldId.toLowerCase();
+                if (!validFieldIds.includes(fieldId)) {
+                    writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.FIELD_VALUE} fieldId: '${fieldId}'`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getFields()`);
+                    // return; // continue to next valueField
+                }
+                try { rec.setValue({ fieldId, value });
+                } catch (e) {
+                    writeLog(LogTypeEnum.ERROR, `Error setting ${recordType} fieldId: '${fieldId}'`, `rec.setValue({ fieldId: ${fieldId}, value: ${value} })`, e);
+                    return;
+                }
+            });
+        } else if (fieldType === SetOptionsEnum.SUBLIST_TEXT) {
+            fieldOptions.forEach(({sublistId, fieldId, line, text}, index) => {
+                fieldId = fieldId.toLowerCase();
+                validFieldIds = rec.getSublistFields({ sublistId });
+                if (!validFieldIds.includes(fieldId)) {
+                    writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.SUBLIST_TEXT} fieldId: ${fieldId}`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getSublistFields(${sublistId})`);
+                    // return; // continue to next textField
+                }
+                line = validateSublistLine(rec, sublistId, line);
+                try {rec.setSublistText({ sublistId, fieldId, line, text });
+                } catch (e) {
+                    writeLog(LogTypeEnum.ERROR, `Error setting ${recordType} sublistId: '${sublistId}' fieldId: '${fieldId}'`, `rec.setSublistText({ sublistId: ${sublistId}, fieldId: ${fieldId}, line: ${line}, text: ${text} })`, e);
+                    return;
+                }
+            });
+        } else if (fieldType === SetOptionsEnum.SUBLIST_VALUE) {
+            fieldOptions.forEach(({sublistId, fieldId, line, value}, index) => {
+                fieldId = fieldId.toLowerCase();
+                validFieldIds = rec.getSublistFields({ sublistId });
+                if (!validFieldIds.includes(fieldId)) {
+                    writeLog(LogTypeEnum.ERROR, `WARNING! possibly Invalid ${SetOptionsEnum.SUBLIST_VALUE} fieldId: '${fieldId}'`, `${arrayLabel}[${index}][${fieldId}] not found in ${recordType} record.getSublistFields(${sublistId})`);
+                    // return; // continue to next valueField
+                }
+                line = validateSublistLine(rec, sublistId, line);
+                try { rec.setSublistValue({ sublistId, fieldId, line, value });
+                } catch (e) {
+                    writeLog(LogTypeEnum.ERROR, `Error setting ${recordType} sublistId: '${sublistId}' fieldId: '${fieldId}'`, `rec.setSublistValue({ sublistId: ${sublistId}, fieldId: ${fieldId}, line: ${line}, value: ${value} })`, e);
+                    return;
+                }
+            });
+        } else {
+            writeLog(LogTypeEnum.ERROR, 
+                `setFieldsByOptionType() Invalid field type: ${fieldType}`, 
+                `setFieldsByOptionType(recordType=${recordType}, fieldType=${fieldType}, fieldOptions=${fieldOptions}, arrayLabel=${arrayLabel})`,
+            );
         }
+        return rec;
     }
 
 

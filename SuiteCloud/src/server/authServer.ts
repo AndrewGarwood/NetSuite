@@ -10,6 +10,7 @@ import {
 } from '../config/env';
 import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from './types';
 import { writeObjectToJson, getCurrentPacificTime, readJsonFileAsObject, printConsoleGroup as print } from 'src/utils/io';
+import { mainLogger as log } from 'src/config/setupLog';
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -24,10 +25,10 @@ let server: Server | any | undefined;
 export const CLOSE_SERVER = (): void => {
     if (server) {
         server.close(() => {
-            console.log('Server closed successfully.');
+            log.info('Server closed successfully.');
         });
     } else {
-        console.log('Server is not running or already closed.');
+        log.info('Server is not running or already closed.');
     }
 }
 
@@ -45,21 +46,21 @@ export async function getAuthCode(): Promise<string> {
                 resolve(authCode);
             } else {
                 res.send('Authorization code not received. Please try again.');
-                console.error('Error in authServer.ts getAuthCode(): Authorization code not received');
+                log.error('Error in authServer.ts getAuthCode(): Authorization code not received');
                 reject(new Error('Authorization code not received'));
             }
         });
         server = app.listen(SERVER_PORT, () => {
-            console.log(`Server is listening on port ${SERVER_PORT} for oauth callback...`);
+            console.log(`Server is listening on port ${SERVER_PORT} for oauth callback -> Opening authURL...`);
             const authLink = `${AUTH_URL}?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${CLIENT_ID}&scope=${SCOPE}&state=${STATE}`;
-            console.log(`Opening authURL...`);
             open(authLink).catch((err) => {    
-                console.error('Error in authServer.ts getAuthCode() when opening authURL:', err);
+                log.error('Error in authServer.ts getAuthCode() when opening authURL:', err);
                 reject(err);
             });
         });
     });
 }
+
 /**
  * @description `OAUTH2 STEP 2`. Exchange the authorization code for {@link TokenResponse}
  * @param {string} authCode - The authorization code received from the OAuth callback.
@@ -79,12 +80,12 @@ export async function exchangeAuthCodeForTokens(authCode: string): Promise<Token
             },
         });
         if (!response || !response.data) {
-            console.error('Error in authServer.ts exchangeAuthCodeForTokens(): No response data received');
+            log.error('Error in authServer.ts exchangeAuthCodeForTokens(): No response data received');
             throw new Error('No response data received after axios.post(...) in authServer.ts exchangeAuthCodeForTokens()');
         }
         return response.data as TokenResponse;
     } catch (error) {
-        console.error('Error in authServer.ts exchangeAuthCodeForTokens():', error);
+        log.error('Error in authServer.ts exchangeAuthCodeForTokens():', error);
         throw new Error('Failed to exchange authorization code for token');
     }
 }
@@ -108,7 +109,7 @@ export async function exchangeRefreshTokenForNewTokens(refreshToken: string): Pr
         });
         return response.data as TokenResponse;
     } catch (error) {
-        console.error('Error in authServer.ts exchangeRefreshTokenForNewTokens():', error);
+        log.error('Error in authServer.ts exchangeRefreshTokenForNewTokens():', error);
         throw new Error('Failed to refresh access token');
     }
 }
@@ -181,9 +182,9 @@ export async function initiateAuthFlow(
 
 /**
  * @param code - The authorization code received from the OAuth callback. Is defined when this function is called in {@link exchangeAuthCodeForTokens}`(authCode)` 
- * - code !== undefined -> grant_type=authorization_code
+ * - `code` !== `undefined` -> `grant_type=authorization_code`
  * @param refreshToken - The refresh token received from the initial token response. Is defined when this function is called in {@link exchangeRefreshTokenForNewTokens}`(refreshToken)` 
- * - refreshToken !== undefined -> grant_type=refresh_token
+ * - `refreshToken` !== `undefined` -> `grant_type=refresh_token`
  * @param redirectUri - The redirect URI used in the OAuth flow. Default is {@link REDIRECT_URI}.
  * @returns {URLSearchParams} params, see {@link URLSearchParams}
  * @reference {@link https://nodejs.org/api/url.html#class-urlsearchparams}

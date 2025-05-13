@@ -24,11 +24,13 @@ import {
     evaluateAlternateEmail, evaluateCompanyName, evaluateContactCompany,
     evaluateContactFirstName, evaluateContactLastName, evaluateContactMiddleName, 
     evaluateVendorAttention, evaluateVendorBillingCountry, 
-    evaluateVendorBillingState, evaluateVendorFirstName, evaluateVendorIsPerson, 
-    evaluateVendorLastName, evaluateVendorMiddleName, evaluateVendorSalutation, 
+    evaluateVendorBillingState, evaluateVendorIsPerson, 
+    evaluateVendorSalutation, 
     evaluateVendorShippingCountry, evaluateVendorShippingState, evaluateVendorTerms, 
-    VENDOR_VALUE_OVERRIDES, pruneVendor, pruneContact, 
-} from "./vendorParseDetails";
+    VENDOR_VALUE_OVERRIDES
+} from "./vendorParseEvaluatorFunctions";
+import { pruneContact, pruneVendor } from "./vendorParsePruneFunctions";
+
 
 /** NOT_INACTIVE = `false` -> `active` === `true` -> NetSuite's `isinactive` = `false` */
 export const NOT_INACTIVE = false;
@@ -38,6 +40,9 @@ export const BILLING_PHONE_COLUMNS = [
 export const SHIPPING_PHONE_COLUMNS = [
     'Ship from 4', 'Ship from 5', 'Main Phone', 'Work Phone', 'Mobile', 'Alt. Phone', 'Bill from 4', 'Bill from 5', 
 ];
+export const NAME_COLUMNS = [
+    'Primary Contact', 'Vendor', 'Bill from 1', 'Ship from 1', 'Bill from 2', 'Ship from 2',
+]
 
 export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions = {
     addressbook: {
@@ -111,13 +116,13 @@ export const PARSE_VENDOR_FROM_VENDOR_CSV_OPTIONS: ParseOptions = {
             ...CONTACT_VENDOR_SHARED_FIELD_VALUE_MAP_ARRAY,
             { fieldId: 'category', rowEvaluator: evaluateVendorCategory },  
             { fieldId: 'companyname', rowEvaluator: evaluateEntityId },
-            { fieldId: 'firstname', rowEvaluator: evaluateContactFirstName },
-            { fieldId: 'middlename', rowEvaluator: evaluateContactMiddleName },
-            { fieldId: 'lastname', rowEvaluator: evaluateContactLastName },
+            { fieldId: 'firstname', rowEvaluator: evaluateContactFirstName, rowEvaluatorArgs: NAME_COLUMNS },
+            { fieldId: 'middlename', rowEvaluator: evaluateContactMiddleName, rowEvaluatorArgs: NAME_COLUMNS },
+            { fieldId: 'lastname', rowEvaluator: evaluateContactLastName, rowEvaluatorArgs: NAME_COLUMNS },
             { fieldId: 'printoncheckas', colName: 'Print on Check as' },
             { fieldId: 'accountnumber', colName: 'Account No.' },
             { fieldId: 'taxidnum', colName: 'Tax ID' },
-            { fieldId: 'terms', rowEvaluator: evaluateVendorTerms, rowEvaluatorArgs: [SB_TERM_DICTIONARY] },
+            { fieldId: 'terms', rowEvaluator: evaluateVendorTerms, rowEvaluatorArgs: SB_TERM_DICTIONARY },
             { fieldId: 'is1099eligible', colName: 'Eligible for 1099' },
         ] as FieldValueMapping[],
         subrecordMapArray: [] // No body subrecords
@@ -133,9 +138,9 @@ export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
         fieldValueMapArray: [
             ...CONTACT_VENDOR_SHARED_FIELD_VALUE_MAP_ARRAY,
             { fieldId: 'officephone', rowEvaluator: evaluatePhone, rowEvaluatorArgs: ['Work Phone'] },
-            { fieldId: 'firstname', rowEvaluator: evaluateContactFirstName },
-            { fieldId: 'middlename', rowEvaluator: evaluateContactMiddleName },
-            { fieldId: 'lastname', rowEvaluator: evaluateContactLastName },
+            { fieldId: 'firstname', rowEvaluator: evaluateContactFirstName, rowEvaluatorArgs: NAME_COLUMNS },
+            { fieldId: 'middlename', rowEvaluator: evaluateContactMiddleName, rowEvaluatorArgs: NAME_COLUMNS },
+            { fieldId: 'lastname', rowEvaluator: evaluateContactLastName, rowEvaluatorArgs: NAME_COLUMNS },
             { fieldId: 'company', rowEvaluator: evaluateEntityId },
         ] as FieldValueMapping[],
     } as FieldDictionaryParseOptions,
@@ -143,3 +148,5 @@ export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
     valueOverrides: VENDOR_VALUE_OVERRIDES,
     pruneFunc: pruneContact,
 }
+
+
