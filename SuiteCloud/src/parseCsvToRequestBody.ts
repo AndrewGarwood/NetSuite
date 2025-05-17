@@ -25,7 +25,7 @@ import {
     hasKeys, isBooleanFieldId, isNullLike, BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES
 } from "./utils/typeValidation";
 import { printConsoleGroup as print, getDelimiterFromFilePath} from "./utils/io";
-import { DATA_DIR, OUTPUT_DIR, STOP_RUNNING } from "./config/env";
+import { STOP_RUNNING } from "./config/env";
 import csv from 'csv-parser';
 import fs from 'fs';
 import { ValueMapping, ValueMappingEntry, isValueMappingEntry } from "./utils/io/types";
@@ -88,8 +88,11 @@ export async function parseCsvToCreateOptions(
                 rowIndex++;
             })
             .on('end', () => {
-                log.debug(`rowIndex: ${rowIndex} - Finished processing CSV file with results.length=${results.length}\n`,
-                    `pruneCount=`, pruneCount, `parseOptionsArray.length=${parseOptionsArray.length}, csvPath=${csvPath}`
+                log.debug(`rowIndex: ${rowIndex} - Finished processing CSV file`, 
+                    `\n\tresults.length=${results.length}`,
+                    `\n\tpruneCount=`, JSON.stringify(pruneCount), 
+                    // `\n\tparseOptionsArray.length=${parseOptionsArray.length}`, 
+                    `\n\tcsvPath=${csvPath}`
                 );
                 resolve(results)
             })
@@ -262,37 +265,42 @@ export function generateSetSublistValueOptionsArray(
 ): SetSublistValueOptions[] {
     let arr = [] as SetSublistValueOptions[];
     for (let [index, sublistFieldValueMap] of Object.entries(sublistFieldValueMapArray)) {
-        let { sublistId, line, fieldId, defaultValue, colName, rowEvaluator, rowEvaluatorArgs } = sublistFieldValueMap;
-        if (!fieldId || (isNullLike(defaultValue) && !colName && !rowEvaluator)) {
-            throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or rowEvaluator or defaultValue`);
-        }     
-        let rowValue: FieldValue = null;    
-        if (rowEvaluator) {
-            rowValue = rowEvaluator(row, ...(rowEvaluatorArgs || []));
-        } else if (colName) {
-            rowValue = transformValue(String(row[colName]), colName, fieldId, valueOverrides);
-        } 
-        
-        if (defaultValue !== undefined && isNullLike(rowValue)) {
-            rowValue = defaultValue;
-        }
+        try {
+            let { sublistId, line, fieldId, defaultValue, colName, rowEvaluator, rowEvaluatorArgs } = sublistFieldValueMap;
+            if (!fieldId || (isNullLike(defaultValue) && !colName && !rowEvaluator)) {
+                throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or rowEvaluator or defaultValue`);
+            }     
+            let rowValue: FieldValue = null;    
+            if (rowEvaluator) {
+                rowValue = rowEvaluator(row, ...(rowEvaluatorArgs || []));
+            } else if (colName) {
+                rowValue = transformValue(String(row[colName]), colName, fieldId, valueOverrides);
+            } 
+            
+            if (defaultValue !== undefined && isNullLike(rowValue)) {
+                rowValue = defaultValue;
+            }
 
-        if (isNullLike(rowValue)) {
-            print({
-                label: `generateSetSublistValueOptionsArray(), row=${rowIndex} rowValue after transformValue or rowEvaluator is null or undefined`, 
-                details: [
-                `sublistFieldValueMap[${index}]: { sublistId: ${sublistId}, fieldId: ${fieldId}, defaultValue: ${defaultValue}, colName: ${colName} }`,
-                `rowValue="${rowValue}" -> continue to next sublistFieldValueMap`
-                ], printToConsole: false, printToFile: true, enableOverwrite: false
+            if (isNullLike(rowValue)) {
+                // print({
+                //     label: `generateSetSublistValueOptionsArray(), row=${rowIndex} rowValue after transformValue or rowEvaluator is null or undefined`, 
+                //     details: [
+                //     `sublistFieldValueMap[${index}]: { sublistId: ${sublistId}, fieldId: ${fieldId}, defaultValue: ${defaultValue}, colName: ${colName} }`,
+                //     `rowValue="${rowValue}" -> continue to next sublistFieldValueMap`
+                //     ], printToConsole: false, printToFile: true, enableOverwrite: false
+                // });
+                continue;
+            }
+            arr.push({
+                sublistId: sublistId, 
+                line: line === undefined || line === null ? parseInt(index) : line, 
+                fieldId: fieldId, 
+                value: rowValue 
             });
-            continue;
+        } catch (error) {
+            log.error(`rowIndex ${rowIndex}: generateSetSublistValueOptionsArray() Error processing sublistFieldValueMapArray[${index}]:`, 
+                `${sublistFieldValueMap}`, error);
         }
-        arr.push({
-            sublistId: sublistId, 
-            line: line === undefined || line === null ? parseInt(index) : line, 
-            fieldId: fieldId, 
-            value: rowValue 
-        });
     }
     return arr;
 }
@@ -328,21 +336,19 @@ export function generateSetFieldValueOptionsArray(
             }   
             
             if (isNullLike(rowValue)) {
-                print({
-                    label: `rowIndex ${rowIndex}: generateSetFieldValueOptionsArray() rowValue is null or undefined.`, 
-                    details: [
-                    `fieldValueMap[${index}]: { fieldId: ${fieldId}, defaultValue: ${defaultValue}, colName: ${colName}}`,
-                    `rowValue="${rowValue}" -> continue to next fieldValueMap`
-                    ], printToConsole: false, printToFile: true, enableOverwrite: false
-                });
+                // print({
+                //     label: `rowIndex ${rowIndex}: generateSetFieldValueOptionsArray() rowValue is null or undefined for fieldId="${fieldId}".`, 
+                //     details: [
+                //     `fieldValueMap[${index}]: { fieldId: "${fieldId}", defaultValue: "${defaultValue}", colName: "${colName}" }`,
+                //     `rowValue="${rowValue}" -> continue to next fieldValueMap`
+                //     ], printToConsole: false, printToFile: true, enableOverwrite: false
+                // });
                 continue;
             }
             arr.push({fieldId: fieldId, value: rowValue })
         } catch (error) {
-            print({
-                label: `rowIndex: ${rowIndex} - generateSetFieldValueOptionsArray() Error processing fieldValueMap[${index}].`, 
-                details: [JSON.stringify(error, null, 4)], printToConsole: false, printToFile: true, enableOverwrite: false
-            });
+            log.error(`rowIndex ${rowIndex}: generateSetFieldValueOptionsArray() Error processing fieldValueMapArray[${index}]:`, 
+                `${fieldValueMap}`, error);
         }
     }
     return arr;

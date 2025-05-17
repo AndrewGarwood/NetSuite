@@ -8,11 +8,10 @@
  * @SbDeployId 1
  */
 
-// import * as record from '@hitc/netsuite-types/N/record.d.ts';
 define(['N/record', 'N/log'], (record, log) => {
     /**
-     * @type {LogStatement[]} - Array<{@link LogStatement}> = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
-     * @see {@link writeLog}(type, title, ...details)
+     * @type {LogStatement[]} - `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
+     * @see {@link writeLog}`(type, title, ...details)`
      * @description return logArray in post response so can process in client
      * e.g. in client write logArray to a json or txt file in a readable format
      * or use logArray to display in a UI component (e.g. table, list, etc.)
@@ -20,7 +19,7 @@ define(['N/record', 'N/log'], (record, log) => {
     const logArray = [];
     
     /**
-     * `createRecordArray` and `createRecordDict` are mutually exclusive
+     * **`createRecordArray` and `createRecordDict` are mutually exclusive**
      * @param {BatchCreateRecordRequest} reqBody - {@link BatchCreateRecordRequest} = `{ createRecordArray`: {@link CreateRecordOptions}`[], createRecordDict: {[K in `{@link RecordTypeEnum}`]?: Array<`{@link CreateRecordOptions}`>} }`
      * @description POST function to create multiple records in NetSuite. Can create record in batches by defining the request's body, reqBody, in two ways: 
      * @param {Array<CreateRecordOptions>} [reqBody.createRecordArray] `METHOD 1 —`
@@ -32,7 +31,7 @@ define(['N/record', 'N/log'], (record, log) => {
      * - for recordType in Object.keys(reqBody.createRecordDict)
      * - - for req in reqBody.createRecordDict[recordType]
      * - - - run function {@link processCreateRecordOptions}(`req`)
-     * @param {string | string[]} reqBody.responseProps - (`optional`) the properties to include in the response in addition to the created records' IDs.
+     * @param {string | string[]} reqBody.responseProps - (optional) the properties to include in the response in addition to the created records' IDs.
      * @returns {BatchCreateRecordResponse} .{@link BatchCreateRecordResponse}
      */
     const post = (/**@description request body of {@link post}*/reqBody) => {
@@ -52,10 +51,10 @@ define(['N/record', 'N/log'], (record, log) => {
             if (createRecordArray && createRecordArray.length > 0) {
                 writeLog(LogTypeEnum.AUDIT, 'reqBody.createRecordArray.length:', createRecordArray.length);
                 for (let i = 0; i < createRecordArray.length; i++) {
-                    let createReq = createRecordArray[i];
-                    let result = processCreateRecordOptions(createReq, responseProps);
+                    let options = createRecordArray[i];
+                    let result = processCreateRecordOptions(options, responseProps);
                     if (!result) {
-                        writeLog(LogTypeEnum.ERROR, `Error Processing createRecordArray[${i}]`, `element ${i} CreateRecordOptions with recordType: ${createReq.recordType}`);
+                        writeLog(LogTypeEnum.ERROR, `Error Processing createRecordArray[${i}]`, `element ${i} CreateRecordOptions with recordType: ${options.recordType}`);
                         continue;
                     } 
                     results.push(result);
@@ -111,25 +110,25 @@ define(['N/record', 'N/log'], (record, log) => {
     }
 
     /**
-     * @param {CreateRecordOptions} createReq {@link CreateRecordOptions} = { `recordType`, `isDynamic`=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary} }.
-     * @param {string} createReq.recordType - The record type to create, see {@link RecordTypeEnum} (e.g. 'assemblyitem')
-     * @param {boolean} [createReq.isDynamic=false] - Indicates if the record should be created in dynamic mode. Default is `false`.
-     * @param {FieldDictionary} [createReq.fieldDict]
-     * - {@link FieldDictionary} = { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetFieldTextOptions}>, `valueFields`: Array<{@link SetFieldValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }.
+     * @param {CreateRecordOptions} options {@link CreateRecordOptions} = { `recordType`, `isDynamic`=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary} }.
+     * @param {string} options.recordType - The record type to create, see {@link RecordTypeEnum} (e.g. 'assemblyitem')
+     * @param {boolean} [options.isDynamic=false] - Indicates if the record should be created in dynamic mode. Default is `false`.
+     * @param {FieldDictionary} [options.fieldDict]
+     * - {@link FieldDictionary} = `{ priorityFields`: `Array<`{@link SetFieldValueOptions}`>`, `textFields`: `Array<`{@link SetFieldTextOptions}`>`, `valueFields`: `Array<`{@link SetFieldValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`.
      * - an object containing field IDs and their corresponding values.
-     * @param {SublistDictionary} [createReq.sublistDict]
-     * - {@link SublistDictionary} = Record<[`sublistId`: string], {@link SublistFieldDictionary}> = { `sublistId`: { `priorityFields`: Array<{@link SetSublistValueOptions}>, `textFields`: Array<{@link SetSublistTextOptions}>, `valueFields`: Array<{@link SetSublistValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> } }.
+     * @param {SublistDictionary} [options.sublistDict]
+     * - {@link SublistDictionary} = `Record<[sublistId`: string], {@link SublistFieldDictionary}`>` = `{ sublistId`: `{ priorityFields`: `Array<`{@link SetSublistValueOptions}`>`, `textFields`: `Array<`{@link SetSublistTextOptions}`>`, `valueFields`: `Array<`{@link SetSublistValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> } }`.
      * - an object containing sublist IDs and their corresponding field IDs and values.
-     * @param {string|string[]} [responseProps] - (optional) the properties to include in the response in addition to the created record ID.
-     * @returns {null | CreateRecordResult} `results` {@link CreateRecordResult} = 
-     * or `null` if error
+     * @param {string|string[]} [responseProps] - `(optional)` the properties to include in the response in addition to the created record ID.
+     * @returns {undefined | CreateRecordResult} `results` {@link CreateRecordResult} = `{ internalId`: number, `[fieldId: string in responseProps]`: {@link FieldValue}` }` 
+     * or `undefined` if error
      */
-    function processCreateRecordOptions(createReq, responseProps) {
-        let {recordType, isDynamic, fieldDict, sublistDict} = createReq;
+    function processCreateRecordOptions(options, responseProps) {
+        let {recordType, isDynamic, fieldDict, sublistDict} = options;
         if (!recordType || (!fieldDict && !sublistDict)) {
-            writeLog(LogTypeEnum.ERROR, 'Input Error in Post_BatchCreateRecordRequest.processRecordRequest(createReq)', 
-                'createReq {CreateRecordOptions} is missing required parameters: recordType and one of (fieldDict, sublistDict)');
-            return null;
+            writeLog(LogTypeEnum.ERROR, 'Input Error in Post_BatchCreateRecordRequest.processRecordRequest(options)', 
+                'options {CreateRecordOptions} is missing required parameters: recordType and one of (fieldDict, sublistDict)');
+            return undefined;
         }
         recordType = recordType.toLowerCase();
         if (Object.keys(RecordTypeEnum).includes(recordType.toUpperCase())) {
@@ -137,7 +136,7 @@ define(['N/record', 'N/log'], (record, log) => {
         } else if (!Object.values(RecordTypeEnum).includes(recordType)) {
             writeLog(LogTypeEnum.ERROR, 'Invalid recordType', 
                 `Invalid recordType: '${recordType}'. Must be a RecordTypeEnum key or one of RecordTypeEnum's values: ${Object.values(RecordTypeEnum).join(', ')}.`);
-            return null;
+            return undefined;
         }
         
         try {
@@ -168,7 +167,7 @@ define(['N/record', 'N/log'], (record, log) => {
                 }
             }
             /**@type {CreateRecordResult} */
-            const result = {recordId: rec.save()};
+            const result = {internalId: rec.save()};
             // writeLog(LogTypeEnum.AUDIT, `Successfully created ${recordType} record`, `recordId: ${result.recordId}`);
             if (responseProps) {
                 // writeLog(LogTypeEnum.DEBUG, `processCreateRecordOptions().try.if(responseProps)`, `responseProps: ${responseProps}`);
@@ -191,7 +190,7 @@ define(['N/record', 'N/log'], (record, log) => {
             return result;
         } catch (e) {
             writeLog(LogTypeEnum.ERROR, `processCreateRecordOptions().catch(e) Error creating '${recordType} record'`, e);
-            return null;
+            return undefined;
         }
     }
 
@@ -466,107 +465,7 @@ define(['N/record', 'N/log'], (record, log) => {
         return line; // return the original line index because it is valid
     }
 
-    /**
-     * @TODO - decide if this is necessary abstraction or if should just use Array.isArray() and arr.length > 0 everywhere
-     * @param {any} arr 
-     * @returns {boolean} true if arr is an array and has at least one element, false otherwise.
-     */
-    const isNonEmptyArray = (arr) => {
-        return Array.isArray(arr) && arr.length > 0;
-    }
-    /**
-     * @description Check if an object has any non-empty keys (not undefined, null, or empty string). 
-     * - passing in an array will return `false`.
-     * @param {Object} obj - The object to check.
-     * @param {Object} [objName=undefined] - `(optional)` The object name for logging purposes.
-     * @returns {boolean} `true` if the object has any non-empty keys, `false` otherwise.
-     */
-    const hasNonTrivialKeys = (obj, objName=undefined) => {
-        if (typeof obj !== 'object' || !obj || Array.isArray(obj)) {
-            return false;
-        }
-        for (const key in obj) { // return true if any key is non-empty
-            let value = obj[key];
-            let valueIsNonTrivial = (obj.hasOwnProperty(key) 
-                && value !== undefined 
-                && value !== null 
-                && (value !== '' 
-                    || isNonEmptyArray(value) 
-                    || (typeof value === 'object' && isNonEmptyArray(Object.entries(value)))
-                )
-            );
-            if (valueIsNonTrivial) {
-                if (objName) {
-                    writeLog(LogTypeEnum.DEBUG, `hasNonTrivialKeys(${objName}) === true`, `obj[${key}] = ${value}`);
-                }
-                return true;
-            }
-        }
-        if (objName) {
-            writeLog(LogTypeEnum.DEBUG, `hasNonTrivialKeys(${objName}) === false`, `obj = ${JSON.stringify(obj, null, 4)}`);
-        }
-        return false;
-    }
 
-    /**
-     * Calls NetSuite log module and pushes log with timestamp={@link getCurrentPacificTime}() to {@link logArray} to return at end of post request.
-     * @reference ~\node_modules\@hitc\netsuite-types\N\log.d.ts
-     * @param {LogTypeEnum} type {@link LogTypeEnum}
-     * @param {string} title 
-     * @param {any} [details]
-     * @returns {void} 
-     */
-    function writeLog(type, title, ...details) {
-        if (!type || !title) {
-            log.error('Invalid log', 'type and title are required');
-            return;
-        }
-        if (!Object.values(LogTypeEnum).includes(type)) {
-            log.error('Invalid log type', `type must be one of ${Object.values(LogTypeEnum).join(', ')}`);
-            return;
-        }
-        const payload = details
-            .map(d => (typeof d === 'string' ? d : JSON.stringify(d, null, 4)))
-            .join(' ');
-            switch (type) {
-                case LogTypeEnum.DEBUG:
-                    log.debug(title, payload);
-                    break;
-                case LogTypeEnum.ERROR:
-                    log.error(title, payload);
-                    break;
-                case LogTypeEnum.AUDIT:
-                    log.audit(title, payload);
-                    break;
-                case LogTypeEnum.EMERGENCY:
-                    log.emergency(title, payload);
-                    break;
-            }
-        logArray.push({ timestamp: getCurrentPacificTime(), type, title, details, message: payload });
-    }
-
-    /**
-     * Gets the current date and time in Pacific Time
-     * @returns {string} The current date and time in Pacific Time
-     */
-    function getCurrentPacificTime() {
-        const currentDate = new Date();
-        const pacificTime = currentDate.toLocaleString('en-US', {timeZone: 'America/Los_Angeles'});
-        return pacificTime;
-    }
-
-/**
- * @enum {string} FieldDictTypeEnum
- * @description Enum for field dictionary types used in {@link processFieldDictionary} and {@link processSubrecordOptions}
- * @property {string} FIELD_DICT - indicates a dictionary is a {@link FieldDictionary}, with values for a record's main body fields
- * @property {string} SUBLIST_FIELD_DICT - indicates a dictionary is a {@link SublistFieldDictionary}, with values for a record's sublist fields
- */
-const FieldDictTypeEnum = {
-    /** indicates a dictionary is a {@link FieldDictionary}, with values for a record's main body fields */
-    FIELD_DICT: 'fieldDict',
-    /** indicates a dictionary is a {@link SublistFieldDictionary}, with values for a record's sublist fields */
-    SUBLIST_FIELD_DICT: 'sublistFieldDict'
-}
 /**
  * Definition of Request body for the POST function in POST_BatchCreateRecord.js
  * @typedef {Object} BatchCreateRecordRequest
@@ -579,7 +478,11 @@ const FieldDictTypeEnum = {
 
 
 /**
- * @typedef {{recordId: number; [fieldId: string]: FieldValue;}} CreateRecordResult
+ * `{ internalId: number; [fieldId: string]:` {@link FieldValue}`; }`
+ * @typedef {{
+ * internalId: number; 
+ * [fieldId: string]: FieldValue;
+ * }} CreateRecordResult
  */
 
 /**
@@ -587,7 +490,7 @@ const FieldDictTypeEnum = {
  * @typedef {Object} BatchCreateRecordResponse
  * @property {boolean} success - Indicates if the request was successful.
  * @property {string} message - A message indicating the result of the request.
- * @property {CreateRecordResult[]} resultsArray - an `Array<`{@link CreateRecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully created.
+ * @property {CreateRecordResult[]} results - an `Array<`{@link CreateRecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully created.
  * @property {string} [error] - An error message if the request was not successful.
  * @property {LogStatement[]} logArray - an `Array<`{@link LogStatement}`>` generated during the request processing.
  */
@@ -817,296 +720,112 @@ const FieldInputTypeEnum = {
  */
 
 
+/**
+ * @enum {string} FieldDictTypeEnum
+ * @description Enum for field dictionary types used in {@link processFieldDictionary} and {@link processSubrecordOptions}
+ * @property {string} FIELD_DICT - indicates a dictionary is a {@link FieldDictionary}, with values for a record's main body fields
+ * @property {string} SUBLIST_FIELD_DICT - indicates a dictionary is a {@link SublistFieldDictionary}, with values for a record's sublist fields
+ */
+const FieldDictTypeEnum = {
+    /** indicates a dictionary is a {@link FieldDictionary}, with values for a record's main body fields */
+    FIELD_DICT: 'FIELD_DICT',
+    /** indicates a dictionary is a {@link SublistFieldDictionary}, with values for a record's sublist fields */
+    SUBLIST_FIELD_DICT: 'SUBLIST_FIELD_DICT'
+}
+    /**
+     * @TODO - decide if this is necessary abstraction or if should just use Array.isArray() and arr.length > 0 everywhere
+     * @param {any} arr 
+     * @returns {boolean} true if arr is an array and has at least one element, false otherwise.
+     */
+    const isNonEmptyArray = (arr) => {
+        return Array.isArray(arr) && arr.length > 0;
+    }
+    /**
+     * @description Check if an object has any non-empty keys (not undefined, null, or empty string). 
+     * - passing in an array will return `false`.
+     * @param {Object} obj - The object to check.
+     * @param {Object} [objName=undefined] - `(optional)` The object name for logging purposes.
+     * @returns {boolean} `true` if the object has any non-empty keys, `false` otherwise.
+     */
+    const hasNonTrivialKeys = (obj, objName=undefined) => {
+        if (typeof obj !== 'object' || !obj || Array.isArray(obj)) {
+            return false;
+        }
+        for (const key in obj) { // return true if any key is non-empty
+            let value = obj[key];
+            let valueIsNonTrivial = (obj.hasOwnProperty(key) 
+                && value !== undefined 
+                && value !== null 
+                && (value !== '' 
+                    || isNonEmptyArray(value) 
+                    || (typeof value === 'object' && isNonEmptyArray(Object.entries(value)))
+                )
+            );
+            if (valueIsNonTrivial) {
+                if (objName) {
+                    writeLog(LogTypeEnum.DEBUG, `hasNonTrivialKeys(${objName}) === true`, `obj[${key}] = ${value}`);
+                }
+                return true;
+            }
+        }
+        if (objName) {
+            writeLog(LogTypeEnum.DEBUG, `hasNonTrivialKeys(${objName}) === false`, `obj = ${JSON.stringify(obj, null, 4)}`);
+        }
+        return false;
+    }
+
+    /**
+     * Calls NetSuite log module and pushes log with timestamp={@link getCurrentPacificTime}() to {@link logArray} to return at end of post request.
+     * @reference ~\node_modules\@hitc\netsuite-types\N\log.d.ts
+     * @param {LogTypeEnum} type {@link LogTypeEnum}
+     * @param {string} title 
+     * @param {any} [details]
+     * @returns {void} 
+     */
+    function writeLog(type, title, ...details) {
+        if (!type || !title) {
+            log.error('Invalid log', 'type and title are required');
+            return;
+        }
+        if (!Object.values(LogTypeEnum).includes(type)) {
+            log.error('Invalid log type', `type must be one of ${Object.values(LogTypeEnum).join(', ')}`);
+            return;
+        }
+        const payload = details
+            .map(d => (typeof d === 'string' ? d : JSON.stringify(d, null, 4)))
+            .join(' ');
+            switch (type) {
+                case LogTypeEnum.DEBUG:
+                    log.debug(title, payload);
+                    break;
+                case LogTypeEnum.ERROR:
+                    log.error(title, payload);
+                    break;
+                case LogTypeEnum.AUDIT:
+                    log.audit(title, payload);
+                    break;
+                case LogTypeEnum.EMERGENCY:
+                    log.emergency(title, payload);
+                    break;
+            }
+        logArray.push({ timestamp: getCurrentPacificTime(), type, title, details, message: payload });
+    }
+
+    /**
+     * Gets the current date and time in Pacific Time
+     * @returns {string} The current date and time in Pacific Time
+     */
+    function getCurrentPacificTime() {
+        const currentDate = new Date();
+        const pacificTime = currentDate.toLocaleString('en-US', {timeZone: 'America/Los_Angeles'});
+        return pacificTime;
+    }
 
 /**
  * @enum {string} RecordTypeEnum
  * @readonly
  * @description supported NetSuite API record types As of 4 June 2024
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
- * 
- * @property {string} ACCOUNT - account
- * @property {string} ACCOUNTING_BOOK - accountingbook
- * @property {string} ACCOUNTING_CONTEXT - accountingcontext
- * @property {string} ACCOUNTING_PERIOD - accountingperiod
- * @property {string} ADV_INTER_COMPANY_JOURNAL_ENTRY - advintercompanyjournalentry
- * @property {string} ALLOCATION_SCHEDULE - allocationschedule
- * @property {string} AMORTIZATION_SCHEDULE - amortizationschedule
- * @property {string} AMORTIZATION_TEMPLATE - amortizationtemplate
- * @property {string} ASSEMBLY_BUILD - assemblybuild
- * @property {string} ASSEMBLY_ITEM - assemblyitem
- * @property {string} ASSEMBLY_UNBUILD - assemblyunbuild
- * @property {string} AUTOMATED_CLEARING_HOUSE - automatedclearinghouse
- * @property {string} BALANCE_TRX_BY_SEGMENTS - balancetrxbysegments
- * @property {string} BILLING_ACCOUNT - billingaccount
- * @property {string} BILLING_CLASS - billingclass
- * @property {string} BILLING_RATE_CARD - billingratecard
- * @property {string} BILLING_REVENUE_EVENT - billingrevenueevent
- * @property {string} BILLING_SCHEDULE - billingschedule
- * @property {string} BIN - bin
- * @property {string} BIN_TRANSFER - bintransfer
- * @property {string} BIN_WORKSHEET - binworksheet
- * @property {string} BLANKET_PURCHASE_ORDER - blanketpurchaseorder
- * @property {string} BOM - bom
- * @property {string} BOM_REVISION - bomrevision
- * @property {string} BONUS - bonus
- * @property {string} BONUS_TYPE - bonustype
- * @property {string} BUDGET_EXCHANGE_RATE - budgetexchangerate
- * @property {string} BULK_OWNERSHIP_TRANSFER - bulkownershiptransfer
- * @property {string} BUNDLE_INSTALLATION_SCRIPT - bundleinstallationscript
- * @property {string} CALENDAR_EVENT - calendarevent
- * @property {string} CAMPAIGN - campaign
- * @property {string} CAMPAIGN_RESPONSE - campaignresponse
- * @property {string} CAMPAIGN_TEMPLATE - campaigntemplate
- * @property {string} CARDHOLDER_AUTHENTICATION - cardholderauthentication
- * @property {string} CASH_REFUND - cashrefund
- * @property {string} CASH_SALE - cashsale
- * @property {string} CHARGE - charge
- * @property {string} CHARGE_RULE - chargerule
- * @property {string} CHECK - check
- * @property {string} CLASSIFICATION - classification
- * @property {string} CLIENT_SCRIPT - clientscript
- * @property {string} CMS_CONTENT - cmscontent
- * @property {string} CMS_CONTENT_TYPE - cmscontenttype
- * @property {string} CMS_PAGE - cmspage
- * @property {string} COMMERCE_CATEGORY - commercecategory
- * @property {string} COMPETITOR - competitor
- * @property {string} CONSOLIDATED_EXCHANGE_RATE - consolidatedexchangerate
- * @property {string} CONTACT - contact
- * @property {string} CONTACT_CATEGORY - contactcategory
- * @property {string} CONTACT_ROLE - contactrole
- * @property {string} COST_CATEGORY - costcategory
- * @property {string} COUPON_CODE - couponcode
- * @property {string} CREDIT_CARD_CHARGE - creditcardcharge
- * @property {string} CREDIT_CARD_REFUND - creditcardrefund
- * @property {string} CREDIT_MEMO - creditmemo
- * @property {string} CURRENCY - currency
- * @property {string} CUSTOMER - customer
- * @property {string} CUSTOMER_CATEGORY - customercategory
- * @property {string} CUSTOMER_DEPOSIT - customerdeposit
- * @property {string} CUSTOMER_MESSAGE - customermessage
- * @property {string} CUSTOMER_PAYMENT - customerpayment
- * @property {string} CUSTOMER_PAYMENT_AUTHORIZATION - customerpaymentauthorization
- * @property {string} CUSTOMER_REFUND - customerrefund
- * @property {string} CUSTOMER_STATUS - customerstatus
- * @property {string} CUSTOMER_SUBSIDIARY_RELATIONSHIP - customersubsidiaryrelationship
- * @property {string} CUSTOM_PURCHASE - custompurchase
- * @property {string} CUSTOM_RECORD - customrecord
- * @property {string} CUSTOM_SALE - customsale
- * @property {string} CUSTOM_TRANSACTION - customtransaction
- * @property {string} DEPARTMENT - department
- * @property {string} DEPOSIT - deposit
- * @property {string} DEPOSIT_APPLICATION - depositapplication
- * @property {string} DESCRIPTION_ITEM - descriptionitem
- * @property {string} DISCOUNT_ITEM - discountitem
- * @property {string} DOWNLOAD_ITEM - downloaditem
- * @property {string} EMAIL_TEMPLATE - emailtemplate
- * @property {string} EMPLOYEE - employee
- * @property {string} EMPLOYEE_CHANGE_REQUEST - employeechangerequest
- * @property {string} EMPLOYEE_CHANGE_REQUEST_TYPE - employeechangerequesttype
- * @property {string} EMPLOYEE_EXPENSE_SOURCE_TYPE - employeeexpensesourcetype
- * @property {string} EMPLOYEE_STATUS - employeestatus
- * @property {string} EMPLOYEE_TYPE - employeetype
- * @property {string} ENTITY_ACCOUNT_MAPPING - entityaccountmapping
- * @property {string} ESTIMATE - estimate
- * @property {string} EXPENSE_AMORTIZATION_EVENT - expenseamortizationevent
- * @property {string} EXPENSE_CATEGORY - expensecategory
- * @property {string} EXPENSE_PLAN - expenseplan
- * @property {string} EXPENSE_REPORT - expensereport
- * @property {string} EXPENSE_REPORT_POLICY - expensereportpolicy
- * @property {string} FAIR_VALUE_PRICE - fairvalueprice
- * @property {string} FINANCIAL_INSTITUTION - financialinstitution
- * @property {string} FIXED_AMOUNT_PROJECT_REVENUE_RULE - fixedamountprojectrevenuerule
- * @property {string} FOLDER - folder
- * @property {string} FORMAT_PROFILE - formatprofile
- * @property {string} FULFILLMENT_REQUEST - fulfillmentrequest
- * @property {string} GENERAL_TOKEN - generaltoken
- * @property {string} GENERIC_RESOURCE - genericresource
- * @property {string} GIFT_CERTIFICATE - giftcertificate
- * @property {string} GIFT_CERTIFICATE_ITEM - giftcertificateitem
- * @property {string} GL_NUMBERING_SEQUENCE - glnumberingsequence
- * @property {string} GLOBAL_ACCOUNT_MAPPING - globalaccountmapping
- * @property {string} GLOBAL_INVENTORY_RELATIONSHIP - globalinventoryrelationship
- * @property {string} GOAL - goal
- * @property {string} IMPORTED_EMPLOYEE_EXPENSE - importedemployeeexpense
- * @property {string} INBOUND_SHIPMENT - inboundshipment
- * @property {string} INTERCOMP_ALLOCATION_SCHEDULE - intercompallocationschedule
- * @property {string} INTER_COMPANY_JOURNAL_ENTRY - intercompanyjournalentry
- * @property {string} INTER_COMPANY_TRANSFER_ORDER - intercompanytransferorder
- * @property {string} INVENTORY_ADJUSTMENT - inventoryadjustment
- * @property {string} INVENTORY_COST_REVALUATION - inventorycostrevaluation
- * @property {string} INVENTORY_COUNT - inventorycount
- * @property {string} INVENTORY_DETAIL - inventorydetail
- * @property {string} INVENTORY_ITEM - inventoryitem
- * @property {string} INVENTORY_NUMBER - inventorynumber
- * @property {string} INVENTORY_STATUS - inventorystatus
- * @property {string} INVENTORY_STATUS_CHANGE - inventorystatuschange
- * @property {string} INVENTORY_TRANSFER - inventorytransfer
- * @property {string} INVENTORY_WORKSHEET - inventoryworksheet
- * @property {string} INVOICE - invoice
- * @property {string} INVOICE_GROUP - invoicegroup
- * @property {string} ISSUE - issue
- * @property {string} ISSUE_PRODUCT - issueproduct
- * @property {string} ISSUE_PRODUCT_VERSION - issueproductversion
- * @property {string} ITEM_ACCOUNT_MAPPING - itemaccountmapping
- * @property {string} ITEM_COLLECTION - itemcollection
- * @property {string} ITEM_COLLECTION_ITEM_MAP - itemcollectionitemmap
- * @property {string} ITEM_DEMAND_PLAN - itemdemandplan
- * @property {string} ITEM_FULFILLMENT - itemfulfillment
- * @property {string} ITEM_GROUP - itemgroup
- * @property {string} ITEM_LOCATION_CONFIGURATION - itemlocationconfiguration
- * @property {string} ITEM_PROCESS_FAMILY - itemprocessfamily
- * @property {string} ITEM_PROCESS_GROUP - itemprocessgroup
- * @property {string} ITEM_RECEIPT - itemreceipt
- * @property {string} ITEM_REVISION - itemrevision
- * @property {string} ITEM_SUPPLY_PLAN - itemsupplyplan
- * @property {string} JOB - job
- * @property {string} JOB_STATUS - jobstatus
- * @property {string} JOB_TYPE - jobtype
- * @property {string} JOURNAL_ENTRY - journalentry
- * @property {string} KIT_ITEM - kititem
- * @property {string} LABOR_BASED_PROJECT_REVENUE_RULE - laborbasedprojectrevenuerule
- * @property {string} LEAD - lead
- * @property {string} LOCATION - location
- * @property {string} LOT_NUMBERED_ASSEMBLY_ITEM - lotnumberedassemblyitem
- * @property {string} LOT_NUMBERED_INVENTORY_ITEM - lotnumberedinventoryitem
- * @property {string} MANUFACTURING_COST_TEMPLATE - manufacturingcosttemplate
- * @property {string} MANUFACTURING_OPERATION_TASK - manufacturingoperationtask
- * @property {string} MANUFACTURING_ROUTING - manufacturingrouting
- * @property {string} MAP_REDUCE_SCRIPT - mapreducescript
- * @property {string} MARKUP_ITEM - markupitem
- * @property {string} MASSUPDATE_SCRIPT - massupdatescript
- * @property {string} MEM_DOC - memdoc
- * @property {string} MERCHANDISE_HIERARCHY_LEVEL - merchandisehierarchylevel
- * @property {string} MERCHANDISE_HIERARCHY_NODE - merchandisehierarchynode
- * @property {string} MERCHANDISE_HIERARCHY_VERSION - merchandisehierarchyversion
- * @property {string} MESSAGE - message
- * @property {string} MFG_PLANNED_TIME - mfgplannedtime
- * @property {string} NEXUS - nexus
- * @property {string} NON_INVENTORY_ITEM - noninventoryitem
- * @property {string} NOTE - note
- * @property {string} NOTE_TYPE - notetype
- * @property {string} OPPORTUNITY - opportunity
- * @property {string} ORDER_RESERVATION - orderreservation
- * @property {string} ORDER_SCHEDULE - orderschedule
- * @property {string} ORDER_TYPE - ordertype
- * @property {string} OTHER_CHARGE_ITEM - otherchargeitem
- * @property {string} OTHER_NAME - othername
- * @property {string} OTHER_NAME_CATEGORY - othernamecategory
- * @property {string} PARTNER - partner
- * @property {string} PARTNER_CATEGORY - partnercategory
- * @property {string} PAYCHECK - paycheck
- * @property {string} PAYCHECK_JOURNAL - paycheckjournal
- * @property {string} PAYMENT_CARD - paymentcard
- * @property {string} PAYMENT_CARD_TOKEN - paymentcardtoken
- * @property {string} PAYMENT_ITEM - paymentitem
- * @property {string} PAYMENT_METHOD - paymentmethod
- * @property {string} PAYROLL_ITEM - payrollitem
- * @property {string} PCT_COMPLETE_PROJECT_REVENUE_RULE - pctcompleteprojectrevenuerule
- * @property {string} PERFORMANCE_METRIC - performancemetric
- * @property {string} PERFORMANCE_REVIEW - performancereview
- * @property {string} PERFORMANCE_REVIEW_SCHEDULE - performancereviewschedule
- * @property {string} PERIOD_END_JOURNAL - periodendjournal
- * @property {string} PHONE_CALL - phonecall
- * @property {string} PICK_STRATEGY - pickstrategy
- * @property {string} PICK_TASK - picktask
- * @property {string} PLANNED_ORDER - plannedorder
- * @property {string} PLANNING_ITEM_CATEGORY - planningitemcategory
- * @property {string} PLANNING_ITEM_GROUP - planningitemgroup
- * @property {string} PLANNING_RULE_GROUP - planningrulegroup
- * @property {string} PLANNING_VIEW - planningview
- * @property {string} PORTLET - portlet
- * @property {string} PRICE_BOOK - pricebook
- * @property {string} PRICE_LEVEL - pricelevel
- * @property {string} PRICE_PLAN - priceplan
- * @property {string} PRICING_GROUP - pricinggroup
- * @property {string} PROJECT_EXPENSE_TYPE - projectexpensetype
- * @property {string} PROJECT_IC_CHARGE_REQUEST - projecticchargerequest
- * @property {string} PROJECT_TASK - projecttask
- * @property {string} PROJECT_TEMPLATE - projecttemplate
- * @property {string} PROMOTION_CODE - promotioncode
- * @property {string} PROSPECT - prospect
- * @property {string} PURCHASE_CONTRACT - purchasecontract
- * @property {string} PURCHASE_ORDER - purchaseorder
- * @property {string} PURCHASE_REQUISITION - purchaserequisition
- * @property {string} REALLOCATE_ITEM - reallocateitem
- * @property {string} RECEIVE_INBOUND_SHIPMENT - receiveinboundshipment
- * @property {string} RESOURCE_ALLOCATION - resourceallocation
- * @property {string} RESTLET - restlet
- * @property {string} RETURN_AUTHORIZATION - returnauthorization
- * @property {string} REVENUE_ARRANGEMENT - revenuearrangement
- * @property {string} REVENUE_COMMITMENT - revenuecommitment
- * @property {string} REVENUE_COMMITMENT_REVERSAL - revenuecommitmentreversal
- * @property {string} REVENUE_PLAN - revenueplan
- * @property {string} REV_REC_FIELD_MAPPING - revrecfieldmapping
- * @property {string} REV_REC_SCHEDULE - revrecschedule
- * @property {string} REV_REC_TEMPLATE - revrectemplate
- * @property {string} SALES_CHANNEL - saleschannel
- * @property {string} SALES_ORDER - salesorder
- * @property {string} SALES_ROLE - salesrole
- * @property {string} SALES_TAX_ITEM - salestaxitem
- * @property {string} SCHEDULED_SCRIPT - scheduledscript
- * @property {string} SCHEDULED_SCRIPT_INSTANCE - scheduledscriptinstance
- * @property {string} SCRIPT_DEPLOYMENT - scriptdeployment
- * @property {string} SERIALIZED_ASSEMBLY_ITEM - serializedassemblyitem
- * @property {string} SERIALIZED_INVENTORY_ITEM - serializedinventoryitem
- * @property {string} SERVICE_ITEM - serviceitem
- * @property {string} SHIP_ITEM - shipitem
- * @property {string} SOLUTION - solution
- * @property {string} STATISTICAL_JOURNAL_ENTRY - statisticaljournalentry
- * @property {string} STORE_PICKUP_FULFILLMENT - storepickupfulfillment
- * @property {string} SUBSCRIPTION - subscription
- * @property {string} SUBSCRIPTION_CHANGE_ORDER - subscriptionchangeorder
- * @property {string} SUBSCRIPTION_LINE - subscriptionline
- * @property {string} SUBSCRIPTION_PLAN - subscriptionplan
- * @property {string} SUBSCRIPTION_TERM - subscriptionterm
- * @property {string} SUBSIDIARY - subsidiary
- * @property {string} SUBSIDIARY_SETTINGS - subsidiarysettings
- * @property {string} SUBTOTAL_ITEM - subtotalitem
- * @property {string} SUITELET - suitelet
- * @property {string} SUPPLY_CHAIN_SNAPSHOT - supplychainsnapshot
- * @property {string} SUPPLY_CHAIN_SNAPSHOT_SIMULATION - supplychainsnapshotsimulation
- * @property {string} SUPPLY_CHANGE_ORDER - supplychangeorder
- * @property {string} SUPPLY_PLAN_DEFINITION - supplyplandefinition
- * @property {string} SUPPORT_CASE - supportcase
- * @property {string} TASK - task
- * @property {string} TAX_ACCT - taxacct
- * @property {string} TAX_GROUP - taxgroup
- * @property {string} TAX_PERIOD - taxperiod
- * @property {string} TAX_TYPE - taxtype
- * @property {string} TERM - term
- * @property {string} TIME_BILL - timebill
- * @property {string} TIME_ENTRY - timeentry
- * @property {string} TIME_OFF_CHANGE - timeoffchange
- * @property {string} TIME_OFF_PLAN - timeoffplan
- * @property {string} TIME_OFF_REQUEST - timeoffrequest
- * @property {string} TIME_OFF_RULE - timeoffrule
- * @property {string} TIME_OFF_TYPE - timeofftype
- * @property {string} TIME_SHEET - timesheet
- * @property {string} TOPIC - topic
- * @property {string} TRANSFER_ORDER - transferorder
- * @property {string} UNITS_TYPE - unitstype
- * @property {string} UNLOCKED_TIME_PERIOD - unlockedtimeperiod
- * @property {string} USAGE - usage
- * @property {string} USEREVENT_SCRIPT - usereventscript
- * @property {string} VENDOR - vendor
- * @property {string} VENDOR_BILL - vendorbill
- * @property {string} VENDOR_CATEGORY - vendorcategory
- * @property {string} VENDOR_CREDIT - vendorcredit
- * @property {string} VENDOR_PAYMENT - vendorpayment
- * @property {string} VENDOR_PREPAYMENT - vendorprepayment
- * @property {string} VENDOR_PREPAYMENT_APPLICATION - vendorprepaymentapplication
- * @property {string} VENDOR_RETURN_AUTHORIZATION - vendorreturnauthorization
- * @property {string} VENDOR_SUBSIDIARY_RELATIONSHIP - vendorsubsidiaryrelationship
- * @property {string} WAVE - wave
- * @property {string} WBS - wbs
- * @property {string} WEBSITE - website
- * @property {string} WORKFLOW_ACTION_SCRIPT - workflowactionscript
- * @property {string} WORK_ORDER - workorder
- * @property {string} WORK_ORDER_CLOSE - workorderclose
- * @property {string} WORK_ORDER_COMPLETION - workordercompletion
- * @property {string} WORK_ORDER_ISSUE - workorderissue
- * @property {string} WORKPLACE - workplace
- * @property {string} ZONE - zone
  */
 const RecordTypeEnum = { // As of 4 June 2024
     ACCOUNT: 'account',

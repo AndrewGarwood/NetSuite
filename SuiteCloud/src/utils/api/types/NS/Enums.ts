@@ -6,6 +6,9 @@
 
 
 export { VendorCategoryEnum } from './Record/Relationships/Vendor'
+export { ContactRoleEnum } from './Record/Relationships/Contact'
+export { CustomerStatusEnum } from './Record/Relationships/Customer'
+
 /**
  * @enum {string} `UnitsTypeEnum`
  * @description Enum for unit types in NetSuite. (defined by account user)

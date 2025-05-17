@@ -12,9 +12,9 @@ export const RADIO_FIELD_TRUE = 'T';
  * Represents the `boolean` value `false` for a radio field in NetSuite.
  */
 export const RADIO_FIELD_FALSE = 'F';
+
 export const BOOLEAN_TRUE_VALUES = ['true', 'yes', 'y'];
 export const BOOLEAN_FALSE_VALUES = ['false', 'no', 'n'];
-
 export const BOOLEAN_FIELD_ID_LIST = [
     'isinactive', 'isprivate', 'giveaccess', 'emailtransactions', 'faxtransactions', 
     'is1099eligible', 'isdefaultbilling', 'isdefaultshipping', 'isprimary', 'isprimaryshipto', 
@@ -43,7 +43,7 @@ export function isNullLike(value: any): boolean {
     if (typeof value === 'object' && Object.keys(value).length === 0) {
         return true;
     }
-    if (typeof value === 'string' && value.trim() === '' || value.toLowerCase() === 'undefined' || value.toLowerCase() === 'null' ) {
+    if (typeof value === 'string' && (value.trim() === '' || value.toLowerCase() === 'undefined' || value.toLowerCase() === 'null') ) {
         return true;
     }
     return false;

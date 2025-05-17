@@ -14,18 +14,18 @@ import {
     SublistFieldDictionaryParseOptions, 
     SublistFieldValueMapping, 
     SublistSubrecordMapping,
-} from "./utils/api/types";
-import { printConsoleGroup as print } from "./utils/io";
+} from "../../api/types";
+import { printConsoleGroup as print } from "../../io";
 import { READLINE as rl } from "src/config/env";
-import { RecordTypeEnum } from "./utils/api/types/NS";
-import { SB_TERM_DICTIONARY } from "./utils/io/mappings";
+import { ContactRoleEnum, RecordTypeEnum } from "../../api/types/NS";
+import { SB_TERM_DICTIONARY } from "../../io/mappings";
 import { 
     evaluatePhone, evaluateEntityId, evaluateEmail, evaluateVendorCategory,
-    evaluateAlternateEmail, evaluateCompanyName, evaluateContactCompany,
+    evaluateAlternateEmail, evaluateContactCompany,
     evaluateContactFirstName, evaluateContactLastName, evaluateContactMiddleName, 
     evaluateVendorAttention, evaluateVendorBillingCountry, 
     evaluateVendorBillingState, evaluateVendorIsPerson, 
-    evaluateVendorSalutation, 
+    evaluateVendorSalutation, evaluateVendorFirstName, evaluateVendorLastName, evaluateVendorMiddleName,
     evaluateVendorShippingCountry, evaluateVendorShippingState, evaluateVendorTerms, 
     VENDOR_VALUE_OVERRIDES
 } from "./vendorParseEvaluatorFunctions";
@@ -35,13 +35,16 @@ import { pruneContact, pruneVendor } from "./vendorParsePruneFunctions";
 /** NOT_INACTIVE = `false` -> `active` === `true` -> NetSuite's `isinactive` = `false` */
 export const NOT_INACTIVE = false;
 export const BILLING_PHONE_COLUMNS = [
-    'Bill from 4', 'Bill from 5', 'Main Phone', 'Work Phone', 'Mobile', 'Alt. Phone', 'Ship from 4', 'Ship from 5', 
+    'Bill from 4', 'Bill from 5', 'Main Phone', 'Work Phone', 'Mobile', 
+    'Alt. Phone', 'Ship from 4', 'Ship from 5', 
 ];
 export const SHIPPING_PHONE_COLUMNS = [
-    'Ship from 4', 'Ship from 5', 'Main Phone', 'Work Phone', 'Mobile', 'Alt. Phone', 'Bill from 4', 'Bill from 5', 
+    'Ship from 4', 'Ship from 5', 'Main Phone', 'Work Phone', 'Mobile', 
+    'Alt. Phone', 'Bill from 4', 'Bill from 5', 
 ];
 export const NAME_COLUMNS = [
-    'Primary Contact', 'Vendor', 'Bill from 1', 'Ship from 1', 'Bill from 2', 'Ship from 2',
+    'Primary Contact', 'Print on Check as', 'Vendor', 
+    'Bill from 1', 'Ship from 1', 'Bill from 2', 'Ship from 2',
 ]
 
 export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions = {
@@ -96,6 +99,7 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
 
 export const CONTACT_VENDOR_SHARED_FIELD_VALUE_MAP_ARRAY: FieldValueMapping[] = [
     { fieldId: 'entityid', rowEvaluator: evaluateEntityId },
+    { fieldId: 'externalid', rowEvaluator: evaluateEntityId },
     { fieldId: 'isinactive', defaultValue: NOT_INACTIVE },
     { fieldId: 'email', rowEvaluator: evaluateEmail, rowEvaluatorArgs: ['Main Email'] },
     { fieldId: 'altemail', rowEvaluator: evaluateAlternateEmail },
@@ -116,13 +120,13 @@ export const PARSE_VENDOR_FROM_VENDOR_CSV_OPTIONS: ParseOptions = {
             ...CONTACT_VENDOR_SHARED_FIELD_VALUE_MAP_ARRAY,
             { fieldId: 'category', rowEvaluator: evaluateVendorCategory },  
             { fieldId: 'companyname', rowEvaluator: evaluateEntityId },
-            { fieldId: 'firstname', rowEvaluator: evaluateContactFirstName, rowEvaluatorArgs: NAME_COLUMNS },
-            { fieldId: 'middlename', rowEvaluator: evaluateContactMiddleName, rowEvaluatorArgs: NAME_COLUMNS },
-            { fieldId: 'lastname', rowEvaluator: evaluateContactLastName, rowEvaluatorArgs: NAME_COLUMNS },
+            { fieldId: 'firstname', rowEvaluator: evaluateVendorFirstName, rowEvaluatorArgs: NAME_COLUMNS },
+            { fieldId: 'middlename', rowEvaluator: evaluateVendorMiddleName, rowEvaluatorArgs: NAME_COLUMNS },
+            { fieldId: 'lastname', rowEvaluator: evaluateVendorLastName, rowEvaluatorArgs: NAME_COLUMNS },
             { fieldId: 'printoncheckas', colName: 'Print on Check as' },
             { fieldId: 'accountnumber', colName: 'Account No.' },
             { fieldId: 'taxidnum', colName: 'Tax ID' },
-            { fieldId: 'terms', rowEvaluator: evaluateVendorTerms, rowEvaluatorArgs: SB_TERM_DICTIONARY },
+            { fieldId: 'terms', rowEvaluator: evaluateVendorTerms, rowEvaluatorArgs: [SB_TERM_DICTIONARY] },
             { fieldId: 'is1099eligible', colName: 'Eligible for 1099' },
         ] as FieldValueMapping[],
         subrecordMapArray: [] // No body subrecords
@@ -141,7 +145,8 @@ export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
             { fieldId: 'firstname', rowEvaluator: evaluateContactFirstName, rowEvaluatorArgs: NAME_COLUMNS },
             { fieldId: 'middlename', rowEvaluator: evaluateContactMiddleName, rowEvaluatorArgs: NAME_COLUMNS },
             { fieldId: 'lastname', rowEvaluator: evaluateContactLastName, rowEvaluatorArgs: NAME_COLUMNS },
-            { fieldId: 'company', rowEvaluator: evaluateEntityId },
+            { fieldId: 'company', rowEvaluator: evaluateContactCompany },
+            { fieldId: 'contactrole', defaultValue: ContactRoleEnum.PRIMARY_CONTACT },
         ] as FieldValueMapping[],
     } as FieldDictionaryParseOptions,
     sublistDictParseOptions: ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,

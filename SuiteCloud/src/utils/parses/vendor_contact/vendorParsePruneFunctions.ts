@@ -1,5 +1,5 @@
 /**
- * @file src/vendorParsePruneFunctions.ts
+ * @file src/utils/parses/vendor_contact/vendorParsePruneFunctions.ts
  */
 import { 
     FieldValue,
@@ -9,10 +9,10 @@ import {
     SetSublistValueOptions,
     SetSubrecordOptions,
     SublistFieldDictionary,
-} from "./utils/api/types";
+} from "../../api/types";
 import { mainLogger as log } from 'src/config/setupLog';
-import { isNullLike, RADIO_FIELD_TRUE } from "./utils/typeValidation";
-import { printConsoleGroup as print } from "./utils/io";
+import { isNullLike, RADIO_FIELD_TRUE } from "../../typeValidation";
+import { printConsoleGroup as print } from "../../io";
 import { READLINE as rl } from "src/config/env";
 
 // TODO: maybe refactor pruneVendor and pruneContact into a single function that takes a record type and requireFields as arguments
@@ -34,11 +34,12 @@ export const pruneVendor = (
         }
         for (const requiredField of REQUIRED_VENDOR_FIELDS) {
             if (!fieldDict?.valueFields?.some((field) => field.fieldId === requiredField && field.value)) {
-                print({
-                    label: `pruneVendor(${(label || '')}):\n\tSetFieldValueOptions is missing field "${requiredField}", returning null`, 
-                    printToConsole: true
-                });
-                log.debug('vendorOptions',vendorOptions);
+                // print({
+                //     label: `pruneVendor(${(label || '')}):\n\tSetFieldValueOptions is missing field "${requiredField}", returning null`, 
+                //     printToConsole: false
+                // });
+                log.debug(`pruneVendor(${(label || '')}):\n\tSetFieldValueOptions is missing field "${requiredField}", returning null`,
+                    `\npruned vendorOptions`, vendorOptions);
                 return null;
             }
         }
@@ -64,10 +65,10 @@ export const pruneContact = (
         let fieldDict = contactOptions.fieldDict as FieldDictionary;
         for (const requiredField of REQUIRED_CONTACT_FIELDS) {
             if (!fieldDict?.valueFields?.some((field) => field.fieldId === requiredField && field.value)) {
-                print({
-                    label: `pruneContact(${(label || '')}):\n\tSetFieldValueOptions is missing field "${requiredField}", returning null`, 
-                    printToConsole: false
-                });
+                // print({
+                //     label: `pruneContact(${(label || '')}):\n\tSetFieldValueOptions is missing field "${requiredField}", returning null`, 
+                //     printToConsole: false
+                // });
                 return null;
             }
         }
@@ -96,11 +97,11 @@ export const pruneAddressBook = (
             let subrecValueFields = subrecOps?.fieldDict?.valueFields as SetFieldValueOptions[];
             for (const requiredField of REQUIRED_ADDRESS_FIELDS) {
                 if (!subrecValueFields?.some((field) => field.fieldId === requiredField)) {
-                    print({
-                        label: `pruneAddressBook(${(label || '')}):`,
-                        details: `subrecordFields[${index}]: SetSubrecordOptions is missing address field "${requiredField}", removing it from subrecordFields`,
-                        printToConsole: false,
-                    });
+                    // print({
+                    //     label: `pruneAddressBook(${(label || '')}):`,
+                    //     details: `subrecordFields[${index}]: SetSubrecordOptions is missing address field "${requiredField}", removing it from subrecordFields`,
+                    //     printToConsole: false,
+                    // });
                     valueFields?.splice(index, 1);
                     subrecordFields.splice(index, 1);
                     index--; // Adjust index after removing an element
