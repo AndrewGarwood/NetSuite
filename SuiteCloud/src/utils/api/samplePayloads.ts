@@ -6,8 +6,9 @@ import {
     SublistDictionary, CreateRecordOptions, FieldDictionary, 
     SetSublistTextOptions, SetSubrecordOptions, SublistFieldDictionary, 
     SetSublistValueOptions, 
-    SetFieldValueOptions
-} from "src/utils/api/types/Api"
+    SetFieldValueOptions, UpsertRecordOptions
+} from "src/utils/api/types"
+import { RADIO_FIELD_FALSE } from "../typeValidation";
 import { NetSuiteCountryEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES } from "src/utils/api/types/NS"
 import { RecordTypeEnum } from "src/utils/api/types/NS/Record/Record"
 
@@ -50,7 +51,18 @@ const SUZZALLO_ADDRESS_SUBRECORD_OPTIONS: SetSubrecordOptions = {
             { fieldId: 'city', value: 'Seattle' },
             { fieldId: 'state', value: STATES.WASHINGTON },
             { fieldId: 'zip', value: '98195' },
-        ]
+        ] as SetFieldValueOptions[],
+    } as FieldDictionary,
+}
+
+export const UW_LIBRARIES_UPSERT_VENDOR_OPTIONS: UpsertRecordOptions = {
+    recordType: RecordTypeEnum.VENDOR,
+    fieldDict: {
+        valueFields: [
+            { fieldId: 'internalid', value: 5711 },
+            { fieldId: 'phone', value: '206-543-2990' },
+            { fieldId: 'email', value: 'awg1024@uw.edu' }
+        ] as SetFieldValueOptions[],
     } as FieldDictionary,
 }
 
@@ -59,9 +71,11 @@ export const UW_LIBRARIES_CREATE_VENDOR_OPTIONS: CreateRecordOptions = {
     isDynamic: NOT_DYNAMIC,
     fieldDict: {
         valueFields: [
-            { fieldId: 'companyname', value: 'UW Libraries' },
-            { fieldId: 'isinactive', value: NOT_INACTIVE },
+            { fieldId: 'entityid', value: 'UW_LIBRARIES' },
             { fieldId: 'externalid', value: 'UW_LIBRARIES' },
+            { fieldId: 'isperson', value: RADIO_FIELD_FALSE },  
+            { fieldId: 'companyname', value: 'UW Libraries' },
+            // { fieldId: 'isinactive', value: NOT_INACTIVE },
         ],
     } as FieldDictionary,
     sublistDict: {
@@ -94,6 +108,7 @@ export const MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS: CreateRecordOptions = 
     fieldDict: {
         valueFields: [
             { fieldId: 'companyname', value: 'City of Mission Viejo' },
+            { fieldId: 'isperson', value: RADIO_FIELD_FALSE },  
             { fieldId: 'isinactive', value: NOT_INACTIVE },
         ] as SetFieldValueOptions[],
     } as FieldDictionary,

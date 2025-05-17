@@ -146,6 +146,10 @@ export const SCRIPT_ENVIORNMENT: SuiteScriptEnvironment = {
                 scriptId: 171,
                 deployId: 1,
             },
+            POST_BatchUpsertRecord: {
+                scriptId: 172,
+                deployId: 1,
+            },
         } as ScriptDictionary,
     }
 }

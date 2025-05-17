@@ -6,97 +6,22 @@
 import { RecordTypeEnum } from './NS/Record/Record';
 
 /**
- * - `createRecordArray` and `createRecordDict` are mutually exclusive
- * - Definition of Request body for the POST function in POST_BatchCreateRecord.js - Can create record in batches by defining the request's body, reqBody, in two ways. 
- * @typedefn `BatchCreateRecordRequest`
- * @property {Array\<CreateRecordOptions>} [createRecordArray]
- * `Array<`{@link CreateRecordOptions}`>` = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]`
- * @property {{[K in RecordTypeEnum]?: Array\<CreateRecordOptions>}} [createRecordDict] 
-     * `{` [K in {@link RecordTypeEnum}]?: `Array<`{@link CreateRecordOptions}`> }`
- * @property {string | string[]} [responseProps] - `string | string[]` - The properties to include in the response in addition to the records' internal IDs.
-*/
-export type BatchCreateRecordRequest = {
-    /** = `Array<`{@link CreateRecordOptions}`>` = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]` */
-    createRecordArray?: CreateRecordOptions[];
-    /** = `{` [K in {@link RecordTypeEnum}]?: `Array<`{@link CreateRecordOptions}`> }` */
-    createRecordDict?: { [K in RecordTypeEnum]?: CreateRecordOptions[] };
-    /** = `string | string[]` - The properties to include in the response in addition to the records' internal IDs. */
-    responseProps?: string | string[];
+ * @enum {string} **`idPropertyEnum`**
+ * @property {string} INTERNAL_ID - The `internalid` (for all records).
+ * @property {string} EXTERNAL_ID - The `externalid` (for all records).
+ * @property {string} ENTITY_ID - The `entityid` (for relationship records). appears on vendor records.
+ * @property {string} ITEM_ID - The `itemid` (for inventory records)
+ * @readonly
+ */
+export enum idPropertyEnum {
+    INTERNAL_ID = 'internalid',
+    EXTERNAL_ID = 'externalid',
+    ENTITY_ID = 'entityid',
+    ITEM_ID = 'itemid'
 }
 
 /**
- * Definition of the return value for `processCreateRecordOptions()` in in POST_BatchCreateRecord.js
- * @typedefn {`Record<string`, {@link FieldValue}`>}` `CreateRecordResults`
- * @property {number} recordId - The internal ID of the created record.
- * @property {FieldValue} [fieldId] - (optional) optionally include other fields of the record's body that you want included in the response.
- */
-export type CreateRecordResult = { 
-    recordId: number; 
-    [fieldId: string]: FieldValue; 
-};
-
-/**
- * Definition of Response for the POST function in POST_BatchCreateRecord.js
- * @typedefn `BatchCreateRecordResponse`
- * @property {boolean} success - Indicates if the request was successful.
- * @property {string} message - A message indicating the result of the request.
- * @property {CreateRecordResults[]} results - an `Array<`{@link CreateRecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully created.
- * @property {string} [error] - An error message if the request was not successful.
- * @property {LogStatement[]} logArray - an `Array<`{@link LogStatement}`>` generated during the request processing.
- */
-export type BatchCreateRecordResponse = {
-    success: boolean;
-    message: string;
-    results: CreateRecordResult[];
-    error?: string;
-    logArray: LogStatement[];
-};
-
-/**
- * @typedefn `CreateRecordOptions`
- * @property {RecordTypeEnum} recordType - The record type to create, see {@link RecordTypeEnum}
- * @property {boolean} [isDynamic=false] - Indicates if the record should be created in dynamic mode. (defaults to false)
- * @property {FieldDictionary} [fieldDict] 
- * - {@link FieldDictionary} = { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetFieldTextOptions}>, `valueFields`: Array<{@link SetFieldValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }.
- * - an object containing field IDs and their corresponding values.
- * @property {SublistDictionary} [sublistDict] 
- * - {@link SublistDictionary} = Record<[`sublistId`: string], {@link SublistFieldDictionary}> = { `sublistId`: { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetSublistTextOptions}>, `valueFields`: Array<{@link SetSublistValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> } }.
- * - an object containing sublist IDs and their corresponding field IDs and values.
- */
-export type CreateRecordOptions = {
-    recordType: RecordTypeEnum;
-    isDynamic?: boolean;
-    fieldDict?: FieldDictionary;
-    sublistDict?: SublistDictionary;
-};
-
-/**
- * Definition of the request body for the POST function in POST_CreateRecord.js
- * @typedefn `CreateRecordRequest`
- * @property {CreateRecordOptions} options - The options for creating the record. {@link CreateRecordOptions} = { `recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary} }.
- * @property {string | string[]} [responseProps] - The properties to include in the response in addition to the record's internal ID.
- */
-export type CreateRecordRequest = {
-    options: CreateRecordOptions;
-    responseProps?: string | string[];
-}
-
-/**
- * @typedefn `CreateRecordResponse`
- * @property {boolean} success - Indicates if the record was created successfully.
- * @property {CreateRecordResult} result - The result of the record creation, including the internal ID and any other properties specified in {@link CreateRecordRequest.responseProps}.
- * @property {string} message - A message indicating the result of the operation.
- * @property {Array<LogStatement>} logArray - `Array<`{@link LogStatement}`>` generated by logs written during the POST requeset.
- */
-export type CreateRecordResponse = {
-    success: boolean;
-    result: CreateRecordResult;
-    message: string;
-    logArray: Array<LogStatement>;
-}
-
-/**
- * @enum {string} `LogTypeEnum`
+ * @enum {string} **`LogTypeEnum`**
  * @readonly
  * @description Enum for NetSuite's log module types
  * @property {string} DEBUG - Debug log type
@@ -134,16 +59,16 @@ export type LogStatement = {
 /**
  * Fields organized by the fields' value type
  * @typedefn `FieldDictionary`
- * @property {Array\<SetFieldValueOptions>} [priorityFields]
- * - Array<{@link SetFieldValueOptions}> = Array<{`fieldId`: string, `value`: {@link FieldValue}}>. 
- * @property {Array\<SetFieldTextOptions>} [textFields] 
- * - Array<{@link SetFieldTextOptions}> = Array<{`fieldId`: string, `text`: string}>. 
- * - For record fields: record.setText(fieldId, text)
- * @property {Array\<SetFieldValueOptions>} [valueFields] 
- * - Array<{@link SetFieldValueOptions}> = Array<{`fieldId`: string, `value`: {@link FieldValue}}>. 
- * - For record fields: record.setValue(fieldId, value)
- * @property {Array\<SetSubrecordOptions>} [subrecordFields]
- * - Array<{@link SetSubrecordOptions}> = Array<{ `parentSublistId`?: string, `line`?: number, fieldId: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}}>.
+ * @property {Array<SetFieldValueOptions>} [priorityFields]
+ * - Array<{@link SetFieldValueOptions}> = `Array<{ fieldId`: string, `value`: {@link FieldValue}` }>`. 
+ * @property {Array<SetFieldTextOptions>} [textFields] 
+ * - Array<{@link SetFieldTextOptions}> = `Array<{ fieldId`: string, `text`: string` }>`. 
+ * - For record fields: `record.setText(fieldId, text)`
+ * @property {Array<SetFieldValueOptions>} [valueFields] 
+ * - Array<{@link SetFieldValueOptions}> = `Array<{ fieldId`: string, `value`: {@link FieldValue}` }>`. 
+ * - For record fields: `record.setValue(fieldId, value)`
+ * @property {Array<SetSubrecordOptions>} [subrecordFields]
+ * - Array<{@link SetSubrecordOptions}> = `Array<{ parentSublistId`?: string, `line`?: number, fieldId: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}` }>`.
  * - array of subrecord fields in the main record
  */
 export type FieldDictionary = {
@@ -156,16 +81,16 @@ export type FieldDictionary = {
 /**
  * Set a record's sublist's field values organized by field type
  * @typedefn `SublistFieldDictionary`
- * @property {Array\<SetFieldValueOptions>} [priorityFields]
- * - Array<{@link SetFieldValueOptions}> = Array<{`sublistId`: string, `fieldId`: string, `line`: number, `value`: {@link FieldValue}}>.
- * @property {Array\<SetSublistTextOptions>} [textFields] 
- * - Array<{@link SetSublistTextOptions}> = Array<{`sublistId`: string, `fieldId`: string, `line`: number, `text`: string}>. 
+ * @property {Array<SetFieldValueOptions>} [priorityFields]
+ * - Array<{@link SetFieldValueOptions}> = `Array<{ sublistId`: string, `fieldId`: string, `line`: number, `value`: {@link FieldValue}` }>`.
+ * @property {Array<SetSublistTextOptions>} [textFields] 
+ * - Array<{@link SetSublistTextOptions}> = `Array<{ sublistId`: string, `fieldId`: string, `line`: number, `text`: string` }>`. 
  * - For record sublist fields: rec.setSublistText(sublistId, fieldId, line, text)
- * @property {Array\<SetSublistValueOptions>} [valueFields]  
- * - Array<{@link SetSublistValueOptions}> = Array<{`sublistId`: string, `fieldId`: string, `line`: number, `value`: {@link FieldValue}}>. 
+ * @property {Array<SetSublistValueOptions>} [valueFields]  
+ * - Array<{@link SetSublistValueOptions}> = `Array<{ sublistId`: string, `fieldId`: string, `line`: number, `value`: {@link FieldValue}` }>`. 
  * - For record sublist fields: rec.setSublistValue(sublistId, fieldId, line, value)
- * @property {Array\<SetSubrecordOptions>} [subrecordFields]
- * - Array<{@link SetSubrecordOptions}> = Array<{`parentSublistId`?: string, `line`?: number, `fieldId`: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}}>.
+ * @property {Array<SetSubrecordOptions>} [subrecordFields]
+ * - Array<{@link SetSubrecordOptions}> = `Array<{ parentSublistId`?: string, `line`?: number, `fieldId`: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}` }>`.
  * - array of subrecord fields in the main record's sublist
  */
 export type SublistFieldDictionary = {
@@ -174,7 +99,6 @@ export type SublistFieldDictionary = {
     valueFields?: SetSublistValueOptions[];
     subrecordFields?: SetSubrecordOptions[];
 };
-
 
 /**
  * @typedefn SublistDictionary
@@ -304,7 +228,7 @@ export interface SetSubrecordOptions {
 }
 
 /**
- * @enum {string} FieldOptionsTypeEnum
+ * @enum {string} `FieldOptionsTypeEnum`
  * @property {string} FIELD_TEXT - fieldText ({@link SetFieldTextOptions}) set text field of record
  * @property {string} FIELD_VALUE - fieldValue ({@link SetFieldValueOptions}) set value field of record
  * @property {string} SUBLIST_TEXT - sublistText ({@link SetSublistTextOptions}) set text field of record's sublist
@@ -324,7 +248,7 @@ export type SetFieldOptionsArrayTypes = SetFieldTextOptions | SetFieldValueOptio
 
 /**
  * @description Enum for the label of the field options array used in log statements.
- * @enum {string} OptionsArrayLabelEnum 
+ * @enum {string} `OptionsArrayLabelEnum` 
  * @property {string} PRIORITY - priorityFields are set first, then textFields and valueFields
  * @property {string} TEXT - textFields are set second, then valueFields
  * @property {string} VALUE - valueFields are set third
@@ -338,13 +262,13 @@ export enum OptionsArrayLabelEnum {
 }
 
 /**
- * @enum {string} FieldDictTypeEnum
- * @property {string} FIELD_DICT - fieldDict
- * @property {string} SUBLIST_FIELD_DICT - sublistFieldDict
+ * @enum {string} `FieldDictTypeEnum`
+ * @property {string} FIELD_DICT - FIELD_DICT
+ * @property {string} SUBLIST_FIELD_DICT - SUBLIST_FIELD_DICT
  */
 export enum FieldDictTypeEnum {
-    FIELD_DICT = 'fieldDict',
-    SUBLIST_FIELD_DICT = 'sublistFieldDict',
+    FIELD_DICT = 'FIELD_DICT',
+    SUBLIST_FIELD_DICT = 'SUBLIST_FIELD_DICT',
 }
 /** 
  * @enum {string} `FieldInputTypeEnum`
@@ -386,43 +310,3 @@ export enum FieldInputTypeEnum {
     INLINE_HTML = 'inlinehtml',
 }
 
-
-/**
- * @typedefn `RetrieveRecordByIdRequest`
- * @property {RecordTypeEnum} recordType - The type of the record to retrieve. see {@link RecordTypeEnum}
- * @property {idPropertyEnum} idProperty - The property to search for the record. see {@link idPropertyEnum}
- * @property {string} searchTerm - The name of the record to search for.
- */
-export type RetrieveRecordByIdRequest = {
-    recordType: RecordTypeEnum;
-    idProperty: idPropertyEnum;
-    searchTerm: string;
-};
-
-
-/**
- * @typedefn `RetrieveRecordByIdResponse`
- * @property {boolean} success - Whether the record was found or not.
- * @property {string} message - The message to return.
- * @property {string | number} [internalId] - The internal ID of the record, if found.
- */
-export type RetrieveRecordByIdResponse ={
-    success: boolean;
-    message: string;
-    internalId?: string | number;
-};
-
-/**
- * @enum {string} `idPropertyEnum`
- * @property {string} INTERNAL_ID - The internal ID of the record. fieldId = `internalid`
- * @property {string} EXTERNAL_ID - The external ID of the record. fieldId = `externalid`
- * @property {string} ENTITY_ID - The entity ID of the record. appears on vendor records. fieldId = `entityid`
- * @property {string} NAME - The name of the record.
- * @readonly
- */
-export enum idPropertyEnum {
-    INTERNAL_ID = 'internalid',
-    EXTERNAL_ID = 'externalid',
-    ENTITY_ID = 'entityid',
-    NAME = 'name'
-}

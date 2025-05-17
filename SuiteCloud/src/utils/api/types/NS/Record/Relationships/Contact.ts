@@ -10,6 +10,23 @@ import { Address, AddressBook } from './Address';
 import { GlobalSubscriptionStatusEnum } from '../../Enums';
 
 /**
+ * @enum {number} **`ContactRoleEnum`**
+ * @description enum for contact role internalIds in NetSuite. see `Setup > Sales > CRM Lists > Contact Roles`.
+ * @property {number} PRIMARY_CONTACT - Primary contact for the company.
+ * @property {number} ALTERNATE_CONTACT - Alternate contact for the company.
+ * @property {number} DECISION_MAKER - Decision maker for the company.
+ * @property {number} CONSULTANT - Consultant for the company.
+ * @property {number} ORDER_CREATOR - Order creator for the company.
+ */
+export enum ContactRoleEnum {
+    PRIMARY_CONTACT = -10,
+    ALTERNATE_CONTACT = -20,
+    DECISION_MAKER = -30,
+    CONSULTANT = -40,
+    ORDER_CREATOR = -50,
+}
+
+/**
  * @interface ContactBase
  * @description interface with basic properties for Contact Record fields in NetSuite.
  * - see {@link Contact} for full interface with all properties.

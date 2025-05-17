@@ -1,22 +1,23 @@
 /**
- * @file src/vendorParseDetails.ts
+ * @file src/utils/parses/vendor_contact/vendorParseEvaluatorFunctions.ts
  */
 import { 
     FieldValue,
-} from "./utils/api/types";
+} from "../../api/types";
 import { mainLogger as log } from 'src/config/setupLog';
-import { isNullLike, BOOLEAN_TRUE_VALUES, RADIO_FIELD_TRUE, RADIO_FIELD_FALSE } from "./utils/typeValidation";
+import { isNullLike, BOOLEAN_TRUE_VALUES, RADIO_FIELD_TRUE, RADIO_FIELD_FALSE } from "../../typeValidation";
 import { printConsoleGroup as print, stringEndsWithAnyOf, COMPANY_KEYWORDS_PATTERN, 
     applyPhoneRegex, stripCharFromString, 
     STRIP_DOT_IF_NOT_ABBREVIATION, cleanString, extractName, extractPhone,
-    extractEmail, EMAIL_REGEX, ValueMapping, isValueMappingEntry, RegExpFlagsEnum } from "./utils/io";
+    extractEmail, EMAIL_REGEX, ValueMapping, isValueMappingEntry, RegExpFlagsEnum, 
+    stringStartsWithAnyOf} from "../../io";
 import { READLINE as rl } from "src/config/env";
-import { HUMAN_VENDORS_ORIGINAL_TEXT,  } from './config/constants'
+import { HUMAN_VENDORS_ORIGINAL_TEXT,  } from '../../../config/constants'
 import { RecordTypeEnum, 
     CountryAbbreviationEnum as COUNTRIES, 
     StateAbbreviationEnum as STATES, 
     TermBase as Term, VendorCategoryEnum 
-} from "./utils/api/types/NS";
+} from "../../api/types/NS";
 
 export const VENDOR_VALUE_OVERRIDES: ValueMapping = {
     'NAME_WITH_SPELLING_ERROR_THAT_WAS_NEVER_FIXED': 'NAME_WITH_SPELLING_FIXED' as FieldValue  
@@ -35,10 +36,10 @@ export function checkForOverride(initialValue: string, valueOverrides: ValueMapp
     if (!initialValue) {
         return initialValue;
     }   
-    print({label: `checkForOverride: ${initialValue}`, details: [
-        `is "${initialValue}" a value we want to override? = ${Object.keys(valueOverrides).includes(initialValue)}`
-        ], printToConsole: false
-    });
+    // print({label: `checkForOverride: ${initialValue}`, details: [
+    //     `is "${initialValue}" a value we want to override? = ${Object.keys(valueOverrides).includes(initialValue)}`
+    //     ], printToConsole: false
+    // });
     if (Object.keys(valueOverrides).includes(initialValue)) {
         let mappedValue = valueOverrides[initialValue as keyof typeof valueOverrides];
         if (isValueMappingEntry(mappedValue)) {
@@ -57,10 +58,10 @@ export function checkForOverride(initialValue: string, valueOverrides: ValueMapp
 export const evaluateVendorIsPerson = (row: Record<string, any>): string => {
     let vendor = checkForOverride(row['Vendor'], VENDOR_VALUE_OVERRIDES) as string;
     if (HUMAN_VENDORS_TRIMMED.includes(vendor)) {
-        print({label: `evaluateVendorIsPerson: ${vendor} -> true`, printToConsole: false});
+        // print({label: `evaluateVendorIsPerson: ${vendor} -> true`, printToConsole: false});
         return RADIO_FIELD_TRUE; // vendor is a person
     }
-    print({label: `evaluateVendorIsPerson: ${vendor} -> false`, printToConsole: false});
+    // print({label: `evaluateVendorIsPerson: ${vendor} -> false`, printToConsole: false});
     return RADIO_FIELD_FALSE; // return false as default (not a person, so a company)
 }
 
@@ -73,11 +74,34 @@ export const evaluateVendorSalutation = (row: Record<string, any>): string => {
     } else if (vendorRowValue.startsWith('dr. ') || vendorRowValue.startsWith('dr ')) {
         return 'Dr.';
     } else {
-        print({label: `No salutation available, vendor: ${vendorRowValue}`, printToConsole: false});
+        // print({label: `No salutation available, vendor: ${vendorRowValue}`, printToConsole: false});
         return '';
     }
 }
-
+/**
+ * calls {@link evaluateVendorIsPerson} to determine if the vendor is a person or not.
+ * @returns the first name of the contact if the vendor is a person, otherwise returns an empty string.
+ * @see {@link evaluateVendorIsPerson}
+ */
+export const evaluateVendorFirstName = (row: Record<string, any>, ...nameColumns: string[]): string => {
+    return evaluateVendorIsPerson(row) === RADIO_FIELD_TRUE ? evaluateContactFirstName(row, ...nameColumns) : '';
+}
+/**
+ * calls {@link evaluateVendorIsPerson} to determine if the vendor is a person or not.
+ * @returns the middle name/initial of the contact if the vendor is a person, otherwise returns an empty string.
+ * @see {@link evaluateVendorIsPerson}
+ */
+export const evaluateVendorMiddleName = (row: Record<string, any>, ...nameColumns: string[]): string => {
+    return evaluateVendorIsPerson(row) === RADIO_FIELD_TRUE ? evaluateContactMiddleName(row, ...nameColumns) : '';
+}
+/**
+ * calls {@link evaluateVendorIsPerson} to determine if the vendor is a person or not.
+ * @returns the last name of the contact if the vendor is a person, otherwise returns an empty string.
+ * @see {@link evaluateVendorIsPerson}
+ */
+export const evaluateVendorLastName = (row: Record<string, any>, ...nameColumns: string[]): string => {
+    return evaluateVendorIsPerson(row) === RADIO_FIELD_TRUE ? evaluateContactLastName(row, ...nameColumns) : '';
+}
 /**
  * 
  * @param row - the `row` of data to look for a vendor payment terms in
@@ -87,10 +111,10 @@ export const evaluateVendorSalutation = (row: Record<string, any>): string => {
 export const evaluateVendorTerms = (row: Record<string, any>, ...termArgs: any[]): FieldValue => {
     const termDict = termArgs[0] as Record<string, Term> || null;
     if (!termDict) {
-        console.error('evaluateVendorTerms: termDict is undefined. Cannot evaluate terms.');
+        log.error('evaluateVendorTerms: termDict is undefined. Cannot evaluate terms.');
         return null;
     }
-    let termsRowValue = String(row['Terms']).trim();
+    let termsRowValue = cleanString(row['Terms']);
     if (termsRowValue && Object.keys(termDict).includes(termsRowValue)) {
         return termDict[termsRowValue].internalid as number;
     } else if (termsRowValue && Object.keys(termDict).some((key) => termDict[key].name === termsRowValue)) {
@@ -100,7 +124,7 @@ export const evaluateVendorTerms = (row: Record<string, any>, ...termArgs: any[]
     } else if (!termsRowValue){
         return null;
     }
-    console.log(`Invalid terms: "${termsRowValue}"`);
+    log.warn(`Invalid terms: "${termsRowValue}"`);
     return null;
 }
 
@@ -125,7 +149,7 @@ export const evaluateVendorBillingCountry = (row: Record<string, any>): string =
     } else if (Object.keys(STATES).includes(billFromState) || Object.values(STATES).includes(billFromState as STATES)) {
         return COUNTRIES.UNITED_STATES; // Default to United States if state is valid but country is not
     } else {
-        print({label: `Invalid Billing country: ${billFromCountry} or state: ${billFromState}`, printToConsole: false});
+        // log.warn(`Invalid Billing country: "${billFromCountry}" or state: "${billFromState}"`);
         return '';
     }
 }
@@ -137,7 +161,7 @@ export const evaluateVendorBillingState = (row: Record<string, any>): string => 
     } else if (Object.values(STATES).includes(billFromState as STATES)) {
         return billFromState;
     } else {
-        print({label: `Invalid Billing state: ${billFromState}`, printToConsole: false});
+        // log.warn(`Invalid Billing state: "${billFromState}"`);
         return '';
     }
 }
@@ -149,7 +173,7 @@ export const evaluateVendorShippingState = (row: Record<string, any>): string =>
     } else if (Object.values(STATES).includes(shipFromState as STATES)) {
         return shipFromState;
     } else {
-        print({label: `Invalid Shipping state: ${shipFromState}`, printToConsole: false});
+        // log.warn(`Invalid Shipping state: "${shipFromState}"`);
         return '';
     }
 }
@@ -164,7 +188,7 @@ export const evaluateVendorShippingCountry = (row: Record<string, any>): string 
     } else if (Object.keys(STATES).includes(shipFromState) || Object.values(STATES).includes(shipFromState as STATES)) {
         return COUNTRIES.UNITED_STATES; // Default to United States if state is valid but country is not
     } else {
-        print({label: `Invalid Shipping country: ${shipFromCountry} or state: ${shipFromState}`, printToConsole: false});
+        // log.warn(`Invalid Shipping country: "${shipFromCountry}" or state: "${shipFromState}"`);
         return '';
     }
 }
@@ -224,6 +248,12 @@ export const evaluateEmail = (
     return ''
 }
 
+/**
+ * return the name `{first, middle, last}` corresponding to the first column with a non-empty first and last name
+ * @param row 
+ * @param nameColumns 
+ * @returns 
+ */
 function evaluateName(
     row: Record<string, any>, 
     ...nameColumns: string[]
@@ -233,42 +263,33 @@ function evaluateName(
     last: string;
 } {
     for (const col of nameColumns) {
-        let initialVal = cleanString(row[col]);
+        let initialVal = cleanString(row[col], STRIP_DOT_IF_NOT_ABBREVIATION);
         if (!initialVal) {
             continue;
         }
-        let {first, middle, last} = extractName(initialVal);
-        if (first) { 
-            return {first: first, middle: middle || '', last: last || ''}; 
-            // return the name corresponding to the first column with a non-empty first name
+        const {first, middle, last} = extractName(initialVal);
+        if (first && last) { 
+        // log.debug(`extractName("${initialVal}") from col="${col}"`,
+        //     `\n\t-> {first="${first}", middle="${middle}", last="${last}"}`);
+            return {first: first, middle: middle || '', last: last}; 
+            // 
         }
     }
     return {first: '', middle: '', last: ''};
 }
 
 
-export const evaluateAlternateEmail = (row: Record<string, any>): string => {
-    let ccEmail = cleanString(row['CC Email']);
-    let invalidEmailPattern = new RegExp(/(\s*;\s*)?[a-zA-Z0-9._%+-]+@benev\.com(\s*;\s*)?/, 'ig')
-    if (ccEmail && !invalidEmailPattern.test(ccEmail)) {
-        // log.debug(`invalidEmailPattern.test("${ccEmail}") = ${invalidEmailPattern.test(ccEmail)}`);
-        return extractEmail(ccEmail);
-    } else if (ccEmail && invalidEmailPattern.test(ccEmail)) {
-        print({label: `evaluateAlternateEmail: "${ccEmail}" -> "${ccEmail.replace(invalidEmailPattern, '').trim()}"`, printToConsole: false});
-        return extractEmail(ccEmail.replace(invalidEmailPattern, '').replace(/[,;:]*/g, '').trim());
-    } 
-    return '';
-}
 
 export const evaluateContactFirstName = (
     row: Record<string, any>, 
     ...nameColumns: string[]
 ): string => {
-    log.debug(`evaluateContactFirstname nameColumns: ${nameColumns}`);  
     let first = cleanString(row['First Name'], STRIP_DOT_IF_NOT_ABBREVIATION);
-    if (!first && evaluateVendorIsPerson(row) === RADIO_FIELD_TRUE) {
-        first = evaluateName(row, ...nameColumns).first;
+    // log.debug(`cleanString(row['First Name']): "${first}"`);
+    if (!first || first.split(' ').length > 1) {
+        first = evaluateName(row, ...(['First Name'].concat(nameColumns))).first;
     }
+    // log.debug(`first after evaluate nameColumns: "${first}"`);
     return first;
 }
 
@@ -278,10 +299,11 @@ export const evaluateContactMiddleName = (
     ...nameColumns: string[]
 ): string => {
     let middle = cleanString(row['M.I.']);
-    if (!middle && evaluateVendorIsPerson(row) === RADIO_FIELD_TRUE) {
+    if (!middle || middle.split(' ').length > 1) {
         middle = evaluateName(row, ...nameColumns).middle;
     }
-    return middle;
+    // log.debug(`middle after evaluate nameColumns: "${middle}"`);
+    return middle.replace(/^-/, '').replace(/-$/, ''); // remove leading and trailing dashes
 }
 
 export const evaluateContactLastName = (
@@ -289,12 +311,26 @@ export const evaluateContactLastName = (
     ...nameColumns: string[]
 ): string => {
     let last = cleanString(row['Last Name'], STRIP_DOT_IF_NOT_ABBREVIATION);
-    if (!last && evaluateVendorIsPerson(row) === RADIO_FIELD_TRUE) {
+    // log.debug(`cleanString(row['Last Name']): "${last}"`);
+    if (!last) {
         last = evaluateName(row, ...nameColumns).last;
     }
+    // log.debug(`last after evaluate nameColumns: "${last}"`);
     return last;
 }
 
+export const evaluateAlternateEmail = (row: Record<string, any>): string => {
+    let ccEmail = cleanString(row['CC Email']);
+    let invalidEmailPattern = new RegExp(/(\s*;\s*)?[a-zA-Z0-9._%+-]+@benev\.com(\s*;\s*)?/, 'ig')
+    if (ccEmail && !invalidEmailPattern.test(ccEmail)) {
+        // log.debug(`invalidEmailPattern.test("${ccEmail}") = ${invalidEmailPattern.test(ccEmail)}`);
+        return extractEmail(ccEmail);
+    } else if (ccEmail && invalidEmailPattern.test(ccEmail)) {
+        // log.debug(`evaluateAlternateEmail: "${ccEmail}" -> "${ccEmail.replace(invalidEmailPattern, '').replace(/[,;:]*/g, '').trim()}"`);
+        return extractEmail(ccEmail.replace(invalidEmailPattern, '').replace(/[,;:]*/g, '').trim());
+    } 
+    return '';
+}
 // @TODO : refactor evaluateCompanyName, evaluateContactCompany, and evaluateEntityId -------------------------------------
 export const evaluateCompanyName = (row: Record<string, any>): string => {
     let company = cleanString(row['Company'], STRIP_DOT_IF_NOT_ABBREVIATION);
