@@ -12,6 +12,11 @@ export const RADIO_FIELD_TRUE = 'T';
  * Represents the `boolean` value `false` for a radio field in NetSuite.
  */
 export const RADIO_FIELD_FALSE = 'F';
+/**
+ * Represents the state of a radio field in NetSuite. e.g. `"isperson"`
+ * - `= typeof `{@link RADIO_FIELD_TRUE}` | typeof `{@link RADIO_FIELD_FALSE}`;` 
+ * */
+export type RadioFieldBoolean = typeof RADIO_FIELD_TRUE | typeof RADIO_FIELD_FALSE;   
 
 export const BOOLEAN_TRUE_VALUES = ['true', 'yes', 'y'];
 export const BOOLEAN_FALSE_VALUES = ['false', 'no', 'n'];

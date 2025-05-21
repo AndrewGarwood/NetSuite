@@ -8,7 +8,7 @@ import { mainLogger as log } from 'src/config/setupLog';
 import { isNullLike, BOOLEAN_TRUE_VALUES, RADIO_FIELD_TRUE, RADIO_FIELD_FALSE } from "../../typeValidation";
 import { printConsoleGroup as print, stringEndsWithAnyOf, COMPANY_KEYWORDS_PATTERN, 
     applyPhoneRegex, stripCharFromString, 
-    STRIP_DOT_IF_NOT_ABBREVIATION, cleanString, extractName, extractPhone,
+    STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, cleanString, extractName, extractPhone,
     extractEmail, EMAIL_REGEX, ValueMapping, isValueMappingEntry, RegExpFlagsEnum, 
     stringStartsWithAnyOf} from "../../io";
 import { READLINE as rl } from "src/config/env";
@@ -20,11 +20,11 @@ import { RecordTypeEnum,
 } from "../../api/types/NS";
 
 export const VENDOR_VALUE_OVERRIDES: ValueMapping = {
-    'NAME_WITH_SPELLING_ERROR_THAT_WAS_NEVER_FIXED': 'NAME_WITH_SPELLING_FIXED' as FieldValue  
+    'VALUE_TO_OVERRIDE': 'NEW_VALUE' as FieldValue  
 }
 
 export const HUMAN_VENDORS_TRIMMED = HUMAN_VENDORS_ORIGINAL_TEXT.map(
-    (name) => cleanString(name, STRIP_DOT_IF_NOT_ABBREVIATION));
+    (name) => cleanString(name, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION));
 
 /**
  * 
@@ -68,7 +68,7 @@ export const evaluateVendorIsPerson = (row: Record<string, any>): string => {
 
 export const evaluateVendorSalutation = (row: Record<string, any>): string => {
     let salutationRowValue = cleanString(row['Mr./Ms./...']);
-    let vendorRowValue = cleanString(row['Vendor'], STRIP_DOT_IF_NOT_ABBREVIATION, { toLower: true});
+    let vendorRowValue = cleanString(row['Vendor'], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, { toLower: true});
     if (salutationRowValue) {
         return salutationRowValue.trim();
     } else if (vendorRowValue.startsWith('dr. ') || vendorRowValue.startsWith('dr ')) {
@@ -195,7 +195,7 @@ export const evaluateVendorShippingCountry = (row: Record<string, any>): string 
 
 /** {@link VendorCategoryEnum}, {@link HUMAN_VENDORS_TRIMMED} */
 export const evaluateVendorCategory = (row: Record<string, any>): number | string => {
-    let vendor = cleanString(row['Vendor'] as string, STRIP_DOT_IF_NOT_ABBREVIATION);
+    let vendor = cleanString(row['Vendor'] as string, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
     let eligibleFor1099: string = String(row['Eligible for 1099']).trim().toLowerCase();
     if (BOOLEAN_TRUE_VALUES.includes(eligibleFor1099)) {
         return VendorCategoryEnum._1099;
@@ -263,7 +263,7 @@ function evaluateName(
     last: string;
 } {
     for (const col of nameColumns) {
-        let initialVal = cleanString(row[col], STRIP_DOT_IF_NOT_ABBREVIATION);
+        let initialVal = cleanString(row[col], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
         if (!initialVal) {
             continue;
         }
@@ -284,7 +284,7 @@ export const evaluateContactFirstName = (
     row: Record<string, any>, 
     ...nameColumns: string[]
 ): string => {
-    let first = cleanString(row['First Name'], STRIP_DOT_IF_NOT_ABBREVIATION);
+    let first = cleanString(row['First Name'], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
     // log.debug(`cleanString(row['First Name']): "${first}"`);
     if (!first || first.split(' ').length > 1) {
         first = evaluateName(row, ...(['First Name'].concat(nameColumns))).first;
@@ -310,7 +310,7 @@ export const evaluateContactLastName = (
     row: Record<string, any>, 
     ...nameColumns: string[]
 ): string => {
-    let last = cleanString(row['Last Name'], STRIP_DOT_IF_NOT_ABBREVIATION);
+    let last = cleanString(row['Last Name'], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
     // log.debug(`cleanString(row['Last Name']): "${last}"`);
     if (!last) {
         last = evaluateName(row, ...nameColumns).last;
@@ -333,9 +333,9 @@ export const evaluateAlternateEmail = (row: Record<string, any>): string => {
 }
 // @TODO : refactor evaluateCompanyName, evaluateContactCompany, and evaluateEntityId -------------------------------------
 export const evaluateCompanyName = (row: Record<string, any>): string => {
-    let company = cleanString(row['Company'], STRIP_DOT_IF_NOT_ABBREVIATION);
-    let vendor = cleanString(row['Vendor'], STRIP_DOT_IF_NOT_ABBREVIATION);
-    let printOnCheckAs = cleanString(row['Print on Check As'], STRIP_DOT_IF_NOT_ABBREVIATION);
+    let company = cleanString(row['Company'], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
+    let vendor = cleanString(row['Vendor'], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
+    let printOnCheckAs = cleanString(row['Print on Check As'], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
     let result: string = vendor;
     if (company !== vendor && printOnCheckAs && company === printOnCheckAs) {
         log.debug(`evaluateCompanyName: `,
@@ -354,7 +354,7 @@ export const evaluateCompanyName = (row: Record<string, any>): string => {
 /** If contact's corresponding vendor record has `isperson` == `true`, 
  * then the vendor is not able to be selected as the contact's company */
 export const evaluateContactCompany = (row: Record<string, any>): string => {
-    let vendor = cleanString(row['Vendor'], STRIP_DOT_IF_NOT_ABBREVIATION);
+    let vendor = cleanString(row['Vendor'], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
     if (HUMAN_VENDORS_TRIMMED.includes(vendor)) {
         return '';
     }
@@ -363,11 +363,11 @@ export const evaluateContactCompany = (row: Record<string, any>): string => {
 
 /**
  * as of right now, just returns {@link checkForOverride}`(`
- * {@link cleanString}`(row['Vendor'] as string`, {@link STRIP_DOT_IF_NOT_ABBREVIATION}`)`, 
+ * {@link cleanString}`(row['Vendor'] as string`, {@link STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION}`)`, 
  * {@link VENDOR_VALUE_OVERRIDES}`)` 
  * */
 export const evaluateEntityId = (row: Record<string, any>): string => {
-    let vendor = cleanString(row['Vendor'], STRIP_DOT_IF_NOT_ABBREVIATION);
+    let vendor = cleanString(row['Vendor'], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
     // if (HUMAN_VENDORS_TRIMMED.includes(vendor)) {
     //     return getFullName(row);
     // }
@@ -388,6 +388,6 @@ export const getFullName = (row: Record<string, any>): string => {
         log.debug(`No valid name found in row: ${JSON.stringify(row)}`);
         return '';
     }
-    return cleanString(fullName, STRIP_DOT_IF_NOT_ABBREVIATION);
+    return cleanString(fullName, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
 }
 

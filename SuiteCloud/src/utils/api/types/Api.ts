@@ -228,7 +228,7 @@ export interface SetSubrecordOptions {
 }
 
 /**
- * @enum {string} `FieldOptionsTypeEnum`
+ * @enum {string} FieldOptionsTypeEnum
  * @property {string} FIELD_TEXT - fieldText ({@link SetFieldTextOptions}) set text field of record
  * @property {string} FIELD_VALUE - fieldValue ({@link SetFieldValueOptions}) set value field of record
  * @property {string} SUBLIST_TEXT - sublistText ({@link SetSublistTextOptions}) set text field of record's sublist
@@ -248,7 +248,7 @@ export type SetFieldOptionsArrayTypes = SetFieldTextOptions | SetFieldValueOptio
 
 /**
  * @description Enum for the label of the field options array used in log statements.
- * @enum {string} `OptionsArrayLabelEnum` 
+ * @enum {string} OptionsArrayLabelEnum 
  * @property {string} PRIORITY - priorityFields are set first, then textFields and valueFields
  * @property {string} TEXT - textFields are set second, then valueFields
  * @property {string} VALUE - valueFields are set third
@@ -262,13 +262,13 @@ export enum OptionsArrayLabelEnum {
 }
 
 /**
- * @enum {string} `FieldDictTypeEnum`
- * @property {string} FIELD_DICT - FIELD_DICT
- * @property {string} SUBLIST_FIELD_DICT - SUBLIST_FIELD_DICT
+ * @enum {string} FieldDictTypeEnum
+ * @property {string} FIELD_DICT - fieldDict
+ * @property {string} SUBLIST_FIELD_DICT - sublistFieldDict
  */
 export enum FieldDictTypeEnum {
-    FIELD_DICT = 'FIELD_DICT',
-    SUBLIST_FIELD_DICT = 'SUBLIST_FIELD_DICT',
+    FIELD_DICT = 'fieldDict',
+    SUBLIST_FIELD_DICT = 'sublistFieldDict',
 }
 /** 
  * @enum {string} `FieldInputTypeEnum`

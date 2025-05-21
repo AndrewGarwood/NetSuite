@@ -10,23 +10,6 @@ import { Address, AddressBook } from './Address';
 import { GlobalSubscriptionStatusEnum } from '../../Enums';
 
 /**
- * @enum {number} **`ContactRoleEnum`**
- * @description enum for contact role internalIds in NetSuite. see `Setup > Sales > CRM Lists > Contact Roles`.
- * @property {number} PRIMARY_CONTACT - Primary contact for the company.
- * @property {number} ALTERNATE_CONTACT - Alternate contact for the company.
- * @property {number} DECISION_MAKER - Decision maker for the company.
- * @property {number} CONSULTANT - Consultant for the company.
- * @property {number} ORDER_CREATOR - Order creator for the company.
- */
-export enum ContactRoleEnum {
-    PRIMARY_CONTACT = -10,
-    ALTERNATE_CONTACT = -20,
-    DECISION_MAKER = -30,
-    CONSULTANT = -40,
-    ORDER_CREATOR = -50,
-}
-
-/**
  * @interface ContactBase
  * @description interface with basic properties for Contact Record fields in NetSuite.
  * - see {@link Contact} for full interface with all properties.
@@ -62,6 +45,25 @@ export interface ContactBase {
 }
 
 /**
+ * @enum {number} **`ContactRoleEnum`**
+ * @description enum for contact role internalIds in NetSuite. see `Setup > Sales > CRM Lists > Contact Roles`.
+ * @property {number} PRIMARY_CONTACT - Primary contact for the company.
+ * @property {number} ALTERNATE_CONTACT - Alternate contact for the company.
+ * @property {number} DECISION_MAKER - Decision maker for the company.
+ * @property {number} CONSULTANT - Consultant for the company.
+ * @property {number} ORDER_CREATOR - Order creator for the company.
+ */
+export enum ContactRoleEnum {
+    PRIMARY_CONTACT = -10,
+    ALTERNATE_CONTACT = -20,
+    DECISION_MAKER = -30,
+    CONSULTANT = -40,
+    ORDER_CREATOR = -50,
+}
+
+
+
+/**
  * @interface Contact
  * @description interface with all properties for Contact Record fields in NetSuite.
  * - see {@link ContactBase} for basic properties.
@@ -71,7 +73,7 @@ export interface ContactBase {
  * @property {string} salutation - Contact's salutation (e.g., Mr., Mrs., Ms.).
  * @property {string} title - Contact's job title at their company.
  * @property {string} company - Company this contact works for.
- * @property {string} contactrole - Contact's role with the company, can create new roles at Setup > Sales > CRM Lists.
+ * @property {string | number} contactrole - Contact's role with the company, can create new roles at Setup > Sales > CRM Lists.
  * @property {Address} defaultaddress - Default billing address, automatically shows when added using the Address subtab. readonly.
  * @property {string} phone - Primary phone number for the contact, required for Online Bill Pay feature.
  * @property {string} mobilephone - Contact's mobile or cell phone number.
@@ -238,5 +240,5 @@ export interface ContactSublists {
      * @label "Address Book"
      * @description Address book sublist for the contact.
      * */
-    addressbook?: AddressBook[];
+    addressbook?: AddressBook;
 }

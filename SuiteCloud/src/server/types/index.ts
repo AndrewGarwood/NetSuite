@@ -1,15 +1,5 @@
-import {
-    AxiosCallEnum,
-    AxiosContentTypeEnum,
-    GrantTypeEnum
-} from './AxiosEnums';
-import { 
-    TokenResponse 
-} from './TokenResponse';
-export {
-    AxiosCallEnum,
-    AxiosContentTypeEnum,
-    GrantTypeEnum,
-
-    TokenResponse
-};
+/**
+ * @file src/server/types/index.ts
+ */
+export * from './AxiosEnums';
+export * from './TokenResponse';

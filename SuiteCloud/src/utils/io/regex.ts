@@ -6,7 +6,8 @@ import { printConsoleGroup as print } from "./writing";
 import { StringCaseOptions, StringPadOptions, StringStripOptions } from "./types/Reading";
 
 
-// TODO: use regex to check if date is in a valid format (e.g. YYYY-MM-DD, MM/DD/YYYY, etc.)
+
+
 /**
  * @description 
  * - Removes extra spaces, commas, and dots from a string (e.g. `'..'` becomes `'.'`)
@@ -168,12 +169,17 @@ export enum RegExpFlagsEnum {
     STICKY = 'y'
 }
 
+const COMPANY_KEYWORD_LIST: string[] = [
+    'company',
+];
+
 /** 
- * could instead make a list then join with `|` and use `new RegExp()` to create a regex from the list
+ * @TODO divide COMPANY_KEYWORDS_PATTERN into multiple regexes then compose
+ * could instead make a {@link COMPANY_KEYWORD_LIST} then join with `|` and use `new RegExp()` to create a regex from the list
  * - `re` = `/\b(?:company|corp|inc|co\.?,? ltd\.?|ltd|\.?l\.?lc|plc . . .)\b/ `
  * */
 export const COMPANY_KEYWORDS_PATTERN: RegExp = 
-/\b(?:compan(y|ies)|corporation|corporate|(drop)?box|corp|inc|co\.?|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|plc|llp|(un)?limited|nys|oc|mc|pr|local|group|consulting|consultant(s)?|vcc|bcp|center|(in)?pack(aging|age)?|electric|chemical|Exhibits|business|Factory|employee|print(s|ing)?|vistaprint|associates|association|account(s)?|arts|AMZ|independent|beauty|skin|meditech|partners|Affiliates|telecom|maps|cosmetic(s)?|connections|practice|computer|service(s)?|skincare|advanced|surgical|administrators|laser|practice|scientific|science|health|healthcare|medical|medspa|spa|perfect|surgeons|(med)?aesthetic(s)?|wellness|courier|capital|financ(e|ing)|collector|dept(\.)?|HVAC|insurance|ins|surety|freight|solution(s)?|trad(e|ing)|renewal|department|institute|instant|university|college|America(n)?|US(A)?|global|digital|virtual|orange|coast|tree|franchise|academy|advertising|travel|technologies|flash|international|tech|clinic(al)?|Exterminator|Nightclub|management|foundation|aid|product(ions|ion|s)?|industr(y|ies|ial)|bio|bio-chem|lubian|technology|technical|special(ist(s)?|ities)?|support|innovat(e|ive|ion(s)?)|county|united|state(s)?|the|one|of|for|and|on|or|at|it|plan|legal|valley|republic|recruit(ing)?|media|southern|office|post office|clean(er|ers)|transport|law|contract|high|food|meal|laboratory|instrument|southwest|ingredient(s)?|commerce|city|Laboratories|lab|logistics|newport|radio|video|photo(graphy)?|korea|communication(s)|derm(atology|atologist(s)?)|new|express|goods|mission|depot|treasur(e|er|y)|revenue|biolab|Orders|staff(ing|ed)?|investors|envelope|refresh|Majestic|motors|museum|event|Kaiser|visa|platinum|level|Rejuvenation|bespoke|Cardio|speed|pro|tax|firm|DC|square|store|group|Buy|buckhead|market(s)?|Bulk|perks|GPT|supplement(s)?|vitamin(s)?|plus|salesforce|Fulfillment|final|elite|sculpt(ing)?|botox|south|symposium|wifi|online|worldwide|tv|wine|rent(al(s)?)?|mail|plumber(s)?|Sociedade|card|\.com)\b/i;
+/\b(?:compan(y|ies)|[@&]+|corporation|corporate|(drop)?box|corp|inc|co\.|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|plc|llp|(un)?limited|nys|oc|mc|pr|local|group|consulting|consultant(s)?|vcc|bcp|center|(in)?pack(aging|age)?|electric|chemical|Exhibit(s)?|business|Factory|employee|print(s|ing)?|Pharmaceutical(s)?|vistaprint|associates|association|account(s)?|art(s)?|AMZ|independent|beauty|beautiful(ly)?|meditech|partners|Acupuncture|Affiliate(s)?|telecom|maps|cosmetic(s)?|connections|practice|computer|service(s)?|skincare|skin|face|facial|body|artisan(s)?|Alchemy|advanced|surgical|surgery|surgeons|administrators|laser|practice|scientific|science|health|healthcare|medical|med|med( |i)?spa|spa|perfect|surgeons|(med)?(a)?esthetic(s|a)?|salon|lounge|studio|wellness|courier|capital|financ(e|ing)|collector|dept(\.)?|HVAC|insurance|ins|surety|freight|fine art|solution(s)?|trad(e|ing)|renewal|department|inst\.|institute|instant|university|college|America(n)?|US(A)?|global|digital|virtual|orange|coast(al)?|tree|franchise|orthopedic(s)?|academy|advertising|travel|technologies|flash|international|tech|clinic(s|al)?|Exterminator|Nightclub|management|foundation|aid|product(ions|ion|s)?|industr(y|ies|ial)|biomed|bio|bio-chem|lubian|technology|technical|special(ist(s)?|ities)?|support|innovat(e|ive|ion(s)?)|county|united|state(s)?|the|one|of|for|by|and|on|or|at|it|the|about|plan|legal|valley|republic|recruit(ing)?|media|southern|office|post office|clean(er|ers)|transport|law|contract|high|food|meal|therapy|dental|laboratory|instrument|southwest|ingredient(s)?|commerce|city|Laboratories|lab|logistics|newport|radio|video|photo(graphy)?|korea|communication(s)|derm(atology|atologist(s)?)|new|express|goods|mission|depot|treasur(e|er|y)|revenue|biolab|Orders|staff(ing|ed)?|investors|envelope|refresh|Anti|AgingMajestic|motors|museum|event|Kaiser|pacific|visa|platinum|level|Rejuvenation|bespoke|Cardio|speed|pro|tax|firm|DC|square|store|weight|group|Buy|balance(d)?|buckhead|market(s)?|Bulk|perks|GPT|Boutique|supplement(s)?|vitamin(s)?|plus|sales|salesforce|precision|fitness|image|premier|Fulfillment|final|elite|elase|sculpt(ing)?|botox|south|Hills|symposium|wifi|online|worldwide|tv|derm([a-z]+)|wine|rent(al(s)?)?|mail|plumber(s)?|Sociedade|card|\.com)\b/i;
 /** - `re` =  `/\b(?:corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc)\.?\s*$/i` */
 export const COMPANY_ABBREVIATION_PATTERN: RegExp =
 /\b(?:corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc|llp)\.?\s*$/i;
@@ -189,7 +195,7 @@ export function doesNotEndWithKnownAbbreviation(s: string): boolean {
 }
 
 /** `stripRightCondition`: {@link doesNotEndWithKnownAbbreviation} */
-export const STRIP_DOT_IF_NOT_ABBREVIATION: StringStripOptions = {
+export const STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION: StringStripOptions = {
     char: '.',
     escape: true,
     stripLeftCondition: undefined,
@@ -230,8 +236,18 @@ export function extractEmail(email: string): string {
     }
     return '';
 }
-
-export const MIDDLE_INITIAL_REGEX = new RegExp(/^[A-Z]{1}\.?$/, RegExpFlagsEnum.IGNORE_CASE);
+/** `re` = /`^(a(t{1,2})n:)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*`/i */
+export const ATTN_SALUTATION_PREFIX_PATTERN 
+    = new RegExp(/^(a(t{1,2})n:)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*/, RegExpFlagsEnum.IGNORE_CASE);
+/** `re` = /`^(Mr\.|Ms\.|Mrs\.|Dr\.|Mx\.)`/i */
+export const SALUTATION_REGEX 
+    = new RegExp(/^(Mr\.|Ms\.|Mrs\.|Dr\.|Mx\.)/, RegExpFlagsEnum.IGNORE_CASE);
+/** `re` = /`^[A-Z]{1}\.?$`/i */
+export const MIDDLE_INITIAL_REGEX 
+    = new RegExp(/^[A-Z]{1}\.?$/, RegExpFlagsEnum.IGNORE_CASE);
+/** Matches "MSPA", "BSN", "FNP-C", "LME", "DOO", "PA-C", "MSN-RN", "RN", "NP", "CRNA", "FNP", "PA", "NMD", "MD", "DO", "LE", "CMA", "OM"  */
+export const JOB_TITLE_SUFFIX_PATTERN 
+    = /\b(,? ?(MSPA|BSN|FNP-C|LME|DOO|Ph\.?D\.|PA-C|MSN-RN|RN|NP|CRNA|FAAD|FNP|PA|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS|FACS|FAC)\.?,?)*\s*$/; 
 /**
  * **if** `name` starts with a number or contains any of {@link COMPANY_KEYWORDS_PATTERN}, do not attempt to extract name and return empty strings
  * @param name `string` - the full name from which to extract 3 parts: the first, middle, and last names
@@ -248,24 +264,24 @@ export function extractName(name: string): {
     last?: string
 } {
     if (!name || typeof name !== 'string') return { first: '', middle: '', last: '' };
-    /** Matches "MSPA", "BSN", "FNP-C", "LME", "DOO", "PA-C", "MSN-RN", "RN", "NP", "CRNA", "FNP", "PA", "NMD", "MD", "DO", "LE", "CMA", "OM"  */
-    const JOB_TITLE_SUFFIX_PATTERN = /\b(,?(MSPA|BSN|FNP-C|LME|DOO|Ph\.?D\.|PA-C|MSN-RN|RN|NP|CRNA|FAAD|FNP|PA|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS)\.?,?)*\s*$/; 
-
-    /** Matches "Mr.", "Ms.", "Mrs.", "Dr.", "Prof." followed by optional space  */
-    const SALUTATION_PREFIX_PATTERN = /^(attn:)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*/i;
     name = name
         .replace(/\s+/g, ' ')
-        .replace(SALUTATION_PREFIX_PATTERN,'')
+        .replace(ATTN_SALUTATION_PREFIX_PATTERN,'')
         .replace(JOB_TITLE_SUFFIX_PATTERN,'')
         .trim();
-    if (stringContainsAnyOf(name, /[0-9!#&@]/) 
-        || stringContainsAnyOf(name, COMPANY_KEYWORDS_PATTERN, RegExpFlagsEnum.IGNORE_CASE)) {
+    if ( // invalid name
+        stringContainsAnyOf(name, /[0-9!#&@]/) 
+        || stringContainsAnyOf(name, COMPANY_KEYWORDS_PATTERN, RegExpFlagsEnum.IGNORE_CASE)
+    ) {
         // log.debug(`stringContainsAnyOf("${name}", /[0-9!#&@]/) = ${stringContainsAnyOf(name, /[0-9!#&@]/)}`, 
         //     `\n\tor stringContainsAnyOf("${name}", COMPANY_KEYWORDS_PATTERN) = ${stringContainsAnyOf(name, COMPANY_KEYWORDS_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`);
         return { first: '', middle: '', last: '' };
     }
     const nameSplit = name.split(/\s+/);
-    nameSplit.map((namePart) => cleanString(namePart, STRIP_DOT_IF_NOT_ABBREVIATION).replace(/(^[-+])*/g, ''));
+    nameSplit.map((namePart) => cleanString(
+        namePart, 
+        STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION
+    ).replace(/(^[-+])*/g, ''));
     if (nameSplit.length == 1) {
         // log.debug(`nameSplit.length == 1: [${nameSplit}]`);
         return { first: nameSplit[0].replace(/,$/g, ''), middle: '', last: '' };
@@ -347,6 +363,8 @@ export const KOREA_PHONE_REGEX: RegExp = /(82)[-).\s]?(\d{1,2})?[-.\s]?(\d{3,4})
  * @description test phone on regex in this order:
  * 1. {@link JAPAN_PHONE_REGEX} = `/(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]?(\d{4})/`
  * 2. {@link KOREA_PHONE_REGEX} = `/(82)[-.\s]?(\d{2})[-.\s]?(\d{3})[-.\s]?(\d{4})/`
+ * 3. {@link HONG_KONG_PHONE_REGEX} = `/(852)[-.\s]?(\d{4})[-.\s]?(\d{4})/`
+ * 4. {@link CHINA_PHONE_REGEX} = `/(86)[-.\s]?(\d{2,3})[-.\s]?(\d{4})[-.\s]?(\d{4})/`
  * 3. GENERIC_{@link PHONE_REGEX} = `/(?:^\D*(\d{1,3})[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})( ?ext ?(\d{3,4}))?(?:\D*$)/`
  * 4. `\d{10}` (i.e. is a string of 10 digits), `return` as `\d{3}-\d{3}-\d{4}`
  * 5. `\d{11}` and `startsWith('1')` (i.e. is a USA phone number), `return` as `1-\d{3}-\d{3}-\d{4}`
@@ -468,6 +486,10 @@ export function stringEndsWithAnyOf(
             'Expected string, array of strings, or RegExpbut received:', typeof suffixes, suffixes);
         return false; // Invalid suffixes type
     }
+    // log.debug(
+    //     `\nregex: ${regex}`,
+    //     `\nregex.test("${s}"): ${regex.test(s)}`
+    // )
     return regex.test(s);
 }
 

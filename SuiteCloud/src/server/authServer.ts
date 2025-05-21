@@ -65,8 +65,6 @@ export async function getAuthCode(): Promise<string> {
                     scope: SCOPE,
                     state: STATE as string,
             }).toString();
-            // log.debug('Full authLink:', authLink);
-            // STOP_RUNNING(0);
             open(authLink).catch((err) => {    
                 log.error('Error in authServer.ts getAuthCode() when opening authURL:', err);
                 reject(err);
@@ -148,15 +146,8 @@ export async function initiateAuthFlow(
         if (!initiateToRefresh) {
             // Step 1: Get the authorization code
             const authCode = await getAuthCode();
-            // writeObjectToJson(
-            //     {lastUpdated: getCurrentPacificTime(), authCode: authCode}, 
-            //     'STEP1_code.json', 
-            //     TOKEN_DIR
-            // );
-            // print({label:'Step 1 Complete! Authorization authCode received. Closing server...'});
             CLOSE_SERVER();
             
-            // Step 2: Exchange code for tokens
             const tokenResponse: TokenResponse = await exchangeAuthCodeForTokens(authCode);
             tokenResponse.lastUpdated = getCurrentPacificTime();
             writeObjectToJson(
@@ -164,7 +155,6 @@ export async function initiateAuthFlow(
                 undefined,
                 STEP2_TOKENS_PATH
             );
-            // print({label: `Step 2 Complete!`});
             return tokenResponse;        
         } else { // Step 3: Refresh the token
             const tokenResponse = readJsonFileAsObject(pathToOriginalTokens) as TokenResponse;
@@ -185,10 +175,8 @@ export async function initiateAuthFlow(
                 undefined,
                 STEP3_TOKENS_PATH
             );
-            // print({label: `Step 3 Complete!`});
             return refreshedTokens;
         }
-        // Step 4: Call RESTlet with the access token
     } catch (error) {
         console.error('Error in authServer.ts initiateAuthFlow():', error);
         return null;
@@ -280,8 +268,7 @@ export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): bool
         const lastUpdatedTime = String(tokenResponse?.lastUpdated);
         const tokenLifespan = Number(tokenResponse?.expires_in);
         const msDiff = calculateDifferenceOfDateStrings(lastUpdatedTime, currentTime, TimeUnitEnum.MILLISECONDS, true) as number;
-        const haveExpired = (msDiff != 0 && msDiff >= tokenLifespan * 1000)
-        // print({label: 'localTokensHaveExpired()', details: `(${msDiff} != 0 && ${msDiff} >= ${tokenLifespan} * 1000) = ${haveExpired}`});
+        const haveExpired = (msDiff != 0 && msDiff >= tokenLifespan * 1000);
         return haveExpired;
     } catch (error) {
         log.error('Error in localTokensHaveExpired(), return default (true):', error);

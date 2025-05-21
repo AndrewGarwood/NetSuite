@@ -126,7 +126,7 @@ export const STATE = require('crypto').randomBytes(32).toString('hex'); // 64 ch
  * see {@link SuiteScriptEnvironment}
  * @description instantiate known script deployments from your NetSuite production and sandbox accounts.
  * */
-export const SCRIPT_ENVIORNMENT: SuiteScriptEnvironment = {
+export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
     production: {},
     sandbox: {
         restlet: {

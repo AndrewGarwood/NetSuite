@@ -7,7 +7,7 @@
 
 export { VendorCategoryEnum } from './Record/Relationships/Vendor'
 export { ContactRoleEnum } from './Record/Relationships/Contact'
-export { CustomerStatusEnum } from './Record/Relationships/Customer'
+export { CustomerStatusEnum, CustomerTaxItemEnum, CustomerCategoryEnum } from './Record/Relationships/Customer'
 
 /**
  * @enum {string} `UnitsTypeEnum`

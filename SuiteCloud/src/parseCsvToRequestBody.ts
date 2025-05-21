@@ -1,12 +1,11 @@
 import { 
-    CreateRecordOptions, 
+    PostRecordOptions, 
     FieldDictionary,
     FieldValue,
     SetFieldValueOptions,
     SetSublistValueOptions,
     SublistDictionary, 
     SublistFieldDictionary,  
-    BatchCreateRecordRequest,  
     SetSubrecordOptions,
 
     ParseOptions,
@@ -33,23 +32,25 @@ import { ValueMapping, ValueMappingEntry, isValueMappingEntry } from "./utils/io
 const NOT_DYNAMIC = false;
 let rowIndex = 0;
 let pruneCount: Record<string, number> = {};
+
+
 /**
- * 
+ * @TODO either edit this method or write alternative that returns dictionary object mapping recordType to PostRecordOptions[]
  * @param csvPath - The path to the CSV file.
  * @param parseOptionsArray - `Array<`{@link ParseOptions}`>` 
  * - = `{ recordType: `{@link RecordTypeEnum}, `fieldDictParseOptions: `{@link FieldDictionaryParseOptions}, `sublistDictParseOptions: `{@link SublistDictionaryParseOptions}` }[]`
- * @returns `results` - `Promise<Array<`{@link CreateRecordOptions}`>>` 
+ * @returns **`results`** - `Promise<Array<`{@link PostRecordOptions}`>>` 
  * - = `{ recordType: `{@link RecordTypeEnum}, `isDynamic: boolean`, `fieldDict: `{@link FieldDictionary}, `sublistDict: `{@link SublistDictionary}` }[]`
  */
-export async function parseCsvToCreateOptions(
+export async function parseCsvToPostOptions(
     csvPath: string,
     parseOptionsArray: ParseOptions[],
-): Promise<CreateRecordOptions[]> {
+): Promise<PostRecordOptions[]> {
     if (!fs.existsSync(csvPath)) {
         throw new Error(`parseCsvToCreateOptions() Unable to Start: File not found: ${csvPath}`);
     }
     return new Promise((resolve, reject) => {
-        const results: CreateRecordOptions[] = [];
+        const results: PostRecordOptions[] = [];
         if (!parseOptionsArray?.length) {
             throw new Error('parseOptionsArray must contain at least one ParseOptions configuration');
         }
@@ -64,7 +65,7 @@ export async function parseCsvToCreateOptions(
                         
                         // Validate required fields exist in CSV row
                         validateFieldMappings(row, fieldDictParseOptions, sublistDictParseOptions);
-                        let createOptions: CreateRecordOptions | null = generateCreateRecordOptions(
+                        let postOptions: PostRecordOptions | null = generatePostRecordOptions(
                             row,
                             recordType,
                             fieldDictParseOptions,
@@ -72,14 +73,14 @@ export async function parseCsvToCreateOptions(
                             valueOverrides
                         );
                         if (pruneFunc) {
-                            createOptions = pruneFunc(createOptions, `{ parseOptionsArray[${index}], rowIndex ${rowIndex}, recordType ${recordType} }`);
+                            postOptions = pruneFunc(postOptions, `{ parseOptionsArray[${index}], rowIndex ${rowIndex}, recordType ${recordType} }`);
                         }
-                        if (!createOptions) {
+                        if (!postOptions) {
                             // log.debug(`{ parseOptionsArray[${index}], rowIndex ${rowIndex}, recordType ${recordType} } was pruned by pruneOptions() and will not be included in the batch request`);
                             pruneCount[recordType] = (pruneCount[recordType] || 0) + 1;
                             continue;
                         }
-                        results.push(createOptions);
+                        results.push(postOptions);
                     }
                 } catch (error) {
                     log.error(`Error processing row ${rowIndex}:`, error);
@@ -88,7 +89,7 @@ export async function parseCsvToCreateOptions(
                 rowIndex++;
             })
             .on('end', () => {
-                log.debug(`rowIndex: ${rowIndex} - Finished processing CSV file`, 
+                log.debug(`rowIndex: ${rowIndex} - Finished processing CSV file for recordType(s): [${parseOptionsArray.map(o => o.recordType).join(', ')}]`, 
                     `\n\tresults.length=${results.length}`,
                     `\n\tpruneCount=`, JSON.stringify(pruneCount), 
                     // `\n\tparseOptionsArray.length=${parseOptionsArray.length}`, 
@@ -130,28 +131,28 @@ function validateFieldMappings(
 }
 
 /**
- * @description returns a {@link CreateRecordOptions} object for the given row and record type. to use in a request body to make a record in NetSuite in standard mode (`isDynamic = false`).
+ * @description returns a {@link PostRecordOptions} object for the given row and record type. to use in a request body to make a record in NetSuite in standard mode (`isDynamic = false`).
  * @param row `Record<string, any>`
  * @param recordType - {@link RecordTypeEnum}
  * @param fieldDictParseOptions - {@link FieldDictionaryParseOptions} = `{ fieldValueMapArray: Array<`{@link FieldValueMapping}`>, subrecordMapArray: Array<`{@link FieldSubrecordMapping}`> }`
  * @param sublistDictParseOptions - {@link SublistDictionaryParseOptions} = `{ [sublistId: string]: { fieldValueMapArray: Array<`{@link SublistFieldValueMapping}`>, subrecordMapArray: Array<`{@link SublistSubrecordMapping}`> } }`
  * @param valueOverrides - {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
- * @returns `createOptions` - {@link CreateRecordOptions} = `{ recordType: string, isDynamic: boolean=false, fieldDict: `{@link FieldDictionary},` sublistDict: `{@link SublistDictionary}` }`
+ * @returns `postOptions` - {@link PostRecordOptions} = `{ recordType: string, isDynamic: boolean=false, fieldDict: `{@link FieldDictionary},` sublistDict: `{@link SublistDictionary}` }`
  */
-export function generateCreateRecordOptions(
+export function generatePostRecordOptions(
     row: Record<string, any>, 
     recordType: RecordTypeEnum, 
     fieldDictParseOptions: FieldDictionaryParseOptions, 
     sublistDictParseOptions: SublistDictionaryParseOptions,
     valueOverrides?: ValueMapping
-): CreateRecordOptions {
-    let createOptions = { 
+): PostRecordOptions {
+    let postOptions = { 
         recordType: recordType,
         isDynamic: NOT_DYNAMIC,
         fieldDict: generateFieldDictionary(row, fieldDictParseOptions, valueOverrides) as FieldDictionary,
         sublistDict: generateSublistDictionary(row, sublistDictParseOptions, valueOverrides) as SublistDictionary,
     }
-    return createOptions as CreateRecordOptions;
+    return postOptions as PostRecordOptions;
 }
 
 
@@ -254,7 +255,7 @@ export function generateSetSubrecordOptionsArray(
 /**
  * 
  * @param row `Record<string, any>`
- * @param sublistFieldValueMapArray `Array<`{@link SublistFieldValueMapping}`>` = `{ sublistId`: string, `line`: number, `fieldId`: string, `colName`?: string`, `rowEvaluator`?: `(row: Record<string, any>) => `{@link FieldValue}` }[]`
+ * @param sublistFieldValueMapArray `Array<`{@link SublistFieldValueMapping}`>` = `{ sublistId`: string, `line`: number, `fieldId`: string, `colName`?: string`, `evaluator`?: `(row: Record<string, any>) => `{@link FieldValue}` }[]`
  * @param valueOverrides {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
  * @returns `arr` — `Array<`{@link SetSublistValueOptions}`>` = `{ sublistId`: string, `line`: number, `fieldId`: string, `value`: string | number | boolean | Date` }[]`
  */
@@ -266,13 +267,13 @@ export function generateSetSublistValueOptionsArray(
     let arr = [] as SetSublistValueOptions[];
     for (let [index, sublistFieldValueMap] of Object.entries(sublistFieldValueMapArray)) {
         try {
-            let { sublistId, line, fieldId, defaultValue, colName, rowEvaluator, rowEvaluatorArgs } = sublistFieldValueMap;
-            if (!fieldId || (isNullLike(defaultValue) && !colName && !rowEvaluator)) {
-                throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or rowEvaluator or defaultValue`);
+            let { sublistId, line, fieldId, defaultValue, colName, evaluator, args } = sublistFieldValueMap;
+            if (!fieldId || (isNullLike(defaultValue) && !colName && !evaluator)) {
+                throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or evaluator or defaultValue`);
             }     
             let rowValue: FieldValue = null;    
-            if (rowEvaluator) {
-                rowValue = rowEvaluator(row, ...(rowEvaluatorArgs || []));
+            if (evaluator) {
+                rowValue = evaluator(row, ...(args || []));
             } else if (colName) {
                 rowValue = transformValue(String(row[colName]), colName, fieldId, valueOverrides);
             } 
@@ -283,7 +284,7 @@ export function generateSetSublistValueOptionsArray(
 
             if (isNullLike(rowValue)) {
                 // print({
-                //     label: `generateSetSublistValueOptionsArray(), row=${rowIndex} rowValue after transformValue or rowEvaluator is null or undefined`, 
+                //     label: `generateSetSublistValueOptionsArray(), row=${rowIndex} rowValue after transformValue or evaluator is null or undefined`, 
                 //     details: [
                 //     `sublistFieldValueMap[${index}]: { sublistId: ${sublistId}, fieldId: ${fieldId}, defaultValue: ${defaultValue}, colName: ${colName} }`,
                 //     `rowValue="${rowValue}" -> continue to next sublistFieldValueMap`
@@ -308,7 +309,7 @@ export function generateSetSublistValueOptionsArray(
 /**
  * 
  * @param row `Record<string, any>`
- * @param fieldValueMapArray `Array<`{@link FieldValueMapping}`>` = `{ fieldId`: string, `colName`?: string, `rowEvaluator`?: `(row: Record<string, any>) => `{@link FieldValue}` }[]` 
+ * @param fieldValueMapArray `Array<`{@link FieldValueMapping}`>` = `{ fieldId`: string, `colName`?: string, `evaluator`?: `(row: Record<string, any>) => `{@link FieldValue}` }[]` 
  * @param valueOverrides {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
  * @returns `arr` — `Array<`{@link SetFieldValueOptions}`>` = `{ fieldId`: string, `value`: string | number | boolean | Date` }[]`
  */
@@ -320,13 +321,13 @@ export function generateSetFieldValueOptionsArray(
     let arr = [] as SetFieldValueOptions[];
     for (let [index, fieldValueMap] of Object.entries(fieldValueMapArray)) {
         try {
-            let { fieldId, defaultValue, colName, rowEvaluator, rowEvaluatorArgs } = fieldValueMap;
-            if (!fieldId || (isNullLike(defaultValue) && !colName && !rowEvaluator)) {
-                throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or rowEvaluator or defaultValue`);
+            let { fieldId, defaultValue, colName, evaluator: evaluator, args: args } = fieldValueMap;
+            if (!fieldId || (isNullLike(defaultValue) && !colName && !evaluator)) {
+                throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or evaluator or defaultValue`);
             }     
             let rowValue: FieldValue = null;
-            if (rowEvaluator) {
-                rowValue = rowEvaluator(row, ...(rowEvaluatorArgs || []));
+            if (evaluator) {
+                rowValue = evaluator(row, ...(args || []));
             } else if (colName) {
                 rowValue = transformValue(String(row[colName]), colName, fieldId, valueOverrides);
             }
@@ -349,6 +350,10 @@ export function generateSetFieldValueOptionsArray(
         } catch (error) {
             log.error(`rowIndex ${rowIndex}: generateSetFieldValueOptionsArray() Error processing fieldValueMapArray[${index}]:`, 
                 `${fieldValueMap}`, error);
+            // print({
+            //     label: `rowIndex: ${rowIndex} - generateSetFieldValueOptionsArray() Error processing fieldValueMap[${index}].`, 
+            //     details: [JSON.stringify(error, null, 4)], printToConsole: false, printToFile: true, enableOverwrite: false
+            // });
         }
     }
     return arr;

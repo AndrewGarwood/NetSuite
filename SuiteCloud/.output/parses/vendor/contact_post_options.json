@@ -1,0 +1,102 @@
+{
+    "contacts": [
+        {
+            "recordType": "contact",
+            "isDynamic": false,
+            "fieldDict": {
+                "valueFields": [
+                    {
+                        "fieldId": "entityid",
+                        "value": "COMPANY_NAME"
+                    },
+                    {
+                        "fieldId": "externalid",
+                        "value": "COMPANY_NAME"
+                    },
+                    {
+                        "fieldId": "isinactive",
+                        "value": false
+                    },
+                    {
+                        "fieldId": "email",
+                        "value": "email@address.com"
+                    },
+                    {
+                        "fieldId": "phone",
+                        "value": "999-999-9999"
+                    },
+                    {
+                        "fieldId": "firstname",
+                        "value": "FIRST_NAME"
+                    },
+                    {
+                        "fieldId": "lastname",
+                        "value": "LAST_NAME"
+                    },
+                    {
+                        "fieldId": "company",
+                        "value": "COMPANY_NAME"
+                    },
+                    {
+                        "fieldId": "contactrole",
+                        "value": "Primary Contact"
+                    }
+                ],
+                "subrecordFields": []
+            },
+            "sublistDict": {
+                "addressbook": {
+                    "valueFields": [
+                        {
+                            "sublistId": "addressbook",
+                            "line": 0,
+                            "fieldId": "label",
+                            "value": "Billing Address - Primary"
+                        }
+                    ],
+                    "subrecordFields": [
+                        {
+                            "parentSublistId": "addressbook",
+                            "line": 0,
+                            "fieldId": "addressbookaddress",
+                            "subrecordType": "address",
+                            "fieldDict": {
+                                "valueFields": [
+                                    {
+                                        "fieldId": "country",
+                                        "value": "US"
+                                    },
+                                    {
+                                        "fieldId": "addressee",
+                                        "value": "COMPANY_NAME"
+                                    },
+                                    {
+                                        "fieldId": "addr1",
+                                        "value": "STREET_ADDRESS_LINE_1"
+                                    },
+                                    {
+                                        "fieldId": "city",
+                                        "value": "CITY"
+                                    },
+                                    {
+                                        "fieldId": "state",
+                                        "value": "CA"
+                                    },
+                                    {
+                                        "fieldId": "zip",
+                                        "value": "99999"
+                                    },
+                                    {
+                                        "fieldId": "addrphone",
+                                        "value": "999-999-9999"
+                                    }
+                                ],
+                                "subrecordFields": []
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
