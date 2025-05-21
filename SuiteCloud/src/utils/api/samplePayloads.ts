@@ -6,7 +6,7 @@ import {
     SublistDictionary, CreateRecordOptions, FieldDictionary, 
     SetSublistTextOptions, SetSubrecordOptions, SublistFieldDictionary, 
     SetSublistValueOptions, 
-    SetFieldValueOptions, UpsertRecordOptions
+    SetFieldValueOptions, PostRecordOptions
 } from "src/utils/api/types"
 import { RADIO_FIELD_FALSE } from "../typeValidation";
 import { NetSuiteCountryEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES } from "src/utils/api/types/NS"
@@ -55,7 +55,7 @@ const SUZZALLO_ADDRESS_SUBRECORD_OPTIONS: SetSubrecordOptions = {
     } as FieldDictionary,
 }
 
-export const UW_LIBRARIES_UPSERT_VENDOR_OPTIONS: UpsertRecordOptions = {
+export const UW_LIBRARIES_UPSERT_VENDOR_OPTIONS: PostRecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
     fieldDict: {
         valueFields: [

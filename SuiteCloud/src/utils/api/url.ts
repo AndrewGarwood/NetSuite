@@ -10,8 +10,9 @@ import { exchangeAuthCodeForTokens, exchangeRefreshTokenForNewTokens } from "src
 export type SearchParamValue = string | number | boolean;
 /**
  * Creates a URL object with search parameters from a dictionary.
+ * @note do not encode values in the dictionary, as they will be encoded by the URL automatically when appended to searchParams.
  * @param {string} baseUrl - The base URL as a string.
- * @param {Object.<string, SearchParamValue | Array<SearchParamValue>>} searchParamsDict - An object containing key-value pairs for search parameters ({@link SearchParamValue}).
+ * @param {Record<string, SearchParamValue | Array<SearchParamValue>>} searchParamsDict - An object containing key-value pairs for search parameters ({@link SearchParamValue} = `string | number | boolean`).
  * @returns {URL} A new {@link URL} object with the search parameters added.
  * @example createUrlWithParams(baseUrl: "https://example.com/api", searchParamsDict: { record: "true", hydrate: "FAVORITE" }) => url 
  * url.toString() = "https://example.com/api?record=true&hydrate=FAVORITE"

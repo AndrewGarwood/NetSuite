@@ -10,6 +10,8 @@ import { FileExtensionResult, ParseOneToManyOptions } from './types/Reading';
 import { FieldValue } from 'src/utils/api/types/Api';
 import {ValueMapping, ColumnMapping, isValueMappingEntry, DelimitedFileTypeEnum, MappedRow, DelimiterCharacterEnum } from './types/Csv';
 import { stripCharFromString, cleanString, UNCONDITIONAL_STRIP_DOT_OPTIONS } from './regex';
+import { BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES } from '../typeValidation';
+import { mainLogger as log } from 'src/config/setupLog';
 
 
 
@@ -37,7 +39,11 @@ export function parseExcelForOneToMany(
         'xlsx'
     ).validatedFilePath;
     try {
-        const { keyStripOptions, valueStripOptions, keyCaseOptions, valueCaseOptions, keyPadOptions, valuePadOptions } = options;
+        const { 
+            keyStripOptions, valueStripOptions, 
+            keyCaseOptions, valueCaseOptions, 
+            keyPadOptions, valuePadOptions 
+        } = options;
         const workbook = xlsx.readFile(filePath);
         const sheet = workbook.Sheets[sheetName];
         const jsonData: any[] = xlsx.utils.sheet_to_json(sheet);
@@ -64,7 +70,7 @@ export function parseExcelForOneToMany(
         });
         return dict;
     } catch (err) {
-        console.error('Error reading or parsing the Excel file:', err, 
+        log.error('Error reading or parsing the Excel file:', err, 
             '\n\t Given File Path:', '"' + filePath + '"');
         return {} as Record<string, Array<string>>;
     }
@@ -94,7 +100,11 @@ export function parseCsvForOneToMany(
         DelimitedFileTypeEnum.CSV
     ).validatedFilePath;
     try {
-        const { keyStripOptions, valueStripOptions, keyCaseOptions, valueCaseOptions, keyPadOptions, valuePadOptions } = options;
+        const { 
+            keyStripOptions, valueStripOptions, 
+            keyCaseOptions, valueCaseOptions, 
+            keyPadOptions, valuePadOptions 
+        } = options;
         const data = fs.readFileSync(filePath, 'utf8');
         const lines = data.split('\n');
         const dict: Record<string, Array<string>> = {};
@@ -129,7 +139,7 @@ export function parseCsvForOneToMany(
         }
         return dict;
     } catch (err) {
-        console.error('Error reading or parsing the CSV file:', err, 
+        log.error('Error reading or parsing the CSV file:', err, 
             '\n\t Given File Path:', '"' + filePath + '"');
         return {} as Record<string, Array<string>>;
     }
@@ -187,7 +197,7 @@ export async function parseDelimitedFileWithMapping<T extends ColumnMapping>(
                         
                         for (const newKey of destinations) {
                             if (newKey in acc) {
-                                console.log(`parseDelimitedFileWithMapping(), mappedRow = Object.entries(columnMapping).reduce(...) Overwriting existing field: ${newKey}`);
+                                log.debug(`parseDelimitedFileWithMapping(), mappedRow = Object.entries(columnMapping).reduce(...) Overwriting existing field: ${newKey}`);
                             }
                             acc[newKey] = transformedValue;
                         }             
@@ -231,40 +241,56 @@ export function transformValue(
     originalKey: string, 
     valueMapping?: ValueMapping
 ): FieldValue {
-    const trimmedValue = originalValue.trim();
+    let trimmedValue = originalValue.trim();
     if (valueMapping && trimmedValue in valueMapping) {
-        const mapping = valueMapping[trimmedValue];
-        if (isValueMappingEntry(mapping)) {
-            const validColumns = Array.isArray(mapping.validColumns) 
-                ? mapping.validColumns 
-                : [mapping.validColumns];
-                
-            if (validColumns.includes(originalKey)) {
-                return mapping.newValue;
-            }
-        } else {
-            // Handle simple value mapping (applies to all columns)
-            return mapping;
-        }
+        return checkForOverride(trimmedValue, originalKey, valueMapping);
     }
-    const BOOLEAN_TRUE_VALUES = ['true', 'yes', 'y'];
-    const BOOLEAN_FALSE_VALUES = ['false', 'no', 'n'];
+
     // Fallback to automatic type conversion
     try {
         if (BOOLEAN_TRUE_VALUES.includes(trimmedValue.toLowerCase())) return true;
         if (BOOLEAN_FALSE_VALUES.includes(trimmedValue.toLowerCase())) return false;
         
-        const parsedDate = new Date(trimmedValue);
-        if (!isNaN(parsedDate.getTime())) return parsedDate;
+        // const parsedDate = new Date(trimmedVal`ue);
+        // if (!isNaN(parsedDate.getTime())) return parsedDate;
         
         return trimmedValue;
     } catch (error) {
-        console.warn(`Could not parse value: ${trimmedValue}`);
+        log.warn(`Could not parse value: ${trimmedValue}`);
         return trimmedValue;
     }
 }
-
-
+/**
+ * 
+ * @param originalValue - the initial value to check if it should be overwritten
+ * @param valueOverrides see {@link ValueMapping}
+ * @returns **`mappedValue?.newValue`**: {@link FieldValue} if `originalValue` satisfies `valueOverrides`, otherwise returns `initialValue`
+ */
+export function checkForOverride(
+    originalValue: string, 
+    originalKey: string, 
+    valueOverrides: ValueMapping
+): FieldValue {
+    if (!originalValue || !valueOverrides 
+        || typeof valueOverrides !== 'object' || Object.keys(valueOverrides).length === 0
+    ) {
+        return originalValue;
+    }   
+    if (Object.keys(valueOverrides).includes(originalValue)) {
+        let mappedValue = valueOverrides[originalValue as keyof typeof valueOverrides];
+        if (isValueMappingEntry(mappedValue) && mappedValue.validColumns) {
+            const validColumns = Array.isArray(mappedValue.validColumns) 
+                ? mappedValue.validColumns 
+                : [mappedValue.validColumns];
+            if (validColumns.includes(originalKey)) {
+                return mappedValue.newValue as FieldValue;
+            }
+        } else {
+            return mappedValue as FieldValue;
+        }
+    }
+    return originalValue;
+}
 
 /**
  * Determines the proper delimiter based on file type or extension
@@ -272,7 +298,10 @@ export function transformValue(
  * @param fileType Explicit file type or `'auto'` for detection
  * @returns `extension` `{`{@link DelimiterCharacterEnum}` | string}` The delimiter character
  */
-export function getDelimiterFromFilePath(filePath: string, fileType?: DelimitedFileTypeEnum): DelimiterCharacterEnum | string {
+export function getDelimiterFromFilePath(
+    filePath: string, 
+    fileType?: DelimitedFileTypeEnum
+): DelimiterCharacterEnum | string {
     if (fileType && fileType === DelimitedFileTypeEnum.CSV) return DelimiterCharacterEnum.COMMA;
     if (fileType && fileType === DelimitedFileTypeEnum.TSV) return DelimiterCharacterEnum.TAB;
     
@@ -304,7 +333,7 @@ export function readFileLinesIntoArray(filePath: string): Array<string> {
             }
         }
     } catch (err) {
-        console.error('Error reading the file:', err);
+        log.error('Error reading the file:', err);
     }
     return result;
 }
@@ -321,7 +350,7 @@ export function readJsonFileAsObject(filePath: string): Record<string, any> | nu
         const jsonData = JSON.parse(data);
         return jsonData;
     } catch (err) {
-        console.error('Error reading or parsing the JSON file:', err, 
+        log.error('Error reading or parsing the JSON file:', err, 
             '\n\t Given File Path:', '"' + filePath + '"');
         return null;
     }
