@@ -5,24 +5,50 @@
 import * as HITCRecord from '@hitc/netsuite-types/N/record';
 
 /**
- * @typedefn RecordRef
+ * @description Represents a valid key that can be used to refer to a record in NetSuite.
  * @property {string} [externalId] - The external ID of the record.
  * @property {string} [internalId] - The internal ID of the record.
- * @property {RecordTypeEnum} [type] - The type of the record.
- * @description Represents a reference to a record in NetSuite.
+ * @property {string} [name] - The name of the record.
  */
-export type RecordRef = string | number | { internalId: number } | { externalId: string };
+export type RecordRef = 
+    string | number |  
+    [internalId: number]  |  [externalId: string]  |  [name: string];
 
+
+/**
+* @description Represents a valid key that can be used to refer to a record in NetSuite.
+* @property {string} [externalId] - The external ID of the record.
+* @property {string} [internalId] - The internal ID of the record.
+* @property {RecordTypeEnum} [type] - The type of the record.
+*/
 export interface NetSuiteRecord {
     internalid?: string;
     isinactive?: boolean;
+    type?: RecordTypeEnum;
 }
 
 /**
- * @enum {string} RecordTypeEnum
+ * Relationship records in NetSuite
+ * @enum {string} **`EntityRecordTypeEnum`**
+ * @property {string} CONTACT - `'contact'`
+ * @property {string} CUSTOMER - `'customer'`
+ * @property {string} VENDOR - `'vendor'`
+ * @property {string} LEAD - `'lead'`
+ * @property {string} PROSPECT - `'prospect'`
+ */
+export enum EntityRecordTypeEnum {
+    CONTACT = 'contact',
+    CUSTOMER = 'customer',
+    VENDOR = 'vendor',
+    LEAD = 'lead',
+    PROSPECT = 'prospect',
+}
+
+
+/**
+ * @enum {string} **`NetSuiteRecordTypeEnum`**
  * @readonly
- * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
- * @reference {@link HITCRecord}
+ * @reference {@link HITCRecord} ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  * @property {string} ACCOUNT - account
  * @property {string} ACCOUNTING_BOOK - accountingbook
  * @property {string} ACCOUNTING_CONTEXT - accountingcontext
@@ -307,7 +333,7 @@ export interface NetSuiteRecord {
  * @property {string} WORKPLACE - workplace
  * @property {string} ZONE - zone
  */
-export enum RecordTypeEnum { // As of 4 June 2024
+export enum NetSuiteRecordTypeEnum { // As of 4 June 2024
     ACCOUNT = 'account',
     ACCOUNTING_BOOK = 'accountingbook',
     ACCOUNTING_CONTEXT = 'accountingcontext',
@@ -592,3 +618,14 @@ export enum RecordTypeEnum { // As of 4 June 2024
     WORKPLACE = 'workplace',
     ZONE = 'zone'
 }
+
+/**
+ * Merged Enum Object for runtime usage.
+ * @see {@link EntityRecordTypeEnum}
+ * @see {@link NetSuiteRecordTypeEnum}
+ */
+export const RecordTypeEnum = {
+    ...EntityRecordTypeEnum,
+    ...NetSuiteRecordTypeEnum,
+} as const;
+export type RecordTypeEnum = typeof RecordTypeEnum[keyof typeof RecordTypeEnum];

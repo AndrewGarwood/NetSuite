@@ -30,8 +30,8 @@ export function createUrlWithParams(
 
     const url = new URL(baseUrl);
     for (const [key, value] of Object.entries(searchParamsDict)) {
-        if (typeof value === "string") {
-            url.searchParams.append(key, value);
+        if (typeof value === "string" || typeof value === "number") {
+            url.searchParams.append(key, String(value));
         } else if (Array.isArray(value)) {
             value.forEach(val => url.searchParams.append(key, String(val)));
         } else {

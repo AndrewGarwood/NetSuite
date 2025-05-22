@@ -170,7 +170,7 @@ export interface SetSublistTextOptions {
 
 /**
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
- * @interface SetSublistValueOptions
+ * @interface **`SetSublistValueOptions`**
  * @property {string} sublistId - The internal ID of the sublist.
  * @property {string} fieldId - The internal ID of a standard or custom sublist field.
  * @property {number} [line] - The line number for the field.
@@ -187,7 +187,7 @@ export interface SetSublistValueOptions {
 }
 
 /**
- * @interface SetSubrecordOptions
+ * @interface **`SetSubrecordOptions`**
  * @property {string} [parentSublistId] - (If setting subrecord of a sublist) The internal ID of the parent record's sublist that contains a subrecord field. (e.g. 'addressbook')
  * @property {number} [line] - `The line number` for the field. (i.e. index of the sublist row) defaults to new line. (can use record.getLineCount(sublistId) to get the number of lines in the sublist)
  * @property {string} fieldId - The internal ID of the field or sublistField that is a subrecord. (e.g. 'addressbookaddress'), 
@@ -309,4 +309,3 @@ export enum FieldInputTypeEnum {
     /** `Inline HTML` fields accept `strings`. Strings containing HTML tags are represented as HTML entities in UI. {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html#:~:text=The%20following%20code%20sample%20shows%20the%20syntax%20for%20INLINEHTML%20fields%20and%20what%20is%20returned.} */
     INLINE_HTML = 'inlinehtml',
 }
-

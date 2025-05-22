@@ -2,7 +2,7 @@
  * @file src/utils/parses/generalEvaluatorFunctions.ts
  */
 
-import { mainLogger as log } from 'src/config/setupLog';
+import { mainLogger as log, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
 import { HUMAN_VENDORS_TRIMMED } from './vendor/vendorParseEvaluatorFunctions';
 import { 
     FieldValue, 
@@ -21,6 +21,9 @@ import {
 export const ENTITY_VALUE_OVERRIDES: ValueMapping = {
 } 
 
+/** 
+ * @returns `entity` = {@link checkForOverride}`(`{@link cleanString}`(row[entityIdColumn],...),...)`
+ * */
 export const entityId = (row: Record<string, any>, entityIdColumn: string): string => {
     let entity = cleanString(row[entityIdColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION) || '';
     return checkForOverride(entity, entityIdColumn, ENTITY_VALUE_OVERRIDES) as string;
@@ -33,27 +36,30 @@ export const isPerson = (
 ): boolean => {
     let entity = entityId(row, entityIdColumn);
     let company = cleanString(row[companyColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
+    const entityNameIsSameAsCompanyName = company && (company.toLowerCase().replace(/\W*/g, '') === entity.toLowerCase().replace(/\W*/g, ''));
     const logArr: any[] = [
         `isPerson("${entity}") entityIdColumn = "${entityIdColumn}", companyColumn = "${companyColumn}"`, 
-        `\n\t HUMAN_VENDORS_TRIMMED.includes("${entity}") = ${HUMAN_VENDORS_TRIMMED.includes(entity)}`,
-        `\n\t  COMPANY_KEYWORDS_PATTERN.test("${entity}") = ${COMPANY_KEYWORDS_PATTERN.test(entity)}`,
-        `\n\t          "${entity}" ends with abbreviation = ${stringEndsWithAnyOf(entity, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`,
-        `\n\t                 /[0-9@]+/.test("${entity}") = ${/[0-9@]+/.test(entity)}`,
-        `\n\t                       Boolean("${company}") = ${Boolean(company)}`,
+        TAB + `HUMAN_VENDORS_TRIMMED.includes("${entity}") = ${HUMAN_VENDORS_TRIMMED.includes(entity)}`,
+        TAB + ` COMPANY_KEYWORDS_PATTERN.test("${entity}") = ${COMPANY_KEYWORDS_PATTERN.test(entity)}`,
+        TAB + `         "${entity}" ends with abbreviation = ${stringEndsWithAnyOf(entity, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`,
+        TAB + `                /[0-9@]+/.test("${entity}") = ${/[0-9@]+/.test(entity)}`,
+        TAB + `                       Boolean("${company}") = ${Boolean(company)}`,
+        TAB + `             entityNameIsSameAsCompanyName = ${entityNameIsSameAsCompanyName}`,
     ];
     if (HUMAN_VENDORS_TRIMMED.includes(entity)) {
-        // log.debug(...[...logArr, `\n\t -> return true`]);
+        log.debug(...[...logArr, TAB + `-> return true`]);
         return true;
     }
     if (COMPANY_KEYWORDS_PATTERN.test(entity) 
         || stringEndsWithAnyOf(entity, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE)
-        || /[0-9@]+/.test(entity)
-        || company// && (company !== entity || COMPANY_KEYWORDS_PATTERN.test(company))
+        || /[0-9@]+/.test(entity) || entity.split(' ').length === 1
+        || (company// && (company !== entity || COMPANY_KEYWORDS_PATTERN.test(company))
+            && company.toLowerCase().replace(/\W*/g, '') !== entity.toLowerCase().replace(/\W*/g, ''))
     ) {
-        // log.debug(...[...logArr, `\n\t -> return false`]);
+        // log.debug(...[...logArr, TAB + `-> return false`]);
         return false;
     }
-    log.debug(...[...logArr, `\n\t Reached End of isPerson() -> return true`]);
+    log.debug(...[...logArr, TAB + `Reached End of isPerson() -> return true`]);
     return true;
 }
 
@@ -135,7 +141,7 @@ export const attention = (
 /**
  * return the name `{first, middle, last}` corresponding to the first column with a non-empty first and last name
  * @param row `Record<string, any>`
- * @param nameColumns 
+ * @param nameColumns the columns of the `row` to look for a name in.
  * @returns `{first: string, middle: string, last: string}` - the first, middle, and last name of the person, if found.
  * @see {@link extractName} for the regex used to validate the name.
  */
@@ -273,5 +279,21 @@ export const terms = (
     log.warn(`Invalid terms: "${termsRowValue}"`);
     return null;
 }
+
+export const website = (
+    row: Record<string, any>, 
+    websiteColumn: string
+): FieldValue => {
+    let website = cleanString(row[websiteColumn]);
+    if (!website) {
+        return '';
+    }
+    website = website
+        .replace(/^(http(s)?:\/\/)?(www\.)?/, '')
+        .replace(/\/$/, '');
+    website = `https://${website}`;
+    return website;
+}
+
 
 

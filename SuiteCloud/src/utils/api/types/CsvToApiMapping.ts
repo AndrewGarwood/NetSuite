@@ -15,6 +15,26 @@ import {
 } from "./Api";
 import { CreateRecordOptions, PostRecordOptions } from "./PostRequests";
 
+/**
+ * @typedefn **`RecordParseOptions`**
+ * @property {RecordTypeEnum | string } recordType - {@link RecordTypeEnum} The type of the NetSuite record.
+ * @property {Array<ParseOptions>} this[recordType] - `Array<`{@link ParseOptions}`>` - The parse options for the record type.
+ */
+export type RecordParseOptions = {
+    [recordType: RecordTypeEnum | string]: ParseOptions[];
+}
+/**
+ * @typedefn **`ParseResults`**
+ * @property {RecordTypeEnum | string } recordType - {@link RecordTypeEnum} The type of the NetSuite record.
+ * @property {Array<PostRecordOptions>} this[recordType].validPostOptions - `Array<`{@link PostRecordOptions}`>` - The valid post options for the record type.
+ * @property {Array<ParseOptions>} this[recordType].invalidParseOptions - `Array<`{@link ParseOptions}`>` - array of parse options that resulted in a PostRecordOptions being pruned after running the {@link ParseOptions.pruneFunc}
+ */
+export type ParseResults = {
+    [recordType: RecordTypeEnum | string]: {
+        validPostOptions: PostRecordOptions[],
+        invalidParseOptions: ParseOptions[],
+    };
+};
 
 /**
  * @typedefn **`ParseOptions`**
@@ -32,7 +52,7 @@ export type ParseOptions = {
     /**
      * @property {function} [pruneFunc] - A `function` that takes a {@link PostRecordOptions} object and returns either a {@link PostRecordOptions} or `null`.
      */
-    pruneFunc?: (options: PostRecordOptions, label?: string) => PostRecordOptions | null;
+    pruneFunc?: (options: PostRecordOptions) => PostRecordOptions | null;
 }
 
 /**
