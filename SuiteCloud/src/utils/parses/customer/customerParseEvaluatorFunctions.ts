@@ -96,7 +96,7 @@ export const customerCompany = (
         return '';
     }
     let entity = entityId(row, entityIdColumn);
-    if (!isPerson(row, entityIdColumn)) {
+    if (!isPerson(row, entityIdColumn, companyNameColumn)) {
         return entity;
     }
     let companyName = checkForOverride(
@@ -104,9 +104,13 @@ export const customerCompany = (
         companyNameColumn, 
         ENTITY_VALUE_OVERRIDES
     ) as string;   
-    if (companyName && companyName !== entity) {
+    if (companyName 
+        && companyName.toLowerCase().replace(/\W*/g, '') !== entity.toLowerCase().replace(/\W*/g, '')
+        //  && COMPANY_KEYWORD_REGEX.test(companyName)
+    ) {
         return companyName;
-    } else {
-        return '';
     }
+    log.debug(`Reached End of customerCompany() -> returning entityId: "${entity}"`); 
+    return entity;
+    
 }

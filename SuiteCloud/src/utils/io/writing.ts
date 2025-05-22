@@ -16,7 +16,7 @@ import { DelimitedFileTypeEnum, DelimiterCharacterEnum } from './types/Csv';
  * @param {string} fileName `string` - optional, 'name.ext', default=`''` If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
  * @param {string} filePath `string` - the complete path or the path to the directory where the file will be saved. If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
  * @param {number} indent `number` - `optional`, default=`4`
- * @param {boolean} enableOverwrite `boolean` - `optional`, default=`true` If `enableOverwrite` is true, the file will be overwritten. If false, the data will be appended to the file.
+ * @param {boolean} enableOverwrite `boolean` - `optional`, default=`true` If `enableOverwrite` is `true`, the file will be overwritten. If `false`, the `data` will be appended to the file.
  * @description Write JSON data to a file.
  * @returns {void}
  */

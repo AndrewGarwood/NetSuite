@@ -97,6 +97,7 @@ export const pruneAddressBook = (
         let subrecordFields = addressbook?.subrecordFields as SetSubrecordOptions[];
         for (let index = 0; index < subrecordFields.length; index++) {
             let subrecOps = subrecordFields[index];
+            let line = subrecOps?.line as number;
             let subrecValueFields = subrecOps?.fieldDict?.valueFields as SetFieldValueOptions[];
             for (const requiredField of REQUIRED_ADDRESS_FIELDS) {
                 if (!subrecValueFields?.some(
@@ -106,7 +107,7 @@ export const pruneAddressBook = (
                         `subrecordFields[${index}]: SetSubrecordOptions is missing address field "${requiredField}"`, 
                         `-> removing it from subrecordFields`
                     );
-                    valueFields?.splice(index, 1);
+                    valueFields = valueFields?.filter((field) => field.line !== line);
                     subrecordFields.splice(index, 1);
                     index--; // Adjust index after removing an element
                     break;

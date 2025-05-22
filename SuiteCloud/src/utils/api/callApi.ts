@@ -2,23 +2,28 @@
  * @file src/utils/api/callApi.ts
  */
 import axios, { create } from "axios";
+import { writeObjectToJson as write } from "../io";
 import { mainLogger as log } from "src/config/setupLog";
-import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY  } from "../../config/env";
-import { AxiosCallEnum, AxiosContentTypeEnum } from "../../server/types/AxiosEnums";
+import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR  } from "../../config/env";
 import { createUrlWithParams } from "./url";
-import { getAccessToken } from "src/server/authServer";
+import { getAccessToken, AxiosCallEnum, AxiosContentTypeEnum } from "src/server";
 import { BatchPostRecordRequest, RetrieveRecordByIdRequest, ScriptDictionary } from "./types";
 
 export const SB_REST_SCRIPTS = SE.sandbox?.restlet || {} as ScriptDictionary;
 export const BATCH_SIZE = 100;
 
+const POST_SCRIPT_ID = SB_REST_SCRIPTS.POST_BatchUpsertRecord.scriptId as number;
+const POST_DEPLOY_ID = SB_REST_SCRIPTS.POST_BatchUpsertRecord.deployId as number;
 /**
  * 
  * @param {Array<any>} arr `Array<any>`
  * @param {number} batchSize `number`
  * @returns {Array<Array<any>>} `batches` — `Array<Array<any>>`
  */
-export function partitionArrayBySize(arr: Array<any>, batchSize: number): Array<Array<any>> {
+export function partitionArrayBySize(
+    arr: Array<any>, 
+    batchSize: number
+): Array<Array<any>> {
     let batches = [];
     for (let i = 0; i < arr.length; i += batchSize) {
         batches.push(arr.slice(i, i + batchSize));
@@ -28,16 +33,21 @@ export function partitionArrayBySize(arr: Array<any>, batchSize: number): Array<
 
 export type PostPayload = AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN_TEXT;
 
-
-export async function postPayload(
+/**
+ * @param payload {@link BatchPostRecordRequest}
+ * @param scriptId `number`
+ * @param deployId `number`
+ * @returns `res`
+ */
+export async function postRecordPayload(
     payload: BatchPostRecordRequest, 
-    scriptId: number, 
-    deployId: number,
+    scriptId: number=POST_SCRIPT_ID, 
+    deployId: number=POST_DEPLOY_ID,
 ): Promise<any> {
     let accessToken = await getAccessToken();
     if (!accessToken) {
-        log.error('sendPostPayload() getAccessToken() is undefined. Cannot call RESTlet.');
-        STOP_RUNNING();
+        log.error('postRecordPayload() getAccessToken() is undefined. Cannot call RESTlet.');
+        STOP_RUNNING(1);
     }
     try {
         const res = await POST(
@@ -48,7 +58,7 @@ export async function postPayload(
         );
         return res;
     } catch (error) {
-        log.error('Error in callApi.ts sendPostPayload()', error);
+        log.error('Error in callApi.ts postRecordPayload()');
         throw error;
     }
 }
@@ -72,7 +82,7 @@ export async function retrieveRecordById(
         )
         return res;
     } catch (error) {
-        log.error('Error in callApi.ts callRetrieveRecordById()', error);
+        log.error('Error in callApi.ts retrieveRecordById()', error);
         throw error;
     }
 }
@@ -105,7 +115,10 @@ export async function POST(
         log.error('callApi.ts POST() payload is undefined. Cannot call RESTlet.');
         throw new Error('payload is undefined. Cannot call RESTlet.');
     }
-    const restletUrl = `${RESTLET_URL_STEM}?script=${scriptId}&deploy=${deployId}`;
+    const restletUrl = createUrlWithParams(RESTLET_URL_STEM, {
+        script: scriptId,
+        deploy: deployId,
+    }).toString(); //`${RESTLET_URL_STEM}?script=${scriptId}&deploy=${deployId}`;
     try {
         const response = await axios.post(restletUrl, payload, {
             headers: { 
@@ -115,7 +128,8 @@ export async function POST(
         });
         return response;
     } catch (error) {
-        log.error('Error in callApi.ts POST():', error);
+        log.error('Error in callApi.ts POST():');//, error);
+        write({error: error}, 'ERROR_POST.json', OUTPUT_DIR);
         throw new Error('Failed to call RESTlet with payload');
     }
 }
@@ -165,9 +179,9 @@ export async function GET(
 
 /**
  * 
- * @param {string} accessToken 
- * @param {string | number} scriptId 
- * @param {string | number} deployId 
+ * @param {string} accessToken `string`
+ * @param {string | number} scriptId `number`
+ * @param {string | number} deployId `number`
  * @param {AxiosCallEnum} callType {@link AxiosCallEnum}
  * @param {AxiosContentTypeEnum} contentType {@link AxiosContentTypeEnum}
  * @returns {Promise<any>}

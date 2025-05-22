@@ -41,13 +41,13 @@ export interface CustomerBase {
 export interface CustomerSublists {
     /**
      * @label "Address Book"
-     * @description Address book sublist for the contact.
+     * @description Address book sublist for the customer.
      * */
     addressbook?: AddressBook;
     /**
      * @notimplemented
      * @label "Contacts"
-     * @description Address book sublist for the contact.
+     * @description contact sublist for the customer.
      * */
     contactroles?: never[];
 }
@@ -91,9 +91,9 @@ export enum CustomerStatusEnum {
 /**
  * @enum {number} **`CustomerTaxItemEnum`**
  * @property {number} NOT_TAXABLE - `-7`
- * @property {number} YOUR_TAX_ITEM - `105`
+ * @property {number} YOUR_TAX_ITEM - `100`
  */
 export enum CustomerTaxItemEnum {
     NOT_TAXABLE = -7,
-    YOUR_TAX_ITEM = 105,
+    YOUR_TAX_ITEM = 100,
 }

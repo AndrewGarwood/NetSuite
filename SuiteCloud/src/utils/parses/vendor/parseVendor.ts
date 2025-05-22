@@ -6,21 +6,23 @@ import {
     readJsonFileAsObject as read, 
     writeObjectToJson as write, 
 } from "../../io";
-import { 
+import {
+    ParseResults, 
     PostRecordOptions, 
     BatchPostRecordRequest, 
     BatchPostRecordResponse, 
     PostRecordResult, 
     SetFieldValueOptions,
     FieldDictionary,
+    RecordTypeEnum,
 } from "src/utils/api/types";
 import { 
     PARSE_VENDOR_FROM_VENDOR_CSV_OPTIONS as VENDOR_OPTIONS, 
     PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS as CONTACT_OPTIONS
 } from "./vendorParseDefinition";
 import { DELAY, SCRIPT_ENVIRONMENT as SE, STOP_RUNNING, DATA_DIR, OUTPUT_DIR } from "src/config/env";
-import { parseCsvToPostOptions } from "src/parseCsvToRequestBody";
-import { partitionArrayBySize, SB_REST_SCRIPTS, BATCH_SIZE, postPayload } from "src/utils/api/callApi";
+import { parseCsvToPostRecordOptions } from "src/parseCsvToRequestBody";
+import { partitionArrayBySize, SB_REST_SCRIPTS, BATCH_SIZE, postRecordPayload } from "src/utils/api/callApi";
 
 
 const VENDOR_DIR = `${DATA_DIR}/vendors` as string;
@@ -29,7 +31,8 @@ const SINGLE_HUMAN_FILE = `${VENDOR_DIR}/single_human_vendor.tsv` as string;
 const SUBSET_FILE = `${VENDOR_DIR}/vendor_subset.tsv` as string;
 const SMALL_SUBSET_FILE = `${VENDOR_DIR}/smaller_vendor_subset.tsv` as string;
 const COMPLETE_FILE = `${VENDOR_DIR}/vendor.tsv` as string;
-
+const POST_SCRIPT_ID = Number(SB_REST_SCRIPTS.POST_BatchUpsertRecord.scriptId);
+const POST_DEPLOY_ID = Number(SB_REST_SCRIPTS.POST_BatchUpsertRecord.deployId);
 
 /** 
  * contact creation has field dependencies on vendor creation, 
@@ -40,17 +43,16 @@ export async function parseVendorFile(
     filePath: string
 ): Promise<void> {
     try {
-        const vendors = await parseCsvToPostOptions(filePath, [VENDOR_OPTIONS]) as PostRecordOptions[];
-        const contacts = await parseCsvToPostOptions(filePath, [CONTACT_OPTIONS]) as PostRecordOptions[];
-        write({ vendors: vendors}, 'vendors_option_array.json', OUTPUT_DIR);
-        write({ contacts: contacts}, 'contacts_option_array.json', OUTPUT_DIR);
+        const parseResults = await parseCsvToPostRecordOptions(filePath, [VENDOR_OPTIONS, CONTACT_OPTIONS]) as ParseResults;
+        const vendors = parseResults[RecordTypeEnum.VENDOR]?.validPostOptions as PostRecordOptions[];
+        const contacts = parseResults[RecordTypeEnum.CONTACT]?.validPostOptions as PostRecordOptions[];
+        write({ vendors: vendors}, 'vendor_options_array.json', OUTPUT_DIR);
+        write({ contacts: contacts}, 'contact_options_array.json', OUTPUT_DIR);
 
         if (vendors.length === 0 || contacts.length === 0) {
             log.error('No vendors and no contacts were parsed from the CSV file. Exiting...');
             STOP_RUNNING(1);
         }
-        const scriptId = Number(SB_REST_SCRIPTS.POST_BatchUpsertRecord.scriptId);
-        const deployId = Number(SB_REST_SCRIPTS.POST_BatchUpsertRecord.deployId);
 
         const vendorBatches: PostRecordOptions[][] = partitionArrayBySize(vendors, BATCH_SIZE);
         const vendorResults: PostRecordResult[] = [];
@@ -59,8 +61,8 @@ export async function parseVendorFile(
                 upsertRecordArray: vendorBatches[i],
                 responseProps: ['entityid', 'isperson']
             }
-            const vendorRes = await postPayload(
-                vendorPayload, scriptId, deployId
+            const vendorRes = await postRecordPayload(
+                vendorPayload, POST_SCRIPT_ID, POST_DEPLOY_ID
             );
             const vendorResData = await vendorRes.data as BatchPostRecordResponse;        
             if(!vendorResData) {
@@ -104,8 +106,8 @@ export async function parseVendorFile(
                 upsertRecordArray: contactBatches[i],
                 responseProps: ['entityid', 'firstname', 'lastname']
             }
-            const contactRes = await postPayload(
-                contactPayload, scriptId, deployId
+            const contactRes = await postRecordPayload(
+                contactPayload, POST_SCRIPT_ID, POST_DEPLOY_ID
             );
             const contactResData = await contactRes.data as BatchPostRecordResponse;
             if(!contactResData) {

@@ -36,6 +36,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         const { upsertRecordArray, upsertRecordDict, responseProps } = reqBody;
         const upsertRecordArrayIsInvalid = !upsertRecordArray || !Array.isArray(upsertRecordArray);
         const upsertRecordDictIsInvalid = !upsertRecordDict || typeof upsertRecordDict !== 'object' || Array.isArray(upsertRecordDict);
+        writeLog(LogTypeEnum.AUDIT, `Checking reqBody input...`, `upsertRecordArrayIsInvalid`, upsertRecordArrayIsInvalid, `upsertRecordDictIsInvalid`, upsertRecordDictIsInvalid);
         if (upsertRecordArrayIsInvalid && upsertRecordDictIsInvalid) { // both invalid
             writeLog(LogTypeEnum.ERROR, 'Invalid request body', 'upsertRecordArray or upsertRecordDict is required');
             return { success: false, message: 'upsertRecordArray or upsertRecordDict is required', error: 'Invalid request body', logArray, results: [] };
@@ -137,22 +138,25 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 }
             }
         }
-        writeLog(LogTypeEnum.DEBUG, 
-            `idPropDict`, idPropDict,
-        );
+        writeLog(LogTypeEnum.AUDIT, `idPropDict`, idPropDict,);
         /**@type {object | undefined} */
         let rec = undefined;
         let isExistingRecord = false;
         const recId = searchForRecordById(recordType, idPropDict);
         if (!recId) {
-            writeLog(LogTypeEnum.DEBUG, 
+            writeLog(LogTypeEnum.AUDIT, 
                 `processUpsertRecordOptions() No record found for ${recordType}`, 
-                `with idPropDict = ${JSON.stringify(idPropDict)}`, `Creating new record...`);
+                `with idPropDict = ${JSON.stringify(idPropDict)}`, 
+                `Creating new ${recordType} record...`
+            );
             rec = record.create({type: recordType, isDynamic: NOT_DYNAMIC});
         } else {
             rec = record.load({type: recordType, id: recId, isDynamic: NOT_DYNAMIC});
             isExistingRecord = true;
-            writeLog(LogTypeEnum.DEBUG, `Loaded Existing ${recordType} record`, `Loaded Existing ${recordType} record with recId: ${recId}`);
+            writeLog(LogTypeEnum.AUDIT, 
+                `Loaded Existing ${recordType} record`, 
+                `Loaded Existing ${recordType} record with recId: ${recId}`
+            );
             // remove idPropertyEnum fields from fieldDict.valueFields because 
             // will get an error saying the record already exists with that id
             if (fieldDict && Array.isArray(fieldDict.valueFields)) {
@@ -258,14 +262,14 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                         `recSearch:`, recSearch);
                     return;
                 } else if (resultRange.length === 0) {
-                    writeLog(LogTypeEnum.DEBUG,
+                    writeLog(LogTypeEnum.AUDIT,
                         'searchForRecordById() No records found',
                         `No '${recordType}' records found with ${idProp}='${idValue}'`,);
                     return;
                 }
                 const searchResult = resultRange[0];
                 const recId = searchResult.id;
-                writeLog(LogTypeEnum.DEBUG,
+                writeLog(LogTypeEnum.AUDIT,
                     'searchForRecordById() Record found',
                     `1 '${recordType}' record found with ${idProp}='${idValue}'`,);
                 return recId;
@@ -310,8 +314,8 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 }
                 try {
                     writeLog(LogTypeEnum.DEBUG, 
-                        `setFieldsByOptionType() attempting rec.setValue();`,
-                        `setFieldsByOptionType() attempting rec.setValue({ fieldId: '${fieldId}', value: '${value}' });`,
+                        `setFieldsByOptionType() attempting <${recordType}>rec.setValue();`,
+                        `setFieldsByOptionType() attempting <${recordType}>rec.setValue({ fieldId: '${fieldId}', value: '${value}' });`,
                         `newValue === previousValue ? ${rec.getValue({ fieldId }) === value}`,
                         `previousValue: '${rec.getValue({ fieldId })}'`, 
                         `newValue:      '${value}'`, 
@@ -339,8 +343,8 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 line = validateSublistLine(rec, sublistId, line);
                 try { 
                     writeLog(LogTypeEnum.DEBUG, 
-                        `setFieldsByOptionType() attempting rec.setSublistValue();`,
-                        `setFieldsByOptionType() attempting rec.setSublistValue({ sublistId: '${sublistId}', fieldId: '${fieldId}', line: ${line}, value: '${value}' });`, 
+                        `setFieldsByOptionType() attempting <${recordType}>rec.setSublistValue();`,
+                        `setFieldsByOptionType() attempting <${recordType}>rec.setSublistValue({ sublistId: '${sublistId}', fieldId: '${fieldId}', line: ${line}, value: '${value}' });`, 
                         `newValue === previousValue ? ${rec.getSublistValue({ sublistId, fieldId, line }) === value}`,
                         `previousValue: '${rec.getSublistValue({ sublistId, fieldId, line })}'`, 
                         `newValue:      '${value}'`

@@ -263,6 +263,7 @@ export function transformValue(
 /**
  * 
  * @param originalValue - the initial value to check if it should be overwritten
+ * @param originalKey - the original column header (`key`) of the value being transformed
  * @param valueOverrides see {@link ValueMapping}
  * @returns **`mappedValue?.newValue`**: {@link FieldValue} if `originalValue` satisfies `valueOverrides`, otherwise returns `initialValue`
  */

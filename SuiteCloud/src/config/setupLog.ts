@@ -20,7 +20,7 @@ const fileInfoTemplate = "{{filePathWithLine}}";//"{{fileName}}:{{fileLine}}";
  * use as value for {@link ISettingsParam.prettyLogTemplate} 
  * @description template string for log messages = {@link timestampTemplate} + {@link logNameTemplate} + {@link logLevelTemplate} + {@link fileInfoTemplate} + `\n\t{{logObjMeta}}`
  * - {@link timestampTemplate} = `({{yyyy}}-{{mm}}-{{dd}} {{hh}}:{{MM}}:{{ss}}.{{ms}})`
- * - {@link logNameTemplate} = `[{{nameWithDelimiterPrefix}}{{name}}{{nameWithDelimiterSuffix}}]`
+ * - {@link logNameTemplate} = `"[{{name}}]"`
  * - {@link logLevelTemplate} = `{{logLevelName}}:`
  * - {@link fileInfoTemplate} = `{{fileName}}:{{fileLine}}`
  * - `\n\t{{logObjMeta}}`,
@@ -38,7 +38,7 @@ const errorInfoTemplate = "{{errorName}}: {{errorMessage}}\n\t{{errorStack}}";
  * use as value for {@link ISettingsParam.prettyErrorTemplate} 
  * @description template string for error message. 
  * */
-const ERROR_TEMPLATE = `${timestampTemplate} ${logNameTemplate} ${logLevelTemplate} ${fileInfoTemplate}\n${errorInfoTemplate}`;
+const ERROR_TEMPLATE = `${errorInfoTemplate}`; //`${timestampTemplate} ${logNameTemplate} ${logLevelTemplate} ${fileInfoTemplate}\n${errorInfoTemplate}`;
 /** 
  * use as value for {@link ISettingsParam.prettyErrorStackTemplate}
  * @description template string for error stack trace lines. 
@@ -87,9 +87,17 @@ export const mainLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
 mainLogger.attachTransport((logObj: ILogObj & ILogObjMeta) => {
     appendFileSync(DEFAULT_LOG_FILEPATH, JSON.stringify(logObj) + "\n", { encoding: "utf-8" });
 });
+/** 
+ * `INDENT_LOG_LINE =  '\n\t '` = newLine + tab + space
+ * - log.debug(s1, INDENT_LOG_LINE + s2, INDENT_LOG_LINE + s3,...) 
+ * */
+export const INDENT_LOG_LINE: string = '\n\t ';
 
 /*
-The tslog library supports colors and styles from the chalk library for its IPrettyLogStyles. If you are using the pattern { color: "yourColorString" } as shown in your prettyLogStyles configuration, the "yourColorString" can be one of the following standard foreground color names:
+The tslog library supports colors and styles from the chalk library for its 
+IPrettyLogStyles. If you are using the pattern { color: "yourColorString" } 
+as shown in your prettyLogStyles configuration, the "yourColorString" can be 
+one of the following standard foreground color names:
 
 black
 red
@@ -113,5 +121,4 @@ whiteBright
 const logger = new Logger({
     prefix: ["main-prefix", "parent-prefix"],
 });
-
 */

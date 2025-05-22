@@ -6,9 +6,8 @@ import { printConsoleGroup as print } from "./writing";
 import { StringCaseOptions, StringPadOptions, StringStripOptions } from "./types/Reading";
 
 
-
-
 /**
+ * @TODO implement a StringReplaceOptions
  * @description 
  * - Removes extra spaces, commas, and dots from a string (e.g. `'..'` becomes `'.'`)
  * - optionally applies 3 option params with: {@link stripCharFromString}, {@link handleCaseOptions}, and {@link handlePadOptions}.
