@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import { AccountEnvironmentEnum, SuiteScriptEnvironment, ScriptDictionary, ScriptDetails } from '../utils/api/types/NS/SuiteScriptEnvironment';
+import { AccountEnvironmentEnum, SuiteScriptEnvironment, ScriptDictionary, ScriptDetails } from '../utils/NS/SuiteScriptEnvironment';
 
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
@@ -164,6 +164,8 @@ export const ONE_DRIVE_DIR = `C:/Users/${USER}/OneDrive - ENTITY_NAME`;
 export const DATA_DIR = path.join(NODE_HOME_DIR, '../data') as string;
 /** = {@link NODE_HOME_DIR}`/.output` = `/SuiteCloud/.output` */
 export const OUTPUT_DIR = path.join(NODE_HOME_DIR, '.output') as string;
+/**`/NetSuiteDev/SuiteCloud/.output/error_json` */
+export const ERROR_DIR = path.join(OUTPUT_DIR, 'error_json') as string;
 
 // Check if OUTPUT_DIR is a valid path
 if (!fs.existsSync(OUTPUT_DIR)) {

@@ -9,14 +9,15 @@ import {
     StateAbbreviationEnum as STATES, 
     CountryAbbreviationEnum as COUNTRIES, 
     TermBase as Term,
-} from "../api/types";
+    RecordTypeEnum,
+} from "../utils/api/types";
 import { 
-    applyPhoneRegex, cleanString, extractEmail, extractName, stringEndsWithAnyOf, RegExpFlagsEnum,
+    extractPhone, cleanString, extractEmail, extractName, stringEndsWithAnyOf, RegExpFlagsEnum,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, COMPANY_KEYWORDS_PATTERN, COMPANY_ABBREVIATION_PATTERN,
     checkForOverride,
     SALUTATION_REGEX,
     ValueMapping, 
-} from "../io";
+} from "../utils/io";
 
 export const ENTITY_VALUE_OVERRIDES: ValueMapping = {
 } 
@@ -29,6 +30,28 @@ export const entityId = (row: Record<string, any>, entityIdColumn: string): stri
     return checkForOverride(entity, entityIdColumn, ENTITY_VALUE_OVERRIDES) as string;
 }
 
+
+export const externalId = (row: Record<string, any>, recordType: RecordTypeEnum, entityIdColumn: string): string => {
+    let entity = entityId(row, entityIdColumn);
+    const externalId = `${entity}<${recordType}>`;
+    return externalId;
+}
+
+/**
+ * @description
+ * Check if the entity is a person or a company based on the `row` context data using the following assumptions/rules:
+ * - `If` the `entityId` is in the {@link HUMAN_VENDORS_TRIMMED} list, it is a person.
+ * - `If` the `entityId` matches the {@link COMPANY_KEYWORDS_PATTERN} or ends with {@link COMPANY_ABBREVIATION_PATTERN}, consider it is a company.
+ * - `If` `/[0-9@]+/.test(entityId)`, it is a company.
+ * - `If` the `entityId` is a single word, it is a company.
+ * - `If` the `company` name is empty, it is a person.
+ * - `If` the `company` name is NOT the same as the `entityId`, it is a company (assume that the value in the company column is not a person's name).
+ * - `else` assume it is a person.
+ * @param row - `Record<string, any>` the `row` of data
+ * @param entityIdColumn `string` - the column of the `row` to look for the entity ID in
+ * @param companyColumn `string` - the column of the `row` to look for the company name in
+ * @returns `boolean` - `true` if the entity is a person, `false` otherwise
+ */
 export const isPerson = (
     row: Record<string, any>, 
     entityIdColumn: string, 
@@ -41,10 +64,10 @@ export const isPerson = (
         `isPerson("${entity}") entityIdColumn = "${entityIdColumn}", companyColumn = "${companyColumn}"`, 
         TAB + `HUMAN_VENDORS_TRIMMED.includes("${entity}") = ${HUMAN_VENDORS_TRIMMED.includes(entity)}`,
         TAB + ` COMPANY_KEYWORDS_PATTERN.test("${entity}") = ${COMPANY_KEYWORDS_PATTERN.test(entity)}`,
-        TAB + `         "${entity}" ends with abbreviation = ${stringEndsWithAnyOf(entity, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`,
-        TAB + `                /[0-9@]+/.test("${entity}") = ${/[0-9@]+/.test(entity)}`,
-        TAB + `                       Boolean("${company}") = ${Boolean(company)}`,
-        TAB + `             entityNameIsSameAsCompanyName = ${entityNameIsSameAsCompanyName}`,
+        TAB + ` "${entity}" ends with company abbreviation = ${stringEndsWithAnyOf(entity, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`,
+        TAB + `                /[0-9@]+/.test("${entity}") = ${/[0-9@&]+/.test(entity)}`,
+        TAB + `                      Boolean("${company}") = ${Boolean(company)}`,
+        TAB + `              entityNameIsSameAsCompanyName = ${entityNameIsSameAsCompanyName}`,
     ];
     if (HUMAN_VENDORS_TRIMMED.includes(entity)) {
         log.debug(...[...logArr, TAB + `-> return true`]);
@@ -59,45 +82,100 @@ export const isPerson = (
         // log.debug(...[...logArr, TAB + `-> return false`]);
         return false;
     }
-    log.debug(...[...logArr, TAB + `Reached End of isPerson() -> return true`]);
+    // log.debug(...[...logArr, TAB + `Reached End of isPerson() -> return true`]);
     return true;
 }
 
 /**
- * 
+ * `row[mainPhoneColumn]` might contain multiple phone numbers, so use mainPhoneMatchIndex
+ * to specify the phone number to use as a value for a particular entity phone field.
  * @param row - `Record<string, any>` the `row` of data to look for a phone number in
- * @param phoneColumns the columns of the `row` to look for a phone number in
- * @returns `phone` - `{string}` - the formatted version of the first valid phone number found in the `row`, or an empty string if none is found.
- * @see {@link applyPhoneRegex} for the regex used to validate the phone number.
+ * @param mainPhoneColumn `string` - the column of the `row` to look for the main phone number in. default = `'Main Phone'`
+ * @param mainPhoneMatchIndex `number` - the index of the phone number to select from `row[mainPhoneColumn]` if it contains multiple phone numbers
+ * @param phoneColumns `string[]` the columns of the `row` to look for a phone number in
+ * @returns `phone` - `string` - the formatted version of the first valid phone number found in the `row`, or an empty string if none is found.
+ * @see {@link extractPhone} for the regex used to validate the phone number.
  */
 export const phone = (
     row: Record<string, any>, 
+    mainPhoneColumn: string='Main Phone',
+    mainPhoneMatchIndex: number=0,
     ...phoneColumns: string[]
-): string =>{
+): string => {
+    if (!row || !mainPhoneColumn || row[mainPhoneColumn] === undefined || row[mainPhoneColumn] === null || !phoneColumns) {
+        return '';
+    }
+    if (typeof mainPhoneMatchIndex !== 'number' || mainPhoneMatchIndex < 0) {
+        log.error(`Invalid mainPhoneMatchIndex: "${mainPhoneMatchIndex}", mainPhoneMatchIndex must be a non-negative integer`);
+        return '';
+    }
     let phone: string = '';
+    const debugLogs: any[] = [
+        `phone("${mainPhoneColumn}", "${mainPhoneMatchIndex}", ${phoneColumns})`,
+    ]
     for (const col of phoneColumns) {
         let initialVal = cleanString(row[col]);
         if (!initialVal) {
             continue;
         }
-        phone = applyPhoneRegex(initialVal);
-        if (phone) { return phone; }// return the first valid phone number found
+        const matchResults = extractPhone(initialVal);
+        if (!matchResults || (col === mainPhoneColumn && matchResults.length <= mainPhoneMatchIndex)) {
+            continue;
+        }
+        let index = col === mainPhoneColumn ? mainPhoneMatchIndex : 0;
+        phone = String(matchResults ? matchResults[index] : '')
+            .replace(/([a-zA-Z]+\s*$)/, ''); // remove any trailing letters
+        debugLogs.push(
+            TAB + `row["${col}"]="${initialVal}", matchResults=${JSON.stringify(matchResults)}`,
+            TAB + `col === mainPhoneColumn ? ${col === mainPhoneColumn}, index=${index}, phone="${phone}"`,);
+        if (phone) {
+            debugLogs.push(
+                ` -> returning "${phone}" from "${col}" column with initialVal="${initialVal}"`,
+            );
+            log.debug(...debugLogs);
+            return phone; 
+        }// return the first valid phone number found
     }
+    debugLogs.push(
+        ` -> reached end of phone() -> returning empty string`,
+    );
+    log.debug(...debugLogs);
     return ''
 }
 
+/**
+ * `row[mainEmailColumn]` might contain multiple email addresses, so use mainEmailMatchIndex 
+ * to specify the email address to use as a value for a particular entity email field.
+ * @param row - `Record<string, any>` the `row` of data to look for an email address in
+ * @param mainEmailColumn `string` - the column of the `row` to look for the main email address in. default = `'Main Email'`
+ * @param mainEmailMatchIndex `number` - the index of the email address to use from the `row[mainEmailColumn]` if it contains multiple email addresses
+ * @param emailColumns `string[]` - 
+ * @returns `email` - `string` - the first valid email address found, or an empty string if none found.
+ */
 export const email = (
-    row: Record<string, any>, 
+    row: Record<string, any>,
+    mainEmailColumn: string='Main Email', 
+    mainEmailMatchIndex: number=0,
     ...emailColumns: string[]
 ): string => {
+    if (!row || !mainEmailColumn || row[mainEmailColumn] === undefined || row[mainEmailColumn] === null || !emailColumns) {
+        return '';
+    }
+    if (typeof mainEmailMatchIndex !== 'number' || mainEmailMatchIndex < 0) {
+        log.error(`Invalid mainEmailMatchIndex: "${mainEmailMatchIndex}", mainEmailMatchIndex must be a non-negative integer`);
+        return '';
+    }
     let email: string = '';
     for (const col of emailColumns) {
         let initialVal = cleanString(row[col]);
         if (!initialVal) {
             continue;
         }
-        // log.debug(`evaluateEmail: extractEmail("${initialVal}") = "${extractEmail(initialVal)}"`);
-        email = extractEmail(initialVal);
+        const matchResults = extractEmail(initialVal);
+        if (!matchResults || (col === mainEmailColumn && matchResults.length <= mainEmailMatchIndex)) {
+            continue;
+        }
+        email = matchResults ? matchResults[col === mainEmailColumn ? mainEmailMatchIndex : 0] : '';
         if (email) { return email; }// return the first valid email address found
     }
     return ''
@@ -170,7 +248,6 @@ export const name = (
 
 
 /**
- * 
  * @param row `Record<string, any>`
  * @param firstNameColumn 
  * @param nameColumns 

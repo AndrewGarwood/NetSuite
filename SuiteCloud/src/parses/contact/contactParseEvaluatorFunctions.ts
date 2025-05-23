@@ -17,8 +17,8 @@ import { RecordTypeEnum,
     CountryAbbreviationEnum as COUNTRIES, 
     StateAbbreviationEnum as STATES, 
     TermBase as Term, VendorCategoryEnum 
-} from "../../api/types/NS";
-import { entityId, isPerson } from "../generalEvaluatorFunctions";
+} from "../../NS";
+import { entityId, isPerson } from "../evaluatorFunctions";
 // import { name as evaluateName} from "../generalEvaluatorFunctions";
 
 export const HUMAN_VENDORS_TRIMMED = HUMAN_VENDORS_ORIGINAL_TEXT.map(

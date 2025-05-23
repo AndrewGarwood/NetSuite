@@ -2,7 +2,7 @@
  * @file src/utils/api/types/PostRequests.ts
  */
 import { FieldDictionary, FieldValue, LogStatement, SublistDictionary } from '.';
-import { RecordTypeEnum } from './NS/Record/Record';
+import { RecordTypeEnum, EntityRecordTypeEnum } from '../../NS';
 
 
 /**
@@ -55,7 +55,7 @@ export type BatchPostRecordResponse = {
 // PostRecordOptions
 /**
  * @typedefn **`PostRecordOptions`**
- * @property {RecordTypeEnum} recordType - The record type to post, see {@link RecordTypeEnum}
+ * @property {RecordTypeEnum | EntityRecordTypeEnum} recordType - The record type to post, see {@link RecordTypeEnum}
  * @property {FieldDictionary} [fieldDict] a dictionary of field IDs and values.
  * - {@link FieldDictionary} = `{ valueFields`: `Array<`{@link SetFieldValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`.
  * @property {SublistDictionary} [sublistDict] an object containing sublist IDs mapped to a dictionary of field IDs and values.
@@ -63,7 +63,7 @@ export type BatchPostRecordResponse = {
  * - - = `{ sublistId`: `{ valueFields`: `Array<`{@link SetSublistValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> } }`.
  */
 export type PostRecordOptions = {
-    recordType: RecordTypeEnum;
+    recordType: RecordTypeEnum | EntityRecordTypeEnum;
     fieldDict?: Omit<FieldDictionary, 'priorityFields' | 'textFields'>;
     sublistDict?: SublistDictionary;
 }

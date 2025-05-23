@@ -3,14 +3,14 @@
  * @description Sample payloads for testing API calls
  */
 import { 
-    SublistDictionary, CreateRecordOptions, FieldDictionary, 
-    SetSublistTextOptions, SetSubrecordOptions, SublistFieldDictionary, 
+    SublistDictionary, PostRecordOptions, FieldDictionary, 
+    SetSubrecordOptions, SublistFieldDictionary, 
     SetSublistValueOptions, 
-    SetFieldValueOptions, PostRecordOptions
+    SetFieldValueOptions
 } from "src/utils/api/types"
 import { RADIO_FIELD_FALSE } from "../typeValidation";
-import { NetSuiteCountryEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES } from "src/utils/api/types/NS"
-import { RecordTypeEnum } from "src/utils/api/types/NS/Record/Record"
+import { NetSuiteCountryEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES } from "src/utils/NS"
+import { RecordTypeEnum } from "src/utils/NS/Record/Record"
 
 const NOT_INACTIVE = false;
 const NOT_DYNAMIC = false;
@@ -66,9 +66,9 @@ export const UW_LIBRARIES_UPSERT_VENDOR_OPTIONS: PostRecordOptions = {
     } as FieldDictionary,
 }
 
-export const UW_LIBRARIES_CREATE_VENDOR_OPTIONS: CreateRecordOptions = {
+export const UW_LIBRARIES_CREATE_VENDOR_OPTIONS: PostRecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
-    isDynamic: NOT_DYNAMIC,
+    // isDynamic: NOT_DYNAMIC,
     fieldDict: {
         valueFields: [
             { fieldId: 'entityid', value: 'UW_LIBRARIES' },
@@ -102,9 +102,9 @@ export const UW_LIBRARIES_CREATE_VENDOR_OPTIONS: CreateRecordOptions = {
     } as SublistDictionary,
 }
 
-export const MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS: CreateRecordOptions = {
+export const MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS: PostRecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
-    isDynamic: NOT_DYNAMIC,
+    // isDynamic: NOT_DYNAMIC,
     fieldDict: {
         valueFields: [
             { fieldId: 'companyname', value: 'City of Mission Viejo' },

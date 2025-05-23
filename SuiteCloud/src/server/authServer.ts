@@ -24,13 +24,14 @@ app.use(bodyParser.urlencoded({ extended: true }));
 let server: Server | any | undefined;
 
 /**
- * @description close the {@link server}: {@link Server} listening for oauth 2.0 callback if it is running.
+ * @description close the {@link server}: {@link Server} listening for oauth 2.0 
+ * callback if it is running.
  * @returns {void}
  */
 export const CLOSE_SERVER = (): void => {
     if (server) {
         server.close(() => {
-            log.info('Server closed successfully.');
+            // log.info('Server closed successfully.');
         });
     } else {
         log.info('Server is not running or already closed.');
@@ -38,8 +39,8 @@ export const CLOSE_SERVER = (): void => {
 }
 
 /**  
- * @description **`OAUTH2 STEP 1`**. use {@link AUTH_URL}, with search params {{@link REDIRECT_URI}, 
- * {@link CLIENT_ID}, {@link SCOPE}, {@link STATE}} to form authorization link and 
+ * @description **`OAUTH2 STEP 1`**. use {@link AUTH_URL}, with search params = { {@link REDIRECT_URI}, 
+ * {@link CLIENT_ID}, {@link SCOPE}, {@link STATE} } to form authorization link and 
  * initiate OAuth callback to be resolved with the callback response's authorization code. 
  */
 export async function getAuthCode(): Promise<string> {
@@ -56,7 +57,7 @@ export async function getAuthCode(): Promise<string> {
             }
         });
         server = app.listen(SERVER_PORT, () => {
-            console.log(`Server is listening on port ${SERVER_PORT} for oauth callback -> Opening authURL...`);
+            log.info(`Server is listening on port ${SERVER_PORT} for oauth callback -> Opening authURL...`);
             const authLink = createUrlWithParams( 
                 AUTH_URL, {
                     response_type: 'code',
@@ -233,7 +234,7 @@ export async function getAccessToken(): Promise<string> {
                 'Access token is expired or undefined. Refresh token is also undefined.', 
                 'Initiating auth flow from the beginning...'
             );
-            let tokenRes: TokenResponse = await initiateAuthFlow() as TokenResponse;
+            let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_IS_NOT_AVAILABLE) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
         } else {
             log.info('Access token is valid. Proceeding with RESTlet call...');

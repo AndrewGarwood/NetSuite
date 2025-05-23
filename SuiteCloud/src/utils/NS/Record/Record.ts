@@ -11,8 +11,7 @@ import * as HITCRecord from '@hitc/netsuite-types/N/record';
  * @property {string} [name] - The name of the record.
  */
 export type RecordRef = 
-    string | number |  
-    [internalId: number]  |  [externalId: string]  |  [name: string];
+    string | number | [internalId: number] | [externalId: string] | [name: string];
 
 
 /**

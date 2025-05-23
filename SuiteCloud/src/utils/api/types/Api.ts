@@ -3,14 +3,14 @@
  * @module Api
  */
 
-import { RecordTypeEnum } from './NS/Record/Record';
+import { RecordTypeEnum } from '../../NS/Record/Record';
 
 /**
  * @enum {string} **`idPropertyEnum`**
- * @property {string} INTERNAL_ID - The `internalid` (for all records).
- * @property {string} EXTERNAL_ID - The `externalid` (for all records).
- * @property {string} ENTITY_ID - The `entityid` (for relationship records). appears on vendor records.
- * @property {string} ITEM_ID - The `itemid` (for inventory records)
+ * @property {string} INTERNAL_ID - The `'internalid'` (for all records).
+ * @property {string} EXTERNAL_ID - The `'externalid'` (for all records).
+ * @property {string} ENTITY_ID - The `'entityid'` (for relationship records). appears on vendor records.
+ * @property {string} ITEM_ID - The `'itemid'` (for inventory records)
  * @readonly
  */
 export enum idPropertyEnum {
@@ -38,7 +38,7 @@ export enum LogTypeEnum {
 
 /**
  * Definition of elements in the {@link logArray} array
- * @typedefn `LogStatement`
+ * @typedefn **`LogStatement`**
  * @property {string} timestamp - The timestamp of the log entry.
  * @property {LogTypeEnum} type - The type of log entry (see {@link LogTypeEnum}).
  * @property {string} title - The title of the log entry.
@@ -53,57 +53,41 @@ export type LogStatement = {
     message?: string;
 };
 
-
-
-
 /**
  * Fields organized by the fields' value type
- * @typedefn `FieldDictionary`
- * @property {Array<SetFieldValueOptions>} [priorityFields]
- * - Array<{@link SetFieldValueOptions}> = `Array<{ fieldId`: string, `value`: {@link FieldValue}` }>`. 
- * @property {Array<SetFieldTextOptions>} [textFields] 
- * - Array<{@link SetFieldTextOptions}> = `Array<{ fieldId`: string, `text`: string` }>`. 
- * - For record fields: `record.setText(fieldId, text)`
+ * @typedefn **`FieldDictionary`**
  * @property {Array<SetFieldValueOptions>} [valueFields] 
- * - Array<{@link SetFieldValueOptions}> = `Array<{ fieldId`: string, `value`: {@link FieldValue}` }>`. 
+ * - `Array<`{@link SetFieldValueOptions}`>`= `Array<{ fieldId`: string, `value`: {@link FieldValue}` }>`. 
  * - For record fields: `record.setValue(fieldId, value)`
  * @property {Array<SetSubrecordOptions>} [subrecordFields]
- * - Array<{@link SetSubrecordOptions}> = `Array<{ parentSublistId`?: string, `line`?: number, fieldId: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}` }>`.
+ * - `Array<`{@link SetSubrecordOptions}`>`= `Array<{ parentSublistId`?: string, `line`?: number, fieldId: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}` }>`.
  * - array of subrecord fields in the main record
  */
 export type FieldDictionary = {
-    priorityFields?: SetFieldValueOptions[];
-    textFields?: SetFieldTextOptions[];
     valueFields?: SetFieldValueOptions[];
     subrecordFields?: SetSubrecordOptions[];
 };
 
 /**
  * Set a record's sublist's field values organized by field type
- * @typedefn `SublistFieldDictionary`
- * @property {Array<SetFieldValueOptions>} [priorityFields]
- * - Array<{@link SetFieldValueOptions}> = `Array<{ sublistId`: string, `fieldId`: string, `line`: number, `value`: {@link FieldValue}` }>`.
- * @property {Array<SetSublistTextOptions>} [textFields] 
- * - Array<{@link SetSublistTextOptions}> = `Array<{ sublistId`: string, `fieldId`: string, `line`: number, `text`: string` }>`. 
- * - For record sublist fields: rec.setSublistText(sublistId, fieldId, line, text)
+ * @typedefn **`SublistFieldDictionary`**
  * @property {Array<SetSublistValueOptions>} [valueFields]  
- * - Array<{@link SetSublistValueOptions}> = `Array<{ sublistId`: string, `fieldId`: string, `line`: number, `value`: {@link FieldValue}` }>`. 
+ * - `Array<`{@link SetSublistValueOptions}`>` = `Array<{ sublistId`: string, `fieldId`: string, `line`: number, `value`: {@link FieldValue}` }>`. 
  * - For record sublist fields: rec.setSublistValue(sublistId, fieldId, line, value)
  * @property {Array<SetSubrecordOptions>} [subrecordFields]
- * - Array<{@link SetSubrecordOptions}> = `Array<{ parentSublistId`?: string, `line`?: number, `fieldId`: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}` }>`.
+ * - `Array<`{@link SetSubrecordOptions}`>` = `Array<{ parentSublistId`?: string, `line`?: number, `fieldId`: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}` }>`.
  * - array of subrecord fields in the main record's sublist
  */
 export type SublistFieldDictionary = {
-    priorityFields?: SetFieldValueOptions[];
-    textFields?: SetSublistTextOptions[];
     valueFields?: SetSublistValueOptions[];
     subrecordFields?: SetSubrecordOptions[];
 };
 
+
 /**
- * @typedefn SublistDictionary
+ * @typedefn **`SublistDictionary`**
  * - a key in `SublistDictionary` is a `sublistId {string}` (e.g. 'addressbook', 'item', etc.)
- * - values are {@link SublistFieldDictionary} = { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetSublistTextOptions}>, `valueFields`: Array<{@link SetSublistValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }.
+ * - values are {@link SublistFieldDictionary} = { `priorityFields`: `Array<`{@link SetFieldValueOptions}`>`, `textFields`: `Array<`{@link SetSublistTextOptions}`>`, `valueFields`: `Array<`{@link SetSublistValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`
  */
 export type SublistDictionary = Record<string, SublistFieldDictionary>;
 
@@ -118,14 +102,14 @@ export type SublistDictionary = Record<string, SublistFieldDictionary>;
  * - `Date` and `DateTime` fields accept {@link Date} values.
  * - `Integer`, `Float`, `Currency` and `Percent` fields accept `number` values.
  * - `Inline HTML` fields accept `strings`. Strings containing HTML tags are represented as HTML entities in UI. {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html#:~:text=The%20following%20code%20sample%20shows%20the%20syntax%20for%20INLINEHTML%20fields%20and%20what%20is%20returned.}
- * @typedefn `{Date | number | number[] | string | string[] | boolean | null}` `FieldValue` 
+ * @typedefn **`FieldValue`** 
  */
 export type FieldValue = Date | number | number[] | string | string[] | boolean | null;
 
 /**
  * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html}
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
- * @interface SetFieldValueOptions
+ * @interface **`SetFieldValueOptions`**
  * @property {string} fieldId - The internal ID of a standard or custom field.
  * @property {FieldValue} value 
  * - The {@link FieldValue} to set the field to. 
@@ -138,35 +122,6 @@ export interface SetFieldValueOptions {
     inputType?: FieldInputTypeEnum;
 }
 
-/**
- * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
- * @interface SetFieldTextOptions
- * @property {string} fieldId - The internal ID of a standard or custom field.
- * @property {string} text - The text to set the value to.
- * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
- */
-export interface SetFieldTextOptions {
-    fieldId: string;
-    text: string;
-    inputType?: FieldInputTypeEnum;
-}
-
-/**
- * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
- * @interface SetSublistTextOptions
- * @property {string} sublistId - The internal ID of the sublist.
- * @property {string} fieldId - (i.e. sublistFieldId) The internal ID of a standard or custom sublist field.
- * @property {number} [line] - The line number for the field.
- * @property {string} text - The text to set the value to.
- * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
- */
-export interface SetSublistTextOptions {
-    sublistId: string;
-    fieldId: string;
-    line?: number;
-    text: string;
-    inputType?: FieldInputTypeEnum;
-}
 
 /**
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
@@ -175,7 +130,7 @@ export interface SetSublistTextOptions {
  * @property {string} fieldId - The internal ID of a standard or custom sublist field.
  * @property {number} [line] - The line number for the field.
  * @property {FieldValue} value - The {@link FieldValue} to set the sublist field to.
- * = {Date | number | number[] | string | string[] | boolean | null}
+ * = `{Date | number | number[] | string | string[] | boolean | null}`
  * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
  */
 export interface SetSublistValueOptions {
@@ -194,8 +149,8 @@ export interface SetSublistValueOptions {
  * - If the subrecord is on the main record, use getSubrecord({fieldId}) = getSubrecord(options: GetFieldOptions): Omit<Record, "save">;
  * - If the subrecord is in a sublist, use rec.getSublistSubrecord({sublistId, fieldId})
  * @property {string} subrecordType - The record type of the subrecord. (e.g. 'address', 'inventorydetail', etc.)
- * @property {FieldDictionary} [fieldDict] - {@link FieldDictionary} = { `priorityFields`: Array<{@link SetFieldValueOptions}>, `textFields`: Array<{@link SetFieldTextOptions}>, `valueFields`: Array<{@link SetFieldValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }.
- * @property {SublistFieldDictionary} [sublistDict] - {@link SublistFieldDictionary} =  { `priorityFields`: Array<{@link SetSublistValueOptions}>, `textFields`: Array<{@link SetSublistTextOptions}>, `valueFields`: Array<{@link SetSublistValueOptions}>, `subrecordFields`: Array<{@link SetSubrecordOptions}> }.
+ * @property {FieldDictionary} [fieldDict] - {@link FieldDictionary} = { `valueFields`: `Array<`{@link SetFieldValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`
+ * @property {SublistFieldDictionary} [sublistDict] - {@link SublistFieldDictionary} =  { `valueFields`: `Array<`{@link SetSublistValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`
  * - (if subrecord has own sublists) an object containing sublist IDs mapped to a dictionary of field IDs and values.
  * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4687606306.html}
  *  ~\node_modules\@hitc\netsuite-types\N\record.d.ts
@@ -227,51 +182,8 @@ export interface SetSubrecordOptions {
     sublistDict?: SublistDictionary;
 }
 
-/**
- * @enum {string} FieldOptionsTypeEnum
- * @property {string} FIELD_TEXT - fieldText ({@link SetFieldTextOptions}) set text field of record
- * @property {string} FIELD_VALUE - fieldValue ({@link SetFieldValueOptions}) set value field of record
- * @property {string} SUBLIST_TEXT - sublistText ({@link SetSublistTextOptions}) set text field of record's sublist
- * @property {string} SUBLIST_VALUE - sublistValue ({@link SetSublistValueOptions}) set value field of record's sublist
- */
-export enum FieldOptionsTypeEnum {
-    FIELD_TEXT = 'fieldText',
-    FIELD_VALUE = 'fieldValue',
-    SUBLIST_TEXT = 'sublistText',
-    SUBLIST_VALUE = 'sublistValue',
-}
-
-/**
- * @typedefn `SetFieldOptionsArrayTypes` 
- * */
-export type SetFieldOptionsArrayTypes = SetFieldTextOptions | SetFieldValueOptions | SetSublistTextOptions | SetSublistValueOptions;
-
-/**
- * @description Enum for the label of the field options array used in log statements.
- * @enum {string} OptionsArrayLabelEnum 
- * @property {string} PRIORITY - priorityFields are set first, then textFields and valueFields
- * @property {string} TEXT - textFields are set second, then valueFields
- * @property {string} VALUE - valueFields are set third
- * @property {string} DEFAULT_LABEL - default label for field options array
- */
-export enum OptionsArrayLabelEnum {
-    PRIORITY = 'priorityFields',
-    TEXT = 'textFields',
-    VALUE = 'valueFields',
-    DEFAULT_LABEL = 'optionsArray',
-}
-
-/**
- * @enum {string} FieldDictTypeEnum
- * @property {string} FIELD_DICT - fieldDict
- * @property {string} SUBLIST_FIELD_DICT - sublistFieldDict
- */
-export enum FieldDictTypeEnum {
-    FIELD_DICT = 'fieldDict',
-    SUBLIST_FIELD_DICT = 'sublistFieldDict',
-}
 /** 
- * @enum {string} `FieldInputTypeEnum`
+ * @enum {string} **`FieldInputTypeEnum`**
  * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html}
  * @property {string} TEXT `Text` fields accept `string` values. 
  * @property {string} RADIO `Radio` fields accept `string` values.

@@ -1,26 +1,26 @@
 /**
- * @file src/utils/parses/vendor_contact/vendorParseEvaluatorFunctions.ts
+ * @file src/parses/vendor/vendorParseEvaluatorFunctions.ts
  */
 import { 
     FieldValue,
-} from "../../api/types";
+} from "../../utils/api/types";
 import { mainLogger as log } from 'src/config/setupLog';
-import { isNullLike, BOOLEAN_TRUE_VALUES, RADIO_FIELD_TRUE, RADIO_FIELD_FALSE } from "../../typeValidation";
+import { isNullLike, BOOLEAN_TRUE_VALUES, RADIO_FIELD_TRUE, RADIO_FIELD_FALSE } from "../../utils/typeValidation";
 import { printConsoleGroup as print, stringEndsWithAnyOf, COMPANY_KEYWORDS_PATTERN, 
-    applyPhoneRegex, stripCharFromString, 
-    STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, cleanString, extractName, extractPhone,
+    extractPhone, stripCharFromString, 
+    STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, cleanString, extractName, formatPhone,
     extractEmail, EMAIL_REGEX, ValueMapping, isValueMappingEntry, RegExpFlagsEnum, 
-    stringStartsWithAnyOf} from "../../io";
+    stringStartsWithAnyOf} from "../../utils/io";
 import { READLINE as rl } from "src/config/env";
-import { HUMAN_VENDORS_ORIGINAL_TEXT,  } from '../../../config/constants'
+import { HUMAN_VENDORS_ORIGINAL_TEXT,  } from '../../config/constants'
 import { RecordTypeEnum, 
     CountryAbbreviationEnum as COUNTRIES, 
     StateAbbreviationEnum as STATES, 
     TermBase as Term, VendorCategoryEnum 
-} from "../../api/types/NS";
+} from "../../utils/NS";
 
 export const VENDOR_VALUE_OVERRIDES: ValueMapping = {
-    'VALUE_TO_OVERRIDE': 'NEW_VALUE' as FieldValue  
+    'A Q Skin Solutions, Inc.': 'AQ Skin Solutions, Inc.' as FieldValue  
 }
 
 export const HUMAN_VENDORS_TRIMMED = HUMAN_VENDORS_ORIGINAL_TEXT.map(
@@ -206,11 +206,11 @@ export const evaluateVendorCategory = (row: Record<string, any>): number | strin
 }
 
 /**
- * 
+ * @deprecated
  * @param row - the `row` of data to look for a phone number in
  * @param phoneColumns the columns of the `row` to look for a phone number in
  * @returns `phone` - `{string}` - the formatted version of the first valid phone number found in the `row`, or an empty string if none is found.
- * @see {@link applyPhoneRegex} for the regex used to validate the phone number.
+ * @see {@link extractPhone} for the regex used to validate the phone number.
  */
 export const evaluatePhone = (
     row: Record<string, any>, 
@@ -223,13 +223,19 @@ export const evaluatePhone = (
             continue;
         }
         // log.debug(`evaluatePhone: applyPhoneRegex("${initialVal}", vendor="${row['Vendor']}") = "${applyPhoneRegex(initialVal, `vendor="${row['Vendor']}"`)}"`);
-        phone = applyPhoneRegex(initialVal, `vendor="${row['Vendor']}"`);
+        phone = (extractPhone(initialVal) || [''])[0];
         if (phone) { return phone; }// return the first valid phone number found
     }
     // print({label: `evaluatePhone: No valid phone number found in columns: ${phoneColumns.join(', ')}`});
     return ''
 }
 
+/**
+ * @deprecated
+ * @param row 
+ * @param emailColumns 
+ * @returns 
+ */
 export const evaluateEmail = (
     row: Record<string, any>, 
     ...emailColumns: string[]
@@ -241,7 +247,7 @@ export const evaluateEmail = (
             continue;
         }
         // log.debug(`evaluateEmail: extractEmail("${initialVal}") = "${extractEmail(initialVal)}"`);
-        email = extractEmail(initialVal);
+        email = (extractEmail(initialVal) || [''])[0];
         if (email) { return email; }// return the first valid email number found
     }
     // print({label: `evaluateEmail: No valid email number found in columns: ${emailColumns.join(', ')}`});
@@ -324,10 +330,10 @@ export const evaluateAlternateEmail = (row: Record<string, any>): string => {
     let invalidEmailPattern = new RegExp(/(\s*;\s*)?[a-zA-Z0-9._%+-]+@benev\.com(\s*;\s*)?/, 'ig')
     if (ccEmail && !invalidEmailPattern.test(ccEmail)) {
         // log.debug(`invalidEmailPattern.test("${ccEmail}") = ${invalidEmailPattern.test(ccEmail)}`);
-        return extractEmail(ccEmail);
+        return (extractEmail(ccEmail) || [''])[0];
     } else if (ccEmail && invalidEmailPattern.test(ccEmail)) {
         // log.debug(`evaluateAlternateEmail: "${ccEmail}" -> "${ccEmail.replace(invalidEmailPattern, '').replace(/[,;:]*/g, '').trim()}"`);
-        return extractEmail(ccEmail.replace(invalidEmailPattern, '').replace(/[,;:]*/g, '').trim());
+        return (extractEmail(ccEmail.replace(invalidEmailPattern, '').replace(/[,;:]*/g, '').trim()) || [''])[0];
     } 
     return '';
 }

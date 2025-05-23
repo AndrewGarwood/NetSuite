@@ -18,15 +18,17 @@ import {
     SublistFieldValueMapping, 
     SublistSubrecordMapping 
 } from "./utils/api/types";
-import { RecordTypeEnum } from "./utils/api/types/NS";
-import { mainLogger as log } from "./config/setupLog";
+import { RecordTypeEnum } from "./utils/NS";
+import { mainLogger as log, INDENT_LOG_LINE as TAB } from "./config/setupLog";
 import {
     hasKeys, isBooleanFieldId, isNullLike, BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES
 } from "./utils/typeValidation";
-import { getDelimiterFromFilePath, ValueMapping, ValueMappingEntry, isValueMappingEntry } from "./utils/io";
+import { printConsoleGroup as print, getDelimiterFromFilePath} from "./utils/io";
 import { STOP_RUNNING } from "./config/env";
 import csv from 'csv-parser';
 import fs from 'fs';
+import { ValueMapping, ValueMappingEntry, isValueMappingEntry } from "./utils/io/types";
+import { parse } from "path";
 
 const NOT_DYNAMIC = false;
 let rowIndex = 0;
@@ -49,7 +51,7 @@ export async function parseCsvToPostRecordOptions(
  * - {@link ParseOptions} =
  * - -  `{ recordType: `{@link RecordTypeEnum}, `fieldDictParseOptions: `{@link FieldDictionaryParseOptions}, `sublistDictParseOptions: `{@link SublistDictionaryParseOptions}` }`
  * @returns **`results`** - `Promise<`{@link ParseResults}`>` 
- * = `{ [key` in {@link RecordTypeEnum}`]?:` `{ valid: Array<`{@link PostRecordOptions}`>, invalid: Array<`{@link PostRecordOptions}`> } }`
+ * = `{ [key` in {@link RecordTypeEnum}`]?:` `{ validPostOptions: Array<`{@link PostRecordOptions}`>, invalidParseOptions: Array<`{@link PostRecordOptions}`> } }`
  * - {@link PostRecordOptions} = `{ recordType: `{@link RecordTypeEnum}, `isDynamic: boolean`, `fieldDict: `{@link FieldDictionary}, `sublistDict: `{@link SublistDictionary}` }`
  */
 export async function parseCsvToPostRecordOptions(
@@ -58,23 +60,24 @@ export async function parseCsvToPostRecordOptions(
     arg2: RecordParseOptions | ParseOptions[],
 ): Promise<ParseResults> {
     if (!csvPath || typeof csvPath !== 'string') {
-        throw new Error(`parseCsvToPostRecordOptions() Unable to Start: No csvPath provided.`);
+        throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No csvPath provided.`);
     }
     if (!fs.existsSync(csvPath)) {
-        throw new Error(`parseCsvToPostRecordOptions() Unable to Start: File not found: ${csvPath}`);
+        throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: File not found: ${csvPath}`);
     }
     if (!arg2 
         || (Array.isArray(arg2) && arg2.length === 0) 
         || (typeof arg2 === 'object' && Object.keys(arg2).length === 0)
     ) {
-        throw new Error(`parseCsvToPostRecordOptions() Unable to Start: No arg2: parseOptionsArray_OR_recordParseOptions provided.`);
+        throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No arg2: parseOptionsArray_OR_recordParseOptions provided.`);
     }
     const recordParseOptions = {} as RecordParseOptions;
-    if (Array.isArray(arg2)) { // handle overload when arg2 is an array of ParseOptions
+    // handle overload when arg2 is an array of ParseOptions
+    if (Array.isArray(arg2)) { 
         arg2.forEach((parseOptions, index) => {
             const recordType = parseOptions.recordType;
             if (!recordType) {
-                throw new Error(`parseCsvToPostRecordOptions() Unable to Start: No recordType provided in parseOptions at arg2 parseOptionsArray[${index}].`);
+                throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No recordType provided in parseOptions at arg2 parseOptionsArray[${index}].`);
             }
             if (recordParseOptions[recordType]) {
                 recordParseOptions[recordType].push(parseOptions);
@@ -84,7 +87,7 @@ export async function parseCsvToPostRecordOptions(
         })
     }
     if (!recordParseOptions || Object.keys(recordParseOptions).length === 0) {
-        throw new Error(`parseCsvToPostRecordOptions() Unable to Start: No parse options provided.`);
+        throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No parse options provided.`);
     }
     const results: ParseResults = {};
     Object.keys(recordParseOptions).forEach(recordKey => {
@@ -98,53 +101,60 @@ export async function parseCsvToPostRecordOptions(
                 for (let recordKey of Object.keys(recordParseOptions)) {
                     const parseOptionsArray = recordParseOptions[recordKey] as ParseOptions[];
                     if (!Array.isArray(parseOptionsArray) || parseOptionsArray.length === 0) {
-                        log.error(`parseCsvToPostRecordOptions() No parse options provided for recordParseOptions["${recordKey}"].`);
+                        log.error(`ERROR in parseCsvToPostRecordOptions() No parse options provided for recordParseOptions["${recordKey}"].`);
                     }
-                        for (let [arrIndex, parseOptions] of Object.entries(parseOptionsArray)) {
-                            try {
-                                const { 
-                                    recordType, 
-                                    fieldDictParseOptions, sublistDictParseOptions, 
-                                    valueOverrides, pruneFunc 
-                                } = parseOptions as ParseOptions;
-                                if (recordKey !== recordType) {
-                                    log.error(`parseCsvToPostRecordOptions() recordType ${recordKey} does not match parseOptions recordType ${recordType}.`);
-                                    continue;
-                                }   
-                                // Validate required fields exist in CSV row
-                                validateFieldMappings(row, fieldDictParseOptions, sublistDictParseOptions);
-                                let postOptions: PostRecordOptions | null = generatePostRecordOptions(
-                                    row,
-                                    recordType,
-                                    fieldDictParseOptions,
-                                    sublistDictParseOptions,
-                                    valueOverrides
-                                );
-                                if (pruneFunc) {
-                                    postOptions = pruneFunc(postOptions);
-                                }
-                                if (!postOptions) { // postOptions === null
-                                    pruneCount[recordType] = (pruneCount[recordType] || 0) + 1;
-                                    results[recordType]?.invalidParseOptions.push(parseOptions);
-                                    continue;
-                                }
-                                results[recordType]?.validPostOptions.push(postOptions);
-                            } catch (error) {
-                                log.error(`parseCsvToPostRecordOptions() Error processing row ${rowIndex} at recordType ${recordKey}'s parseOptionsArray[${arrIndex}]:`, error);
-                                results[recordKey]?.invalidParseOptions.push(...parseOptionsArray);
-                                reject(error);
+                    for (let [arrIndex, parseOptions] of Object.entries(parseOptionsArray)) {
+                        try {
+                            const { 
+                                recordType, 
+                                fieldDictParseOptions, sublistDictParseOptions, 
+                                valueOverrides, pruneFunc 
+                            } = parseOptions as ParseOptions;
+                            if (recordKey !== recordType) {
+                                log.error(`ERROR in parseCsvToPostRecordOptions() recordType ${recordKey} does not match parseOptions recordType ${recordType}.`);
+                                continue;
+                            }   
+                            // Validate required fields exist in CSV row
+                            validateFieldMappings(row, fieldDictParseOptions, sublistDictParseOptions);
+                            let postOptions: PostRecordOptions | null = generatePostRecordOptions(
+                                row,
+                                recordType,
+                                fieldDictParseOptions,
+                                sublistDictParseOptions,
+                                valueOverrides
+                            );
+                            if (pruneFunc) {
+                                postOptions = pruneFunc(postOptions);
                             }
+                            if (!postOptions) { // postOptions === null
+                                pruneCount[recordType] = (pruneCount[recordType] || 0) + 1;
+                                results[recordType]?.invalidParseOptions.push(parseOptions);
+                                continue;
+                            }
+                            results[recordType]?.validPostOptions.push(postOptions);
+                        } catch (error) {
+                            log.error(`ERROR in parseCsvToPostRecordOptions() Error processing row ${rowIndex} at recordType ${recordKey}'s parseOptionsArray[${arrIndex}]:`, error);
+                            results[recordKey]?.invalidParseOptions.push(...parseOptionsArray);
+                            reject(error);
                         }
-                    
-                    
+                    }
                 }
                 rowIndex++;
             })
             .on('end', () => {
-                log.debug(`rowIndex: ${rowIndex} - Finished processing CSV file for recordType(s): `, 
-                    `\n\tpruneCount=`, JSON.stringify(pruneCount), 
-                    // `\n\tparseOptionsArray.length=${parseOptionsArray.length}`, 
-                    `\n\tcsvPath=${csvPath}`
+                const parseSummary: Record<string, any> = {};
+                Object.keys(results).forEach(recordKey => {
+                    parseSummary[recordKey] = {
+                        validPostOptions: results[recordKey]?.validPostOptions.length || 0,
+                        invalidParseOptions: results[recordKey]?.invalidParseOptions.length || 0,
+                        pruneCount: pruneCount[recordKey] || 0,
+                    }
+                });
+                log.debug(
+                    `rowIndex: ${rowIndex} - Finished processing CSV file for recordType(s): [${Object.keys(recordParseOptions).join(', ')}]`, 
+                    // TAB + `pruneCount:`, JSON.stringify(pruneCount),
+                    TAB + `parseSummary:`, parseSummary,//JSON.stringify(parseSummary, null, 4), 
+                    TAB + `csvPath: ${csvPath}`
                 );
                 resolve(results)
             })

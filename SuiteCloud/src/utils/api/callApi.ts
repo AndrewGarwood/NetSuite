@@ -1,19 +1,19 @@
 /**
  * @file src/utils/api/callApi.ts
  */
-import axios, { create } from "axios";
+import axios from "axios";
 import { writeObjectToJson as write } from "../io";
-import { mainLogger as log } from "src/config/setupLog";
+import { mainLogger as log, INDENT_LOG_LINE as TAB } from "src/config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR  } from "../../config/env";
 import { createUrlWithParams } from "./url";
 import { getAccessToken, AxiosCallEnum, AxiosContentTypeEnum } from "src/server";
-import { BatchPostRecordRequest, RetrieveRecordByIdRequest, ScriptDictionary } from "./types";
+import { BatchPostRecordRequest, BatchPostRecordResponse, PostRecordOptions, RetrieveRecordByIdRequest, ScriptDictionary } from "./types";
 
 export const SB_REST_SCRIPTS = SE.sandbox?.restlet || {} as ScriptDictionary;
 export const BATCH_SIZE = 100;
 
-const POST_SCRIPT_ID = SB_REST_SCRIPTS.POST_BatchUpsertRecord.scriptId as number;
-const POST_DEPLOY_ID = SB_REST_SCRIPTS.POST_BatchUpsertRecord.deployId as number;
+const BATCH_UPSERT_SCRIPT_ID = SB_REST_SCRIPTS.POST_BatchUpsertRecord.scriptId as number;
+const BATCH_UPSERT_DEPLOY_ID = SB_REST_SCRIPTS.POST_BatchUpsertRecord.deployId as number;
 /**
  * 
  * @param {Array<any>} arr `Array<any>`
@@ -34,39 +34,83 @@ export function partitionArrayBySize(
 export type PostPayload = AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN_TEXT;
 
 /**
+ * enforces max batch size of 100 records per payload e.g. if `payload.upsertRecordArray` > 100,
+ * then split into multiple payloads of at most 100 records each
  * @param payload {@link BatchPostRecordRequest}
  * @param scriptId `number`
  * @param deployId `number`
- * @returns `res`
+ * @returns `responses` — `Promise<any[]>`
  */
 export async function postRecordPayload(
     payload: BatchPostRecordRequest, 
-    scriptId: number=POST_SCRIPT_ID, 
-    deployId: number=POST_DEPLOY_ID,
-): Promise<any> {
-    let accessToken = await getAccessToken();
+    scriptId: number=BATCH_UPSERT_SCRIPT_ID, 
+    deployId: number=BATCH_UPSERT_DEPLOY_ID,
+): Promise<any[]> {
+    if (!payload || Object.keys(payload).length === 0) {
+        log.error('postRecordPayload() payload is undefined or empty. Cannot call RESTlet.');
+        STOP_RUNNING(1);
+    }
+    const accessToken = await getAccessToken();
     if (!accessToken) {
         log.error('postRecordPayload() getAccessToken() is undefined. Cannot call RESTlet.');
         STOP_RUNNING(1);
     }
-    try {
-        const res = await POST(
-            accessToken,
-            scriptId,
-            deployId,
-            payload,
-        );
-        return res;
-    } catch (error) {
-        log.error('Error in callApi.ts postRecordPayload()');
-        throw error;
-    }
+    const { upsertRecordArray, upsertRecordDict, responseProps } = payload;
+    const responses: any[] = [];
+    // normalize payload size
+    const batches: PostRecordOptions[][] = [];
+    if (!upsertRecordDict && Array.isArray(upsertRecordArray) && upsertRecordArray.length > BATCH_SIZE) {
+        batches.push(...partitionArrayBySize(upsertRecordArray, BATCH_SIZE));
+        for (let i = 0; i < batches.length; i++) {
+            const batch = batches[i];
+            let batchPayloadSummary: Record<string, number> = {};
+            for (const options of upsertRecordArray) {
+                const recordType = options.recordType;
+                if (recordType) {
+                    if (!batchPayloadSummary[recordType]) {
+                        batchPayloadSummary[recordType] = 0;
+                    }
+                    batchPayloadSummary[recordType]++;
+                }
+            } 
+            try {
+                const res = await POST(
+                    accessToken, scriptId, deployId,
+                    { 
+                        upsertRecordArray: batch, 
+                        responseProps: responseProps 
+                    } as BatchPostRecordRequest,
+                );
+                responses.push(res);
+                await DELAY(1000); 
+                log.debug(
+                    `finished batch ${i+1} of ${batches.length}`, 
+                    TAB + `batchPayloadSummary: ${JSON.stringify(batchPayloadSummary)}`
+                );
+            } catch (error) {
+                log.error(`Error in callApi.ts postRecordPayload().upsertRecordArray.POST(batchIndex=${i}):`, error);
+                throw error;
+            }
+        }
+    } else {// else if ((upsertRecordDict && !upsertRecordArray) || upsertRecordArray) {
+        // @TODO: handle upsertRecordDict size normalization
+        // i.e. when (Object.values(upsertRecordDict).some((array) => Array.isArray(array) 
+        // && array.length > BATCH_SIZE))
+        try {
+            const res = await POST(accessToken, scriptId, deployId, payload);
+            responses.push(res);
+        } catch (error) {
+            log.error('Error in callApi.ts postRecordPayload().upsertRecordDict.POST():', error);
+            throw error;
+        }
+    } 
+    return responses;
 }
 
 export async function retrieveRecordById(
     payload: RetrieveRecordByIdRequest,
-    scriptId: number=Number(SB_REST_SCRIPTS.GET_RetrieveRecordById.scriptId),
-    deployId: number=Number(SB_REST_SCRIPTS.GET_RetrieveRecordById.deployId),
+    scriptId: number=SB_REST_SCRIPTS.GET_RetrieveRecordById.scriptId,
+    deployId: number=SB_REST_SCRIPTS.GET_RetrieveRecordById.deployId,
 ): Promise<any> {
     const accessToken = await getAccessToken();
     if (!accessToken) {
@@ -94,6 +138,7 @@ export async function retrieveRecordById(
  * @param {string | number} scriptId 
  * @param {string | number} deployId 
  * @param {Record<string, any>} payload 
+ * @param {PostPayload} contentType {@link PostPayload}. default = {@link AxiosContentTypeEnum.JSON},
  * @returns {Promise<any>}
  */
 export async function POST(
