@@ -11,16 +11,16 @@ import {
     SublistSubrecordMapping,
     RecordTypeEnum,
     ContactRoleEnum,
-} from "../../api/types";
+} from "../../utils/api/types";
 import { mainLogger as log } from "src/config/setupLog";
-import { CustomerStatusEnum, CustomerTaxItemEnum } from "../../api/types";
+import { CustomerStatusEnum, CustomerTaxItemEnum } from "../../utils/api/types";
 import { SB_TERM_DICTIONARY as TERM_DICT, CUSTOMER_CATEGORY_MAPPING as CATEGORY_DICT } from "src/utils/io";
-import * as evaluate from "../generalEvaluatorFunctions";
-import * as prune from "../generalPruneFunctions";
+import * as evaluate from "../evaluatorFunctions";
+import * as prune from "../pruneFunctions";
 import * as customerEval from "./customerParseEvaluatorFunctions";
 import * as contactEval from "../contact/contactParseEvaluatorFunctions";
 
-export const NOT_INACTIVE = false;
+const NOT_INACTIVE = false;
 export const BILLING_PHONE_COLUMNS = [
     'Bill to 4', 'Bill to 5', 'Main Phone', 'Work Phone', 'Mobile', 
     'Alt. Phone', 'Alt. Mobile', 'Home Phone',
@@ -67,7 +67,7 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
                         { fieldId: 'city', colName: 'City' },
                         { fieldId: 'state', evaluator: evaluate.state, args: ['State']},
                         { fieldId: 'zip', colName: 'Zip' },
-                        { fieldId: 'addrphone', evaluator: evaluate.phone, args: BILLING_PHONE_COLUMNS },
+                        { fieldId: 'addrphone', evaluator: evaluate.phone, args: [undefined, undefined, ...BILLING_PHONE_COLUMNS] },
                     ] as FieldValueMapping[],
                 } as FieldDictionaryParseOptions,
             } as SublistSubrecordMapping,
@@ -92,7 +92,7 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
                         { fieldId: 'city', colName: 'Ship To City' },
                         { fieldId: 'state', evaluator: evaluate.state, args: ['Ship To State']},
                         { fieldId: 'zip', colName: 'Ship To Zip' },
-                        { fieldId: 'addrphone', evaluator: evaluate.phone, args: SHIPPING_PHONE_COLUMNS },
+                        { fieldId: 'addrphone', evaluator: evaluate.phone, args: [undefined, undefined, ...SHIPPING_PHONE_COLUMNS] },
                     ] as FieldValueMapping[],
                 } as FieldDictionaryParseOptions,
             } as SublistSubrecordMapping,
@@ -102,14 +102,13 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
 
 export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldValueMapping[] = [
     { fieldId: 'entityid', evaluator: evaluate.entityId, args: ['Customer'] },
-    // { fieldId: 'externalid', evaluator: evaluate.entityId, args: ['Customer'] },
     { fieldId: 'isinactive', defaultValue: NOT_INACTIVE },
-    { fieldId: 'email', evaluator: evaluate.email, args: ['Main Email', 'Alt. Email 1'] },
-    { fieldId: 'altemail', evaluator: evaluate.email, args: ['Alt. Email 1', 'CC Email'] },
-    { fieldId: 'phone', evaluator: evaluate.phone, args: ['Main Phone', 'Alt. Phone', 'Work Phone'] },
-    { fieldId: 'mobilephone', evaluator: evaluate.phone, args: ['Mobile', 'Alt. Mobile'] },
-    { fieldId: 'homephone', evaluator: evaluate.phone, args: ['Home Phone'] },
-    { fieldId: 'fax', evaluator: evaluate.phone, args: ['Fax', 'Alt. Fax'] },
+    { fieldId: 'email', evaluator: evaluate.email, args: ['Main Email', 0, 'Alt. Email 1'] },
+    { fieldId: 'altemail', evaluator: evaluate.email, args: ['Main Email', 1, 'Alt. Email 1', 'CC Email'] },
+    { fieldId: 'phone', evaluator: evaluate.phone, args: ['Main Phone', 0, 'Alt. Phone', 'Work Phone'] },
+    { fieldId: 'mobilephone', evaluator: evaluate.phone, args: [undefined, undefined, 'Mobile', 'Alt. Mobile'] },
+    { fieldId: 'homephone', evaluator: evaluate.phone, args: [undefined, undefined, 'Home Phone'] },
+    { fieldId: 'fax', evaluator: evaluate.phone, args: [undefined, undefined, 'Fax', 'Alt. Fax'] },
     { fieldId: 'salutation', evaluator: evaluate.salutation, args: ['Mr./Ms./...', 'First Name', 'Primary Contact', 'Secondary Contact', 'Customer'] },
     { fieldId: 'title', colName: 'Job Title' },
     { fieldId: 'comments', colName: 'Note' },
@@ -131,6 +130,8 @@ export const PARSE_CUSTOMER_FROM_CUSTOMER_CSV_OPTIONS: ParseOptions = {
         fieldValueMapArray: [
             { fieldId: 'isperson', evaluator: customerEval.customerIsPerson, args: ['Customer'] },
             ...CONTACT_CUSTOMER_SHARED_FIELDS,
+            { fieldId: 'externalid', evaluator: evaluate.externalId, args: [RecordTypeEnum.CUSTOMER, 'Customer'] },
+            { fieldId: 'altphone', evaluator: evaluate.phone, args: ['Main Phone', 1, 'Alt. Phone', 'Work Phone'] },
             { fieldId: 'entitystatus', defaultValue: CustomerStatusEnum.CLOSED_WON },
             { fieldId: 'category', evaluator: customerEval.customerCategory, args: ['Customer Type', CATEGORY_DICT] },
             { fieldId: 'companyname', evaluator: customerEval.customerCompany, args: ['Customer', 'Company'] },
@@ -147,7 +148,7 @@ export const PARSE_CUSTOMER_FROM_CUSTOMER_CSV_OPTIONS: ParseOptions = {
     } as FieldDictionaryParseOptions,
     sublistDictParseOptions: {
         ...ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,
-        // ...CONTACT_ROLES_SUBLIST_DEFAULT_OPTIONS
+        ...CONTACT_ROLES_SUBLIST_DEFAULT_OPTIONS
     },
     valueOverrides: evaluate.ENTITY_VALUE_OVERRIDES,
     pruneFunc: prune.entity,
@@ -158,12 +159,13 @@ export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
     fieldDictParseOptions: {
         fieldValueMapArray: [
             ...CONTACT_CUSTOMER_SHARED_FIELDS,
-            { fieldId: 'officephone', evaluator: evaluate.phone, args: ['Work Phone'] },
-            { fieldId: 'firstname', evaluator: evaluate.firstName, args: NAME_COLUMNS },
-            { fieldId: 'middlename', evaluator: evaluate.middleName, args: NAME_COLUMNS },
-            { fieldId: 'lastname', evaluator: evaluate.lastName, args: NAME_COLUMNS },
+            { fieldId: 'externalid', evaluator: evaluate.externalId, args: [RecordTypeEnum.CONTACT, 'Customer'] },
+            { fieldId: 'officephone', evaluator: evaluate.phone, args: [undefined, undefined, 'Work Phone'] },
+            { fieldId: 'firstname', evaluator: evaluate.firstName, args: ['First Name', ...NAME_COLUMNS] },
+            { fieldId: 'middlename', evaluator: evaluate.middleName, args: ['M.I.', ...NAME_COLUMNS] },
+            { fieldId: 'lastname', evaluator: evaluate.lastName, args: ['Last Name', ...NAME_COLUMNS] },
             { fieldId: 'company', evaluator: contactEval.contactCompany, args: ['Customer'] },
-            // { fieldId: 'role', defaultValue: ContactRoleEnum.PRIMARY_CONTACT },
+            { fieldId: 'contactrole', defaultValue: ContactRoleEnum.PRIMARY_CONTACT },
         ] as FieldValueMapping[],
     } as FieldDictionaryParseOptions,
     sublistDictParseOptions: ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,

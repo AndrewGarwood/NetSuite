@@ -2,17 +2,18 @@
  * @file src/utils/parses/customer/customerParseEvaluatorFunctions.ts
  */
 import { 
+    CustomerStatusEnum,
     FieldValue,
-} from "../../api/types";
+} from "../../utils/api/types";
 import { mainLogger as log } from 'src/config/setupLog';
-import { RADIO_FIELD_TRUE, RADIO_FIELD_FALSE } from "../../typeValidation";
+import { RADIO_FIELD_TRUE, RADIO_FIELD_FALSE } from "../../utils/typeValidation";
 import { 
     checkForOverride,
     cleanString,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION,
     ValueMapping, 
-} from "../../io";
-import { isPerson, firstName, middleName, lastName, entityId, ENTITY_VALUE_OVERRIDES } from "../generalEvaluatorFunctions";
+} from "../../utils/io";
+import { isPerson, firstName, middleName, lastName, entityId, ENTITY_VALUE_OVERRIDES } from "../evaluatorFunctions";
 
 
 export const customerIsPerson = (row: Record<string, any>, entityIdColumn: string): string => {
@@ -22,7 +23,7 @@ export const customerIsPerson = (row: Record<string, any>, entityIdColumn: strin
     return isPerson(row, entityIdColumn) ? RADIO_FIELD_TRUE : RADIO_FIELD_FALSE;
 }
 
-/** calls {@link firstName}`(row, firstNameColumn, ...nameColumns)` from `generalEvaluatorFunctions.ts` if customer is an individual human and not a company */
+/** calls {@link firstName}`(row, firstNameColumn, ...nameColumns)` from `evaluatorFunctions.ts` if customer is an individual human and not a company */
 export const firstNameIfCustomerIsPerson = (
     row: Record<string, any>,
     entityIdColumn: string,
@@ -86,6 +87,20 @@ export const customerCategory = (
     return categoryDict[categoryValue] as FieldValue;
 }
 
+export const customerStatus = (
+    row: Record<string, any>,
+    categoryColumn: string,
+): FieldValue => {
+    if (!row || !categoryColumn) {
+        return '';
+    }
+    let categoryValue = row[categoryColumn];
+    if (!categoryValue) {
+        return CustomerStatusEnum.QUALIFIED;
+    }
+    return CustomerStatusEnum.CLOSED_WON;
+}
+
 
 export const customerCompany = (
     row: Record<string, any>,
@@ -110,7 +125,7 @@ export const customerCompany = (
     ) {
         return companyName;
     }
-    log.debug(`Reached End of customerCompany() -> returning entityId: "${entity}"`); 
+    // log.debug(`Reached End of customerCompany() -> returning entityId: "${entity}"`); 
     return entity;
     
 }

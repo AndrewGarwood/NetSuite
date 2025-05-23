@@ -2,7 +2,7 @@
  * @file src/utils/api/types/CsvToApiMapping.ts
  * @module CsvToApiMapping
  */
-import { RecordTypeEnum } from "./NS";
+import { RecordTypeEnum } from "../../NS";
 import { ValueMapping, ValueMappingEntry } from "../../io/types";
 import { 
     FieldDictionary,

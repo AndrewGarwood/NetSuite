@@ -1,9 +1,10 @@
 /**
  * @file src/utils/io/regex.ts
  */
-import { mainLogger as log } from 'src/config/setupLog';
+import { mainLogger as log, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
 import { printConsoleGroup as print } from "./writing";
 import { StringCaseOptions, StringPadOptions, StringStripOptions } from "./types/Reading";
+import { format } from 'node:path';
 
 
 /**
@@ -178,7 +179,7 @@ const COMPANY_KEYWORD_LIST: string[] = [
  * - `re` = `/\b(?:company|corp|inc|co\.?,? ltd\.?|ltd|\.?l\.?lc|plc . . .)\b/ `
  * */
 export const COMPANY_KEYWORDS_PATTERN: RegExp = 
-/\b(?:compan(y|ies)|[@&]+|corporation|corporate|(drop)?box|corp|inc|co\.|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|plc|llp|(un)?limited|nys|oc|mc|pr|local|group|consulting|consultant(s)?|vcc|bcp|center|(in)?pack(aging|age)?|electric|chemical|Exhibit(s)?|business|Factory|employee|print(s|ing)?|Pharmaceutical(s)?|vistaprint|associates|association|account(s)?|art(s)?|AMZ|independent|beauty|beautiful(ly)?|meditech|partners|Acupuncture|Affiliate(s)?|telecom|maps|cosmetic(s)?|connections|practice|computer|service(s)?|skincare|skin|face|facial|body|artisan(s)?|Alchemy|advanced|surgical|surgery|surgeons|administrators|laser|practice|scientific|science|health|healthcare|medical|med|med( |i)?spa|spa|perfect|surgeons|(med)?(a)?esthetic(s|a)?|salon|lounge|studio|wellness|courier|capital|financ(e|ing)|collector|dept(\.)?|HVAC|insurance|ins|surety|freight|fine art|solution(s)?|trad(e|ing)|renewal|department|inst\.|institute|instant|university|college|America(n)?|US(A)?|global|digital|virtual|orange|coast(al)?|tree|franchise|orthopedic(s)?|academy|advertising|travel|technologies|flash|international|tech|clinic(s|al)?|Exterminator|Nightclub|management|foundation|aid|product(ions|ion|s)?|industr(y|ies|ial)|biomed|bio|bio-chem|lubian|technology|technical|special(ist(s)?|ities)?|support|innovat(e|ive|ion(s)?)|county|united|state(s)?|the|one|of|for|by|and|on|or|at|it|the|about|plan|legal|valley|republic|recruit(ing)?|media|southern|office|post office|clean(er|ers)|transport|law|contract|high|food|meal|therapy|dental|laboratory|instrument|southwest|ingredient(s)?|commerce|city|Laboratories|lab|logistics|newport|radio|video|photo(graphy)?|korea|communication(s)|derm(atology|atologist(s)?)|new|express|goods|mission|depot|treasur(e|er|y)|revenue|biolab|Orders|staff(ing|ed)?|investors|envelope|refresh|Anti|AgingMajestic|motors|museum|event|Kaiser|pacific|visa|platinum|level|Rejuvenation|bespoke|Cardio|speed|pro|tax|firm|DC|square|store|weight|group|Buy|balance(d)?|buckhead|market(s)?|Bulk|perks|GPT|Boutique|supplement(s)?|vitamin(s)?|plus|sales|salesforce|precision|fitness|image|premier|Fulfillment|final|elite|elase|sculpt(ing)?|botox|south|Hills|symposium|wifi|online|worldwide|tv|derm([a-z]+)|wine|rent(al(s)?)?|mail|plumber(s)?|Sociedade|card|\.com)\b/i;
+/\b(?:compan(y|ies)|[+@&]+|corporation|corporate|(drop)?box|corp|inc|co\.|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|plc|llp|(un)?limited|nys|oc|mc|pr|local|group|consulting|consultant(s)?|vcc|bcp|center|(in)?pack(aging|age)?|electric|chemical|Exhibit(s)?|business|Factory|employee|print(s|ing)?|Pharmaceutical(s)?|vistaprint|associates|association|account(s)?|art(s)?|AMZ|independent|beauty|beautiful(ly)?|meditech|medaesthetic|partners|Acupuncture|Affiliate(s)?|telecom|maps|cosmetic(s)?|connections|practice|computer|service(s)?|skincare|skin|face|facial|body|artisan(s)?|Alchemy|advanced|surgical|surgery|surgeons|administrators|laser|practice|scientific|science|health|healthcare|medical|med|med( |i)?spa|spa|perfect|surgeons|(med)?(a)?esthetic(s|a)?|salon|lounge|studio|wellness|courier|capital|financ(e|ing)|collector|dept(\.)?|HVAC|insurance|ins|surety|freight|fine art|solution(s)?|trad(e|ing)|renewal|department|inst\.|institute|instant|university|college|America(n)?|US(A)?|global|digital|virtual|orange|coast(al)?|tree|franchise|orthopedic(s)?|academy|advertising|travel|technologies|flash|international|tech|clinic(s|al)?|Exterminator|Nightclub|management|foundation|aid|product(ions|ion|s)?|industr(y|ies|ial)|biomed|bio|bio-chem|lubian|technology|technical|special(ist(s)?|ities)?|support|innovat(e|ive|ion(s)?)|county|united|state(s)?|the|one|of|for|by|and|on|or|at|it|the|about|plan|legal|valley|republic|recruit(ing)?|media|southern|office|post office|clean(er|ers)|transport|law|contract|high|food|meal|therapy|dental|laboratory|instrument|southwest|ingredient(s)?|commerce|city|Laboratories|lab|logistics|newport|radio|video|photo(graphy)?|korea|communication(s)|derm(atology|atologist(s)?)|new|express|goods|mission|depot|treasur(e|er|y)|revenue|biolab|Orders|staff(ing|ed)?|investors|envelope|refresh|Anti|AgingMajestic|motors|museum|event|Kaiser|pacific|visa|platinum|level|Rejuvenation|bespoke|Cardio|speed|pro|tax|firm|DC|square|store|weight|group|Buy|balance(d)?|buckhead|market(s)?|Bulk|perks|GPT|Boutique|supplement(s)?|vitamin(s)?|plus|sales|salesforce|precision|fitness|image|premier|Fulfillment|final|elite|elase|sculpt(ing)?|botox|south|Hills|symposium|wifi|online|worldwide|tv|derm([a-z]+)|wine|rent(al(s)?)?|mail|plumber(s)?|Sociedade|card|\.com)\b/i;
 /** - `re` =  `/\b(?:corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc)\.?\s*$/i` */
 export const COMPANY_ABBREVIATION_PATTERN: RegExp =
 /\b(?:corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc|llp)\.?\s*$/i;
@@ -225,15 +226,15 @@ export function isValidEmail(email: string): boolean {
 }
 
 /** @returns `email`: `string` - the first email that matches {@link EMAIL_REGEX} or an empty string `''`*/
-export function extractEmail(email: string): string {
-    if (!email) return '';
+export function extractEmail(email: string): RegExpMatchArray | null {
+    if (!email) return null;
     email = email.trim();
     const match = email.match(EMAIL_REGEX);
     if (match) {
         // log.debug(`extractEmail("${email}") = "${match[0]}"`);
-        return match[0];
+        return match;
     }
-    return '';
+    return null;
 }
 /** `re` = /`^(a(t{1,2})n:)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*`/i */
 export const ATTN_SALUTATION_PREFIX_PATTERN 
@@ -246,7 +247,7 @@ export const MIDDLE_INITIAL_REGEX
     = new RegExp(/^[A-Z]{1}\.?$/, RegExpFlagsEnum.IGNORE_CASE);
 /** Matches "MSPA", "BSN", "FNP-C", "LME", "DOO", "PA-C", "MSN-RN", "RN", "NP", "CRNA", "FNP", "PA", "NMD", "MD", "DO", "LE", "CMA", "OM"  */
 export const JOB_TITLE_SUFFIX_PATTERN 
-    = /\b(,? ?(MSPA|BSN|FNP-C|LME|DOO|Ph\.?D\.|PA-C|MSN-RN|RN|NP|CRNA|FAAD|FNP|PA|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS|FACS|FAC)\.?,?)*\s*$/; 
+    = /\b(,? ?(MSPA|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|PA-C|MSN-RN|RN|NP|CRNA|FAAD|FNP|PA|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS|FACS|FAC)\.?,?)*\s*$/; 
 /**
  * **if** `name` starts with a number or contains any of {@link COMPANY_KEYWORDS_PATTERN}, do not attempt to extract name and return empty strings
  * @param name `string` - the full name from which to extract 3 parts: the first, middle, and last names
@@ -294,6 +295,7 @@ export function extractName(name: string): {
     return { first: '', middle: '', last: '' }; 
 }
 
+// https://en.wikipedia.org/wiki/List_of_telephone_country_codes
 
 /** 
  * @TODO see if the non digit non capturing part is needed
@@ -309,7 +311,7 @@ export function extractName(name: string): {
  * - - `(?:...)` Non-capturing group for any non-digit characters - `(?:\D*$)`
  * */
 export const PHONE_REGEX: RegExp = 
-    /(?:^\D*(\d{1,3})[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})[-.\s]?(?:ext|x)?(?:[-:.\s]*)?(\d{1,4})?(?:\D*$)/; 
+    /(?:^\D*(\d{1,3})[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})[-.\s]?(?:ext|x|ex)?(?:[-:.\s]*)?(\d{1,4})?(?:\D*$)/i; 
 
 /**
  * @description
@@ -340,7 +342,7 @@ export const CHINA_PHONE_REGEX: RegExp = /(86)[-.\s]?(\d{2,3})[-.\s]?(\d{4})[-.\
  * - **`$3`** - First four digits - `(\d{4})`
  * - **`$4`** - Last four digits - `(\d{4})`
  */
-export const JAPAN_PHONE_REGEX: RegExp = /(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]?(\d{4})/
+export const JAPAN_PHONE_REGEX: RegExp = /(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]?(\d{4})/;
 
 /**
  * @description
@@ -351,23 +353,26 @@ export const JAPAN_PHONE_REGEX: RegExp = /(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]
  * - **`$3`** - First three digits - `(\d{3})`
  * - **`$4`** - Last four digits - `(\d{4})`
  */
-export const KOREA_PHONE_REGEX: RegExp = /(82)[-).\s]?(\d{1,2})?[-.\s]?(\d{3,4})[-.\s]?(\d{4})/
+export const KOREA_PHONE_REGEX: RegExp = /(82)[-).\s]?(\d{1,2})?[-.\s]?(\d{3,4})[-.\s]?(\d{4})/;
 
-// https://en.wikipedia.org/wiki/List_of_telephone_country_codes
+const phoneRegexList: {re: RegExp, groupFormat: string}[] = [
+    { re: CHINA_PHONE_REGEX, groupFormat: '$1-$2-$3-$4' },
+    { re: HONG_KONG_PHONE_REGEX, groupFormat: '$1-$2-$3' },
+    { re: KOREA_PHONE_REGEX, groupFormat: '$1-$2-$3-$4' },
+    { re: JAPAN_PHONE_REGEX, groupFormat: '$1-$2-$3-$4' },
+    { re: PHONE_REGEX, groupFormat: '$1-$2-$3-$4 ext $5' },
+]
 
 /**
  * @param {string} phone - `string` - phone number to test
- * @param {string} label - `string` - `optional` label to print in the console
  * @returns {string} `phone` - formatted phone number or empty string if unable to format it
  * @description test phone on regex in this order:
- * 1. {@link JAPAN_PHONE_REGEX} = `/(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]?(\d{4})/`
- * 2. {@link KOREA_PHONE_REGEX} = `/(82)[-.\s]?(\d{2})[-.\s]?(\d{3})[-.\s]?(\d{4})/`
- * 3. {@link HONG_KONG_PHONE_REGEX} = `/(852)[-.\s]?(\d{4})[-.\s]?(\d{4})/`
- * 4. {@link CHINA_PHONE_REGEX} = `/(86)[-.\s]?(\d{2,3})[-.\s]?(\d{4})[-.\s]?(\d{4})/`
- * 3. GENERIC_{@link PHONE_REGEX} = `/(?:^\D*(\d{1,3})[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})( ?ext ?(\d{3,4}))?(?:\D*$)/`
- * 4. `\d{10}` (i.e. is a string of 10 digits), `return` as `\d{3}-\d{3}-\d{4}`
- * 5. `\d{11}` and `startsWith('1')` (i.e. is a USA phone number), `return` as `1-\d{3}-\d{3}-\d{4}`
- * 6. `else` return as is * 
+ * 1. {@link KOREA_PHONE_REGEX} = `/(82)[-.\s]?(\d{2})[-.\s]?(\d{3})[-.\s]?(\d{4})/`
+ * 2. {@link HONG_KONG_PHONE_REGEX} = `/(852)[-.\s]?(\d{4})[-.\s]?(\d{4})/`
+ * 3. {@link CHINA_PHONE_REGEX} = `/(86)[-.\s]?(\d{2,3})[-.\s]?(\d{4})[-.\s]?(\d{4})/`
+ * 4. {@link JAPAN_PHONE_REGEX} = `/(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]?(\d{4})/`
+ * 5. GENERIC_{@link PHONE_REGEX} = `/(?:^\D*(\d{1,3})[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})( ?ext ?(\d{3,4}))?(?:\D*$)/`
+ * 6. `else` return emtpy string
  * @note Valid formats for NetSuite Phone Number fields are: 
  * 1. `999-999-9999`
  * 2. `1-999-999-9999`
@@ -375,68 +380,54 @@ export const KOREA_PHONE_REGEX: RegExp = /(82)[-).\s]?(\d{1,2})?[-.\s]?(\d{3,4})
  * 4. `1(999) 999-9999`
  * 5. `999-999-9999 ext 9999`
  */
-export function applyPhoneRegex(phone: string, label?: string): string {
+export function extractPhone(phone: string): string[] | RegExpMatchArray | null {
     if (!phone) {
-        return '';
+        return null;
     }
     const originalPhone = String(phone);
-    phone = originalPhone.trim().replace(/^\s*[a-zA-Z]*|[a-zA-Z]\s*$|[,;:/]/g, '');
-    if (JAPAN_PHONE_REGEX.test(phone)) {
-        phone = extractPhone(phone, JAPAN_PHONE_REGEX, '$1-$2-$3-$4');
-    } else if (KOREA_PHONE_REGEX.test(phone)) {
-        phone = extractPhone(phone, KOREA_PHONE_REGEX, '$1-$2-$3-$4');
-    }  else if (HONG_KONG_PHONE_REGEX.test(phone)) {
-        phone = extractPhone(phone, HONG_KONG_PHONE_REGEX, '$1-$2-$3');
-    } else if (CHINA_PHONE_REGEX.test(phone)) {
-        phone = extractPhone(phone, CHINA_PHONE_REGEX, '$1-$2-$3-$4');
-    } else if (PHONE_REGEX.test(phone)) {
-        phone = extractPhone(phone, PHONE_REGEX, '$1-$2-$3-$4 ext $5');
-    } else if (phone.length === 10 && /^\d{10}$/.test(phone)) {
-        phone = extractPhone(phone, /(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
-    } else if (phone.length === 11 && /^\d{11}$/.test(phone) && phone.startsWith('1')) {
-        phone = extractPhone(phone, /(\d{1})(\d{3})(\d{3})(\d{4})/, '$1-$2-$3-$4');
-    } else {
-        // log.debug(`applyPhoneRegex() Input value is not valid phone number: "${phone}", returning empty string.`);
-        return '';
+    // remove leading and trailing letters. remove commas, semicolons, colons, and slashes
+    phone = originalPhone.trim().replace(/^\s*[a-zA-Z]*|[a-zA-Z]\s*$|[,;:/]/g, ''); 
+    const debugLogs: any[] = [];
+    for (const { re, groupFormat } of phoneRegexList) {
+        
+        let matches =  phone.match(re);
+        if (!matches) {
+            continue;
+        }
+        let formattedPhones = matches.map(p => formatPhone(p, re, groupFormat));
+        log.debug(
+            `extractPhone("${originalPhone}") - testing regex: ${re.source} on "${phone}"`,
+            TAB + `matches: ${JSON.stringify(matches)}`,
+            TAB + `formattedPhones: ${JSON.stringify(formattedPhones)}`,
+        )
+        return formattedPhones;
     }
-    phone = stripCharFromString(phone, {
-        char: '-', 
-        escape: false, 
-        stripLeftCondition: undefined, 
-        leftArgs: undefined, 
-        stripRightCondition: undefined, 
-        rightArgs: undefined
-    } as StringStripOptions);
-    phone = phone.replace(/\s{2,}/, ' ').replace(/ext(?=\D*$)/,'').trim();
-    print({
-        label: `applyPhoneRegex()` + (label ? ` ${label}` : ''), 
-        details: [
-            `originalPhone: "${originalPhone}"`, 
-            `finalPhone:    "${phone}"`
-        ], printToConsole: false
-    });
-    return phone;
+    if (phone) { // phone is non-empty and did not match any regex
+        log.warn(`extractPhone() - no match found for "${phone}", returning empty string.`)
+    };
+    return null;
+
 }
 
 /**
- * 
- * @param phone `string` - the phone number to extract from
+ * @param phone `string` - the phone number to format
  * @param re {@link RegExp} - the regex to use to extract the phone number
- * @param groupFormat `string` - the format to use to extract the phone number
+ * @param groupFormat `string` - use to format the phone number
  * - `optional` - if not provided, the phone number is returned as is 
- * @returns `phone`: `string` - the extracted phone number
+ * @returns `phone`: `string` - the formatted phone number
  */
-export function extractPhone(
+export function formatPhone(
     phone: string, 
     re: RegExp, 
     groupFormat?: string
 ): string {
     if (!phone) return '';
     let result: string = '';
-    const match = phone.match(PHONE_REGEX);
-    if (match) {
-        result = match[0];
+    const match = phone.match(re);
+    if (!match) {
+        return '';
     }
+    result = match[0] as string;
     if (groupFormat) {
         result = result.replace(re, groupFormat);
     }
@@ -445,9 +436,9 @@ export function extractPhone(
 
 /**
  * Checks if a string ends with any of the specified suffixes.
- * @param s The string to check.
+ * @param s The `string` to check.
  * @param suffixes An array of possible ending strings.
- * @param flags Optional regex flags to use when creating the RegExp object. see {@link RegExpFlagsEnum}
+ * @param flags `Optional` regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}
  * @returns `true` if the string ends with any of the suffixes, `false` otherwise.
  * @example
  * const myString = "hello world";
@@ -495,9 +486,9 @@ export function stringEndsWithAnyOf(
 
 /**
  * 
- * @param str The string to check.
+ * @param str The `string` to check.
  * @param prefixes possible starting string(s).
- * @param flags Optional regex flags to use when creating the RegExp object. see {@link RegExpFlagsEnum}
+ * @param flags `Optional` regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}
  * @returns 
  */
 export function stringStartsWithAnyOf(
@@ -536,7 +527,7 @@ export function stringStartsWithAnyOf(
 
 /**
  * 
- * @param str The string to check.
+ * @param str The `string` to check.
  * @param substrings possible substring(s).
  * @param flags `Optional` regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}
  * @returns 

@@ -10,8 +10,8 @@ import {
     SetSublistValueOptions,
     SetSubrecordOptions,
     SublistFieldDictionary, 
-} from "../api/types";
-import { isNullLike, RADIO_FIELD_TRUE } from "../typeValidation";
+} from "../utils/api/types";
+import { isNullLike, RADIO_FIELD_TRUE } from "../utils/typeValidation";
 
 
 

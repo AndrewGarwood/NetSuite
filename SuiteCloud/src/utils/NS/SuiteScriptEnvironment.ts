@@ -38,7 +38,7 @@ export type SuiteScriptEnvironment = {
 /**
  * @typedefn ScriptDeploymentDict
  * @description dictionary mapping a script's label to its details
- * @property {string} key - The shorthand name used when coding the script.
+ * @property {string} key - The name of the script.
  * @property {ScriptDetails} value - The script details for the script.
  */
 export type ScriptDictionary = { 
@@ -48,15 +48,15 @@ export type ScriptDictionary = {
 /**
  * @typedefn ScriptDetails
  * @description Script details for NetSuite SuiteScript. assume that the script has been uploaded, a script record made, and a script deployment record made.
- * @property {string | number} scriptId - The ID of the script.
+ * @property {number} scriptId - The ID of the script.
  * @property {string} [scriptName] - The script record's name field on NetSuite.
- * @property {string | number} deployId - The ID of the script deployment.
+ * @property {number} deployId - The ID of the script deployment.
  * @property {string} [deployName] - The script deployment record's name field on NetSuite.
  */
 export type ScriptDetails = {
-    scriptId: string | number;
+    scriptId: number;
     scriptName?: string;
-    deployId: string | number
+    deployId: number
     deployName?: string;
 };
 

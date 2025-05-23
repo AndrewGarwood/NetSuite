@@ -314,22 +314,18 @@ const LogTypeEnum = {
  */
 
 /**
- * @enum {string} **`idPropertyEnum`**
- * @property {string} INTERNAL_ID - The `internalid` (for all records).
- * @property {string} EXTERNAL_ID - The `externalid` (for all records).
- * @property {string} ENTITY_ID - The `entityid` (for relationship records)
- * @property {string} ITEM_ID - The `itemid` (for inventory records)
+ * @enum {string} `idPropertyEnum`
+ * @property {string} INTERNAL_ID - The internal ID of the record.
+ * @property {string} EXTERNAL_ID - The external ID of the record.
+ * @property {string} ENTITY_ID - The entity ID of the record.
+ * @property {string} NAME - The name of the record.
  * @readonly
  */
 const idPropertyEnum = {
-    /**`'internalid'` */
     INTERNAL_ID: 'internalid',
-    /**`'externalid'` */
     EXTERNAL_ID: 'externalid',
-    /**`'entityid'` (for relationship records) */
     ENTITY_ID: 'entityid',
-    /**`'itemid'` (for inventory records) */
-    ITEM_ID: 'itemid',
+    NAME: 'name'
 };
 
 

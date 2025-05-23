@@ -1,5 +1,5 @@
 /**
- * @file src/vendorParseOptions.ts
+ * @file src/parses/vendor/vendorParseOptions.ts
  * @description Define {@link ParseOptions} specifying how CSV row values should be parsed into NetSuite record fields to feed into {@link parseCsvToCreateOptions}.
  * - e.g. for the vendor.csv file, I want to create two records from each row, each of which potentially have two subrecords (their addresses).
  * see {@link PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS} and {@link PARSE_VENDOR_FROM_VENDOR_CSV_OPTIONS}
@@ -14,11 +14,11 @@ import {
     SublistFieldDictionaryParseOptions, 
     SublistFieldValueMapping, 
     SublistSubrecordMapping,
-} from "../../api/types";
-import { printConsoleGroup as print } from "../../io";
+} from "../../utils/api/types";
+import { printConsoleGroup as print } from "../../utils/io";
 import { READLINE as rl } from "src/config/env";
-import { ContactRoleEnum, RecordTypeEnum } from "../../api/types/NS";
-import { SB_TERM_DICTIONARY } from "../../io/mappings";
+import { ContactRoleEnum, RecordTypeEnum } from "../../utils/NS";
+import { SB_TERM_DICTIONARY } from "../../utils/io/mappings";
 import { 
     evaluatePhone, evaluateEntityId, evaluateEmail, evaluateVendorCategory,
     evaluateAlternateEmail, evaluateContactCompany,
@@ -133,7 +133,7 @@ export const PARSE_VENDOR_FROM_VENDOR_CSV_OPTIONS: ParseOptions = {
     } as FieldDictionaryParseOptions,
     sublistDictParseOptions: ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,
     valueOverrides: VENDOR_VALUE_OVERRIDES,
-    pruneFunc: pruneVendor,
+    // pruneFunc: pruneVendor,
 };
 
 export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
@@ -151,7 +151,7 @@ export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
     } as FieldDictionaryParseOptions,
     sublistDictParseOptions: ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,
     valueOverrides: VENDOR_VALUE_OVERRIDES,
-    pruneFunc: pruneContact,
+    // pruneFunc: pruneContact,
 }
 
 

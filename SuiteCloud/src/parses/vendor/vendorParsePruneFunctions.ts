@@ -1,22 +1,21 @@
 /**
- * @file src/utils/parses/vendor_contact/vendorParsePruneFunctions.ts
+ * @file src/parses/vendor/vendorParsePruneFunctions.ts
  */
 import { 
     FieldValue,
     FieldDictionary,
-    CreateRecordOptions,
+    CreateRecordOptions, PostRecordOptions,
     SetFieldValueOptions,
     SetSublistValueOptions,
     SetSubrecordOptions,
     SublistFieldDictionary,
-} from "../../api/types";
+} from "../../utils/api/types";
 import { mainLogger as log } from 'src/config/setupLog';
-import { isNullLike, RADIO_FIELD_TRUE } from "../../typeValidation";
-import { printConsoleGroup as print } from "../../io";
+import { isNullLike, RADIO_FIELD_TRUE } from "../../utils/typeValidation";
+import { printConsoleGroup as print } from "../../utils/io";
 import { READLINE as rl } from "src/config/env";
 
-// TODO: maybe refactor pruneVendor and pruneContact into a single function that takes a record type and requireFields as arguments
-
+/**@deprecated */
 export const pruneVendor = (
     vendorOptions: CreateRecordOptions,
     label?: string
@@ -51,7 +50,9 @@ export const pruneVendor = (
     }
 }
 
-/** make sure contact has a firstname and entityid. then call {@link pruneAddressBook} */
+/**
+ * @deprecated 
+ * make sure contact has a firstname and entityid. then call {@link pruneAddressBook} */
 export const pruneContact = (
     contactOptions: CreateRecordOptions,
     label?: string
@@ -80,6 +81,7 @@ export const pruneContact = (
     }
 }
 
+/**@deprecated */
 export const pruneAddressBook = (
     options: CreateRecordOptions,
     label?: string
