@@ -8,7 +8,11 @@
 export { VendorCategoryEnum } from './Record/Relationships/Vendor'
 export { ContactRoleEnum } from './Record/Relationships/Contact'
 export { CustomerStatusEnum, CustomerTaxItemEnum, CustomerCategoryEnum } from './Record/Relationships/Customer'
-
+export { 
+    SearchOperatorEnum, FilterOperatorEnum, ColumnSummaryEnum, SearchSortEnum, 
+    MultiSelectOperatorEnum, DateOperatorEnum, NumericOperatorEnum, TextOperatorEnum, 
+    RecordOperatorEnum 
+} from './Search/Search'
 /**
  * @enum {string} `UnitsTypeEnum`
  * @description Enum for unit types in NetSuite. (defined by account user)

@@ -23,26 +23,15 @@ import { mainLogger as log, INDENT_LOG_LINE as TAB } from "./config/setupLog";
 import {
     hasKeys, isBooleanFieldId, isNullLike, BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES
 } from "./utils/typeValidation";
-import { printConsoleGroup as print, getDelimiterFromFilePath} from "./utils/io";
+import { getDelimiterFromFilePath} from "./utils/io";
 import { STOP_RUNNING } from "./config/env";
 import csv from 'csv-parser';
 import fs from 'fs';
 import { ValueMapping, ValueMappingEntry, isValueMappingEntry } from "./utils/io/types";
-import { parse } from "path";
 
 const NOT_DYNAMIC = false;
 let rowIndex = 0;
 let pruneCount: Record<string, number> = {};
-
-export async function parseCsvToPostRecordOptions(
-    csvPath: string,
-    recordParseOptions: RecordParseOptions
-): Promise<ParseResults>
-
-export async function parseCsvToPostRecordOptions(
-    csvPath: string,
-    parseOptionsArray: ParseOptions[],
-): Promise<ParseResults>
 
 /**
  * @param csvPath - The path to the CSV file.
@@ -54,6 +43,16 @@ export async function parseCsvToPostRecordOptions(
  * = `{ [key` in {@link RecordTypeEnum}`]?:` `{ validPostOptions: Array<`{@link PostRecordOptions}`>, invalidParseOptions: Array<`{@link PostRecordOptions}`> } }`
  * - {@link PostRecordOptions} = `{ recordType: `{@link RecordTypeEnum}, `isDynamic: boolean`, `fieldDict: `{@link FieldDictionary}, `sublistDict: `{@link SublistDictionary}` }`
  */
+export async function parseCsvToPostRecordOptions(
+    csvPath: string,
+    recordParseOptions: RecordParseOptions
+): Promise<ParseResults>
+
+export async function parseCsvToPostRecordOptions(
+    csvPath: string,
+    parseOptionsArray: ParseOptions[],
+): Promise<ParseResults>
+
 export async function parseCsvToPostRecordOptions(
     csvPath: string,
     /** `arg2` = parseOptionsArray_OR_recordParseOptions: {@link ParseOptions}`[]` or {@link RecordParseOptions} */
@@ -151,9 +150,10 @@ export async function parseCsvToPostRecordOptions(
                     }
                 });
                 log.debug(
-                    `rowIndex: ${rowIndex} - Finished processing CSV file for recordType(s): [${Object.keys(recordParseOptions).join(', ')}]`, 
+                    `Finished processing CSV file - LastrowIndex: ${rowIndex}`,
+                    TAB + `recordType(s): [${Object.keys(recordParseOptions).join(', ')}]`, 
                     // TAB + `pruneCount:`, JSON.stringify(pruneCount),
-                    TAB + `parseSummary:`, parseSummary,//JSON.stringify(parseSummary, null, 4), 
+                    TAB + `parseSummary:`, JSON.stringify(parseSummary), 
                     TAB + `csvPath: ${csvPath}`
                 );
                 resolve(results)
@@ -344,13 +344,6 @@ export function generateSetSublistValueOptionsArray(
             }
 
             if (isNullLike(rowValue)) {
-                // print({
-                //     label: `generateSetSublistValueOptionsArray(), row=${rowIndex} rowValue after transformValue or evaluator is null or undefined`, 
-                //     details: [
-                //     `sublistFieldValueMap[${index}]: { sublistId: ${sublistId}, fieldId: ${fieldId}, defaultValue: ${defaultValue}, colName: ${colName} }`,
-                //     `rowValue="${rowValue}" -> continue to next sublistFieldValueMap`
-                //     ], printToConsole: false, printToFile: true, enableOverwrite: false
-                // });
                 continue;
             }
             arr.push({
@@ -382,7 +375,7 @@ export function generateSetFieldValueOptionsArray(
     let arr = [] as SetFieldValueOptions[];
     for (let [index, fieldValueMap] of Object.entries(fieldValueMapArray)) {
         try {
-            let { fieldId, defaultValue, colName, evaluator: evaluator, args: args } = fieldValueMap;
+            let { fieldId, defaultValue, colName, evaluator, args } = fieldValueMap;
             if (!fieldId || (isNullLike(defaultValue) && !colName && !evaluator)) {
                 throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or evaluator or defaultValue`);
             }     
@@ -398,23 +391,12 @@ export function generateSetFieldValueOptionsArray(
             }   
             
             if (isNullLike(rowValue)) {
-                // print({
-                //     label: `rowIndex ${rowIndex}: generateSetFieldValueOptionsArray() rowValue is null or undefined for fieldId="${fieldId}".`, 
-                //     details: [
-                //     `fieldValueMap[${index}]: { fieldId: "${fieldId}", defaultValue: "${defaultValue}", colName: "${colName}" }`,
-                //     `rowValue="${rowValue}" -> continue to next fieldValueMap`
-                //     ], printToConsole: false, printToFile: true, enableOverwrite: false
-                // });
                 continue;
             }
             arr.push({fieldId: fieldId, value: rowValue })
         } catch (error) {
             log.error(`rowIndex ${rowIndex}: generateSetFieldValueOptionsArray() Error processing fieldValueMapArray[${index}]:`, 
                 `${fieldValueMap}`, error);
-            // print({
-            //     label: `rowIndex: ${rowIndex} - generateSetFieldValueOptionsArray() Error processing fieldValueMap[${index}].`, 
-            //     details: [JSON.stringify(error, null, 4)], printToConsole: false, printToFile: true, enableOverwrite: false
-            // });
         }
     }
     return arr;

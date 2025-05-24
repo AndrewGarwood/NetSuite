@@ -10,7 +10,8 @@ import { parseDelimitedFileWithMapping } from "src/utils/io/reading";
 // --------------------------------------------------------------------
 /** types for the {@link parseDelimitedFileWithMapping}`()` function */
 
-/** 
+/**
+ * @deprecated 
  * Mapping of original column names to NetSuite column names
  * - Record<string, string>, entry = [originalKey, newKey(s)] 
  */
@@ -24,6 +25,18 @@ export type ColumnMapping = Record<string, string | string[]>;
 export type ValueMappingEntry = {
     newValue: FieldValue;
     validColumns: string | string[];
+};
+
+/**
+ * @description use when row[columnName] might contain multiple values e.g. `row[columnName] = "email1; email2; email3"`
+ * @property {string} col - The column name to extract a value from.
+ * @property {number} [minIndex] - Accept values from col starting at this index of regex matchResults returned from extractor(row[col])
+ */
+export type ColumnSliceOptions = {
+    /**The column name to extract a value from. */
+    colName: string;
+    /**Accept values from col starting at this index of regex matchResults returned from extractor(row[col]) */
+    minIndex?: number
 };
 
 /**
@@ -45,6 +58,7 @@ export function isValueMappingEntry(value: any): value is ValueMappingEntry {
 export type ValueMapping = Record<string, FieldValue | ValueMappingEntry>;
 
 /**
+ * @deprecated 
  * @description The MappedRow type remaps the keys of the input 
  * type T (a {@link ColumnMapping}) to its values, and assigns the type string to all 
  * the new keys
@@ -70,7 +84,7 @@ export type MappedRow<T extends ColumnMapping> = {
 
 /**
  * @description The DelimitedFileTypeEnum enum defines the possible file types for delimited files.
- * @enum {string} DelimitedFileTypeEnum
+ * @enum {string} **`DelimitedFileTypeEnum`**
  * @property {string} CSV - Comma-separated values (CSV) file type.
  * @property {string} TSV - Tab-separated values (TSV) file type.
  * @property {string} AUTO - call {@link getDelimiterFromFilePath}(filePath, fileType) to detect file type based on file extension.
@@ -82,7 +96,7 @@ export enum DelimitedFileTypeEnum {
 }
 
 /**
- * @enum {string} `DelimiterCharacterEnum`
+ * @enum {string} **`DelimiterCharacterEnum`**
  * @property {string} TAB  `\t` - Tab character used as a delimiter.
  * @property {string} COMMA  `,` - Comma character used as a delimiter.
  * @description The DelimiterEnum enum defines the possible delimiters for CSV files.

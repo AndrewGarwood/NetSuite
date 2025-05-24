@@ -16,7 +16,8 @@ import {
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, COMPANY_KEYWORDS_PATTERN, COMPANY_ABBREVIATION_PATTERN,
     checkForOverride,
     SALUTATION_REGEX,
-    ValueMapping, 
+    ValueMapping,
+    ColumnSliceOptions, 
 } from "../utils/io";
 
 export const ENTITY_VALUE_OVERRIDES: ValueMapping = {
@@ -86,99 +87,58 @@ export const isPerson = (
     return true;
 }
 
+
 /**
- * `row[mainPhoneColumn]` might contain multiple phone numbers, so use mainPhoneMatchIndex
- * to specify the phone number to use as a value for a particular entity phone field.
- * @param row - `Record<string, any>` the `row` of data to look for a phone number in
- * @param mainPhoneColumn `string` - the column of the `row` to look for the main phone number in. default = `'Main Phone'`
- * @param mainPhoneMatchIndex `number` - the index of the phone number to select from `row[mainPhoneColumn]` if it contains multiple phone numbers
- * @param phoneColumns `string[]` the columns of the `row` to look for a phone number in
- * @returns `phone` - `string` - the formatted version of the first valid phone number found in the `row`, or an empty string if none is found.
- * @see {@link extractPhone} for the regex used to validate the phone number.
+ * @param row - `Record<string, any>` the `row` of data
+ * @param columnOptions `Array<string |` {@link ColumnSliceOptions}`>` the columns of the `row` to look for the fieldValue in
+ * @returns `matchResults[minIndex]` - `string` - or an empty string if none is found.
  */
-export const phone = (
-    row: Record<string, any>, 
-    mainPhoneColumn: string='Main Phone',
-    mainPhoneMatchIndex: number=0,
-    ...phoneColumns: string[]
+export const field = (
+    row: Record<string, any>,
+    extractor: (fieldValue: string) => RegExpMatchArray | null | string[],
+    ...columnOptions: ColumnSliceOptions[] | string[] | Array<string | ColumnSliceOptions>
 ): string => {
-    if (!row || !mainPhoneColumn || row[mainPhoneColumn] === undefined || row[mainPhoneColumn] === null || !phoneColumns) {
+    if (!row) {
         return '';
     }
-    if (typeof mainPhoneMatchIndex !== 'number' || mainPhoneMatchIndex < 0) {
-        log.error(`Invalid mainPhoneMatchIndex: "${mainPhoneMatchIndex}", mainPhoneMatchIndex must be a non-negative integer`);
-        return '';
-    }
-    let phone: string = '';
-    const debugLogs: any[] = [
-        `phone("${mainPhoneColumn}", "${mainPhoneMatchIndex}", ${phoneColumns})`,
-    ]
-    for (const col of phoneColumns) {
+    for (const colOption of columnOptions) {
+        const col = typeof colOption === 'string' ? colOption : colOption.colName;
+        const minIndex = typeof colOption === 'object' && colOption.minIndex ? colOption.minIndex : 0;
         let initialVal = cleanString(row[col]);
         if (!initialVal) {
             continue;
         }
-        const matchResults = extractPhone(initialVal);
-        if (!matchResults || (col === mainPhoneColumn && matchResults.length <= mainPhoneMatchIndex)) {
+        const matchResults = extractor(initialVal);
+        if (!matchResults || matchResults.length <= minIndex || !matchResults[minIndex]) {
             continue;
         }
-        let index = col === mainPhoneColumn ? mainPhoneMatchIndex : 0;
-        phone = String(matchResults ? matchResults[index] : '')
-            .replace(/([a-zA-Z]+\s*$)/, ''); // remove any trailing letters
-        debugLogs.push(
-            TAB + `row["${col}"]="${initialVal}", matchResults=${JSON.stringify(matchResults)}`,
-            TAB + `col === mainPhoneColumn ? ${col === mainPhoneColumn}, index=${index}, phone="${phone}"`,);
-        if (phone) {
-            debugLogs.push(
-                ` -> returning "${phone}" from "${col}" column with initialVal="${initialVal}"`,
-            );
-            log.debug(...debugLogs);
-            return phone; 
-        }// return the first valid phone number found
+        return matchResults[minIndex];
     }
-    debugLogs.push(
-        ` -> reached end of phone() -> returning empty string`,
-    );
-    log.debug(...debugLogs);
     return ''
 }
 
 /**
- * `row[mainEmailColumn]` might contain multiple email addresses, so use mainEmailMatchIndex 
- * to specify the email address to use as a value for a particular entity email field.
+ * @param row - `Record<string, any>` the `row` of data to look for an phone number in
+ * @param phoneColumnOptions `Array<string |` {@link ColumnSliceOptions}`>` the columns of the `row` to look for an phone number in
+ * @returns `email` - `string` - the first valid phone number found, or an empty string if none found.
+ */
+export const phone = (
+    row: Record<string, any>, 
+    ...phoneColumnOptions: Array<string | ColumnSliceOptions>
+): string => {
+    return field(row, extractPhone,...phoneColumnOptions);
+}
+
+/**
  * @param row - `Record<string, any>` the `row` of data to look for an email address in
- * @param mainEmailColumn `string` - the column of the `row` to look for the main email address in. default = `'Main Email'`
- * @param mainEmailMatchIndex `number` - the index of the email address to use from the `row[mainEmailColumn]` if it contains multiple email addresses
- * @param emailColumns `string[]` - 
+ * @param emailColumnOptions - `Array<string |` {@link ColumnSliceOptions}`>` the columns of the `row` to look for an email address in
  * @returns `email` - `string` - the first valid email address found, or an empty string if none found.
  */
 export const email = (
     row: Record<string, any>,
-    mainEmailColumn: string='Main Email', 
-    mainEmailMatchIndex: number=0,
-    ...emailColumns: string[]
+    ...emailColumnOptions: Array<string | ColumnSliceOptions>
 ): string => {
-    if (!row || !mainEmailColumn || row[mainEmailColumn] === undefined || row[mainEmailColumn] === null || !emailColumns) {
-        return '';
-    }
-    if (typeof mainEmailMatchIndex !== 'number' || mainEmailMatchIndex < 0) {
-        log.error(`Invalid mainEmailMatchIndex: "${mainEmailMatchIndex}", mainEmailMatchIndex must be a non-negative integer`);
-        return '';
-    }
-    let email: string = '';
-    for (const col of emailColumns) {
-        let initialVal = cleanString(row[col]);
-        if (!initialVal) {
-            continue;
-        }
-        const matchResults = extractEmail(initialVal);
-        if (!matchResults || (col === mainEmailColumn && matchResults.length <= mainEmailMatchIndex)) {
-            continue;
-        }
-        email = matchResults ? matchResults[col === mainEmailColumn ? mainEmailMatchIndex : 0] : '';
-        if (email) { return email; }// return the first valid email address found
-    }
-    return ''
+    return field(row, extractEmail, ...emailColumnOptions);
 }
 
 export const salutation = (
