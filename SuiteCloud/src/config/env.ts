@@ -31,7 +31,7 @@ export const STOP_RUNNING = (exitCode: number=0, ...msg: any[]): void => {
  * @example DELAY(1000) // pauses for 1 second
  * */
 export const DELAY = (ms: number, ...msg: any[]): Promise<void> => {
-    console.log(`Pausing for ${ms} milliseconds...`, ...(msg || []));
+    console.log(`Pausing for ${ms} milliseconds:`, ...(msg || []));
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 

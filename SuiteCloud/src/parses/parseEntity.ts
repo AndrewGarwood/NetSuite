@@ -135,13 +135,13 @@ export async function parseEntityFile(
             TAB + `${entityType}UpdateResponses.length: ${entityUpdateResponses.length}`,
         );
         log.debug(...debugLogs);
-        write({ [`${entityType}Options`]: entities }, `${entityType}_options.json`, `${OUTPUT_DIR}/parses/${entityType}`);
-        write({ validContacts: validContacts }, `contact_options.json`, `${OUTPUT_DIR}/parses/${entityType}`);
-        write({ removedContacts: removedContacts }, `removed_contacts.json`, `${OUTPUT_DIR}/parses/${entityType}`);
+        write({ [`${entityType}Options`]: entities }, `${OUTPUT_DIR}/parses/${entityType}`, `${entityType}_options.json`);
+        write({ validContacts: validContacts }, `${OUTPUT_DIR}/parses/${entityType}`, `contact_options.json`);
+        write({ removedContacts: removedContacts }, `${OUTPUT_DIR}/parses/${entityType}`, `removed_contacts.json`);
 
-        write({ [`${entityType}Results`]: entityResults }, `${entityType}_results.json`, `${OUTPUT_DIR}/parses/${entityType}`);
-        write({ contactResults: contactResults }, `contact_results.json`, `${OUTPUT_DIR}/parses/${entityType}`);
-        // write({ [`${entityType}UpdateResponses`]: updateResponses }, `${entityType}_update_responses.json`, `${OUTPUT_DIR}/parses/${entityType}`);
+        write({ [`${entityType}Results`]: entityResults }, `${OUTPUT_DIR}/parses/${entityType}`, `${entityType}_results.json`);
+        write({ contactResults: contactResults }, `${OUTPUT_DIR}/parses/${entityType}`, `contact_results.json`);
+        // write({ [`${entityType}UpdateResponses`]: updateResponses }, `${OUTPUT_DIR}/parses/${entityType}`, `${entityType}_update_responses.json`);
         return;
 
     } catch (error) {

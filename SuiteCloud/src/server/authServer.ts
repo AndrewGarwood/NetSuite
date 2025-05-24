@@ -10,7 +10,7 @@ import {
 } from '../config/env';
 import { createUrlWithParams } from 'src/utils/api/url';
 import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from './types';
-import { writeObjectToJson, getCurrentPacificTime, readJsonFileAsObject, printConsoleGroup as print, calculateDifferenceOfDateStrings, TimeUnitEnum, } from 'src/utils/io';
+import { writeObjectToJson as write, getCurrentPacificTime, readJsonFileAsObject, printConsoleGroup as print, calculateDifferenceOfDateStrings, TimeUnitEnum, } from 'src/utils/io';
 import { mainLogger as log } from 'src/config/setupLog';
 import path from 'node:path';
 const STEP2_TOKENS_PATH = path.join(TOKEN_DIR, 'STEP2_tokens.json') as string;
@@ -151,9 +151,8 @@ export async function initiateAuthFlow(
             
             const tokenResponse: TokenResponse = await exchangeAuthCodeForTokens(authCode);
             tokenResponse.lastUpdated = getCurrentPacificTime();
-            writeObjectToJson(
+            write(
                 tokenResponse,
-                undefined,
                 STEP2_TOKENS_PATH
             );
             return tokenResponse;        
@@ -171,9 +170,8 @@ export async function initiateAuthFlow(
             }
             const refreshedTokens: TokenResponse = await exchangeRefreshTokenForNewTokens(tokenResponse.refresh_token);
             refreshedTokens.lastUpdated = getCurrentPacificTime();
-            writeObjectToJson(
+            write(
                 refreshedTokens,
-                undefined,
                 STEP3_TOKENS_PATH
             );
             return refreshedTokens;
