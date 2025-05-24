@@ -4,13 +4,14 @@
 import axios from "axios";
 import { writeObjectToJson as write } from "../io";
 import { mainLogger as log, INDENT_LOG_LINE as TAB } from "src/config/setupLog";
-import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR  } from "../../config/env";
+import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "./url";
 import { getAccessToken, AxiosCallEnum, AxiosContentTypeEnum } from "src/server";
-import { BatchPostRecordRequest, BatchPostRecordResponse, PostRecordOptions, RetrieveRecordByIdRequest, ScriptDictionary } from "./types";
+import { BatchPostRecordRequest, BatchPostRecordResponse, PostRecordOptions, PostRecordResult, RetrieveRecordByIdRequest, ScriptDictionary } from "./types";
 
 export const SB_REST_SCRIPTS = SE.sandbox?.restlet || {} as ScriptDictionary;
 export const BATCH_SIZE = 100;
+const TWO_SECOND_DELAY = 2000;
 
 const BATCH_UPSERT_SCRIPT_ID = SB_REST_SCRIPTS.POST_BatchUpsertRecord.scriptId as number;
 const BATCH_UPSERT_DEPLOY_ID = SB_REST_SCRIPTS.POST_BatchUpsertRecord.deployId as number;
@@ -31,10 +32,8 @@ export function partitionArrayBySize(
     return batches;
 }
 
-export type PostPayload = AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN_TEXT;
-
 /**
- * enforces max batch size of 100 records per payload e.g. if `payload.upsertRecordArray` > 100,
+ * enforces max {@link BATCH_SIZE} of 100 records per payload e.g. if `payload.upsertRecordArray` > 100,
  * then split into multiple payloads of at most 100 records each
  * @param payload {@link BatchPostRecordRequest}
  * @param scriptId `number`
@@ -47,12 +46,12 @@ export async function postRecordPayload(
     deployId: number=BATCH_UPSERT_DEPLOY_ID,
 ): Promise<any[]> {
     if (!payload || Object.keys(payload).length === 0) {
-        log.error('postRecordPayload() payload is undefined or empty. Cannot call RESTlet.');
+        log.error('postRecordPayload() payload is undefined or empty. Cannot call RESTlet. Exiting...');
         STOP_RUNNING(1);
     }
     const accessToken = await getAccessToken();
     if (!accessToken) {
-        log.error('postRecordPayload() getAccessToken() is undefined. Cannot call RESTlet.');
+        log.error('postRecordPayload() getAccessToken() is undefined. Cannot call RESTlet. Exiting...');
         STOP_RUNNING(1);
     }
     const { upsertRecordArray, upsertRecordDict, responseProps } = payload;
@@ -63,16 +62,6 @@ export async function postRecordPayload(
         batches.push(...partitionArrayBySize(upsertRecordArray, BATCH_SIZE));
         for (let i = 0; i < batches.length; i++) {
             const batch = batches[i];
-            let batchPayloadSummary: Record<string, number> = {};
-            for (const options of upsertRecordArray) {
-                const recordType = options.recordType;
-                if (recordType) {
-                    if (!batchPayloadSummary[recordType]) {
-                        batchPayloadSummary[recordType] = 0;
-                    }
-                    batchPayloadSummary[recordType]++;
-                }
-            } 
             try {
                 const res = await POST(
                     accessToken, scriptId, deployId,
@@ -82,10 +71,14 @@ export async function postRecordPayload(
                     } as BatchPostRecordRequest,
                 );
                 responses.push(res);
-                await DELAY(1000); 
-                log.debug(
-                    `finished batch ${i+1} of ${batches.length}`, 
-                    TAB + `batchPayloadSummary: ${JSON.stringify(batchPayloadSummary)}`
+                await DELAY(TWO_SECOND_DELAY,
+                    TAB + `finished batch ${i+1} of ${batches.length}`,
+                    TAB + `batchIndex=${i} results: `, JSON.stringify(((res.data as BatchPostRecordResponse).results as PostRecordResult[])
+                        .reduce((acc, postResult) => {
+                            acc[postResult.recordType] = (acc[postResult.recordType] || 0) + 1;
+                            return acc;
+                        }, {} as Record<string, number>), null, 4)
+                        .split('\n').map(line => TAB + line).join(''),
                 );
             } catch (error) {
                 log.error(`Error in callApi.ts postRecordPayload().upsertRecordArray.POST(batchIndex=${i}):`, error);
@@ -101,6 +94,7 @@ export async function postRecordPayload(
             responses.push(res);
         } catch (error) {
             log.error('Error in callApi.ts postRecordPayload().upsertRecordDict.POST():', error);
+            write({error: error}, ERROR_DIR, 'ERROR_postRecordPayload.json');
             throw error;
         }
     } 
@@ -131,14 +125,13 @@ export async function retrieveRecordById(
     }
 }
 
-
 /**
  * 
  * @param {string} accessToken 
  * @param {string | number} scriptId 
  * @param {string | number} deployId 
  * @param {Record<string, any>} payload 
- * @param {PostPayload} contentType {@link PostPayload}. default = {@link AxiosContentTypeEnum.JSON},
+ * @param {PostPayload} contentType AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN_TEXT. default = {@link AxiosContentTypeEnum.JSON},
  * @returns {Promise<any>}
  */
 export async function POST(
@@ -146,19 +139,19 @@ export async function POST(
     scriptId: string | number, 
     deployId: string | number,
     payload: Record<string, any> | any,
-    contentType: PostPayload = AxiosContentTypeEnum.JSON,
+    contentType: AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN_TEXT = AxiosContentTypeEnum.JSON,
 ): Promise<any> {
     if (!scriptId || !deployId) {
-        log.error('callApi.ts POST() scriptId or deployId is undefined. Cannot call RESTlet.');
-        throw new Error('scriptId or deployId is undefined. Cannot call RESTlet.');
+        log.error('callApi.ts POST().scriptId or deployId is undefined. Cannot call RESTlet.');
+        throw new Error('callApi.ts POST().scriptId or deployId is undefined. Cannot call RESTlet.');
     }
     if (!accessToken) {
-        log.error('callApi.ts POST() getAccessToken() is undefined. Cannot call RESTlet.');
-        throw new Error('getAccessToken() is undefined. Cannot call RESTlet.');
+        log.error('callApi.ts POST().accessToken is undefined. Cannot call RESTlet.');
+        throw new Error('callApi.ts POST().accessToken is undefined. Cannot call RESTlet.');
     }
     if (!payload) {
-        log.error('callApi.ts POST() payload is undefined. Cannot call RESTlet.');
-        throw new Error('payload is undefined. Cannot call RESTlet.');
+        log.error('callApi.ts POST().payload is undefined. Cannot call RESTlet.');
+        throw new Error('callApi.ts POST().payload is undefined. Cannot call RESTlet.');
     }
     const restletUrl = createUrlWithParams(RESTLET_URL_STEM, {
         script: scriptId,
@@ -174,23 +167,23 @@ export async function POST(
         return response;
     } catch (error) {
         log.error('Error in callApi.ts POST():');//, error);
-        write({error: error}, 'ERROR_POST.json', OUTPUT_DIR);
+        write({error: error}, ERROR_DIR, 'ERROR_POST.json');
         throw new Error('Failed to call RESTlet with payload');
     }
 }
 
 /**
  * 
- * @param accessToken 
- * @param scriptId 
- * @param deployId 
+ * @param accessToken `string`
+ * @param scriptId `number`
+ * @param deployId `number`
  * @param params `Record<string, any>` to pass as query parameters into the {@link URL}. constructed using {@link createUrlWithParams}
- * @returns {Promise<any>}
+ * @returns `response` - `{Promise<any>}`
  */
 export async function GET(
     accessToken: string, 
-    scriptId: string | number, 
-    deployId: string | number,
+    scriptId: number, 
+    deployId: number,
     params: Record<string, any>,
 ): Promise<any> {
     if (!params) {
@@ -205,9 +198,11 @@ export async function GET(
         log.error('GET() getAccessToken() is undefined. Cannot call RESTlet.');
         throw new Error('getAccessToken() is undefined. Cannot call RESTlet.');
     }
-    params.script = scriptId;
-    params.deploy = deployId;
-    const restletUrl = createUrlWithParams(RESTLET_URL_STEM, params).toString();
+    const restletUrl = createUrlWithParams(RESTLET_URL_STEM, {
+        script: scriptId,
+        deploy: deployId,
+        ...params,
+    }).toString();
     try {
         const response = await axios.get(restletUrl, {
             headers: { 
@@ -229,7 +224,7 @@ export async function GET(
  * @param {string | number} deployId `number`
  * @param {AxiosCallEnum} callType {@link AxiosCallEnum}
  * @param {AxiosContentTypeEnum} contentType {@link AxiosContentTypeEnum}
- * @returns {Promise<any>}
+ * @returns `response` `{Promise<any>}`
  */
 export async function REST(
     accessToken: string, 

@@ -73,8 +73,8 @@ export async function parseVendorFile(
         const validContacts: PostRecordOptions[] = [];
 
         const contactResults: PostRecordResult[] = [];
-        write({ vendors: vendors}, 'vendor_options_array.json', `${OUTPUT_DIR}parses/vendor`);
-        write({ contacts: contacts}, 'contact_options_array.json', `${OUTPUT_DIR}parses/vendor`);
+        write({ vendors: vendors}, `${OUTPUT_DIR}parses/vendor`, 'vendor_options.json');
+        write({ contacts: contacts}, `${OUTPUT_DIR}parses/vendor`, 'contact_options.json');
 
     } catch (error) {
         log.error('Error parsing CSV to PostRecordOptions:', error);
