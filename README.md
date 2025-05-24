@@ -14,6 +14,6 @@
 6. Use authorization tokens generated from authorization flow to make API calls, e.g. in [SuiteCloud/src/parses/parseEntity.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parses/parseEntity.ts) using functions from [SuiteCloud/src/utils/api/callApi.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/callApi.ts)
 7. Write more features/improvements and refactor as work continues.
 
-#### Guides I found useful for using SuiteScript: 
+#### Guides I found helpful for using SuiteScript: 
 - [NetSuite RESTlet Creation - SuiteScript 2.0 with OAuth 2 - YouTube](https://www.youtube.com/watch?v=MAOMQp5dh0U)
 - [The SuiteScript Developer's Guide on NetSuite Subrecords - NetSuite Insights](https://netsuite.smash-ict.com/suitescript-developers-guide-on-netsuite-subrecords-part-1/)

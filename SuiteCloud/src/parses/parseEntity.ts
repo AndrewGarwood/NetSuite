@@ -24,7 +24,7 @@ export const CONTACT_RESPONSE_PROPS = ['entityid', 'company', 'firstname', 'last
  * contact record has a `select` field for company,
  * - if a `entityType` is a company, then the associated `contact.company` field should be set to the entity's `internalid`
  * - ...so let's make the entities first and get their `internalid`(s) in the Post Response
- * @param filePath - path to the local csv file containing the entity data 
+ * @param filePath - `string` - path to the csv file containing the entity data 
  * @param entityType - {@link EntityRecordTypeEnum} - type of the primary entity to parse from file at filePath
  * @param parseOptions - `Array<`{@link ParseOptions}`>` - apply parse definitions to the file's rows
  * @returns `Promise<void>` - returns nothing
@@ -135,13 +135,13 @@ export async function parseEntityFile(
             TAB + `${entityType}UpdateResponses.length: ${entityUpdateResponses.length}`,
         );
         log.debug(...debugLogs);
-        write({ [`${entityType}Options`]: entities }, `${entityType}_options.json`, `${OUTPUT_DIR}/${entityType}`);
-        write({ validContacts: validContacts }, `contact_options.json`, `${OUTPUT_DIR}/${entityType}`);
-        write({ removedContacts: removedContacts }, `removed_contacts.json`, `${OUTPUT_DIR}/${entityType}`);
+        write({ [`${entityType}Options`]: entities }, `${entityType}_options.json`, `${OUTPUT_DIR}/parses/${entityType}`);
+        write({ validContacts: validContacts }, `contact_options.json`, `${OUTPUT_DIR}/parses/${entityType}`);
+        write({ removedContacts: removedContacts }, `removed_contacts.json`, `${OUTPUT_DIR}/parses/${entityType}`);
 
-        write({ [`${entityType}Results`]: entityResults }, `${entityType}_results.json`, `${OUTPUT_DIR}/${entityType}`);
-        write({ contactResults: contactResults }, `contact_results.json`, `${OUTPUT_DIR}/${entityType}`);
-        // write({ [`${entityType}UpdateResponses`]: updateResponses }, `${entityType}_update_responses.json`, `${OUTPUT_DIR}/${entityType}`);
+        write({ [`${entityType}Results`]: entityResults }, `${entityType}_results.json`, `${OUTPUT_DIR}/parses/${entityType}`);
+        write({ contactResults: contactResults }, `contact_results.json`, `${OUTPUT_DIR}/parses/${entityType}`);
+        // write({ [`${entityType}UpdateResponses`]: updateResponses }, `${entityType}_update_responses.json`, `${OUTPUT_DIR}/parses/${entityType}`);
         return;
 
     } catch (error) {

@@ -1,8 +1,8 @@
 /**
  * @file src/utils/api/types/PostRequests.ts
  */
-import { FieldDictionary, FieldValue, LogStatement, SublistDictionary } from '.';
-import { RecordTypeEnum, EntityRecordTypeEnum } from '../../NS';
+import { FieldDictionary, FieldValue, idPropertyEnum, LogStatement, SublistDictionary } from '.';
+import { RecordTypeEnum, EntityRecordTypeEnum, RecordOperatorEnum } from '../../NS';
 
 
 /**
@@ -56,6 +56,10 @@ export type BatchPostRecordResponse = {
 /**
  * @typedefn **`PostRecordOptions`**
  * @property {RecordTypeEnum | EntityRecordTypeEnum} recordType - The record type to post, see {@link RecordTypeEnum}
+ * @property {boolean} [isDynamic=false] - Indicates if the record should be created/loaded in dynamic mode. (defaults to false)
+ * @property {idSearchOptions[]} [idOptions] - = `Array<`{@link idSearchOptions}`>` 
+ * - = `{ idProp`: {@link idPropertyEnum}, `idValue`: string | number, `searchOperator`: {@link RecordOperatorEnum}` }[]`
+ * - options specifying how to search for an existing record.
  * @property {FieldDictionary} [fieldDict] a dictionary of field IDs and values.
  * - {@link FieldDictionary} = `{ valueFields`: `Array<`{@link SetFieldValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`.
  * @property {SublistDictionary} [sublistDict] an object containing sublist IDs mapped to a dictionary of field IDs and values.
@@ -64,8 +68,22 @@ export type BatchPostRecordResponse = {
  */
 export type PostRecordOptions = {
     recordType: RecordTypeEnum | EntityRecordTypeEnum;
-    fieldDict?: Omit<FieldDictionary, 'priorityFields' | 'textFields'>;
+    isDynamic?: boolean;
+    idOptions?: idSearchOptions[];
+    fieldDict?: FieldDictionary;
     sublistDict?: SublistDictionary;
+}
+
+/**
+ * @typedefn **`idSearchOptions`**
+ * @property {idPropertyEnum} idProp - The property to search for. See {@link idPropertyEnum}
+ * @property {RecordOperatorEnum} searchOperator - The operator to use for the search. See {@link RecordOperatorEnum}
+ * @property {string | number | string[] | number[]} idValue - The value(s) of the property to search for.
+ */
+export type idSearchOptions = {
+    idProp: idPropertyEnum;
+    searchOperator: RecordOperatorEnum;
+    idValue: string | number | string[] | number[];
 }
 
 

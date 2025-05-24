@@ -8,7 +8,6 @@
  * @SbDeployId 1
  */
 
-
 define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     /**
      * @type {LogStatement[]} - `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
@@ -19,18 +18,18 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
 
     /**
      * **`upsertRecordArray`** and **`upsertRecordDict`** are ***mutually exclusive***
-     * @param {BatchUpsertRecordRequest} reqBody - {@link BatchUpsertRecordRequest} = `{ upsertRecordArray`: {@link UpsertRecordOptions}`[], upsertRecordDict: {[K in `{@link RecordTypeEnum}`]?: Array<`{@link UpsertRecordOptions}`>}, responseProps: string | string[] }`
-     * @param {Array<UpsertRecordOptions>} [reqBody.upsertRecordArray] `METHOD 1 —`
-     * `Array<`{@link UpsertRecordOptions}`>` = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]`
+     * @param {BatchPostRecordRequest} reqBody - {@link BatchPostRecordRequest} = `{ upsertRecordArray`: {@link PostRecordOptions}`[], upsertRecordDict: {[K in `{@link RecordTypeEnum}`]?: Array<`{@link PostRecordOptions}`>}, responseProps: string | string[] }`
+     * @param {Array<PostRecordOptions>} [reqBody.upsertRecordArray] `METHOD 1 —`
+     * `Array<`{@link PostRecordOptions}`>` = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]`
      * - for `req` in `reqBody.upsertRecordArray`
-     * > run function {@link processUpsertRecordOptions}(`req`)
-     * @param {{[K in RecordTypeEnum]?: Array<UpsertRecordOptions>}} [reqBody.upsertRecordDict] `METHOD 2 — `
-     * `Record<`[K in {@link RecordTypeEnum}]?: `Array<`{@link UpsertRecordOptions}`>>`
+     * > run function {@link processPostRecordOptions}(`req`)
+     * @param {{[K in RecordTypeEnum]?: Array<PostRecordOptions>}} [reqBody.upsertRecordDict] `METHOD 2 — `
+     * `Record<`[K in {@link RecordTypeEnum}]?: `Array<`{@link PostRecordOptions}`>>`
      * - for `recordType` in `Object.keys(reqBody.upsertRecordDict)`
      * - - for `req` in `reqBody.upsertRecordDict[recordType]`
-     * - - - run function {@link processUpsertRecordOptions}(`req`)
+     * - - - run function {@link processPostRecordOptions}(`req`)
      * @param {string | string[]} reqBody.responseProps - `(optional)` the properties to include in the response in addition to the upserted records' IDs.
-     * @returns {BatchUpsertRecordResponse} .{@link BatchUpsertRecordResponse}
+     * @returns {BatchPostRecordResponse} .{@link BatchPostRecordResponse}
      */
     const post = (reqBody) => {
         const { upsertRecordArray, upsertRecordDict, responseProps } = reqBody;
@@ -45,15 +44,15 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             return { success: false, message: 'upsertRecordArray and upsertRecordDict are mutually exclusive', error: 'Invalid request body', logArray, results: [] };
         }
         /**@type {PostRecordResult[]} */
-        let results = [];
+        const results = [];
         try {
             if (upsertRecordArray && isNonEmptyArray(upsertRecordArray)) {
                 writeLog(LogTypeEnum.AUDIT, 'upsertRecordArray.length', upsertRecordArray.length);
                 for (let i = 0; i < upsertRecordArray.length; i++) {
                     const options = upsertRecordArray[i];
-                    const result = processUpsertRecordOptions(options, responseProps);
+                    const result = processPostRecordOptions(options, responseProps);
                     if (!result) {
-                        writeLog(LogTypeEnum.ERROR, `post.processUpsertRecordOptions() failed for upsertRecordArray[${i}]`);//, options);
+                        writeLog(LogTypeEnum.ERROR, `post.processPostRecordOptions() failed for upsertRecordArray[${i}]`);//, options);
                         continue;
                     }
                     results.push(result);
@@ -70,9 +69,9 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     }
                     for (let i = 0; i < optionsArray.length; i++) {
                         const options = optionsArray[i];
-                        const result = processUpsertRecordOptions(options, responseProps);
+                        const result = processPostRecordOptions(options, responseProps);
                         if (!result) {
-                            writeLog(LogTypeEnum.ERROR, `post.processUpsertRecordOptions() failed for upsertRecordDict[${recordType}][${i}]`);//, options);
+                            writeLog(LogTypeEnum.ERROR, `post.processPostRecordOptions() failed for upsertRecordDict[${recordType}][${i}]`);//, options);
                             continue;
                         }
                         results.push(result);
@@ -80,7 +79,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 }
             }
             writeLog(LogTypeEnum.AUDIT, 'End of POST_BatchUpsertRecord', { numRecordsProcessed: results.length });
-            /**@type {BatchUpsertRecordResponse} */
+            /**@type {BatchPostRecordResponse} */
             return {
                 success: true,
                 message: 'Batch upsert completed, numRecordsProcessed: ' + results.length,
@@ -89,7 +88,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             }
         } catch (e) {
             writeLog(LogTypeEnum.ERROR, 'Error in POST_BatchUpsertRecord', JSON.stringify(e));
-            /**@type {BatchUpsertRecordResponse} */
+            /**@type {BatchPostRecordResponse} */
             return {
                 success: false,
                 message: 'Error in POST_BatchUpsertRecord: Batch upsert failed after processing ' + results.length + ' records',
@@ -101,57 +100,61 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     }
     /**
      * 
-     * @param {UpsertRecordOptions} options {@link UpsertRecordOptions} = `{ recordType`: {@link RecordTypeEnum}, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }`
+     * @param {PostRecordOptions} options {@link PostRecordOptions} = `{ recordType`: {@link RecordTypeEnum}, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }`
      * @param {string} options.recordType - The record type to create, see {@link RecordTypeEnum}
+     * @param {boolean} [options.isDynamic] - `(optional)` whether to create/load the record in dynamic or standard mode. Default is `false`.
+     * - `true` = dynamic mode, `false` = standard mode.
+     * @param {idSearchOptions[]} [options.idOptions] - `(optional)` an array of id search options to find an existing record to upsert.
+     * - {@link idSearchOptions} = `{ idProp`: {@link idPropertyEnum}, `searchOperator`: {@link SearchOperatorEnum}, `idValue`: string | number` }`
      * @param {FieldDictionary} [options.fieldDict]
      * - {@link FieldDictionary} = `{ valueFields`: `Array<`{@link SetFieldValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`.
-     * - an object containing field IDs and their corresponding values.
+     * - an object containing fieldIds and their corresponding values.
      * @param {SublistDictionary} [options.sublistDict]
      * - {@link SublistDictionary} = `Record<[sublistId`: string], {@link SublistFieldDictionary}`>` = `{ sublistId`: `{ valueFields`: `Array<`{@link SetSublistValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> } }`.
-     * - an object containing sublist IDs and their corresponding field IDs and values.
+     * - an object containing sublist IDs and their corresponding fieldIds and values.
      * @param {string | string[]} responseProps - `(optional) string | string[]` the properties to include in the response in addition to the created record ID.
      * @returns {PostRecordResult | undefined} `result`: {@link PostRecordResult} = `{ internalId`: number, `[fieldId: string in responseProps]`: {@link FieldValue}` }`
      * or `undefined` if an error occurs.
      */
-    function processUpsertRecordOptions(options, responseProps) {
-        let { recordType, fieldDict, sublistDict } = options;
+    function processPostRecordOptions(options, responseProps) {
+        let { recordType, isDynamic, idOptions, fieldDict, sublistDict } = options;
         if (!recordType || typeof recordType !== 'string' || (!fieldDict && !sublistDict)) {
             writeLog(LogTypeEnum.ERROR,
-                'processUpsertRecordOptions() Invalid UpsertRecordOptions',
-                'recordType and (fieldDict or sublistDict) are required properties of UpsertRecordOptions');
+                'processPostRecordOptions() Invalid PostRecordOptions',
+                'recordType and (fieldDict or sublistDict) are required properties of PostRecordOptions');
             return;
         }
         recordType = recordType.toLowerCase();
         if (Object.keys(RecordTypeEnum).includes(recordType.toUpperCase())) {
             recordType = RecordTypeEnum[recordType.toUpperCase()];
         } else if (!Object.values(RecordTypeEnum).includes(recordType)) {
-            writeLog(LogTypeEnum.ERROR, 'processUpsertRecordOptions() Invalid recordType',
+            writeLog(LogTypeEnum.ERROR, 'processPostRecordOptions() Invalid recordType',
                 `Invalid recordType: '${recordType}'. Must be a RecordTypeEnum key or one of RecordTypeEnum's values.`);
             return;
         }
         /**@type {Record<[idPropertyEnum: string], string | number>} */
         const idPropDict = {};
-        if (fieldDict && Array.isArray(fieldDict.valueFields)) {
+        if (!idOptions && fieldDict && Array.isArray(fieldDict.valueFields)) {
             for (const { fieldId, value } of fieldDict.valueFields) {
                 if (Object.values(idPropertyEnum).includes(fieldId)) {
                     idPropDict[fieldId] = value;
                 }
             }
+            writeLog(LogTypeEnum.AUDIT, `processPostRecordOptions() !idOptions && idPropDict`, idPropDict,);
         }
-        writeLog(LogTypeEnum.AUDIT, `idPropDict`, idPropDict,);
         /**@type {object | undefined} */
         let rec = undefined;
         let isExistingRecord = false;
-        const recId = searchForRecordById(recordType, idPropDict);
+        const recId = searchForRecordById(recordType, idOptions ? idOptions : idPropDict);
         if (!recId) {
             writeLog(LogTypeEnum.AUDIT, 
-                `processUpsertRecordOptions() No record found for ${recordType}`, 
-                `with idPropDict = ${JSON.stringify(idPropDict)}`, 
+                `processPostRecordOptions() No record found for ${recordType}`, 
+                `with idOptions = ${JSON.stringify(idOptions ? idOptions : idPropDict)}`,
                 `Creating new ${recordType} record...`
             );
-            rec = record.create({type: recordType, isDynamic: NOT_DYNAMIC});
+            rec = record.create({type: recordType, isDynamic: isDynamic || NOT_DYNAMIC});
         } else {
-            rec = record.load({type: recordType, id: recId, isDynamic: NOT_DYNAMIC});
+            rec = record.load({type: recordType, id: recId, isDynamic: isDynamic || NOT_DYNAMIC});
             isExistingRecord = true;
             writeLog(LogTypeEnum.AUDIT, 
                 `Loaded Existing ${recordType} record`, 
@@ -159,9 +162,12 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             );
             // remove idPropertyEnum fields from fieldDict.valueFields because 
             // will get an error saying the record already exists with that id
+            const idPropsUsed = idOptions ? idOptions.map(({ idProp, idValue, searchOperator }) => idProp) 
+                : Object.keys(idPropDict).length > 0 ? Object.keys(idPropDict) 
+                : Object.values(idPropertyEnum);
             if (fieldDict && Array.isArray(fieldDict.valueFields)) {
                 fieldDict.valueFields = fieldDict.valueFields.filter(({ fieldId, value }, index) => {
-                    return ![idPropertyEnum.INTERNAL_ID, idPropertyEnum.ENTITY_ID, idPropertyEnum.ITEM_ID].includes(fieldId);
+                    return !idPropsUsed.includes(fieldId);
                 });
             }
         }
@@ -176,14 +182,14 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     sublistId = sublistId.toLowerCase();
                     if (!validSublistIds.includes(sublistId)) {
                         writeLog(LogTypeEnum.ERROR, 
-                            `WARNING! processUpsertRecordOptions() Invalid sublistId: ${sublistId}`, 
-                            `processUpsertRecordOptions() Invalid sublistId: ${sublistId}`, 
+                            `WARNING! processPostRecordOptions() Invalid sublistId: '${sublistId}'`, 
+                            `processPostRecordOptions() Invalid sublistId: '${sublistId}'.`, 
                             `Sublist ID '${sublistId}' not found in ${recordType} record.`);
                         continue; // continue to next sublist
                     } else if (!hasNonTrivialKeys(sublistFieldDict)) {
                         writeLog(LogTypeEnum.ERROR, 
-                            `processUpsertRecordOptions() Invalid sublistDict[${sublistId}]`, 
-                            `processUpsertRecordOptions()'s options.sublistDict[${sublistId}]: SublistFieldDictionary is undefined or null or not an object or empty.`);
+                            `processPostRecordOptions() Invalid sublistDict[${sublistId}]`, 
+                            `processPostRecordOptions()'s options.sublistDict[${sublistId}]: SublistFieldDictionary is undefined or null or not an object or empty.`);
                         continue; // continue to next sublist
                     }
                     rec = processFieldDictionary(rec, recordType, sublistFieldDict, FieldDictTypeEnum.SUBLIST_FIELD_DICT);
@@ -215,69 +221,86 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             return result;
         } catch (e) {
             writeLog(LogTypeEnum.ERROR, 
-                `processUpsertRecordOptions() Error processing fieldDict or sublistDict`, JSON.stringify(e));
+                `processPostRecordOptions() Error processing fieldDict or sublistDict`, JSON.stringify(e));
             return;
         }
     }
+    
     /**
-     * 
      * @param {RecordTypeEnum} recordType {@link RecordTypeEnum} = record type of parent record
-     * @param {Record<[idPropertyEnum: string], string | number>} idPropDict `Record<[`{@link idPropertyEnum}`: string], string | number>`
+     * @param {Record<[idPropertyEnum: string], string | number> | idSearchOptions[]} idOptionsParam `Record<[`{@link idPropertyEnum}`: string], string | number> |` {@link idSearchOptions}`[]`
      * @returns {string | undefined} `recId` = {@link SearchResult.id} = the internalid of the record if found in the search, undefined if not found.
      */
-    function searchForRecordById(recordType, idPropDict) {
-        if (!recordType || !idPropDict) {
+    function searchForRecordById(recordType, idOptionsParam) {
+        if (!recordType) {
             writeLog(LogTypeEnum.ERROR, 
                 `searchForRecordById() Invalid parameters`, 
-                `recordType and idPropDict are required`);
+                `recordType is required`);
             return;
         }
-        if (Object.keys(idPropDict).length === 0) {
-            writeLog(LogTypeEnum.DEBUG, 
+        if (!idOptionsParam || Object.entries(idOptionsParam).length === 0) {
+            writeLog(LogTypeEnum.ERROR,
+                `searchForRecordById() Invalid parameters`,
+                `idOptionsParam is required, but received !idOptionsParam || Object.entries(idOptionsParam).length === 0`
+            );
+        }
+        /**@type {idSearchOptions[]} - {@link idSearchOptions}  */
+        const idOptions = [];
+        // convert idOptionsParam to typeof idSearchOptions[], if necessary
+        if (Array.isArray(idOptionsParam)) {
+            idOptions.push(...idOptionsParam);
+        } else if (typeof idOptionsParam === 'object') {
+            for (const idProp in idOptionsParam) {
+                idOptions.push({
+                    idProp: idProp,
+                    idValue: idProp === idPropertyEnum.INTERNAL_ID ? Number(idOptionsParam[idProp]) : String(idOptionsParam[idProp]),
+                    searchOperator: idProp === idPropertyEnum.INTERNAL_ID ? SearchOperatorEnum.RECORD.ANY_OF : SearchOperatorEnum.TEXT.IS,
+                });
+            }
+        } else {
+            writeLog(LogTypeEnum.AUDIT,
                 `searchForRecordById() Invalid parameters`, 
-                `idPropDict is empty`, `fieldDict.valueFields must contain at least one element with fieldId in idPropertyEnum`,
+                `idOptionsParam must be an idPropDict or an array of idSearchOptions, returning undefined`
             );
             return;
         }
-        for (const idProp in idPropDict) {
-            const equalityOperator = idProp === idPropertyEnum.INTERNAL_ID 
-                ? SearchOperatorEnum.RECORD.ANY_OF : SearchOperatorEnum.TEXT.IS;
-            const idValue = idProp === idPropertyEnum.INTERNAL_ID 
-                ? Number(idPropDict[idProp]) : String(idPropDict[idProp]);
+        for (let i = 0; i < idOptions.length; i++) {
+            const { idProp, searchOperator, idValue } = idOptions[i];
             try {
                 const recSearch = search.create({
                     type: recordType,
                     filters: [
-                        [idProp, equalityOperator, idValue],
+                        [idProp, searchOperator, idValue],
                     ],
                 });
                 /** @type {ResultSet} */
                 const resultSet = recSearch.run();
                 /** @type {SearchResult[]} */
                 const resultRange = resultSet.getRange({ start: 0, end: 10 });
-                if (resultRange.length > 1) {
+                if (resultRange.length > 1 // if find multiple records when the operator and property used should have only found one
+                    && (searchOperator === SearchOperatorEnum.TEXT.IS || searchOperator === SearchOperatorEnum.RECORD.ANY_OF)
+                ) {
                     writeLog(LogTypeEnum.ERROR,
                         'searchForRecordById() Multiple records found',
-                        `Multiple '${recordType}' records found with ${idProp}='${idValue}'`,
+                        `${resultRange.length} '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                         `recSearch:`, recSearch);
-                    return;
+                    continue;
                 } else if (resultRange.length === 0) {
                     writeLog(LogTypeEnum.AUDIT,
-                        'searchForRecordById() No records found',
-                        `No '${recordType}' records found with ${idProp}='${idValue}'`,);
-                    return;
-                }
+                        'searchForRecordById() 0 records found',
+                        `0 '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,);
+                    continue;
+                } // else found 1 record
                 const searchResult = resultRange[0];
                 const recId = searchResult.id;
                 writeLog(LogTypeEnum.AUDIT,
                     'searchForRecordById() Record found',
-                    `1 '${recordType}' record found with ${idProp}='${idValue}'`,);
+                    `1 '${recordType}' record found with ${idProp}='${idValue}' and operator='${searchOperator}'`,);
                 return recId;
-
             } catch (e) {
                 writeLog(LogTypeEnum.ERROR,
-                    `searchForRecordById() Error searching for ${recordType} record with ${idProp}='${idValue}'`, JSON.stringify(e));
-                return;
+                    `searchForRecordById() Error searching for ${recordType} record with ${idProp}='${idValue}' and operator='${searchOperator}'`, JSON.stringify(e));
+                continue;
             }
         }
     }
@@ -623,11 +646,11 @@ const idPropertyEnum = {
 const NOT_DYNAMIC = false;
 /**
  * Definition of Request body for the {@link post} function in POST_BatchUpsertRecord.js
- * @typedef {Object} BatchUpsertRecordRequest
- * @property {Array<UpsertRecordOptions>} [upsertRecordArray] 
- * `Array<`{@link UpsertRecordOptions}`>` to create records in NetSuite.
- * @property {{[K in RecordTypeEnum]?: Array<UpsertRecordOptions>}} [upsertRecordDict] 
- * `Record<`[K in {@link RecordTypeEnum}]?: `Array<`{@link UpsertRecordOptions}`>>` to create records in NetSuite.
+ * @typedef {Object} BatchPostRecordRequest
+ * @property {Array<PostRecordOptions>} [upsertRecordArray] 
+ * `Array<`{@link PostRecordOptions}`>` to create records in NetSuite.
+ * @property {{[K in RecordTypeEnum]?: Array<PostRecordOptions>}} [upsertRecordDict] 
+ * `Record<`[K in {@link RecordTypeEnum}]?: `Array<`{@link PostRecordOptions}`>>` to create records in NetSuite.
  * @property {string | string[]} [responseProps] - `string | string[]` - The properties to include in the response in addition to the records' internalids.
  */
 
@@ -642,7 +665,7 @@ const NOT_DYNAMIC = false;
 
 /**
  * Definition of Response for the post function in POST_BatchUpsertRecord.js
- * @typedef {Object} BatchUpsertRecordResponse
+ * @typedef {Object} BatchPostRecordResponse
  * @property {boolean} success - Indicates if the request was successful.
  * @property {string} message - A message indicating the result of the request.
  * @property {PostRecordResult[]} [results] - an `Array<`{@link PostRecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully upserted.
@@ -650,17 +673,27 @@ const NOT_DYNAMIC = false;
  * @property {LogStatement[]} logArray - an `Array<`{@link LogStatement}`>` generated during the request processing.
  */
 
-// UpsertRecordOptions
+// PostRecordOptions
 /**
- * @typedef {Object} UpsertRecordOptions
- * @property {RecordTypeEnum} recordType - The record type to create, see {@link RecordTypeEnum}
- * @property {FieldDictionary} [fieldDict] a dictionary of field IDs and values.
+ * @typedef {Object} PostRecordOptions
+ * @property {RecordTypeEnum} recordType - The record type to post, see {@link RecordTypeEnum}
+ * @property {boolean} [isDynamic=false] - Indicates if the record should be created/loaded in dynamic mode. (defaults to false)
+ * @property {idSearchOptions[]} [idOptions] - = `Array<`{@link idSearchOptions}`>` 
+ * - = `{ idProp`: {@link idPropertyEnum}, `searchOperator`: {@link RecordOperatorEnum}, `idValue`: string | number` }[]`
+ * - options to search for an existing record to upsert.
+ * @property {FieldDictionary} [fieldDict] a dictionary of fieldIds and values.
  * - {@link FieldDictionary} = `{ valueFields`: `Array<`{@link SetFieldValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`.
- * @property {SublistDictionary} [sublistDict] an object containing sublist IDs mapped to a dictionary of field IDs and values.
+ * @property {SublistDictionary} [sublistDict] an object containing sublist IDs mapped to a dictionary of fieldIds and values.
  * - {@link SublistDictionary} = `Record<[sublistId: string]`, {@link SublistFieldDictionary}`>` 
  * - - = `{ sublistId`: `{ valueFields`: `Array<`{@link SetSublistValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> } }`.
  */
 
+/**
+ * @typedef {Object} idSearchOptions
+ * @property {idPropertyEnum} idProp - The property to search for. See {@link idPropertyEnum}
+ * @property {RecordOperatorEnum} searchOperator - The operator to use for the search. See {@link RecordOperatorEnum}
+ * @property {string | number | string[] | number[]} idValue - The value(s) of `idProp` to search for using `searchOperator`.
+ */
 
 // FieldDictionary
 /**
@@ -677,7 +710,7 @@ const NOT_DYNAMIC = false;
 /**
  * @typedef {Record<string, SublistFieldDictionary>} SublistDictionary 
  * = `Record<[sublistId: string]`, {@link SublistFieldDictionary}`>` 
- * - an object containing sublist IDs mapped to a dictionary of field IDs and values.
+ * - an object containing sublist IDs mapped to a dictionary of fieldIds and values.
  */
 
 // SublistFieldDictionary
@@ -740,7 +773,7 @@ const NOT_DYNAMIC = false;
  * @property {FieldDictionary} [fieldDict] - {@link FieldDictionary} = `{ valueFields`: `Array<`{@link SetFieldValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`.
  * @property {SublistDictionary} [sublistDict] - {@link SublistDictionary} = `Record<[sublistId: string]`, {@link SublistFieldDictionary}`>` 
  * - = `{ sublistId`: `{ valueFields`: `Array<`{@link SetSublistValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> } }`.
- * - (if subrecord has own sublists) an object containing sublist IDs mapped to a dictionary of field IDs and values.
+ * - (if subrecord has own sublists) an object containing sublist IDs mapped to a dictionary of fieldIds and values.
  */
 
 
@@ -803,6 +836,7 @@ const NOT_DYNAMIC = false;
             log.error('Invalid log type', `type must be one of ${Object.values(LogTypeEnum).join(', ')}`);
             return;
         }
+        details = details || [title];
         const payload = details
             .map(d => (typeof d === 'string' ? d : JSON.stringify(d, null, 4)))
             .join(' ');
@@ -833,16 +867,16 @@ const NOT_DYNAMIC = false;
         return pacificTime;
     }
 
-    /**
-     * @enum {string} **`FilterOperatorEnum`**
-     * @readonly
-     * @property {string} AND = `'and'`
-     * @property {string} OR = `'or'`
-     */
-    const FilterOperatorEnum = {
-        AND: 'and',
-        OR: 'or',
-    };
+/**
+ * @enum {string} **`FilterOperatorEnum`**
+ * @readonly
+ * @property {string} AND = `'and'`
+ * @property {string} OR = `'or'`
+ */
+const FilterOperatorEnum = {
+    AND: 'and',
+    OR: 'or',
+};
 /**
  * @enum {string} **`SetOptionsEnum`**
  * @description `Enum` used in {@link setFieldsByOptionType}`()` to indicate which function to call for setting field values in the record.
@@ -878,7 +912,7 @@ const ColumnSummaryEnum = {
 }
 
 /**
- * @enum {string} **`SearchOperatorEnum`**
+ * @enum {string} **`SearchSortEnum`**
  */
 const SearchSortEnum = {
     ASC: 'asc',
@@ -987,7 +1021,6 @@ const MultiSelectOperatorEnum = {
  * @description operators for fields with the following input types: 
  * - `List, Record`
  * @reference https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_0304061100.html#subsect_161114820748:~:text=id%3A%20%27customsearch_my_so_search%27%0A%20%20%20%20%20%20%20%20%7D)%3B%0A%20%20%20%20%7D%0A%0A%20%20%20%20deleteSearch()%3B%0A%7D)%3B-,Search%20Using%20a%20Specific%20Record%20Field,-The%20following%20sample
-
  */
 const RecordOperatorEnum = {
     ANY_OF: 'anyof',

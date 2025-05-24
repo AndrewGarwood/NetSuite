@@ -2,15 +2,13 @@
  * @file src/utils/io/regex.ts
  */
 import { mainLogger as log, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
-import { printConsoleGroup as print } from "./writing";
 import { StringCaseOptions, StringPadOptions, StringStripOptions } from "./types/Reading";
-import { format } from 'node:path';
 
 
 /**
  * @TODO implement a StringReplaceOptions
  * @description 
- * - Removes extra spaces, commas, and dots from a string (e.g. `'..'` becomes `'.'`)
+ * - Removes leading+trailing spaces, extra spaces, commas, and dots from a string (e.g. `'..'` becomes `'.'`)
  * - optionally applies 3 option params with: {@link stripCharFromString}, {@link handleCaseOptions}, and {@link handlePadOptions}.
  * @param s - the `string` to clean
  * @param stripOptions — {@link StringStripOptions}
@@ -217,7 +215,10 @@ export const UNCONDITIONAL_STRIP_DOT_OPTIONS: StringStripOptions = {
 export const BOOLEAN_FIELD_ID_REGEX = new RegExp(/(^(is|give|send|fax|email)[a-z0-9]{2,}$)/)
 
 /** `re` = `/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/` */
-export const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+export const EMAIL_REGEX = new RegExp(
+    /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/, 
+    RegExpFlagsEnum.GLOBAL
+);
 
 export function isValidEmail(email: string): boolean {
     if (!email) return false;
@@ -229,25 +230,41 @@ export function isValidEmail(email: string): boolean {
 export function extractEmail(email: string): RegExpMatchArray | null {
     if (!email) return null;
     email = email.trim();
+    const debugLogs: any[] = [];
     const match = email.match(EMAIL_REGEX);
+    debugLogs.push(
+        `extractEmail() EMAIL_REGEX.test("${email}") = ${EMAIL_REGEX.test(email)}`, 
+        TAB + `match=${JSON.stringify(match)}`
+    );
     if (match) {
-        // log.debug(`extractEmail("${email}") = "${match[0]}"`);
+        debugLogs.push(`-> match not null -> returning ${JSON.stringify(match)}`);
+        // log.debug(...debugLogs);
         return match;
     }
+    debugLogs.push(`-> match is null -> returning null`);
+    // log.debug(...debugLogs);
     return null;
 }
 /** `re` = /`^(a(t{1,2})n:)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*`/i */
-export const ATTN_SALUTATION_PREFIX_PATTERN 
-    = new RegExp(/^(a(t{1,2})n:)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*/, RegExpFlagsEnum.IGNORE_CASE);
+export const ATTN_SALUTATION_PREFIX_PATTERN = new RegExp(
+    /^(a(t{1,2})n:)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*/, 
+    RegExpFlagsEnum.IGNORE_CASE
+);
 /** `re` = /`^(Mr\.|Ms\.|Mrs\.|Dr\.|Mx\.)`/i */
-export const SALUTATION_REGEX 
-    = new RegExp(/^(Mr\.|Ms\.|Mrs\.|Dr\.|Mx\.)/, RegExpFlagsEnum.IGNORE_CASE);
+export const SALUTATION_REGEX = new RegExp(
+    /^(Mr\.|Ms\.|Mrs\.|Dr\.|Mx\.)/, 
+    RegExpFlagsEnum.IGNORE_CASE
+);
 /** `re` = /`^[A-Z]{1}\.?$`/i */
-export const MIDDLE_INITIAL_REGEX 
-    = new RegExp(/^[A-Z]{1}\.?$/, RegExpFlagsEnum.IGNORE_CASE);
-/** Matches "MSPA", "BSN", "FNP-C", "LME", "DOO", "PA-C", "MSN-RN", "RN", "NP", "CRNA", "FNP", "PA", "NMD", "MD", "DO", "LE", "CMA", "OM"  */
-export const JOB_TITLE_SUFFIX_PATTERN 
-    = /\b(,? ?(MSPA|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|PA-C|MSN-RN|RN|NP|CRNA|FAAD|FNP|PA|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS|FACS|FAC)\.?,?)*\s*$/; 
+export const MIDDLE_INITIAL_REGEX = new RegExp(
+    /^[A-Z]{1}\.?$/, 
+    RegExpFlagsEnum.IGNORE_CASE
+);
+/** `re` = `/\b(,? ?(MSPA|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|PA-C|MSN-RN|RN|NP|CRNA|FAAD|FNP|PA|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS|FACS|FAC)\.?,?)*\b/g`  */
+export const JOB_TITLE_SUFFIX_PATTERN = new RegExp(
+    /\b(,? ?(MSPA|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|PA-C|MSN-RN|RN|NP|CRNA|FAAD|FNP|PA|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS|FACS|FAC)\.?,?)*\b/, 
+    RegExpFlagsEnum.GLOBAL
+); 
 /**
  * **if** `name` starts with a number or contains any of {@link COMPANY_KEYWORDS_PATTERN}, do not attempt to extract name and return empty strings
  * @param name `string` - the full name from which to extract 3 parts: the first, middle, and last names
@@ -298,20 +315,20 @@ export function extractName(name: string): {
 // https://en.wikipedia.org/wiki/List_of_telephone_country_codes
 
 /** 
- * @TODO see if the non digit non capturing part is needed
  * @description 
- * `re` = `/(?:^\D*(\d{1,3})[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})( ?ext ?(\d{3,4}))?(?:\D*$)/`
- * - There are 5 capturing groups in the regex and 2 non-capturing groups:
- * - **`$1`**  - Country code (optional) - `(?:^\D*(\d{1,3})[-.\s]?)?`
- * - - `(?:...)` is a non-capturing group, `^\D*` matches any non-digit characters (0 or more times), `(\d{1,3})` captures 1 to 3 digits, and `[-.\s]?` matches an optional separator (dash, dot, or space).
+ * `re` = `/(?:^|\D)(\d{1,3}[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})[-.\s]?(?:ext|x|ex)?(?:[-:.\s]*)?(\d{1,4})?(?:\D|$)/i`
+ * - There are 5 capturing groups in the regex:
+ * - **`$1`**  - Country code (optional) - `(\d{1,3})`
  * - **`$2`** - Area code - `(\d{3})`
  * - **`$3`** - First three digits - `(\d{3})`
  * - **`$4`** - Last four digits - `(\d{4})`
  * - **`$5`** - Extension (optional) - `( ?ext ?(\d{3,4}))?`
- * - - `(?:...)` Non-capturing group for any non-digit characters - `(?:\D*$)`
  * */
-export const PHONE_REGEX: RegExp = 
-    /(?:^\D*(\d{1,3})[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})[-.\s]?(?:ext|x|ex)?(?:[-:.\s]*)?(\d{1,4})?(?:\D*$)/i; 
+export const PHONE_REGEX = new RegExp(
+    /(?:^|\D)(\d{1,3}[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})[-.\s]?(?:ext|x|ex)?(?:[-:.\s]*)?(\d{1,4})?(?:\D|$)/,
+    RegExpFlagsEnum.IGNORE_CASE + RegExpFlagsEnum.GLOBAL
+);
+    // /(?:^\D*(\d{1,3})[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})[-.\s]?(?:ext|x|ex)?(?:[-:.\s]*)?(\d{1,4})?(?:\D*$)/i; 
 
 /**
  * @description
@@ -388,22 +405,22 @@ export function extractPhone(phone: string): string[] | RegExpMatchArray | null 
     // remove leading and trailing letters. remove commas, semicolons, colons, and slashes
     phone = originalPhone.trim().replace(/^\s*[a-zA-Z]*|[a-zA-Z]\s*$|[,;:/]/g, ''); 
     const debugLogs: any[] = [];
-    for (const { re, groupFormat } of phoneRegexList) {
-        
+    for (let i = 0; i < phoneRegexList.length; i++) {
+        const { re, groupFormat } = phoneRegexList[i];
         let matches =  phone.match(re);
         if (!matches) {
             continue;
         }
         let formattedPhones = matches.map(p => formatPhone(p, re, groupFormat));
-        log.debug(
-            `extractPhone("${originalPhone}") - testing regex: ${re.source} on "${phone}"`,
+        debugLogs.push(
+            `extractPhone("${originalPhone}") - testing phoneRegexList[${i}] on "${phone}"`,
             TAB + `matches: ${JSON.stringify(matches)}`,
             TAB + `formattedPhones: ${JSON.stringify(formattedPhones)}`,
         )
         return formattedPhones;
     }
     if (phone) { // phone is non-empty and did not match any regex
-        log.warn(`extractPhone() - no match found for "${phone}", returning empty string.`)
+        // log.warn(`extractPhone() - no match found for "${phone}", returning empty string.`)
     };
     return null;
 
@@ -431,7 +448,8 @@ export function formatPhone(
     if (groupFormat) {
         result = result.replace(re, groupFormat);
     }
-    return result;
+    return cleanString(result, { char: '-', escape: false})
+        .replace(/([a-zA-Z]+\s*$)/, '').trim();
 }
 
 /**
