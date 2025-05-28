@@ -11,16 +11,19 @@ import {
 import { createUrlWithParams } from 'src/utils/api/url';
 import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from './types';
 import { writeObjectToJson as write, getCurrentPacificTime, readJsonFileAsObject, printConsoleGroup as print, calculateDifferenceOfDateStrings, TimeUnitEnum, } from 'src/utils/io';
-import { mainLogger as log } from 'src/config/setupLog';
+import { mainLogger as log, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
 import path from 'node:path';
+
+/** `src/server/tokens/STEP2_tokens.json` */
 const STEP2_TOKENS_PATH = path.join(TOKEN_DIR, 'STEP2_tokens.json') as string;
+/** `src/server/tokens/STEP3_tokens.json` */
 const STEP3_TOKENS_PATH = path.join(TOKEN_DIR, 'STEP3_tokens.json') as string;
 const REFRESH_TOKEN_IS_AVAILABLE = true;
 const REFRESH_TOKEN_IS_NOT_AVAILABLE = false;
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 
-/**@see {@link Server} from ~\node_modules\@types\node\http.d.ts*/
+/**@see {@link Server} from `\node_modules\@types\node\http.d.ts`*/
 let server: Server | any | undefined;
 
 /**
@@ -31,7 +34,7 @@ let server: Server | any | undefined;
 export const CLOSE_SERVER = (): void => {
     if (server) {
         server.close(() => {
-            // log.info('Server closed successfully.');
+            log.info('Server closed successfully.');
         });
     } else {
         log.info('Server is not running or already closed.');
@@ -64,7 +67,7 @@ export async function getAuthCode(): Promise<string> {
                     redirect_uri: REDIRECT_URI,
                     client_id: CLIENT_ID,
                     scope: SCOPE,
-                    state: STATE as string,
+                    state: require('crypto').randomBytes(32).toString('hex') as string,
             }).toString();
             open(authLink).catch((err) => {    
                 log.error('Error in authServer.ts getAuthCode() when opening authURL:', err);
@@ -212,30 +215,33 @@ function generateAxiosParams(
 
 /**
  * 
- * @returns {Promise<string>} - The access token to be used as `Bearer {accessToken}` in REST calls.
+ * @returns `accessToken` `{Promise<string>}` - The access token to be used as `Bearer {accessToken}` in REST calls.
+ * @throws {Error} if there is an error in the authentication flow or if the access token cannot be retrieved.
  */
 export async function getAccessToken(): Promise<string> {
-    let accessToken = readJsonFileAsObject(STEP3_TOKENS_PATH)?.access_token || readJsonFileAsObject(STEP2_TOKENS_PATH)?.access_token ||  '';
-    let refreshToken = readJsonFileAsObject(STEP2_TOKENS_PATH)?.refresh_token || '';
+    const STEP3_tokenResponse = readJsonFileAsObject(STEP3_TOKENS_PATH) as TokenResponse;
+    const STEP2_tokenResponse = readJsonFileAsObject(STEP2_TOKENS_PATH) as TokenResponse;
+    let accessToken = STEP3_tokenResponse.access_token || STEP2_tokenResponse.access_token ||  '';
+    let refreshToken = STEP2_tokenResponse.refresh_token || '';
     const accessTokenIsExpired = localTokensHaveExpired(STEP3_TOKENS_PATH);
     const refreshTokenIsExpired = localTokensHaveExpired(STEP2_TOKENS_PATH);
     try {
         if ((!accessToken || accessTokenIsExpired) && refreshToken && !refreshTokenIsExpired) {
             log.info(
-                'Access token is expired or undefined, Refresh token is available.',
+                '(Access token is undefined or expired) AND (Refresh token is available and has not yet expired).',
                 'Initiating auth flow from exchangeRefreshTokenForNewTokens()...'
             );
             let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_IS_AVAILABLE) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
         } else if ((!accessToken || accessTokenIsExpired) && (!refreshToken || refreshTokenIsExpired)) {
             log.info(
-                'Access token is expired or undefined. Refresh token is also undefined.', 
+                '(Access token is undefined or expired) AND (Refresh token is undefined or expired).', 
                 'Initiating auth flow from the beginning...'
             );
             let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_IS_NOT_AVAILABLE) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
         } else {
-            log.info('Access token is valid. Proceeding with RESTlet call...');
+            log.info(`Access token is valid. Proceeding with REST call...`);
         }
         CLOSE_SERVER();
         return accessToken as string;
@@ -266,8 +272,16 @@ export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): bool
         const currentTime: string = getCurrentPacificTime();
         const lastUpdatedTime = String(tokenResponse?.lastUpdated);
         const tokenLifespan = Number(tokenResponse?.expires_in);
-        const msDiff = calculateDifferenceOfDateStrings(lastUpdatedTime, currentTime, TimeUnitEnum.MILLISECONDS, true) as number;
+        const msDiff = calculateDifferenceOfDateStrings(
+            lastUpdatedTime, currentTime, TimeUnitEnum.MILLISECONDS, true
+        ) as number;
         const haveExpired = (msDiff != 0 && msDiff >= tokenLifespan * 1000);
+        if (haveExpired) {
+            log.info(`Local access token has expired, tokenPath: ${filePath}.`,
+                TAB + `lastUpdated: ${lastUpdatedTime}`, 
+                TAB + `currentTime: ${currentTime}`
+            );
+        }
         return haveExpired;
     } catch (error) {
         log.error('Error in localTokensHaveExpired(), return default (true):', error);

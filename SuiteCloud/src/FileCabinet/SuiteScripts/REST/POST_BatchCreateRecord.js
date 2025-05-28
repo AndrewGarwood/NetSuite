@@ -2,10 +2,10 @@
  * @NApiVersion 2.1
  * @NScriptType Restlet
  * @NScriptName POST_BatchCreateRecord
- * @ProdNScriptId NOT_DEPLOYED
- * @ProdDeployId NOT_DEPLOYED
- * @SbNScriptId 169
- * @SbDeployId 1
+ * @PROD_ScriptId NOT_DEPLOYED
+ * @PROD_DeployId NOT_DEPLOYED
+ * @SB_ScriptId 169
+ * @SB_DeployId 1
  */
 
 define(['N/record', 'N/log'], (record, log) => {

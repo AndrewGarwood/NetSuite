@@ -1,11 +1,11 @@
 /**
- * @file src/utils/parses/customer/customerParseEvaluatorFunctions.ts
+ * @file src/parses/customer/customerParseEvaluatorFunctions.ts
  */
 import { 
     CustomerStatusEnum,
     FieldValue,
 } from "../../utils/api/types";
-import { mainLogger as log } from 'src/config/setupLog';
+import { parseLogger as log } from 'src/config/setupLog';
 import { RADIO_FIELD_TRUE, RADIO_FIELD_FALSE } from "../../utils/typeValidation";
 import { 
     checkForOverride,

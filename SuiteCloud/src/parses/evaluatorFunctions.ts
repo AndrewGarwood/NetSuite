@@ -1,8 +1,8 @@
 /**
- * @file src/utils/parses/generalEvaluatorFunctions.ts
+ * @file src/parses/evaluatorFunctions.ts
  */
 
-import { mainLogger as log, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
+import { parseLogger as log, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
 import { HUMAN_VENDORS_TRIMMED } from './vendor/vendorParseEvaluatorFunctions';
 import { 
     FieldValue, 
@@ -80,10 +80,10 @@ export const isPerson = (
         || (company// && (company !== entity || COMPANY_KEYWORDS_PATTERN.test(company))
             && company.toLowerCase().replace(/\W*/g, '') !== entity.toLowerCase().replace(/\W*/g, ''))
     ) {
-        // log.debug(...[...logArr, TAB + `-> return false`]);
+        log.debug(...[...logArr, TAB + `-> return false`]);
         return false;
     }
-    // log.debug(...[...logArr, TAB + `Reached End of isPerson() -> return true`]);
+    log.debug(...[...logArr, TAB + `Reached End of isPerson() -> return true`]);
     return true;
 }
 
@@ -167,11 +167,13 @@ export const salutation = (
 export const attention = (
     row: Record<string, any>,
     entityIdColumn: string,
+    salutationColumn: string,
     ...nameColumns: string[]
 ): string => {
     let entity = entityId(row, entityIdColumn);
     let { first, middle, last } = name(row, ...nameColumns);
-    let fullName = `${first} ${middle} ${last}`.trim().replace(/\s+/g, ' ');
+    let fullName = `${salutation(row, salutationColumn).replace(/\.\s*/, '')}. ${first} ${middle} ${last}`
+        .trim().replace(/\s+/g, ' ');
     return fullName === entity ? '' : fullName;
 }
 
@@ -198,8 +200,8 @@ export const name = (
         }
         const {first, middle, last} = extractName(initialVal);
         if (first && last) { 
-        // log.debug(`extractName("${initialVal}") from col="${col}"`,
-        //     `\n\t-> {first="${first}", middle="${middle}", last="${last}"}`);
+        log.debug(`extractName("${initialVal}") from col="${col}"`,
+            `\n\t-> {first="${first}", middle="${middle}", last="${last}"}`);
             return {first: first, middle: middle || '', last: last}; 
         }
     }
@@ -269,7 +271,7 @@ export const state = (
     } else if (Object.values(STATES).includes(state as STATES)) {
         return state;
     } else {
-        // log.warn(`Invalid state: "${state}"`);
+        log.warn(`Invalid state: "${state}"`);
         return '';
     }
 }
@@ -289,7 +291,7 @@ export const country = (
         return COUNTRIES.UNITED_STATES; 
         // Default to United States if state is valid but country is not
     } else {
-        // log.warn(`Invalid country: "${country}" or state: "${state}"`);
+        log.warn(`Invalid country: "${country}" or state: "${state}"`);
         return '';
     }
 }
@@ -317,19 +319,40 @@ export const terms = (
     return null;
 }
 
+
+const commonEmailDomains = [
+    'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com',
+    'aol.com', 'mail.com', 'live.com', 'msn.com', 'comcast.net',
+    'verizon.net', 'att.net', 'sbcglobal.net', 'bellsouth.net',
+    'cox.net', 'charter.net', 'earthlink.net', 'roadrunner.com', 
+    '.edu', 'live.com'
+]
 export const website = (
     row: Record<string, any>, 
-    websiteColumn: string
+    websiteColumn: string,
+    ...emailColumnOptions: Array<string | ColumnSliceOptions>
 ): FieldValue => {
     let website = cleanString(row[websiteColumn]);
-    if (!website) {
-        return '';
+    if (website) {
+        website = website
+            .replace(/^(http(s)?:\/\/)?(www\.)?/, '')
+            .replace(/\/$/, '');
+        return `https://${website}`;
+    } else { // see if email address is for the entity's website
+        for (const colOption of emailColumnOptions) {
+            let emailValue = email(row, colOption);
+            if (!emailValue 
+                || stringEndsWithAnyOf(emailValue, commonEmailDomains, RegExpFlagsEnum.IGNORE_CASE)
+            ) {
+                continue; // skip common email domains
+            }
+            website = emailValue.split('@')[1] // get the domain part of the email
+                .replace(/^(http(s)?:\/\/)?(www\.)?/, '')
+                .replace(/\/$/, '');
+            return `https://${website}`;
+        }
     }
-    website = website
-        .replace(/^(http(s)?:\/\/)?(www\.)?/, '')
-        .replace(/\/$/, '');
-    website = `https://${website}`;
-    return website;
+    return '';
 }
 
 

@@ -2,11 +2,11 @@
  * @NApiVersion 2.1
  * @NScriptType Restlet
  * @NScriptName DELETE_DeleteRecordById
- * @ProdNScriptId number
- * @ProdDeployId number
- * @SbNScriptId number
- * @SbDeployId number
- */
+ * @ProdNScriptId NOT_DEPLOYED
+ * @ProdDeployId NOT_DEPLOYED
+ * @SbNScriptId NOT_DEPLOYED
+ * @SbDeployId NOT_DEPLOYED 
+ * */
 
 define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     const doDelete = (/** @type {DeleteRecordRequest}, see {@link DeleteRecordRequest}*/req) => {
@@ -36,7 +36,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             log.error({ title: 'Invalid recordType', details: `Invalid recordType: ${recordType}.Must be a RecordTypeEnum key or one of RecordTypeEnum's values:  ${Object.values(RecordTypeEnum).join(', ')}.` });
             throw new Error(`Invalid recordType: ${recordType}. Must be a RecordTypeEnum key or one of RecordTypeEnum's values: ${Object.values(RecordTypeEnum).join(', ')}.`);
         }
-        /**@type { Array<DeleteRecordResult> }, Array<{@link DeleteRecordResult}>*/
+        /**@type { Array<DeleteRecordResult> }, `Array<`{@link DeleteRecordResult}`>`*/
         const results = [];
         for (const idValue of idValues) {
             let internalId = idValue;
@@ -49,7 +49,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             }
             try {
                 const recordToDelete = record.load({ type: recordType, id: internalId });
-                recordToDelete.deleteRecord();
+                record.delete({ type: recordType, id: internalId });
                 log.audit({ title: 'Record deleted', details: `Record of type ${recordType} with id ${internalId} deleted successfully.` });
                 results.push({ success: true, recordId: internalId });
             } catch (error) {
@@ -78,22 +78,24 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
  */
 
 /**
- * @enum {string} idPropertyEnum
+ * @enum {string} `idPropertyEnum`
  * @property {string} INTERNAL_ID - The internal ID of the record.
  * @property {string} EXTERNAL_ID - The external ID of the record.
+ * @property {string} ENTITY_ID - The entity ID of the record.
  * @property {string} NAME - The name of the record.
  * @readonly
  */
 const idPropertyEnum = {
     INTERNAL_ID: 'internalid',
     EXTERNAL_ID: 'externalid',
+    ENTITY_ID: 'entityid',
     NAME: 'name'
 };
 
 /**
- * @enum {string} RecordTypeEnum
- * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
+ * @enum {string} **`RecordTypeEnum`**
  * @readonly
+ * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  */
 const RecordTypeEnum = { // As of 4 June 2024
     ACCOUNT: 'account',

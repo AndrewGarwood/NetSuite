@@ -1,8 +1,8 @@
 /**
- * @file src/utils/parses/generalPruneFunctions.ts
+ * @file src/parses/pruneFunctions.ts
  */
 
-import { mainLogger as log } from 'src/config/setupLog';
+import { pruneLogger as log, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
 import { 
     FieldDictionary,
     PostRecordOptions,
@@ -30,13 +30,12 @@ export const entity = (
     const REQUIRED_FIELDS = ['entityid', 'companyname']
     try {
         let fieldDict = options.fieldDict as FieldDictionary;
-
         for (const requiredField of REQUIRED_FIELDS) {
             if (!fieldDict?.valueFields?.some(
                 (field) => field.fieldId === requiredField && field.value)
             ) {
                 log.debug(`pruneEntity():`,
-                    `\n\tSetFieldValueOptions is missing field "${requiredField}", returning null`);
+                    TAB + `SetFieldValueOptions is missing field "${requiredField}", returning null`);
                 return null;
             }
             
@@ -45,9 +44,8 @@ export const entity = (
             (field) => field.fieldId === 'isperson' && field.value === RADIO_FIELD_TRUE)
         ) {
             options = requireNameFields(options) as PostRecordOptions;
-        } else {
-            options = pruneAddressBook(options) as PostRecordOptions;
-        }
+        } 
+        options = pruneAddressBook(options) as PostRecordOptions;
         return options;
     } catch (error) {
         log.error(`Error in pruneEntity():`, error);
@@ -71,7 +69,7 @@ export const requireNameFields = (
                 (field) => field.fieldId === requiredField && field.value)
             ) {
                 log.debug(`pruneIfNoName():`, 
-                    `\n\tSetFieldValueOptions is missing field "${requiredField}", returning null`
+                    TAB + `SetFieldValueOptions is missing field "${requiredField}", returning null`
                 );
                 return null;
             }
@@ -83,38 +81,40 @@ export const requireNameFields = (
         return options;
     }
 }
-/** `REQUIRED_ADDRESS_FIELDS = ['addr1']` */
+/** `REQUIRED_ADDRESS_FIELDS = ['addr1', 'country']` */
 export const pruneAddressBook = (
     options: PostRecordOptions,
 ): PostRecordOptions | null => {
     if (isNullLike(options)) {
         return null;
     }
-    const REQUIRED_ADDRESS_FIELDS = ['addr1']
+    const REQUIRED_ADDRESS_FIELDS = ['addr1', 'country']
     try {
         let addressbook = options?.sublistDict?.addressbook as SublistFieldDictionary;
         let valueFields = addressbook?.valueFields as SetSublistValueOptions[];
         let subrecordFields = addressbook?.subrecordFields as SetSubrecordOptions[];
         for (let index = 0; index < subrecordFields.length; index++) {
             let subrecOps = subrecordFields[index];
-            let line = subrecOps?.line as number;
+            let currentLine = subrecOps?.line as number;
             let subrecValueFields = subrecOps?.fieldDict?.valueFields as SetFieldValueOptions[];
             for (const requiredField of REQUIRED_ADDRESS_FIELDS) {
                 if (!subrecValueFields?.some(
                     (field) => field.fieldId === requiredField)
                 ) {
                     log.debug(`pruneAddressBook():`,
-                        `subrecordFields[${index}]: SetSubrecordOptions is missing address field "${requiredField}"`, 
-                        `-> removing it from subrecordFields`
+                        TAB + `subrecordFields[${index}]: SetSubrecordOptions is missing address field "${requiredField}"`, 
+                        TAB + `-> removing it from subrecordFields`
                     );
-                    valueFields = valueFields?.filter((field) => field.line !== line);
+                    valueFields = valueFields?.filter((field) => field.line !== currentLine);
                     subrecordFields.splice(index, 1);
                     index--; // Adjust index after removing an element
                     break;
                 }
             }
         }
-        if (subrecordFields.length === 0) {
+        if (subrecordFields.length === 0 || valueFields.length === 0) {
+            log.debug(`pruneAddressBook(): No valid addressbook fields found, 
+                deleting addressbook sublist`);
             delete options.sublistDict?.addressbook;
         }
         return options;

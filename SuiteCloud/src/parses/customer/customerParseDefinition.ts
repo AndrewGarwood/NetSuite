@@ -1,5 +1,5 @@
 /**
- * @file src/utils/parses/customer/customerParseDefinition.ts
+ * @file src/parses/customer/customerParseDefinition.ts
  */
 import { 
     ParseOptions,
@@ -14,11 +14,7 @@ import {
 } from "../../utils/api/types";
 import { mainLogger as log } from "src/config/setupLog";
 import { CustomerStatusEnum, CustomerTaxItemEnum } from "../../utils/api/types";
-import { 
-    SB_TERM_DICTIONARY as TERM_DICT, 
-    CUSTOMER_CATEGORY_MAPPING as CATEGORY_DICT, 
-    ColumnSliceOptions 
-} from "src/utils/io";
+import { SB_TERM_DICTIONARY as TERM_DICT, CUSTOMER_CATEGORY_MAPPING as CATEGORY_DICT, ColumnSliceOptions } from "src/utils/io";
 import * as evaluate from "../evaluatorFunctions";
 import * as prune from "../pruneFunctions";
 import * as customerEval from "./customerParseEvaluatorFunctions";
@@ -62,8 +58,8 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
                         { fieldId: 'attention', 
                             evaluator: evaluate.attention, 
                             args: [
-                                'Customer', 
-                                ...['Primary Contact', 'Bill to 1', 'Bill to 2', 'Street1', 'Street2', 'Secondary Contact']
+                                'Customer', 'Mr./Ms./...', 
+                                ['Primary Contact', 'Bill to 1', 'Bill to 2', 'Street1', 'Street2', 'Secondary Contact']
                             ] 
                         },
                         { fieldId: 'addr1', colName: 'Street1' },
@@ -87,8 +83,8 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
                         { fieldId: 'attention', 
                             evaluator: evaluate.attention, 
                             args: [
-                                'Customer', 
-                                ...['Primary Contact', 'Ship to 1', 'Ship to 2', 'Ship To Street1', 'Ship To Street2', 'Secondary Contact']
+                                'Customer', 'Mr./Ms./...',
+                                ['Primary Contact', 'Ship to 1', 'Ship to 2', 'Ship To Street1', 'Ship To Street2', 'Secondary Contact']
                             ] 
                         },
                         { fieldId: 'addr1', colName: 'Ship To Street1' },
@@ -146,7 +142,7 @@ export const PARSE_CUSTOMER_FROM_CUSTOMER_CSV_OPTIONS: ParseOptions = {
             { fieldId: 'terms', evaluator: evaluate.terms, args: ['Terms', TERM_DICT] },
             { fieldId: 'taxable', defaultValue: true },
             { fieldId: 'taxitem', defaultValue: CustomerTaxItemEnum.YOUR_TAX_ITEM },
-            { fieldId: 'url', evaluator: evaluate.website, args: ['Website'] },
+            { fieldId: 'url', evaluator: evaluate.website, args: ['Website', 'Main Email'] },
         ] as FieldValueMapping[],
         subrecordMapArray: [] // No body subrecords
     } as FieldDictionaryParseOptions,
