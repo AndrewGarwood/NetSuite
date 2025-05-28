@@ -6,8 +6,12 @@ import { OUTPUT_DIR } from './env';
 import { Logger, ISettingsParam, ISettings, ILogObj, ILogObjMeta, IPrettyLogStyles, IMeta } from 'tslog';
 import path from 'node:path';
 import { appendFileSync } from 'node:fs';
-const DEFAULT_LOG_FILEPATH = path.join(OUTPUT_DIR, "logs", "DEBUG.txt");
-const ERROR_LOG_FILEPATH = path.join(OUTPUT_DIR, "logs", "ERROR.txt"); 
+/**`OUTPUT_DIR/logs` */
+const LOG_DIR = path.join(OUTPUT_DIR, "logs");  
+/**`OUTPUT_DIR/logs/DEBUG.txt` */
+const DEFAULT_LOG_FILEPATH = path.join(LOG_DIR, "DEBUG.txt");
+/**`OUTPUT_DIR/logs/ERROR.txt` */
+const ERROR_LOG_FILEPATH = path.join(LOG_DIR, "ERROR.txt"); 
 
 const dateTemplate = "{{yyyy}}-{{mm}}-{{dd}}";
 const timeTemplate = "{{hh}}:{{MM}}:{{ss}}";//.{{ms}}";
@@ -40,20 +44,12 @@ const errorInfoTemplate = "{{errorName}}: {{errorMessage}}\n\t{{errorStack}}";
  * */
 const ERROR_TEMPLATE = `${errorInfoTemplate}`; //`${timestampTemplate} ${logNameTemplate} ${logLevelTemplate} ${fileInfoTemplate}\n${errorInfoTemplate}`;
 /** 
- * use as value for {@link ISettingsParam.prettyErrorStackTemplate}
+ * use as value for {@link ISettingsParam.prettyErrorStackTemplate}.
  * @description template string for error stack trace lines. 
  * */
 const ERROR_STACK_TEMPLATE = `${fileInfoTemplate}:{{method}} {{stack}}`;
-const MAIN_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
-    type: "pretty",
-    name: "NS_Main",
-    minLevel: 0,
-    prettyLogTemplate: LOG_TEMPLATE,
-    prettyErrorTemplate: ERROR_TEMPLATE,
-    prettyErrorStackTemplate: ERROR_STACK_TEMPLATE,
-    stylePrettyLogs: true,
-    prettyLogTimeZone: "local",
-    prettyLogStyles: {
+
+const PRETTY_LOG_STYLES: IPrettyLogStyles = {
         yyyy: "green",
         mm: "green",
         dd: "green",
@@ -81,44 +77,47 @@ const MAIN_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
         nameWithDelimiterSuffix: ["whiteBright", "bold", "bgBlack"],
         errorName: ["red", "bold"],
         errorMessage: ["red", "bgBlackBright"],
-    } as IPrettyLogStyles,
+};   
+
+const MAIN_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
+    type: "pretty",
+    name: "NS_Main",
+    minLevel: 0,
+    prettyLogTemplate: LOG_TEMPLATE,
+    prettyErrorTemplate: ERROR_TEMPLATE,
+    prettyErrorStackTemplate: ERROR_STACK_TEMPLATE,
+    stylePrettyLogs: true,
+    prettyLogTimeZone: "local",
+    prettyLogStyles: PRETTY_LOG_STYLES,
 }
 export const mainLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
 mainLogger.attachTransport((logObj: ILogObj & ILogObjMeta) => {
     appendFileSync(DEFAULT_LOG_FILEPATH, JSON.stringify(logObj) + "\n", { encoding: "utf-8" });
+});
+
+/** `type: hidden` -> suppress logs from being sent to console */
+const PARSE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
+    type: "hidden", // "pretty" | "hidden" | "json"
+    name: "NS_Parse",
+    minLevel: 0,
+    prettyLogTemplate: LOG_TEMPLATE,
+    prettyErrorTemplate: ERROR_TEMPLATE,
+    prettyErrorStackTemplate: ERROR_STACK_TEMPLATE,
+    stylePrettyLogs: true,
+    prettyLogTimeZone: "local",
+    prettyLogStyles: PRETTY_LOG_STYLES,
+}
+
+export const parseLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
+parseLogger.attachTransport((logObj: ILogObj & ILogObjMeta) => {
+    appendFileSync(path.join(LOG_DIR, 'PARSE_LOG.txt'), JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
+});
+export const pruneLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
+pruneLogger.attachTransport((logObj: ILogObj & ILogObjMeta) => {
+    appendFileSync(path.join(LOG_DIR, 'PRUNE_LOG.txt'), JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
 });
 /** 
  * `INDENT_LOG_LINE =  '\n\t '` = newLine + tab + space
  * - log.debug(s1, INDENT_LOG_LINE + s2, INDENT_LOG_LINE + s3,...) 
  * */
 export const INDENT_LOG_LINE: string = '\n\t ';
-
-/*
-The tslog library supports colors and styles from the chalk library for its 
-IPrettyLogStyles. If you are using the pattern { color: "yourColorString" } 
-as shown in your prettyLogStyles configuration, the "yourColorString" can be 
-one of the following standard foreground color names:
-
-black
-red
-green
-yellow
-blue
-magenta
-cyan
-white
-gray (alias for blackBright)
-grey (alias for blackBright)
-blackBright
-redBright
-greenBright
-yellowBright
-blueBright
-magentaBright
-cyanBright
-whiteBright
-
-const logger = new Logger({
-    prefix: ["main-prefix", "parent-prefix"],
-});
-*/

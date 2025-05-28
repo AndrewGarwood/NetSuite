@@ -2,17 +2,17 @@
  * @file src/utils/api/types/DeleteRequests.ts
  */
 
-import { FieldValue, RecordTypeEnum, LogStatement } from ".";
+import { FieldValue, RecordTypeEnum, EntityRecordTypeEnum, LogStatement } from ".";
 
 /**
  * @typedefn **`DeleteRecordByTypeRequest`**
- * @property {RecordTypeEnum} recordType - The type of the record to delete (see {@link RecordTypeEnum}).
+ * @property {RecordTypeEnum | EntityRecordTypeEnum} recordType - The type of the record to delete (see {@link RecordTypeEnum}).
  * @property {DeleteExcludeOptions} [excludeOptions] - The options ({@link DeleteExcludeOptions}) for excluding records from deletion.
  * @property {number} [maxDeletions] - The maximum number of records to delete. If omitted, all records of the specified type will be deleted.
  * @property {string | string[]} [responseProps] - `string | string[]` - The properties to include in the response in addition to the records' internal IDs.
  */
 export type DeleteRecordByTypeRequest = {
-    recordType: RecordTypeEnum;
+    recordType: RecordTypeEnum | EntityRecordTypeEnum;
     excludeOptions?: DeleteExcludeOptions;
     maxDeletions?: number;
     responseProps?: string | string[];

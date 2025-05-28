@@ -41,6 +41,7 @@ export type BatchPostRecordRequest = {
  * @property {boolean} success - Indicates if the request was successful.
  * @property {string} message - A message indicating the result of the request.
  * @property {PostRecordResult[]} [results] - an `Array<`{@link PostRecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully upserted.
+ * @property {PostRecordOptions[]} [rejects] - an `Array<`{@link PostRecordOptions}`>` containing the objects that resulted in error(s).
  * @property {string} [error] - An error message if the request was not successful.
  * @property {LogStatement[]} logArray - an `Array<`{@link LogStatement}`>` generated during the request processing.
  */
@@ -48,6 +49,7 @@ export type BatchPostRecordResponse = {
     success: boolean;
     message: string;
     results?: PostRecordResult[];
+    rejects?: PostRecordOptions[];
     error?: string;
     logArray: LogStatement[];
 }

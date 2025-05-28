@@ -2,13 +2,14 @@
  * @file src/utils/io/writing.ts
  */
 import fs from 'fs';
-import { mainLogger as log } from 'src/config/setupLog';
+import { mainLogger as log, INDENT_LOG_LINE as NEW_LINE_TAB } from 'src/config/setupLog';
 import { OUTPUT_DIR } from '../../config/env';
 import { getCurrentPacificTime } from './dateTime';
 import { validateFileExtension } from './reading';
 import { DelimitedFileTypeEnum, DelimiterCharacterEnum } from './types/Csv';
 import { hasKeys } from '../typeValidation';
 import path from 'node:path';
+
 
 
 export type WriteJsonOptions = {
@@ -77,6 +78,8 @@ export function writeObjectToJson(
         fileName = arg1?.fileName || fileName;
         indent = arg1?.indent || indent;
         enableOverwrite = arg1?.enableOverwrite || enableOverwrite;
+    } else if (typeof arg1 === 'object'&& filePath) {
+        data = arg1 as Record<string, any>;
     }
 
     const validationResults = validateFileExtension(
@@ -102,20 +105,45 @@ export function writeObjectToJson(
 }
 
 /**
+ * @param data `Record<string, any> | string` - JSON data to stringify
+ * @param indent `number` - `optional`, default=`0` - number of additional indents to add to each line
+ * @param spaces `number` - `optional`, default=`4`
+ * @returns 
+ */
+export function indentedStringify(
+    data: Record<string, any> | string,
+    indent: number=0,
+    spaces: number=4
+): string {
+    if (!data) {
+        return '';
+    }
+    let jsonString = typeof data === 'string' 
+        ? data : JSON.stringify(data, null, spaces);
+    jsonString = jsonString
+        .split('\n')
+        .map(line => NEW_LINE_TAB + '\t'.repeat(indent) + line)
+        .join('');
+    return jsonString;
+}
+
+/**
+ * @deprecated
  * Output JSON data to the console
  * @param {Record<string, any>} data `Record<string, any>`
- * @param {number} indent `number` - `optional`, default=`4` 
+ * @param {number} spaces `number` - `optional`, default=`4` 
  */
-export function printJson(data:Record<string, any>, indent: number=4) {
+export function printJson(data:Record<string, any>, spaces: number=4) {
     try {
-        console.log(JSON.stringify(data, null, indent));
+        console.log(JSON.stringify(data, null, spaces));
     } catch (e) {
         log.error(e);
     }
 }
 
 /**
- * @typedefn `{Object}` `ConsoleGroup`
+ * @deprecated
+ * @typedefn **`ConsoleGroup`**
  * @property {string} label `string` - label for the console group
  * @property {Array<string> | string} details `string[]` - log each string in arr on new line
  * @property {boolean} collapse `boolean` - `optional`, default=`false`
@@ -139,7 +167,7 @@ export type ConsoleGroup = {
 
 
 /**
- * 
+ * @deprecated
  * @param {ConsoleGroup} consoleGroup {@link ConsoleGroup}
  * @param {string} consoleGroup.label `string`
  * @param {Array<string> | string} consoleGroup.details `string[]` - log each string in arr on new line

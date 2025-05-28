@@ -1,7 +1,8 @@
 /**
  * @file src/utils/io/regex.ts
  */
-import { mainLogger as log, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
+import { parseLogger as log, mainLogger as mlog, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
+import { StateAbbreviationEnum } from '../NS';
 import { StringCaseOptions, StringPadOptions, StringStripOptions } from "./types/Reading";
 
 
@@ -50,7 +51,9 @@ export function cleanString(
  */
 export function toTitleCase(s: string): string {
     if (!s) return '';
-    return s.replace(/\b\w/g, char => char.toUpperCase());
+    return s
+        .replace(/\b\w/g, char => char.toUpperCase())
+        .replace(/(?<=\b[A-Z]{1})\w*\b/g, char => char.toLowerCase());
 }
 
 /**
@@ -189,7 +192,11 @@ export function doesNotEndWithKnownAbbreviation(s: string): boolean {
     if (!s) return false;
     s = s.trim();
     const singleInitialPattern = /\b[A-Z]\.?\b/;
-    return !s.endsWith('Ph.D.') && !stringEndsWithAnyOf(s, COMPANY_ABBREVIATION_PATTERN as RegExp, RegExpFlagsEnum.IGNORE_CASE) && !stringEndsWithAnyOf(s, singleInitialPattern, RegExpFlagsEnum.IGNORE_CASE);
+    return !s.endsWith('Ph.D.') 
+        && !stringEndsWithAnyOf(s, /\b[A-Z]{2}\.?\b/) 
+        && !stringEndsWithAnyOf(s, JOB_TITLE_SUFFIX_PATTERN, RegExpFlagsEnum.IGNORE_CASE) 
+        && !stringEndsWithAnyOf(s, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE) 
+        && !stringEndsWithAnyOf(s, singleInitialPattern, RegExpFlagsEnum.IGNORE_CASE);
 }
 
 /** `stripRightCondition`: {@link doesNotEndWithKnownAbbreviation} */
@@ -238,16 +245,16 @@ export function extractEmail(email: string): RegExpMatchArray | null {
     );
     if (match) {
         debugLogs.push(`-> match not null -> returning ${JSON.stringify(match)}`);
-        // log.debug(...debugLogs);
+        log.debug(...debugLogs);
         return match;
     }
     debugLogs.push(`-> match is null -> returning null`);
-    // log.debug(...debugLogs);
+    log.debug(...debugLogs);
     return null;
 }
 /** `re` = /`^(a(t{1,2})n:)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*`/i */
 export const ATTN_SALUTATION_PREFIX_PATTERN = new RegExp(
-    /^(a(t{1,2})n:)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*/, 
+    /^((attention|attn|atn):)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*/, 
     RegExpFlagsEnum.IGNORE_CASE
 );
 /** `re` = /`^(Mr\.|Ms\.|Mrs\.|Dr\.|Mx\.)`/i */
@@ -286,12 +293,15 @@ export function extractName(name: string): {
         .replace(ATTN_SALUTATION_PREFIX_PATTERN,'')
         .replace(JOB_TITLE_SUFFIX_PATTERN,'')
         .trim();
+    const debugLogs: any[] = [];
     if ( // invalid name
         stringContainsAnyOf(name, /[0-9!#&@]/) 
         || stringContainsAnyOf(name, COMPANY_KEYWORDS_PATTERN, RegExpFlagsEnum.IGNORE_CASE)
     ) {
-        // log.debug(`stringContainsAnyOf("${name}", /[0-9!#&@]/) = ${stringContainsAnyOf(name, /[0-9!#&@]/)}`, 
-        //     `\n\tor stringContainsAnyOf("${name}", COMPANY_KEYWORDS_PATTERN) = ${stringContainsAnyOf(name, COMPANY_KEYWORDS_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`);
+        debugLogs.push(`extractName()`,
+            TAB + `stringContainsAnyOf("${name}", /[0-9!#&@]/) = ${stringContainsAnyOf(name, /[0-9!#&@]/)}`, 
+            TAB + `or stringContainsAnyOf("${name}", COMPANY_KEYWORDS_PATTERN) = ${stringContainsAnyOf(name, COMPANY_KEYWORDS_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`
+        );
         return { first: '', middle: '', last: '' };
     }
     const nameSplit = name.split(/\s+/);
@@ -299,16 +309,16 @@ export function extractName(name: string): {
         namePart, 
         STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION
     ).replace(/(^[-+])*/g, ''));
+    debugLogs.push(`nameSplit.length == ${nameSplit.length}, nameSplit: [${nameSplit}]`);
     if (nameSplit.length == 1) {
-        // log.debug(`nameSplit.length == 1: [${nameSplit}]`);
         return { first: nameSplit[0].replace(/,$/g, ''), middle: '', last: '' };
     } else if (nameSplit.length == 2) {
-        // log.debug(`nameSplit.length == 2: [${nameSplit}]`);
         return { first: nameSplit[0].replace(/,$/g, ''), middle: '', last: nameSplit[1].replace(/,$/g, '') };
     } else if (nameSplit.length > 2) {
-        // log.debug(`nameSplit.length > 2: [${nameSplit}]`);
         return { first: nameSplit[0].replace(/,$/g, ''), middle: nameSplit[1].replace(/,$/g, ''), last: nameSplit.slice(2).join(' ').replace(/,$/g, '') };
     }
+    debugLogs.push(`extractName() - no valid name parts found, returning empty strings`);
+    log.debug(...debugLogs);
     return { first: '', middle: '', last: '' }; 
 }
 
@@ -318,7 +328,7 @@ export function extractName(name: string): {
  * @description 
  * `re` = `/(?:^|\D)(\d{1,3}[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})[-.\s]?(?:ext|x|ex)?(?:[-:.\s]*)?(\d{1,4})?(?:\D|$)/i`
  * - There are 5 capturing groups in the regex:
- * - **`$1`**  - Country code (optional) - `(\d{1,3})`
+ * - **`$1`** - Country code (optional) - `(\d{1,3})`
  * - **`$2`** - Area code - `(\d{3})`
  * - **`$3`** - First three digits - `(\d{3})`
  * - **`$4`** - Last four digits - `(\d{4})`
@@ -332,45 +342,57 @@ export const PHONE_REGEX = new RegExp(
 
 /**
  * @description
- * `re` = `/(852)[-.\s]?(\d{4})[-.\s]?(\d{4})/`
- * - There are 3 groups in the regex:
- * - **`$1`**  - Country code - `(852)`
+ * `re` = `/(?:^|\D)(852)[-.\s]?(\d{4})[-.\s]?(\d{4})(?:\D|$)/`
+ * - There are 3 capturing groups in the regex:
+ * - **`$1`** - Country code - `(852)`
  * - **`$2`** - First four digits - `(\d{4})`
  * - **`$3`** - Last four digits - `(\d{4})`
  */
-export const HONG_KONG_PHONE_REGEX: RegExp = /(852)[-.\s]?(\d{4})[-.\s]?(\d{4})/;
+export const HONG_KONG_PHONE_REGEX = new RegExp(
+    /(?:^|\D)(852)[-.\s]?(\d{4})[-.\s]?(\d{4})(?:\D|$)/,
+    RegExpFlagsEnum.GLOBAL
+);
 
 /**
  * @description
- * `re` = `/(86)[-.\s]?(\d{2,3})[-.\s]?(\d{4})[-.\s]?(\d{4})/`
- * - There are 4 groups in the regex:
- * - **`$1`**  - Country code - `(86)`
+ * `re` = `/(?:^|\D)(86)[-.\s]?(\d{2,3})[-.\s]?(\d{4})[-.\s]?(\d{4})(?:\D|$)/`
+ * - There are 4 capturing groups in the regex:
+ * - **`$1`** - Country code - `(86)`
  * - **`$2`** - Area code - `(\d{2,3})`
  * - **`$3`** - First four digits - `(\d{4})`
  * - **`$4`** - Last four digits - `(\d{4})`
  */
-export const CHINA_PHONE_REGEX: RegExp = /(86)[-.\s]?(\d{2,3})[-.\s]?(\d{4})[-.\s]?(\d{4})/;
+export const CHINA_PHONE_REGEX = new RegExp(
+    /(?:^|\D)(86)[-.\s]?(\d{2,3})[-.\s]?(\d{4})[-.\s]?(\d{4})(?:\D|$)/,
+    RegExpFlagsEnum.GLOBAL
+);
 /** 
  * @description 
- * `re` = `/(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]?(\d{4})/` 
- * - There are 4 groups in the regex:
- * - **`$1`**  - Country code - `(81)`
+ * `re` = `/(?:^|\D)(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]?(\d{4})(?:\D|$)/` 
+ * - There are 4 capturing groups in the regex:
+ * - **`$1`** - Country code - `(81)`
  * - **`$2`** - Area code - `(\d{1})`
  * - **`$3`** - First four digits - `(\d{4})`
  * - **`$4`** - Last four digits - `(\d{4})`
  */
-export const JAPAN_PHONE_REGEX: RegExp = /(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]?(\d{4})/;
+export const JAPAN_PHONE_REGEX= new RegExp(
+    /(?:^|\D)(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]?(\d{4})(?:\D|$)/,
+    RegExpFlagsEnum.GLOBAL
+);
 
 /**
  * @description
- * `re` = `/(82)[-.\s]?(\d{2})[-.\s]?(\d{3})[-.\s]?(\d{4})/`
- * - There are 4 groups in the regex:
+ * `re` = `/(?:^|\D)(82)[-).\s]?(\d{1,2})?[-.\s]?(\d{3,4})[-.\s]?(\d{4})(?:\D|$)/`
+ * - There are 4 capturing groups in the regex:
  * - **`$1`** - Country code - `(82)`
  * - **`$2`** - Area code - `(\d{2})`
  * - **`$3`** - First three digits - `(\d{3})`
  * - **`$4`** - Last four digits - `(\d{4})`
  */
-export const KOREA_PHONE_REGEX: RegExp = /(82)[-).\s]?(\d{1,2})?[-.\s]?(\d{3,4})[-.\s]?(\d{4})/;
+export const KOREA_PHONE_REGEX = new RegExp(
+    /(?:^|\D)(82)[-).\s]?(\d{1,2})?[-.\s]?(\d{3,4})[-.\s]?(\d{4})(?:\D|$)/,
+    RegExpFlagsEnum.GLOBAL
+);
 
 const phoneRegexList: {re: RegExp, groupFormat: string}[] = [
     { re: CHINA_PHONE_REGEX, groupFormat: '$1-$2-$3-$4' },
@@ -384,11 +406,11 @@ const phoneRegexList: {re: RegExp, groupFormat: string}[] = [
  * @param {string} phone - `string` - phone number to test
  * @returns {string} `phone` - formatted phone number or empty string if unable to format it
  * @description test phone on regex in this order:
- * 1. {@link KOREA_PHONE_REGEX} = `/(82)[-.\s]?(\d{2})[-.\s]?(\d{3})[-.\s]?(\d{4})/`
- * 2. {@link HONG_KONG_PHONE_REGEX} = `/(852)[-.\s]?(\d{4})[-.\s]?(\d{4})/`
- * 3. {@link CHINA_PHONE_REGEX} = `/(86)[-.\s]?(\d{2,3})[-.\s]?(\d{4})[-.\s]?(\d{4})/`
- * 4. {@link JAPAN_PHONE_REGEX} = `/(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]?(\d{4})/`
- * 5. GENERIC_{@link PHONE_REGEX} = `/(?:^\D*(\d{1,3})[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})( ?ext ?(\d{3,4}))?(?:\D*$)/`
+ * 1. {@link KOREA_PHONE_REGEX} = `/(?:^|\D)(82)[-).\s]?(\d{1,2})?[-.\s]?(\d{3,4})[-.\s]?(\d{4})(?:\D|$)/`
+ * 2. {@link HONG_KONG_PHONE_REGEX} = `/(?:^|\D)(852)[-.\s]?(\d{4})[-.\s]?(\d{4})(?:\D|$)/`
+ * 3. {@link CHINA_PHONE_REGEX} = `/(?:^|\D)(86)[-.\s]?(\d{2,3})[-.\s]?(\d{4})[-.\s]?(\d{4})(?:\D|$)`
+ * 4. {@link JAPAN_PHONE_REGEX} = `/(?:^|\D)(81)[-.\s]?(\d{1})[-.\s]?(\d{4})[-.\s]?(\d{4})(?:\D|$)/`
+ * 5. GENERIC_{@link PHONE_REGEX} = `/(?:^|\D)(\d{1,3}[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})[-.\s]?(?:ext|x|ex)?(?:[-:.\s]*)?(\d{1,4})?(?:\D|$)/i`
  * 6. `else` return emtpy string
  * @note Valid formats for NetSuite Phone Number fields are: 
  * 1. `999-999-9999`
@@ -420,8 +442,9 @@ export function extractPhone(phone: string): string[] | RegExpMatchArray | null 
         return formattedPhones;
     }
     if (phone) { // phone is non-empty and did not match any regex
-        // log.warn(`extractPhone() - no match found for "${phone}", returning empty string.`)
+        debugLogs.push(`extractPhone() - no match found for "${phone}", returning empty string.`)
     };
+    log.debug(...debugLogs);
     return null;
 
 }
@@ -494,9 +517,9 @@ export function stringEndsWithAnyOf(
             'Expected string, array of strings, or RegExpbut received:', typeof suffixes, suffixes);
         return false; // Invalid suffixes type
     }
-    // log.debug(
-    //     `\nregex: ${regex}`,
-    //     `\nregex.test("${s}"): ${regex.test(s)}`
+    // log.debug(`stringEndsWithAnyOf()`,
+    //     TAB + `regex: ${regex}`,
+    //     TAB + `regex.test("${s}"): ${regex.test(s)}`
     // )
     return regex.test(s);
 }
@@ -536,8 +559,9 @@ export function stringStartsWithAnyOf(
     if (!regex) {
         log.warn(
             'startsWithAnyOf() Invalid prefixes type. returning false.', 
-            'Expected string, array of strings, or RegExp, but received:', typeof prefixes, 
-            'prefixes', prefixes);
+            TAB + 'Expected string, array of strings, or RegExp, but received:', typeof prefixes, 
+            TAB + 'prefixes', prefixes
+        );
         return false; // Invalid prefixes type
     }
     return regex.test(str);
@@ -569,8 +593,7 @@ export function stringContainsAnyOf(str: string, substrings: string | string[] |
 
     if (!regex) {
         log.warn('containsAnyOf() Invalid substrings type. returning false.', 
-            'Expected string, array of strings, or RegExp, but received:', 
-            typeof substrings, substrings);
+        TAB + `Expected string, array of strings, or RegExp, but received: ${typeof substrings}, ${substrings}`);
         return false; // Invalid substrings type
     }
     return regex.test(str);

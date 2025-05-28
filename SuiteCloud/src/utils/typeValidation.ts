@@ -2,6 +2,7 @@
  * @file src/utils/typeValidation.ts
  */
 import { FieldValue } from "src/utils/api/types";
+import { mainLogger as log } from "src/config/setupLog";
 import { BOOLEAN_FIELD_ID_REGEX, EMAIL_REGEX } from "./io/regex";
 
 /**
@@ -17,6 +18,7 @@ export const RADIO_FIELD_FALSE = 'F';
  * - `= typeof `{@link RADIO_FIELD_TRUE}` | typeof `{@link RADIO_FIELD_FALSE}`;` 
  * */
 export type RadioFieldBoolean = typeof RADIO_FIELD_TRUE | typeof RADIO_FIELD_FALSE;   
+
 
 export const BOOLEAN_TRUE_VALUES = ['true', 'yes', 'y'];
 export const BOOLEAN_FALSE_VALUES = ['false', 'no', 'n'];
@@ -110,7 +112,7 @@ export function hasKeys<T extends Object>(obj: T, keys: Array<keyof T>): boolean
     }
     for (const key of keys) {
         if (!obj.hasOwnProperty(key)) {
-            console.warn(`hasKeys() Key "${String(key)}" not found in the object`);
+            // log.warn(`hasKeys() key "${String(key)}" not found in the object`);
             return false; // Key not found in the object
         }
     }

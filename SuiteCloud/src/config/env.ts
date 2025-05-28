@@ -150,6 +150,10 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
                 scriptId: 172,
                 deployId: 1,
             },
+            DELETE_DeleteRecordByType: {
+                scriptId: 173,
+                deployId: 1,
+            },
         } as ScriptDictionary,
     }
 }
