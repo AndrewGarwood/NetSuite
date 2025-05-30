@@ -1,6 +1,7 @@
 import { 
     readJsonFileAsObject as read, 
-    writeObjectToJson as write, 
+    writeObjectToJson as write,
+    parseCsvForOneToMany 
 } from "./utils/io";
 import { TOKEN_DIR, DATA_DIR, OUTPUT_DIR, STOP_RUNNING } from "./config/env";
 import { mainLogger as log, INDENT_LOG_LINE as TAB } from "./config/setupLog";
@@ -18,22 +19,27 @@ import * as customerFiles from './parses/customer/parseCustomer';
 
 async function main() {
     const {entities: customers, contacts } = await parseEntityFile(
-        customerFiles.COMPLETE_FILE, 
+        customerFiles.SINGLE_COMPANY_FILE, 
         EntityRecordTypeEnum.CUSTOMER, 
         [CUSTOMER_OPTIONS, CONTACT_OPTIONS]
     );
-    await postEntityRecords(
-        EntityRecordTypeEnum.CUSTOMER,
-        customers, contacts
-    );
-    log.info(`Parsed ${customers.length} customers and ${contacts.length} contacts from file`);
-    STOP_RUNNING(0, 'end of main()');
+    try {
+        const { 
+            entityResponses: customerResponses,
+            contactResponses: contactResponses,
+            entityUpdateResponses: customerUpdateResponses, 
+        } = await postEntityRecords(
+            EntityRecordTypeEnum.CUSTOMER, customers, contacts
+        );
+    } catch (error) {
+        log.error('Error posting entity records', error);
+    }
+    STOP_RUNNING(0, 'main.ts: End of main()');
 }
 main().catch(error => {
-    log.error('Error executing main() function. error.keys=', Object.keys(error));
+    log.error('Error executing main() function', Object.keys(error));
     STOP_RUNNING(1);
 });
-
 // const res = await deleteRecordByType(
 //     { recordType: EntityRecordTypeEnum.CUSTOMER } as DeleteRecordByTypeRequest
 // );

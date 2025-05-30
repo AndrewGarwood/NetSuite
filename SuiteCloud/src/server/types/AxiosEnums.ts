@@ -4,7 +4,7 @@
  */
 
 /**
- * @enum {string} `GrantTypeEnum`
+ * @enum {string} **`GrantTypeEnum`**
  * @description Enum for OAuth2 grant types.
  * @property {string} AUTHORIZATION_CODE - Authorization code grant type.
  * @property {string} REFRESH_TOKEN - Refresh token grant type.
@@ -14,9 +14,8 @@ export enum GrantTypeEnum {
     REFRESH_TOKEN='refresh_token',
 }
 
-
 /**
- * @enum {string} `AxiosCallEnum`
+ * @enum {string} **`AxiosCallEnum`**
  * @description Enum for Axios HTTP methods.
  * @property {string} GET - HTTP GET method.
  * @property {string} POST - HTTP POST method.
@@ -32,7 +31,7 @@ export enum AxiosCallEnum {
 
 
 /**
- * @enum {string} `AxiosContentTypeEnum`
+ * @enum {string} **`AxiosContentTypeEnum`**
  * @description Enum for Content-Type headers.
  * @property {string} JSON - application/json
  * @property {string} TEXT - text/plain

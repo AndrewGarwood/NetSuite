@@ -6,6 +6,16 @@ import { OUTPUT_DIR } from './env';
 import { Logger, ISettingsParam, ISettings, ILogObj, ILogObjMeta, IPrettyLogStyles, IMeta } from 'tslog';
 import path from 'node:path';
 import { appendFileSync } from 'node:fs';
+/** 
+ * `INDENT_LOG_LINE =  '\n\t '` = newLine + tab + space
+ * - log.debug(s1, INDENT_LOG_LINE + s2, INDENT_LOG_LINE + s3,...) 
+ * */
+export const INDENT_LOG_LINE: string = '\n\t ';
+
+/** 
+ * `NEW_LINE =  '\n > '` = newLine + space + > + space
+ * */
+export const NEW_LINE: string = '\n > ';
 /**`OUTPUT_DIR/logs` */
 const LOG_DIR = path.join(OUTPUT_DIR, "logs");  
 /**`OUTPUT_DIR/logs/DEBUG.txt` */
@@ -35,7 +45,7 @@ const LOG_TEMPLATE = [
     // logNameTemplate, 
     fileInfoTemplate,
     logLevelTemplate, 
-].join(' ') + "\n  > ";
+].join(' ') + NEW_LINE;
 
 const errorInfoTemplate = "{{errorName}}: {{errorMessage}}\n\t{{errorStack}}";
 /** 
@@ -116,8 +126,4 @@ export const pruneLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
 pruneLogger.attachTransport((logObj: ILogObj & ILogObjMeta) => {
     appendFileSync(path.join(LOG_DIR, 'PRUNE_LOG.txt'), JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
 });
-/** 
- * `INDENT_LOG_LINE =  '\n\t '` = newLine + tab + space
- * - log.debug(s1, INDENT_LOG_LINE + s2, INDENT_LOG_LINE + s3,...) 
- * */
-export const INDENT_LOG_LINE: string = '\n\t ';
+

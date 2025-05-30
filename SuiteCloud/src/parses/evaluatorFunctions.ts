@@ -71,7 +71,7 @@ export const isPerson = (
         TAB + `              entityNameIsSameAsCompanyName = ${entityNameIsSameAsCompanyName}`,
     ];
     if (HUMAN_VENDORS_TRIMMED.includes(entity)) {
-        log.debug(...[...logArr, TAB + `-> return true`]);
+        // log.debug(...[...logArr, TAB + `-> return true`]);
         return true;
     }
     if (COMPANY_KEYWORDS_PATTERN.test(entity) 
@@ -80,10 +80,10 @@ export const isPerson = (
         || (company// && (company !== entity || COMPANY_KEYWORDS_PATTERN.test(company))
             && company.toLowerCase().replace(/\W*/g, '') !== entity.toLowerCase().replace(/\W*/g, ''))
     ) {
-        log.debug(...[...logArr, TAB + `-> return false`]);
+        // log.debug(...[...logArr, TAB + `-> return false`]);
         return false;
     }
-    log.debug(...[...logArr, TAB + `Reached End of isPerson() -> return true`]);
+    // log.debug(...[...logArr, TAB + `Reached End of isPerson() -> return true`]);
     return true;
 }
 
@@ -200,8 +200,9 @@ export const name = (
         }
         const {first, middle, last} = extractName(initialVal);
         if (first && last) { 
-        log.debug(`extractName("${initialVal}") from col="${col}"`,
-            `\n\t-> {first="${first}", middle="${middle}", last="${last}"}`);
+            // log.debug(`extractName("${initialVal}") from col="${col}"`,
+            //     TAB+`-> {first="${first}", middle="${middle}", last="${last}"}`
+            // );
             return {first: first, middle: middle || '', last: last}; 
         }
     }

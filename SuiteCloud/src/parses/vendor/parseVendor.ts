@@ -23,7 +23,7 @@ import {
 } from "./vendorParseDefinition";
 import { DELAY, SCRIPT_ENVIRONMENT as SE, STOP_RUNNING, DATA_DIR, OUTPUT_DIR } from "src/config/env";
 import { parseCsvToPostRecordOptions } from "src/parseCsvToRequestBody";
-import { partitionArrayBySize, SB_REST_SCRIPTS, BATCH_SIZE, postRecordPayload } from "src/utils/api/callApi";
+import { partitionArrayBySize, SB_REST_SCRIPTS, BATCH_SIZE, upsertRecordPayload } from "src/utils/api/callApi";
 
 
 /** = `['entityid', 'companyname', 'isperson', 'email']` */
@@ -47,7 +47,6 @@ export async function parseVendorFile(
         const parseResults = await parseCsvToPostRecordOptions(filePath, [VENDOR_OPTIONS, CONTACT_OPTIONS]) as ParseResults;
         const vendors = parseResults[RecordTypeEnum.VENDOR]?.validPostOptions as PostRecordOptions[];
         const contacts = parseResults[RecordTypeEnum.CONTACT]?.validPostOptions as PostRecordOptions[];
-
         if (vendors.length === 0 || contacts.length === 0) {
             log.error('No vendors and no contacts were parsed from the CSV file. Exiting...');
             STOP_RUNNING(1);

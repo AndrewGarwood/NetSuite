@@ -3,7 +3,7 @@
  */
 import axios from "axios";
 import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify } from "../io";
-import { mainLogger as log, INDENT_LOG_LINE as TAB } from "src/config/setupLog";
+import { mainLogger as log, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "./url";
 import { getAccessToken, AxiosCallEnum, AxiosContentTypeEnum } from "src/server";
@@ -41,19 +41,19 @@ export function partitionArrayBySize(
  * @param payload {@link BatchPostRecordRequest}
  * @param scriptId `number`
  * @param deployId `number`
- * @returns `responses` — `Promise<any[]>`
+ * @returns `responses` — `Promise<`{@link BatchPostRecordResponse}`[]>`
  */
-export async function postRecordPayload(
+export async function upsertRecordPayload(
     payload: BatchPostRecordRequest, 
     scriptId: number=BATCH_UPSERT_RECORD_SCRIPT_ID, 
     deployId: number=BATCH_UPSERT_RECORD_DEPLOY_ID,
-): Promise<any[]> {
+): Promise<BatchPostRecordResponse[]> {
     if (!payload || Object.keys(payload).length === 0) {
-        log.error('postRecordPayload() payload is undefined or empty. Cannot call RESTlet. Exiting...');
+        log.error('upsertRecordPayload() payload is undefined or empty. Cannot call RESTlet. Exiting...');
         STOP_RUNNING(1);
     }
     const { upsertRecordArray, upsertRecordDict, responseProps } = payload;
-    const responses: any[] = [];
+    const responseDataArr: any[] = [];
     // normalize payload size
     const batches: PostRecordOptions[][] = [];
     if (!upsertRecordDict 
@@ -61,9 +61,7 @@ export async function postRecordPayload(
         && upsertRecordArray.length > BATCH_SIZE
     ) {
         batches.push(...partitionArrayBySize(upsertRecordArray, BATCH_SIZE));
-        
         for (let i = 0; i < batches.length; i++) {
-            if (i < 53) continue; // continue where left off...
             const batch = batches[i];
             try {
                 const accessToken = await getAccessToken();
@@ -74,10 +72,13 @@ export async function postRecordPayload(
                         responseProps: responseProps 
                     } as BatchPostRecordRequest,
                 );
-                responses.push(res);
                 await DELAY(TWO_SECOND_DELAY,
-                    TAB + `finished batch ${i+1} of ${batches.length}`,
-                    TAB + `batchIndex=${i} results: `, 
+                    NL + `finished batch ${i+1} of ${batches.length}`,);
+                if (!res.data) {
+                    continue;
+                }
+                responseDataArr.push(res.data as BatchPostRecordResponse);
+                log.debug(NL+`upsertRecordPayload() batchIndex=${i} results: `, 
                     indentedStringify(((res.data as BatchPostRecordResponse).results as PostRecordResult[]).reduce((acc, postResult) => {
                             acc[postResult.recordType] = (acc[postResult.recordType] || 0) + 1;
                             return acc;
@@ -85,8 +86,8 @@ export async function postRecordPayload(
                 );
                 continue;
             } catch (error) {
-                log.error(`Error in callApi.ts postRecordPayload().upsertRecordArray.POST(batchIndex=${i}):`, error);
-                write({error: error}, ERROR_DIR, `ERROR_postRecordPayload_batch_${i}.json`);
+                log.error(`Error in callApi.ts upsertRecordPayload().upsertRecordArray.POST(batchIndex=${i}):`, error);
+                write({error: error}, ERROR_DIR, `ERROR_upsertRecordPayload_batch_${i}.json`);
                 continue;
             }
         }
@@ -97,14 +98,14 @@ export async function postRecordPayload(
         const accessToken = await getAccessToken();
         try {
             const res = await POST(accessToken, scriptId, deployId, payload);
-            responses.push(res);
+            responseDataArr.push(res);
         } catch (error) {
-            log.error('Error in callApi.ts postRecordPayload().upsertRecordDict.POST():', error);
-            write({error: error}, ERROR_DIR, 'ERROR_postRecordPayload.json');
+            log.error('Error in callApi.ts upsertRecordPayload().upsertRecordDict.POST():', error);
+            write({error: error}, ERROR_DIR, 'ERROR_upsertRecordPayload.json');
             throw error;
         }
     } 
-    return responses;
+    return responseDataArr;
 }
 
 
@@ -213,12 +214,12 @@ export async function deleteRecordByType(
     deployId: number=DELETE_RECORD_BY_TYPE_DEPLOY_ID
 ): Promise<any> {
     if (!payload || Object.keys(payload).length === 0) {
-        log.error('postRecordPayload() payload is undefined or empty. Cannot call RESTlet. Exiting...');
+        log.error('upsertRecordPayload() payload is undefined or empty. Cannot call RESTlet. Exiting...');
         STOP_RUNNING(1);
     }
     const accessToken = await getAccessToken();
     if (!accessToken) {
-        log.error('postRecordPayload() getAccessToken() is undefined. Cannot call RESTlet. Exiting...');
+        log.error('upsertRecordPayload() getAccessToken() is undefined. Cannot call RESTlet. Exiting...');
         STOP_RUNNING(1);
     }
     try {

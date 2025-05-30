@@ -35,7 +35,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         const { upsertRecordArray, upsertRecordDict, responseProps } = reqBody;
         const upsertRecordArrayIsInvalid = !upsertRecordArray || !Array.isArray(upsertRecordArray);
         const upsertRecordDictIsInvalid = !upsertRecordDict || typeof upsertRecordDict !== 'object' || Array.isArray(upsertRecordDict);
-        writeLog(LogTypeEnum.AUDIT, `Checking reqBody input...`, `upsertRecordArrayIsInvalid`, upsertRecordArrayIsInvalid, `upsertRecordDictIsInvalid`, upsertRecordDictIsInvalid);
+        writeLog(LogTypeEnum.AUDIT, `Checking reqBody input...`, `upsertRecordArrayIsInvalid: '${upsertRecordArrayIsInvalid}'`, `upsertRecordDictIsInvalid: '${upsertRecordDictIsInvalid}'`);
         if (upsertRecordArrayIsInvalid && upsertRecordDictIsInvalid) { // both invalid
             writeLog(LogTypeEnum.ERROR, 'Invalid request body', 'upsertRecordArray or upsertRecordDict is required');
             return { success: false, message: 'upsertRecordArray or upsertRecordDict is required', error: 'Invalid request body', logArray, results: [] };
@@ -82,25 +82,33 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     }
                 }
             }
-            writeLog(LogTypeEnum.AUDIT, 'End of POST_BatchUpsertRecord', { numRecordsProcessed: results.length });
+            writeLog(LogTypeEnum.AUDIT, 'End of POST_BatchUpsertRecord', { 
+                numRecordsProcessed: results.length,
+                numRejects: rejects.length,
+                numErrorLogs: logArray.filter(log => log.type === LogTypeEnum.ERROR).length,
+            });
             /**@type {BatchPostRecordResponse} */
             return {
                 success: true,
                 message: 'Batch upsert completed, numRecordsProcessed: ' + results.length,
-                logArray,
-                results,
-                rejects
+                logArray: logArray,
+                results: results,
+                rejects: rejects
             }
         } catch (e) {
-            writeLog(LogTypeEnum.ERROR, 'Error in POST_BatchUpsertRecord', JSON.stringify(e));
+            writeLog(LogTypeEnum.ERROR, 'Error in POST_BatchUpsertRecord', { 
+                numRecordsProcessed: results.length,
+                numRejects: rejects.length,
+                numErrorLogs: logArray.filter(log => log.type === LogTypeEnum.ERROR).length,
+            }, JSON.stringify(e));
             /**@type {BatchPostRecordResponse} */
             return {
                 success: false,
                 message: 'Error in POST_BatchUpsertRecord: Batch upsert failed after processing ' + results.length + ' records',
                 error: String(e),
-                logArray,
-                results,
-                rejects
+                logArray: logArray,
+                results: results,
+                rejects: rejects
             }
         }
     }
@@ -289,14 +297,14 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     && (searchOperator === SearchOperatorEnum.TEXT.IS || searchOperator === SearchOperatorEnum.RECORD.ANY_OF)
                 ) {
                     writeLog(LogTypeEnum.ERROR,
-                        'searchForRecordById() Multiple records found',
+                        'searchForRecordById() Multiple records found.',
                         `${resultRange.length} '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                         `recSearch:`, recSearch
                     );
                     continue;
                 } else if (resultRange.length === 0) {
                     writeLog(LogTypeEnum.AUDIT,
-                        'searchForRecordById() 0 records found',
+                        'searchForRecordById() 0 records found.',
                         `0 '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                     );
                     continue;
@@ -304,7 +312,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 const searchResult = resultRange[0];
                 const recId = searchResult.id;
                 writeLog(LogTypeEnum.AUDIT,
-                    'searchForRecordById() Record found',
+                    'searchForRecordById() Record found!',
                     `1 '${recordType}' record found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                 );
                 return recId;
@@ -805,7 +813,6 @@ const NOT_DYNAMIC = false;
  * - (if subrecord has own sublists) an object containing sublist IDs mapped to a dictionary of fieldIds and values.
  */
 
-
     /**
      * @TODO - decide if this is necessary abstraction or if should just use Array.isArray() and arr.length > 0 everywhere
      * @param {any} arr 
@@ -818,10 +825,9 @@ const NOT_DYNAMIC = false;
      * @description Check if an object has any non-empty keys (not undefined, null, or empty string). 
      * - passing in an array will return `false`.
      * @param {Object} obj - The object to check.
-     * @param {Object} [objName=undefined] - `(optional)` The object name for logging purposes.
      * @returns {boolean} `true` if the object has any non-empty keys, `false` otherwise.
      */
-    function hasNonTrivialKeys(obj, objName = undefined) {
+    function hasNonTrivialKeys(obj) {
         if (typeof obj !== 'object' || !obj || Array.isArray(obj) || Object.keys(obj).length === 0) {
             return false;
         }
@@ -836,14 +842,8 @@ const NOT_DYNAMIC = false;
                 )
             );
             if (valueIsNonTrivial) {
-                if (objName) {
-                    writeLog(LogTypeEnum.DEBUG, `hasNonTrivialKeys(${objName}) === true`, `obj[${key}] = ${value}`);
-                }
                 return true;
             }
-        }
-        if (objName) {
-            writeLog(LogTypeEnum.DEBUG, `hasNonTrivialKeys(${objName}) === false`, `obj = ${JSON.stringify(obj, null, 4)}`);
         }
         return false;
     }
@@ -865,13 +865,14 @@ const NOT_DYNAMIC = false;
             log.error('Invalid log type', `type must be one of ${Object.values(LogTypeEnum).join(', ')}`);
             return;
         }
-        details = details || [title];
+        details = details && details.length > 0 ? details : [title];
         const payload = details
             .map(d => (typeof d === 'string' ? d : JSON.stringify(d, null, 4)))
             .join(' ');
         switch (type) {
             case LogTypeEnum.DEBUG:
-                log.debug(title, payload);
+                // I exceeded governance... my bad. 
+                // log.debug(title, payload);
                 break;
             case LogTypeEnum.ERROR:
                 log.error(title, payload);
@@ -1135,9 +1136,13 @@ const FieldInputTypeEnum = {
  * @readonly
  */
 const LogTypeEnum = {
+    /** = `'debug'` */
     DEBUG: 'debug',
+    /** = `'error'` */
     ERROR: 'error',
+    /** = `'audit'` */
     AUDIT: 'audit',
+    /** = `'emergency'` */
     EMERGENCY: 'emergency',
 };
 
