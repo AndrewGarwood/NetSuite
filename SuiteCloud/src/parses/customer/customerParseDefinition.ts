@@ -114,7 +114,15 @@ export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldValueMapping[] = [
     { fieldId: 'comments', colName: 'Note' },
 ]
 
-
+/**
+ * Not able to read/write to this sublist because it's a "static sublist"
+ * "error.SuiteScriptError", "name": "SSS_INVALID_SUBLIST_OPERATION", 
+ * "message": 
+ * "You have attempted an invalid sublist or line item operation. 
+ *  You are either trying to access a field on a non-existent line or 
+ *  you are trying to add or remove lines from a static sublist..."
+* {@link https://stoic.software/articles/types-of-sublists/#:~:text=Lastly%2C%20the-,Static%20List,-sublists%20are%20read} 
+* */
 export const CONTACT_ROLES_SUBLIST_DEFAULT_OPTIONS: SublistDictionaryParseOptions = {
     contactroles: {
         fieldValueMapArray: [
@@ -132,7 +140,7 @@ export const PARSE_CUSTOMER_FROM_CUSTOMER_CSV_OPTIONS: ParseOptions = {
             ...CONTACT_CUSTOMER_SHARED_FIELDS,
             { fieldId: 'externalid', evaluator: evaluate.externalId, args: [RecordTypeEnum.CUSTOMER, 'Customer'] },
             { fieldId: 'altphone', evaluator: evaluate.phone, args: [{colName: 'Main Phone', minIndex: 1}, 'Alt. Phone', 'Work Phone'] as Array<string | ColumnSliceOptions> },
-            { fieldId: 'entitystatus', defaultValue: CustomerStatusEnum.CLOSED_WON },
+            { fieldId: 'entitystatus', evaluator: customerEval.customerStatus, args: ['Customer Type'] },
             { fieldId: 'category', evaluator: customerEval.customerCategory, args: ['Customer Type', CATEGORY_DICT] },
             { fieldId: 'companyname', evaluator: customerEval.customerCompany, args: ['Customer', 'Company'] },
             { fieldId: 'firstname', evaluator: customerEval.firstNameIfCustomerIsPerson, args: ['Customer', 'First Name', ...NAME_COLUMNS] },
@@ -148,7 +156,7 @@ export const PARSE_CUSTOMER_FROM_CUSTOMER_CSV_OPTIONS: ParseOptions = {
     } as FieldDictionaryParseOptions,
     sublistDictParseOptions: {
         ...ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,
-        ...CONTACT_ROLES_SUBLIST_DEFAULT_OPTIONS
+        // ...CONTACT_ROLES_SUBLIST_DEFAULT_OPTIONS
     },
     valueOverrides: evaluate.ENTITY_VALUE_OVERRIDES,
     pruneFunc: prune.entity,

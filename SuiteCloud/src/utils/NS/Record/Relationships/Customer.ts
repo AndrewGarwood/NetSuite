@@ -46,6 +46,7 @@ export interface CustomerSublists {
     addressbook?: AddressBook;
     /**
      * @notimplemented
+     * @readonly
      * @label "Contacts"
      * @description contact sublist for the customer.
      * */

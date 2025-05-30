@@ -34,8 +34,9 @@ export const entity = (
             if (!fieldDict?.valueFields?.some(
                 (field) => field.fieldId === requiredField && field.value)
             ) {
-                log.debug(`pruneEntity():`,
-                    TAB + `SetFieldValueOptions is missing field "${requiredField}", returning null`);
+                // log.debug(`pruneEntity():`,
+                //     TAB + `SetFieldValueOptions is missing field "${requiredField}", returning null`
+                // );
                 return null;
             }
             
@@ -68,9 +69,9 @@ export const requireNameFields = (
             if (!fieldDict?.valueFields?.some(
                 (field) => field.fieldId === requiredField && field.value)
             ) {
-                log.debug(`pruneIfNoName():`, 
-                    TAB + `SetFieldValueOptions is missing field "${requiredField}", returning null`
-                );
+                // log.debug(`pruneIfNoName():`, 
+                //     TAB + `SetFieldValueOptions is missing field "${requiredField}", returning null`
+                // );
                 return null;
             }
         }
@@ -101,10 +102,10 @@ export const pruneAddressBook = (
                 if (!subrecValueFields?.some(
                     (field) => field.fieldId === requiredField)
                 ) {
-                    log.debug(`pruneAddressBook():`,
-                        TAB + `subrecordFields[${index}]: SetSubrecordOptions is missing address field "${requiredField}"`, 
-                        TAB + `-> removing it from subrecordFields`
-                    );
+                    // log.debug(`pruneAddressBook():`,
+                    //     TAB + `subrecordFields[${index}]: SetSubrecordOptions is missing address field "${requiredField}"`, 
+                    //     TAB + `-> removing it from subrecordFields`
+                    // );
                     valueFields = valueFields?.filter((field) => field.line !== currentLine);
                     subrecordFields.splice(index, 1);
                     index--; // Adjust index after removing an element
