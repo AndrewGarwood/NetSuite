@@ -2,10 +2,12 @@
  * @file src/parses/parseEntity.ts
  */
 import {
+    getCurrentPacificTime,
+    indentedStringify,
     writeObjectToJson as write, 
 } from "../utils/io";
-import { mainLogger as log, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
-import { OUTPUT_DIR, STOP_RUNNING } from "src/config/env";
+import { mainLogger as log, parseLogger as plog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
+import { OUTPUT_DIR, ERROR_DIR, STOP_RUNNING, CLOUD_LOG_DIR } from "src/config/env";
 import { RadioFieldBoolean, RADIO_FIELD_TRUE } from "src/utils/typeValidation";
 import { parseCsvToPostRecordOptions } from "src/parseCsvToRequestBody";
 import { 
@@ -23,13 +25,14 @@ export const CONTACT_RESPONSE_PROPS = ['entityid', 'company', 'firstname', 'last
 
 
 /** 
+ * calls {@link parseCsvToPostRecordOptions} to parse a csv file containing entity data,
  * contact record has a `select` field for company,
  * - if a `entityType` is a company, then the associated `contact.company` field should be set to the entity's `internalid`
  * - ...so let's make the entities first and get their `internalid`(s) in the Post Response
  * @param filePath - `string` - path to the csv file containing the entity data 
  * @param entityType - {@link EntityRecordTypeEnum} - type of the primary entity to parse from file at filePath
  * @param parseOptions - `Array<`{@link ParseOptions}`>` - apply parse definitions to the file's rows
- * @returns `Promise<{entities: PostRecordOptions[], contacts: PostRecordOptions[], parseResults: ParseResults}>` - returns...
+ * @returns `Promise<{ entities: `{@link PostRecordOptions}`[], contacts: `PostRecordOptions`[] }>`
  */
 export async function parseEntityFile(
     filePath: string,
@@ -37,65 +40,143 @@ export async function parseEntityFile(
     parseOptions: ParseOptions[]
 ): Promise<{
     entities: PostRecordOptions[], 
-    contacts: PostRecordOptions[], 
-    parseResults: ParseResults
+    contacts: PostRecordOptions[],
 }> { 
+    const entityFileParseResults = {
+        entities: [] as PostRecordOptions[], 
+        contacts: [] as PostRecordOptions[],
+    }
     if (!filePath) {
         log.error('No file path provided. returning...');
-        return {} as { entities: [], contacts: [], parseResults: {} };
+        return entityFileParseResults;
     }
-    if (!entityType 
-        || entityType === EntityRecordTypeEnum.CONTACT 
+    if (!entityType
         || !Object.values(EntityRecordTypeEnum).includes(entityType)
     ) {
         log.error('No valid entity type provided. returning...');
-        return {} as { entities: [], contacts: [], parseResults: {} };
+        return entityFileParseResults;
     }
     try {
-        const parseResults = await parseCsvToPostRecordOptions(
-            filePath, parseOptions) as ParseResults;
-        const entities = parseResults[entityType]?.validPostOptions as PostRecordOptions[];
-        const contacts = parseResults[RecordTypeEnum.CONTACT]?.validPostOptions as PostRecordOptions[];
-        if (entities.length === 0 && contacts.length === 0) {
+        const parseResults 
+            = await parseCsvToPostRecordOptions(filePath, parseOptions) as ParseResults;
+        entityFileParseResults.entities 
+            = parseResults[entityType]?.validPostOptions as PostRecordOptions[];
+        entityFileParseResults.contacts 
+            = parseResults[RecordTypeEnum.CONTACT]?.validPostOptions as PostRecordOptions[];
+        if (entityFileParseResults.entities.length === 0 && entityFileParseResults.contacts.length === 0) {
             log.error(`No ${entityType}s and no contacts were parsed from the CSV file. Exiting...`);
         }
-        return {
-            entities: entities,
-            contacts: contacts,
-            parseResults: parseResults
-        }
+        return entityFileParseResults;
     } catch (error) {
         log.error(`main.ts parseEntityFile() Error parsing ${entityType} file:`, error);
-        return {} as { entities: [], contacts: [], parseResults: {} };
+        return entityFileParseResults;
     }
 }
 
 /**
- * @param entityType - {@link EntityRecordTypeEnum}
+ * @description Post entities and their contacts to NetSuite
+ * @param entities `Array<`{@link PostRecordOptions}`>`
+ * @param responseProps `Array<string>` - properties to return in the response, defaults to {@link ENTITY_RESPONSE_PROPS}
+ * @returns **`entityResponses`** `Promise<`{@link BatchPostRecordResponse}`[]`
+ */
+export async function postEntities(
+    entities: PostRecordOptions[],
+    responseProps: string[] = ENTITY_RESPONSE_PROPS,
+): Promise<BatchPostRecordResponse[]> {
+    try {
+        const entityResponses: BatchPostRecordResponse[] = await upsertRecordPayload({
+            upsertRecordArray: entities,
+            responseProps: responseProps
+        } as BatchPostRecordRequest);
+
+        return entityResponses;
+    } catch (error) {
+        log.error(`postEntityRecords() Error posting entities and contacts.`);
+        write({timestamp: getCurrentPacificTime(), caught: error as any}, 
+            ERROR_DIR, 'ERROR_postEntityRecords.json'
+        );
+    }
+    return [];
+}
+
+/**
+ * @param contacts `Array<`{@link PostRecordOptions}`>` - should be {@link matchContactsToPostEntityResponses}'s return value, `companyContacts`
+ * @param responseProps `Array<string>` - properties to return in the response, defaults to {@link CONTACT_RESPONSE_PROPS}
+ * @returns **`contactResponses`** `Promise<`{@link BatchPostRecordResponse}`[]>`
+ */
+export async function postContacts(
+    contacts: PostRecordOptions[],
+    responseProps: string[] = CONTACT_RESPONSE_PROPS
+): Promise<BatchPostRecordResponse[]> {
+    try {
+        const contactResponses: BatchPostRecordResponse[] = await upsertRecordPayload({
+            upsertRecordArray: contacts,
+            responseProps: responseProps
+        } as BatchPostRecordRequest);
+        return contactResponses;
+    } catch (error) {
+        log.error(`postEntityContacts() Error posting contacts.`);
+        write({timestamp: getCurrentPacificTime(), caught: error as any}, 
+            ERROR_DIR, 'ERROR_postEntityContacts.json'
+        );
+    }
+    log.warn(`postEntityContacts() returning empty array.`);
+    return [] as BatchPostRecordResponse[];
+}
+
+/**
+ * @TODO validate params and add if statements to exit method early if a responseArr is empty  
+ * @description Post entities and their contacts to NetSuite, then update the entities with 
+ * the contact's internalId so the contact shows up on the entities' contacts sublist
+ * @param entityType {@link EntityRecordTypeEnum} - type of the primary entity to update
  * @param entities `Array<`{@link PostRecordOptions}`>`
  * @param contacts `Array<`{@link PostRecordOptions}`>`
- */
-export async function postEntityRecords(
+ * @returns `Promise<{ entityResponses: `{@link BatchPostRecordResponse}`[], contactResponses: `{@link BatchPostRecordResponse}`[], entityUpdateResponses: `{@link BatchPostRecordResponse}`[] }>`
+ * */
+export async function postEntitiesAndContacts(
     entityType: EntityRecordTypeEnum,
     entities: PostRecordOptions[],
     contacts: PostRecordOptions[],
 ): Promise<{
-    entityResponses: BatchPostRecordResponse[], 
-    contactResponses: BatchPostRecordResponse[], 
+    entityResponses: BatchPostRecordResponse[],
+    contactResponses: BatchPostRecordResponse[],
     entityUpdateResponses: BatchPostRecordResponse[]
 }> {
-    let debugLogs: any[] = [];
-    const entityResponses: BatchPostRecordResponse[] = await upsertRecordPayload({
-        upsertRecordArray: entities,
+    const entityResponses: BatchPostRecordResponse[] = await postEntities(entities);
+    const companyContacts: PostRecordOptions[] 
+        = matchContactsToPostEntityResponses(contacts, entityResponses).companyContacts;
+    const contactResponses: BatchPostRecordResponse[]
+        = await postContacts(companyContacts);
+    const entityUpdates: PostRecordOptions[]
+        = generateEntityUpdates(entityType, contactResponses);
+    if (entityUpdates.length === 0) {
+        log.warn(`entityUpdates.length === 0. Exiting.`);
+        return {
+            entityResponses: entityResponses,
+            contactResponses: contactResponses,
+            entityUpdateResponses: []
+        };
+    }
+    const entityUpdateResponses = await upsertRecordPayload({ 
+        upsertRecordArray: entityUpdates,
         responseProps: ENTITY_RESPONSE_PROPS
-    } as BatchPostRecordRequest);
-    const { matchedContacts: companyContacts } 
-        = matchContactsToPostEntityResponses(contacts, entityResponses);
-    const contactResponses: BatchPostRecordResponse[] = await upsertRecordPayload({
-        upsertRecordArray: companyContacts,
-        responseProps: CONTACT_RESPONSE_PROPS
-    } as BatchPostRecordRequest);
+    });
+    return {
+        entityResponses: entityResponses,
+        contactResponses: contactResponses,
+        entityUpdateResponses: entityUpdateResponses
+    };
+}
 
+/** 
+ * @param entityType {@link EntityRecordTypeEnum} - type of the primary entity to update
+ * @param contactResponses `Array<`{@link BatchPostRecordResponse}`>` - responses from initial contact post.
+ * @returns **`entityUpdates`** = `Array<`{@link PostRecordOptions}`>` - represents updates to set entity.contact to internalId of entity-company's corresponding contact 
+ * */
+export function generateEntityUpdates(
+    entityType: EntityRecordTypeEnum,
+    contactResponses: BatchPostRecordResponse[]
+): PostRecordOptions[] {
     const entityUpdates: PostRecordOptions[] = [];
     const contactResults: PostRecordResult[] = getPostResults(contactResponses);    
     for (let contactResult of contactResults) {
@@ -105,7 +186,7 @@ export async function postEntityRecords(
                 { 
                     idProp: idPropertyEnum.INTERNAL_ID, 
                     searchOperator: SearchOperatorEnum.RECORD.ANY_OF, 
-                    idValue: contactResult?.company // contactResult.company = ${entityType}'s internalid
+                    idValue: contactResult?.company // = ${entityType}'s internalid
                 },
                 { 
                     idProp: idPropertyEnum.ENTITY_ID, 
@@ -115,45 +196,22 @@ export async function postEntityRecords(
             ] as idSearchOptions[],
             fieldDict: {
                 valueFields: [
-                    // { // included so REST script can use as search term
-                    //     fieldId: idPropertyEnum.INTERNAL_ID, 
-                    //     value: contactResult?.company // contactResult.company = ${entityType}'s internalid
-                    // },
-                    // { // (maybe redundant) included so REST script can use as search term
-                    //     fieldId: idPropertyEnum.ENTITY_ID, 
-                    //     value: contactResult?.entityid 
-                    // },
-                    { // new SetFieldValueOptions to update ${entityType} with
+                    {
                         fieldId: 'contact', 
                         value: contactResult?.internalId 
                     }
                 ] as SetFieldValueOptions[],
             } as FieldDictionary,
-            sublistDict: {
-                contactroles: { 
-                    valueFields: [
-                        { sublistId: 'contactroles', line: 0 , fieldId: 'role', value: ContactRoleEnum.PRIMARY_CONTACT },
-                        { sublistId: 'contactroles', line: 0 , fieldId: 'contact', value: contactResult?.internalId  }
-                    ] as SetSublistValueOptions[] 
-                } as SublistFieldDictionary
-            } as SublistDictionary
         } as PostRecordOptions);
     }
-    const entityUpdateResponses = await upsertRecordPayload({ 
-        upsertRecordArray: entityUpdates,
-        responseProps: ENTITY_RESPONSE_PROPS
-    });
-    // log.debug(...debugLogs);
-    return {
-        entityResponses: entityResponses,
-        contactResponses: contactResponses,
-        entityUpdateResponses: entityUpdateResponses,
-    };
-
+    return entityUpdates;
 }
 
-
-function getPostResults(
+/**
+ * @param entityResponses `Array<`{@link BatchPostRecordResponse}`>`
+ * @returns **`entityResults`** = `Array<`{@link PostRecordResult}`>`
+ */
+export function getPostResults(
     entityResponses: BatchPostRecordResponse[]
 ): PostRecordResult[] {
     const entityResults: PostRecordResult[] = [];
@@ -165,7 +223,7 @@ function getPostResults(
         entityResults.push(...entityResponse.results as PostRecordResult[]);
     }
     if (entityResults.length === 0) {
-        log.error(`No entityResults found. Returning empty array.`);
+        log.warn(`No entityResults found. Returning empty array.`);
         return [];
     }
     return entityResults;
@@ -173,9 +231,9 @@ function getPostResults(
 
 /**
  * @param entities `Array<`{@link PostRecordOptions}`>`
- * @returns `numCompanyEntities` - `number`
+ * @returns **`numCompanyEntities`** - `number`
  */
-function countCompanyEntities(entities: PostRecordOptions[]): number {
+export function countCompanyEntities(entities: PostRecordOptions[]): number {
     let numCompanyEntities = 0;
     for (let i = 0; i < entities.length; i++) {
         const entity: PostRecordOptions = entities[i];
@@ -195,22 +253,20 @@ function countCompanyEntities(entities: PostRecordOptions[]): number {
  * @description match `internalid`s of entity post results to contacts
  * @param contacts `Array<`{@link PostRecordOptions}`>`
  * @param entityResponses `Array<`{@link BatchPostRecordResponse}`>`
- * @returns `{ matchedContacts: Array<`{@link PostRecordOptions}`>, unmatchedContacts: Array<`{@link PostRecordOptions}`> }`
- * - `matchedContacts`: - contacts corresponding to an entity in netsuite where `entity.isperson === 'F'` (i.e. a company) -> need to make a contact record.
- * - `unmatchedContacts`: - contacts corresponding to an entity in netsuite where `entity.isperson === 'T'` (i.e. a person) -> no need to make a contact record.
+ * @returns `{ companyContacts: Array<`{@link PostRecordOptions}`>, unmatchedContacts: Array<`{@link PostRecordOptions}`> }`
+ * - **`companyContacts`**: - contacts corresponding to an entity in netsuite where `entity.isperson === 'F'` (i.e. a company) -> need to make a contact record.
+ * - **`unmatchedContacts`**: - contacts corresponding to an entity in netsuite where `entity.isperson === 'T'` (i.e. a person) -> no need to make a contact record.
  */
 export function matchContactsToPostEntityResponses(
     contacts: PostRecordOptions[], 
     entityResponses: BatchPostRecordResponse[]
 ): {
-    matchedContacts: PostRecordOptions[], 
+    companyContacts: PostRecordOptions[], 
     unmatchedContacts: PostRecordOptions[],
 } {
-    const entityResults: PostRecordResult[] 
-        = getPostResults(entityResponses);
-
+    const entityResults: PostRecordResult[] = getPostResults(entityResponses);
+    const companyContacts: PostRecordOptions[] = [];
     const unmatchedContacts: PostRecordOptions[] = [];
-    const matchedContacts: PostRecordOptions[] = [];
     for (let i = 0; i < contacts.length; i++) {
         const contact: PostRecordOptions = contacts[i];
         let contactCompanyField = contact.fieldDict?.valueFields?.find(
@@ -218,23 +274,36 @@ export function matchContactsToPostEntityResponses(
         ) as SetFieldValueOptions;
         const contactCompany: string = contactCompanyField?.value as string;
         if (!contactCompany) {
-            log.debug(`contactCompany is undefined -> isPerson(entity)===true -> no need to worry about the select field. continuing...`);
+            plog.debug(`contactCompany is undefined -> isPerson(entity)===true -> no need to worry about the select field. continuing...`);
             unmatchedContacts.push(contact);
             continue;
         }
-        let entityInternalId = entityResults.find(
-            entityResult => entityResult?.entityid === contactCompany
+        /**
+         * - `if` turn on customer numbering in NetSuite Setup, 
+         * `then` responseProp value for `entityid` is: 
+         * > `'${customerNumber} ${originalEntityId}'` 
+         * - `therefore` extract the `entityid` value to compare in lookup 
+         * by using indexOf(' ')+1 and slice() to get the part after the first space.
+         * */
+        const entityInternalId = entityResults.find(entityResult => {
+            let entityId = String(entityResult?.entityid) || '';
+            return entityId.slice(entityId.indexOf(' ')+1) === contactCompany
+                || entityResult?.companyname === contactCompany
+        }
         )?.internalId;
         if (!entityInternalId) {
-            log.warn(`entityInternalId is undefined for contact with company '${contactCompany}' at contacts[index=${i}]. Adding to unmatchedContacts.`);
+            log.warn(
+                `entityInternalId is undefined for contact with company '${contactCompany}' at contacts[index=${i}].`, 
+                `Adding to unmatchedContacts.`
+            );
             unmatchedContacts.push(contact);
             continue;
         }
         contactCompanyField.value = entityInternalId;
-        matchedContacts.push(contact);
+        companyContacts.push(contact);
     }
     return {
-        matchedContacts: matchedContacts,
+        companyContacts: companyContacts,
         unmatchedContacts: unmatchedContacts
     };
 }

@@ -1,3 +1,6 @@
+/**
+ * @file src/parseCsvToRequestBody.ts
+ */
 import { 
     PostRecordOptions, 
     FieldDictionary,
@@ -21,20 +24,27 @@ import {
 import { RecordTypeEnum } from "./utils/NS";
 import { mainLogger as log, INDENT_LOG_LINE as TAB } from "./config/setupLog";
 import {
-    hasKeys, isBooleanFieldId, isNullLike, BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES
+    isBooleanFieldId, isNullLike, BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES
 } from "./utils/typeValidation";
-import { getDelimiterFromFilePath} from "./utils/io";
+import { getDelimiterFromFilePath, indentedStringify } from "./utils/io";
 import { STOP_RUNNING } from "./config/env";
 import csv from 'csv-parser';
 import fs from 'fs';
 import { ValueMapping, ValueMappingEntry, isValueMappingEntry } from "./utils/io/types";
 
+/** use to set the field `"isinactive"` to false */
 const NOT_DYNAMIC = false;
 let rowIndex = 0;
 let pruneCount: Record<string, number> = {};
 
 /**
- * @param csvPath - The path to the CSV file.
+ * @TODO modify handling of pruneFunc so that can read the invalid PostRecordOptions 
+ * instead of just returning the ParseOptions that generated them
+ * 
+ */
+
+/**
+ * @param csvPath `string` - The path to the CSV file.
  * @param recordParseOptions - {@link RecordParseOptions}
  * - = `{ [key` in {@link RecordTypeEnum}`]?:` {@link ParseOptions}`[] }`
  * - {@link ParseOptions} =
@@ -55,7 +65,7 @@ export async function parseCsvToPostRecordOptions(
 
 export async function parseCsvToPostRecordOptions(
     csvPath: string,
-    /** `arg2` = parseOptionsArray_OR_recordParseOptions: {@link ParseOptions}`[]` or {@link RecordParseOptions} */
+    /** `arg2` = {@link ParseOptions}`[]` or {@link RecordParseOptions} */
     arg2: RecordParseOptions | ParseOptions[],
 ): Promise<ParseResults> {
     if (!csvPath || typeof csvPath !== 'string') {
@@ -68,7 +78,7 @@ export async function parseCsvToPostRecordOptions(
         || (Array.isArray(arg2) && arg2.length === 0) 
         || (typeof arg2 === 'object' && Object.keys(arg2).length === 0)
     ) {
-        throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No arg2: parseOptionsArray_OR_recordParseOptions provided.`);
+        throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No arg2: (parseOptionsArray OR recordParseOptions) provided.`);
     }
     const recordParseOptions = {} as RecordParseOptions;
     // handle overload when arg2 is an array of ParseOptions
@@ -106,14 +116,15 @@ export async function parseCsvToPostRecordOptions(
                         try {
                             const { 
                                 recordType, 
-                                fieldDictParseOptions, sublistDictParseOptions, 
-                                valueOverrides, pruneFunc 
+                                fieldDictParseOptions, 
+                                sublistDictParseOptions, 
+                                valueOverrides, 
+                                pruneFunc 
                             } = parseOptions as ParseOptions;
                             if (recordKey !== recordType) {
                                 log.error(`ERROR in parseCsvToPostRecordOptions() recordType ${recordKey} does not match parseOptions recordType ${recordType}.`);
                                 continue;
                             }   
-                            // Validate required fields exist in CSV row
                             validateFieldMappings(row, fieldDictParseOptions, sublistDictParseOptions);
                             let postOptions: PostRecordOptions | null = generatePostRecordOptions(
                                 row,
@@ -125,7 +136,7 @@ export async function parseCsvToPostRecordOptions(
                             if (pruneFunc) {
                                 postOptions = pruneFunc(postOptions);
                             }
-                            if (!postOptions) { // postOptions === null
+                            if (!postOptions) {
                                 pruneCount[recordType] = (pruneCount[recordType] || 0) + 1;
                                 results[recordType]?.invalidParseOptions.push(parseOptions);
                                 continue;
@@ -150,11 +161,12 @@ export async function parseCsvToPostRecordOptions(
                     }
                 });
                 log.debug(
-                    `Finished processing CSV file - LastrowIndex: ${rowIndex}`,
+                    `Finished processing CSV file`,
+                    TAB + `Last rowIndex: ${rowIndex}`,
                     TAB + `recordType(s): [${Object.keys(recordParseOptions).join(', ')}]`, 
                     // TAB + `pruneCount:`, JSON.stringify(pruneCount),
-                    TAB + `parseSummary:`, JSON.stringify(parseSummary), 
-                    TAB + `csvPath: ${csvPath}`
+                    TAB + ` parseSummary:`, indentedStringify(parseSummary),
+                    TAB + `      csvPath: "${csvPath}"`
                 );
                 resolve(results)
             })
@@ -163,11 +175,10 @@ export async function parseCsvToPostRecordOptions(
 }
 
 /**
- * @TODO maybe try to use {@link hasKeys}`(obj, keys)` to validate the row object
  * @param row `Record<string, any>` - The CSV row to validate.
  * @param fieldDict - {@link FieldDictionaryParseOptions} = `{ fieldValueMapArray: Array<`{@link FieldValueMapping}`>, subrecordMapArray: Array<`{@link FieldSubrecordMapping}`> }`
  * @param sublistDict - {@link SublistDictionaryParseOptions} = `{ [sublistId: string]: { fieldValueMapArray: Array<`{@link SublistFieldValueMapping}`>, subrecordMapArray: Array<`{@link SublistSubrecordMapping}`> } }`
- * @throws Error if any of the required fields are missing in the CSV row
+ * @throws `Error` if any of the required fields are missing in the CSV row
  */
 function validateFieldMappings(
     row: Record<string, any>,
@@ -218,7 +229,6 @@ export function generatePostRecordOptions(
 
 
 /**
- * 
  * @param row `Record<string, any>`
  * @param fieldDictParseOptions {@link FieldDictionaryParseOptions} = { `fieldValueMapArray`: `Array<`{@link FieldValueMapping}`>`, `subrecordMapArray`: `Array<`{@link FieldSubrecordMapping}`> }`
  * @param valueOverrides {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
@@ -237,7 +247,6 @@ export function generateFieldDictionary(
 }
 
 /**
- * 
  * @param row `Record<string, any>`
  * @param sublistDictParseOptions {@link SublistDictionaryParseOptions} = { [`sublistId`: string]: {@link SublistFieldDictionaryParseOptions} }
  * = { [`sublistId`: string]: { `fieldValueMapArray`: `Array<`{@link SublistFieldValueMapping}`>`, `subrecordMapArray`: `Array<`{@link SublistSubrecordMapping}`>` } } 
@@ -262,7 +271,6 @@ export function generateSublistDictionary(
 }
 
 /**
- * 
  * @param row `Record<string, any>`
  * @param parentType {@link FieldParentTypeEnum} 
  * @param subrecordMapArray `Array<`{@link FieldSubrecordMapping}`> | Array<`{@link SublistSubrecordMapping}`>`
@@ -314,7 +322,6 @@ export function generateSetSubrecordOptionsArray(
 }
 
 /**
- * 
  * @param row `Record<string, any>`
  * @param sublistFieldValueMapArray `Array<`{@link SublistFieldValueMapping}`>` = `{ sublistId`: string, `line`: number, `fieldId`: string, `colName`?: string`, `evaluator`?: `(row: Record<string, any>) => `{@link FieldValue}` }[]`
  * @param valueOverrides {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
@@ -361,7 +368,6 @@ export function generateSetSublistValueOptionsArray(
 }
 
 /**
- * 
  * @param row `Record<string, any>`
  * @param fieldValueMapArray `Array<`{@link FieldValueMapping}`>` = `{ fieldId`: string, `colName`?: string, `evaluator`?: `(row: Record<string, any>) => `{@link FieldValue}` }[]` 
  * @param valueOverrides {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
@@ -403,7 +409,6 @@ export function generateSetFieldValueOptionsArray(
 }
 
 /**
- * 
  * @param {string} originalValue - The original value to be transformed with valueMapping or default operaitons
  * @param {string} originalKey  - The original column header (key) of the value being transformed
  * @param {string} newKey - The new column header (`fieldId`) (key) of the value being transformed
@@ -423,7 +428,6 @@ export function transformValue(
             const validColumns = Array.isArray(mappedValue.validColumns) 
                 ? mappedValue.validColumns 
                 : [mappedValue.validColumns];
-                
             if (validColumns.includes(originalKey)) {
                 return mappedValue.newValue;
             }
@@ -441,9 +445,8 @@ export function transformValue(
             return false
         };
         
-        // try to parse as date
+        // maybe try to parse as date
         // TODO: use regex to check if date is in a valid format (e.g. YYYY-MM-DD, MM/DD/YYYY, etc.)
-
         // else return as string
         return trimmedValue;
     } catch (error) {
