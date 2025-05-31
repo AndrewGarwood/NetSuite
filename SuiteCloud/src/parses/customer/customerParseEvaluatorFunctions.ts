@@ -87,6 +87,7 @@ export const customerCategory = (
     return categoryDict[categoryValue] as FieldValue;
 }
 
+/**You have entered an Invalid Field Value 7 for the following field: entitystatus */
 export const customerStatus = (
     row: Record<string, any>,
     categoryColumn: string,
@@ -95,9 +96,10 @@ export const customerStatus = (
         return '';
     }
     let categoryValue = row[categoryColumn];
-    if (!categoryValue) {
-        return CustomerStatusEnum.QUALIFIED;
-    }
+    // not possible to set a customer record to qualified; instead make a 'lead' record.
+    // if (!categoryValue) {
+    //     return CustomerStatusEnum.QUALIFIED; 
+    // }
     return CustomerStatusEnum.CLOSED_WON;
 }
 

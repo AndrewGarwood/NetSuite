@@ -2,26 +2,25 @@
  * @file src/config/setupLog.ts
  * @reference https://tslog.js.org/#/?id=pretty-templates-and-styles-color-settings
  */
-import { OUTPUT_DIR } from './env';
+import { OUTPUT_DIR, CLOUD_LOG_DIR } from './env';
 import { Logger, ISettingsParam, ISettings, ILogObj, ILogObjMeta, IPrettyLogStyles, IMeta } from 'tslog';
 import path from 'node:path';
 import { appendFileSync } from 'node:fs';
+/** LOCAL_LOG_DIR (in onedrive) or `OUTPUT_DIR/logs` */
+const LOCAL_LOG_DIR = path.join(OUTPUT_DIR, "logs");  
+/**`OUTPUT_DIR/logs/DEBUG.txt` */
+const DEFAULT_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, "DEBUG.txt");
+/**`OUTPUT_DIR/logs/ERROR.txt` */
+const ERROR_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, "ERROR.txt"); 
 /** 
  * `INDENT_LOG_LINE =  '\n\t '` = newLine + tab + space
  * - log.debug(s1, INDENT_LOG_LINE + s2, INDENT_LOG_LINE + s3,...) 
  * */
 export const INDENT_LOG_LINE: string = '\n\t ';
-
 /** 
  * `NEW_LINE =  '\n > '` = newLine + space + > + space
  * */
 export const NEW_LINE: string = '\n > ';
-/**`OUTPUT_DIR/logs` */
-const LOG_DIR = path.join(OUTPUT_DIR, "logs");  
-/**`OUTPUT_DIR/logs/DEBUG.txt` */
-const DEFAULT_LOG_FILEPATH = path.join(LOG_DIR, "DEBUG.txt");
-/**`OUTPUT_DIR/logs/ERROR.txt` */
-const ERROR_LOG_FILEPATH = path.join(LOG_DIR, "ERROR.txt"); 
 
 const dateTemplate = "{{yyyy}}-{{mm}}-{{dd}}";
 const timeTemplate = "{{hh}}:{{MM}}:{{ss}}";//.{{ms}}";
@@ -120,10 +119,10 @@ const PARSE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
 
 export const parseLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
 parseLogger.attachTransport((logObj: ILogObj & ILogObjMeta) => {
-    appendFileSync(path.join(LOG_DIR, 'PARSE_LOG.txt'), JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
+    appendFileSync(path.join(CLOUD_LOG_DIR, 'PARSE_LOG.txt'), JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
 });
 export const pruneLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
 pruneLogger.attachTransport((logObj: ILogObj & ILogObjMeta) => {
-    appendFileSync(path.join(LOG_DIR, 'PRUNE_LOG.txt'), JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
+    appendFileSync(path.join(CLOUD_LOG_DIR, 'PRUNE_LOG.txt'), JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
 });
 

@@ -20,6 +20,7 @@ import * as prune from "../pruneFunctions";
 import * as customerEval from "./customerParseEvaluatorFunctions";
 import * as contactEval from "../contact/contactParseEvaluatorFunctions";
 
+/** use to set the field `"isinactive"` to false */
 const NOT_INACTIVE = false;
 export const BILLING_PHONE_COLUMNS = [
     'Bill to 4', 'Bill to 5', 'Main Phone', 'Work Phone', 'Mobile', 
@@ -54,11 +55,13 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
                 fieldDictParseOptions: {
                     fieldValueMapArray: [
                         { fieldId: 'country', evaluator: evaluate.country, args: ['Country', 'State']},
-                        { fieldId: 'addressee', evaluator: evaluate.entityId, args: ['Customer'] },
+                        { fieldId: 'addressee', evaluator: customerEval.customerCompany, args: ['Customer', 'Company'] },
                         { fieldId: 'attention', 
                             evaluator: evaluate.attention, 
                             args: [
-                                'Customer', 'Mr./Ms./...', 
+                                'Street1',
+                                'Customer', 
+                                'Mr./Ms./...', 
                                 ['Primary Contact', 'Bill to 1', 'Bill to 2', 'Street1', 'Street2', 'Secondary Contact']
                             ] 
                         },
@@ -79,11 +82,13 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
                 fieldDictParseOptions: {
                     fieldValueMapArray: [
                         { fieldId: 'country', evaluator: evaluate.country, args: ['Ship To Country', 'Ship To State']},
-                        { fieldId: 'addressee', evaluator: evaluate.entityId, args: ['Customer'] },
+                        { fieldId: 'addressee', evaluator: customerEval.customerCompany, args: ['Customer', 'Company'] },
                         { fieldId: 'attention', 
                             evaluator: evaluate.attention, 
                             args: [
-                                'Customer', 'Mr./Ms./...',
+                                'Ship To Street1',
+                                'Customer', 
+                                'Mr./Ms./...',
                                 ['Primary Contact', 'Ship to 1', 'Ship to 2', 'Ship To Street1', 'Ship To Street2', 'Secondary Contact']
                             ] 
                         },
@@ -115,6 +120,8 @@ export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldValueMapping[] = [
 ]
 
 /**
+ * @deprecated
+ * @note
  * Not able to read/write to this sublist because it's a "static sublist"
  * "error.SuiteScriptError", "name": "SSS_INVALID_SUBLIST_OPERATION", 
  * "message": 
@@ -126,7 +133,7 @@ export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldValueMapping[] = [
 export const CONTACT_ROLES_SUBLIST_DEFAULT_OPTIONS: SublistDictionaryParseOptions = {
     contactroles: {
         fieldValueMapArray: [
-            {sublistId: 'contactroles', line: 0, fieldId: 'role', defaultValue: ContactRoleEnum.PRIMARY_CONTACT }
+            { sublistId: 'contactroles', line: 0, fieldId: 'role', defaultValue: ContactRoleEnum.PRIMARY_CONTACT }
         ]
     } as SublistFieldDictionaryParseOptions
 }
@@ -162,6 +169,10 @@ export const PARSE_CUSTOMER_FROM_CUSTOMER_CSV_OPTIONS: ParseOptions = {
     pruneFunc: prune.entity,
 };
 
+/**
+ * @TODO - don't parse addresses twice, 
+ * instead copy the addressbook from the customer parse results.
+ * */
 export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
     recordType: RecordTypeEnum.CONTACT,
     fieldDictParseOptions: {
@@ -178,5 +189,5 @@ export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
     } as FieldDictionaryParseOptions,
     sublistDictParseOptions: ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,
     valueOverrides: evaluate.ENTITY_VALUE_OVERRIDES,
-    pruneFunc: prune.requireNameFields,
+    pruneFunc: prune.contact,
 }

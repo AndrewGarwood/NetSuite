@@ -27,21 +27,22 @@ export interface NetSuiteRecord {
 }
 
 /**
- * Relationship records in NetSuite
+ * Entity records in NetSuite. Entities can be companies or individuals.
+ * {@link RecordTypeEnum.CONTACT}s appear in the `Contacts` sublist of an entity record.
  * @enum {string} **`EntityRecordTypeEnum`**
- * @property {string} CONTACT - `'contact'`
  * @property {string} CUSTOMER - `'customer'`
  * @property {string} VENDOR - `'vendor'`
  * @property {string} LEAD - `'lead'`
  * @property {string} PROSPECT - `'prospect'`
  */
 export enum EntityRecordTypeEnum {
-    CONTACT = 'contact',
     CUSTOMER = 'customer',
     VENDOR = 'vendor',
     LEAD = 'lead',
     PROSPECT = 'prospect',
 }
+// CONTACT = 'contact',
+//  * @property {string} CONTACT - `'contact'`
 
 
 /**

@@ -13,42 +13,12 @@ import { stdin as input, stdout as output } from 'node:process';
 import path from 'node:path';
 
 
-/**
- * @description Exit the program/script for debugging purposes
- * @param {number} exitCode - The exit code to use when exiting the program. Default is `0`. Use `1` for error.
- * @param {...any} [msg] - `(optional)` The message to log before exiting.
- * @returns {void}
- * */
-export const STOP_RUNNING = (exitCode: number=0, ...msg: any[]): void => {
-    console.log('STOP_RUNNING() called with exitCode:', exitCode, ...(msg || []));
-    process.exit(exitCode);
-}
-/**
- * @description Pause execution for specified amount of milliseconds 
- * @param {number} ms - The number of milliseconds to pause execution for.
- * @param {...any} [msg] - `(optional)` The message to log before pausing.
- * @returns {Promise<void>}
- * @example DELAY(1000) // pauses for 1 second
- * */
-export const DELAY = (ms: number, ...msg: any[]): Promise<void> => {
-    console.log(`Pausing for ${ms} milliseconds:`, ...(msg || []));
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/** 
- * @example 
- * // import READLINE as rl;
- * const answer = await rl.question('What do you think of Node.js?')
- * */
-export const READLINE = readline.createInterface({ input, output });
-
 /** `./SuiteCloud/` = the directory where the node_modules folder lives*/
 export const NODE_HOME_DIR = process.cwd();
 /** = {@link NODE_HOME_DIR}`/src` = `SuiteCloud/src` = `process.cwd()/src`*/
 export const SRC_DIR = path.join(NODE_HOME_DIR, 'src') as string;
 /** = {@link SRC_DIR}`/server/tokens` */
 export const TOKEN_DIR = path.join(SRC_DIR, 'server', 'tokens') as string;
-
 
 export const BASE_ACCOUNT_ID = (process.env.ACCOUNT_ID || 'MISSING_ENV_VARIABLE-ACCOUNT_ID') as string;
 
@@ -164,6 +134,8 @@ console.log('USER:'.padEnd(13), USER);
 
 /** = `C:/Users/${USER}/OneDrive - ${ENTITY_NAME}` */
 export const ONE_DRIVE_DIR = `C:/Users/${USER}/OneDrive - ENTITY_NAME`;
+/** `${`{@link ONE_DRIVE_DIR}`}/NetSuite/logs` (not part of git repo so no worry about file size) */
+export const CLOUD_LOG_DIR = path.join(ONE_DRIVE_DIR, 'NetSuite', 'logs') as string;
 /** = {@link NODE_HOME_DIR}`/../data` = `root/data` */
 export const DATA_DIR = path.join(NODE_HOME_DIR, '../data') as string;
 /** = {@link NODE_HOME_DIR}`/.output` = `/SuiteCloud/.output` */
@@ -171,8 +143,44 @@ export const OUTPUT_DIR = path.join(NODE_HOME_DIR, '.output') as string;
 /**`/NetSuiteDev/SuiteCloud/.output/error_json` */
 export const ERROR_DIR = path.join(OUTPUT_DIR, 'error_json') as string;
 
-// Check if OUTPUT_DIR is a valid path
-if (!fs.existsSync(OUTPUT_DIR)) {
-    console.error(`ERROR: OUTPUT_DIR path does not exist: ${OUTPUT_DIR}, please check your .env file.`);
-    STOP_RUNNING(1);
+validateDirectory(
+    NODE_HOME_DIR, SRC_DIR, TOKEN_DIR, ONE_DRIVE_DIR, CLOUD_LOG_DIR, 
+    DATA_DIR, OUTPUT_DIR, ERROR_DIR
+);
+function validateDirectory(...dirPaths: string[]): void {
+    for (const dirPath of dirPaths) {
+        if (!fs.existsSync(dirPath)) {
+            console.error(`ERROR: Directory does not exist: ${dirPath}`);
+            STOP_RUNNING(1);
+        }
+    }
+}
+
+/** 
+ * @example 
+ * import READLINE as rl;
+ * const answer = await rl.question('What do you think of Node.js?')
+ * */
+export const READLINE = readline.createInterface({ input, output });
+
+/**
+ * @description Exit the program/script for debugging purposes
+ * @param {number} exitCode - The exit code to use when exiting the program. Default is `0`. Use `1` for error.
+ * @param {...any} [msg] - `(optional)` The message to log before exiting.
+ * @returns {void}
+ * */
+export const STOP_RUNNING = (exitCode: number=0, ...msg: any[]): void => {
+    console.log(`STOP_RUNNING() called with exitCode ${exitCode}.`, ...(msg || []));
+    process.exit(exitCode);
+}
+/**
+ * @description Pause execution for specified amount of milliseconds 
+ * @param {number} ms - The number of milliseconds to pause execution for.
+ * @param {...any} [msg] - `(optional)` The message to log before pausing.
+ * @returns {Promise<void>}
+ * @example DELAY(1000) // pauses for 1 second
+ * */
+export const DELAY = async (ms: number, ...msg: any[]): Promise<void> => {
+    console.log(`Pausing for ${ms} milliseconds:`, ...(msg || []));
+    return new Promise(resolve => setTimeout(resolve, ms));
 }

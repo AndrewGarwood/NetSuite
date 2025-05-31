@@ -2,7 +2,7 @@
  * @file src/parses/evaluatorFunctions.ts
  */
 
-import { parseLogger as log, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
+import { parseLogger as log, mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
 import { HUMAN_VENDORS_TRIMMED } from './vendor/vendorParseEvaluatorFunctions';
 import { 
     FieldValue, 
@@ -24,7 +24,7 @@ export const ENTITY_VALUE_OVERRIDES: ValueMapping = {
 } 
 
 /** 
- * @returns `entity` = {@link checkForOverride}`(`{@link cleanString}`(row[entityIdColumn],...),...)`
+ * @returns **`entity`** = {@link checkForOverride}`(`{@link cleanString}`(row[entityIdColumn],...),...)`
  * */
 export const entityId = (row: Record<string, any>, entityIdColumn: string): string => {
     let entity = cleanString(row[entityIdColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION) || '';
@@ -51,7 +51,7 @@ export const externalId = (row: Record<string, any>, recordType: RecordTypeEnum,
  * @param row - `Record<string, any>` the `row` of data
  * @param entityIdColumn `string` - the column of the `row` to look for the entity ID in
  * @param companyColumn `string` - the column of the `row` to look for the company name in
- * @returns `boolean` - `true` if the entity is a person, `false` otherwise
+ * @returns **`boolean`** - `true` if the entity is a person, `false` otherwise
  */
 export const isPerson = (
     row: Record<string, any>, 
@@ -91,7 +91,7 @@ export const isPerson = (
 /**
  * @param row - `Record<string, any>` the `row` of data
  * @param columnOptions `Array<string |` {@link ColumnSliceOptions}`>` the columns of the `row` to look for the fieldValue in
- * @returns `matchResults[minIndex]` - `string` - or an empty string if none is found.
+ * @returns **`matchResults[minIndex]`** - `string` - or an empty string if none is found.
  */
 export const field = (
     row: Record<string, any>,
@@ -120,7 +120,7 @@ export const field = (
 /**
  * @param row - `Record<string, any>` the `row` of data to look for an phone number in
  * @param phoneColumnOptions `Array<string |` {@link ColumnSliceOptions}`>` the columns of the `row` to look for an phone number in
- * @returns `email` - `string` - the first valid phone number found, or an empty string if none found.
+ * @returns **`phone`** - `string` - the first valid phone number found, or an empty string if none found.
  */
 export const phone = (
     row: Record<string, any>, 
@@ -132,7 +132,7 @@ export const phone = (
 /**
  * @param row - `Record<string, any>` the `row` of data to look for an email address in
  * @param emailColumnOptions - `Array<string |` {@link ColumnSliceOptions}`>` the columns of the `row` to look for an email address in
- * @returns `email` - `string` - the first valid email address found, or an empty string if none found.
+ * @returns **`email`** - `string` - the first valid email address found, or an empty string if none found.
  */
 export const email = (
     row: Record<string, any>,
@@ -166,15 +166,38 @@ export const salutation = (
 
 export const attention = (
     row: Record<string, any>,
+    firstAddressLineColumn: string,
     entityIdColumn: string,
     salutationColumn: string,
     ...nameColumns: string[]
 ): string => {
-    let entity = entityId(row, entityIdColumn);
-    let { first, middle, last } = name(row, ...nameColumns);
-    let fullName = `${salutation(row, salutationColumn).replace(/\.\s*/, '')}. ${first} ${middle} ${last}`
-        .trim().replace(/\s+/g, ' ');
-    return fullName === entity ? '' : fullName;
+    if (!row || !entityIdColumn) {
+        return '';
+    }
+    let result = '';
+    const entity = entityId(row, entityIdColumn);
+    // let { first, middle, last } = name(row, ...nameColumns);
+    const first = firstName(row, 'First Name', ...nameColumns);
+    const middle = middleName(row, 'Middle Name', ...nameColumns);
+    const last = lastName(row, 'Last Name', ...nameColumns);
+    // mlog.debug(`first="${first}", middle="${middle}", last="${last}"`);
+    const fullName = 
+        salutation(row, salutationColumn, ...nameColumns)
+        .replace(/\.\s*$/, '') 
+        + `. ${first} ${middle} ${last}`
+        .replace(/^\.\s+/, '').replace(/\s+/g, ' ').trim();
+    // mlog.debug(`fullName: "${fullName}"`);
+    result = fullName.includes(entity) 
+        || String(row[firstAddressLineColumn]).includes(fullName) ? '' : fullName;
+    // mlog.debug(`attention(entityIdColumn="${entityIdColumn}", salutationColumn="${salutationColumn}", nameColumns=${nameColumns})`,
+    //     TAB + `      entity: "${entity}"`,
+    //     TAB + `salutation: "${salutation(row, salutationColumn)}"`,
+    //     TAB + `  fullName: "${fullName}"`,
+    //     TAB + `fullName.includes(entity): ${fullName.includes(entity)}`,
+    //     TAB + `String(row[firstAddressLineColumn]).includes(fullName): ${String(row[firstAddressLineColumn]).includes(fullName)}`,
+    //     TAB + `-> return result: "${result}"`
+    // );
+    return result;
 }
 
 
@@ -200,10 +223,10 @@ export const name = (
         }
         const {first, middle, last} = extractName(initialVal);
         if (first && last) { 
-            // log.debug(`extractName("${initialVal}") from col="${col}"`,
-            //     TAB+`-> {first="${first}", middle="${middle}", last="${last}"}`
-            // );
-            return {first: first, middle: middle || '', last: last}; 
+            log.debug(`extractName("${initialVal}") from col="${col}"`,
+                TAB+`-> return { first="${first}", middle="${middle}", last="${last}" }`
+            );
+            return { first: first, middle: middle || '', last: last }; 
         }
     }
     return {first: '', middle: '', last: ''};
@@ -229,7 +252,7 @@ export const firstName = (
     if (!first || first.split(' ').length > 1) {
         first = name(row, ...([firstNameColumn].concat(nameColumns))).first;
     }
-    // log.debug(`first after evaluate nameColumns: "${first}"`);
+    // mlog.debug(`first after evaluate nameColumns: "${first}"`);
     return first.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');;
 }
 
@@ -257,7 +280,7 @@ export const lastName = (
     if (!last) {
         last = name(row, ...nameColumns).last;
     }
-    // log.debug(`last after evaluate nameColumns: "${last}"`);
+    // mlog.debug(`last after evaluate nameColumns: "${last}"`);
     return last.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');;
 }
 
@@ -322,7 +345,7 @@ export const terms = (
 
 
 const commonEmailDomains = [
-    'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com',
+    'benev.com', 'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com',
     'aol.com', 'mail.com', 'live.com', 'msn.com', 'comcast.net',
     'verizon.net', 'att.net', 'sbcglobal.net', 'bellsouth.net',
     'cox.net', 'charter.net', 'earthlink.net', 'roadrunner.com', 

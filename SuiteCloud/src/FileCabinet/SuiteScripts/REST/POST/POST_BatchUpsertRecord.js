@@ -29,13 +29,16 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
      * - - for `req` in `reqBody.upsertRecordDict[recordType]`
      * - - - run function {@link processPostRecordOptions}(`req`)
      * @param {string | string[]} reqBody.responseProps - `(optional)` the properties to include in the response in addition to the upserted records' IDs.
-     * @returns {BatchPostRecordResponse} .{@link BatchPostRecordResponse}
+     * @returns {BatchPostRecordResponse} **`response`** {@link BatchPostRecordResponse}
      */
     const post = (reqBody) => {
         const { upsertRecordArray, upsertRecordDict, responseProps } = reqBody;
         const upsertRecordArrayIsInvalid = !upsertRecordArray || !Array.isArray(upsertRecordArray);
         const upsertRecordDictIsInvalid = !upsertRecordDict || typeof upsertRecordDict !== 'object' || Array.isArray(upsertRecordDict);
-        writeLog(LogTypeEnum.AUDIT, `Checking reqBody input...`, `upsertRecordArrayIsInvalid: '${upsertRecordArrayIsInvalid}'`, `upsertRecordDictIsInvalid: '${upsertRecordDictIsInvalid}'`);
+        writeLog(LogTypeEnum.DEBUG, `Start POST_BatchUpsertRecord.post(reqBody), Checking reqBody input...`, 
+            `upsertRecordArrayIsInvalid: '${upsertRecordArrayIsInvalid}',`, 
+            `upsertRecordDictIsInvalid: '${upsertRecordDictIsInvalid}'`
+        );
         if (upsertRecordArrayIsInvalid && upsertRecordDictIsInvalid) { // both invalid
             writeLog(LogTypeEnum.ERROR, 'Invalid request body', 'upsertRecordArray or upsertRecordDict is required');
             return { success: false, message: 'upsertRecordArray or upsertRecordDict is required', error: 'Invalid request body', logArray, results: [] };
@@ -49,7 +52,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         const rejects = [];
         try {
             if (upsertRecordArray && isNonEmptyArray(upsertRecordArray)) {
-                writeLog(LogTypeEnum.AUDIT, 'upsertRecordArray.length', upsertRecordArray.length);
+                writeLog(LogTypeEnum.DEBUG, 'upsertRecordArray.length', upsertRecordArray.length);
                 for (let i = 0; i < upsertRecordArray.length; i++) {
                     const options = upsertRecordArray[i];
                     const result = processPostRecordOptions(options, responseProps);
@@ -62,9 +65,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 }
             }
             if (upsertRecordDict && isNonEmptyArray(Object.keys(upsertRecordDict))) {
-                writeLog(LogTypeEnum.AUDIT, 'Object.keys(upsertRecordDict).length', Object.keys(upsertRecordDict).length);
                 for (let recordType of Object.keys(upsertRecordDict)) {
-                    writeLog(LogTypeEnum.AUDIT, `upsertRecordDict[${recordType}].length`, upsertRecordDict[recordType].length);
                     const optionsArray = upsertRecordDict[recordType];
                     if (!isNonEmptyArray(optionsArray)) {
                         writeLog(LogTypeEnum.ERROR, `post.upsertRecordDict[${recordType}] is not an array`, optionsArray);
@@ -82,21 +83,23 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     }
                 }
             }
-            writeLog(LogTypeEnum.AUDIT, 'End of POST_BatchUpsertRecord', { 
-                numRecordsProcessed: results.length,
-                numRejects: rejects.length,
-                numErrorLogs: logArray.filter(log => log.type === LogTypeEnum.ERROR).length,
-            });
+            writeLog(LogTypeEnum.AUDIT, `End of POST_BatchUpsertRecord:`, 
+                { 
+                    numRecordsProcessed: results.length,
+                    numRejects: rejects.length,
+                    numErrorLogs: logArray.filter(log => log.type === LogTypeEnum.ERROR).length,
+                },
+            );
             /**@type {BatchPostRecordResponse} */
             return {
                 success: true,
-                message: 'Batch upsert completed, numRecordsProcessed: ' + results.length,
+                message: 'Batch upsert completed, numRecordsProcessed:' + results.length,
                 logArray: logArray,
                 results: results,
                 rejects: rejects
             }
         } catch (e) {
-            writeLog(LogTypeEnum.ERROR, 'Error in POST_BatchUpsertRecord', { 
+            writeLog(LogTypeEnum.ERROR, `Error in POST_BatchUpsertRecord:`, { 
                 numRecordsProcessed: results.length,
                 numRejects: rejects.length,
                 numErrorLogs: logArray.filter(log => log.type === LogTypeEnum.ERROR).length,
@@ -104,7 +107,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             /**@type {BatchPostRecordResponse} */
             return {
                 success: false,
-                message: 'Error in POST_BatchUpsertRecord: Batch upsert failed after processing ' + results.length + ' records',
+                message: 'Error in POST_BatchUpsertRecord: Batch upsert failed after processing ' + results.length + ` records.`,
                 error: String(e),
                 logArray: logArray,
                 results: results,
@@ -154,32 +157,33 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     idPropDict[fieldId] = value;
                 }
             }
-            writeLog(LogTypeEnum.AUDIT, `processPostRecordOptions() !idOptions && idPropDict`, idPropDict,);
+            writeLog(LogTypeEnum.DEBUG, `processPostRecordOptions() !idOptions && idPropDict`, idPropDict,);
         }
         /**@type {object | undefined} */
         let rec = undefined;
         let isExistingRecord = false;
         const recId = searchForRecordById(recordType, idOptions ? idOptions : idPropDict);
         if (!recId) {
-            writeLog(LogTypeEnum.AUDIT, 
+            writeLog(LogTypeEnum.DEBUG, 
                 `processPostRecordOptions() No record found for ${recordType}`, 
                 `with idOptions = ${JSON.stringify(idOptions ? idOptions : idPropDict)}`,
-                `Creating new ${recordType} record...`
+                `-> Creating new ${recordType} record...`
             );
             rec = record.create({type: recordType, isDynamic: isDynamic || NOT_DYNAMIC});
         } else {
             rec = record.load({type: recordType, id: recId, isDynamic: isDynamic || NOT_DYNAMIC});
             isExistingRecord = true;
-            writeLog(LogTypeEnum.AUDIT, 
-                `Loaded Existing ${recordType} record`, 
-                `Loaded Existing ${recordType} record with recId: ${recId}`
+            writeLog(LogTypeEnum.DEBUG, 
+                `Loading Existing ${recordType} record with internalid: '${recId}'`, 
             );
             // remove idPropertyEnum fields from fieldDict.valueFields because 
             // will get an error saying the record already exists with that id
-            const idPropsUsed = (idOptions 
-                ? idOptions.map(({ idProp, idValue, searchOperator }) => idProp) 
-                : Object.keys(idPropDict).length > 0 
-                    ? Object.keys(idPropDict) : Object.values(idPropertyEnum));
+            const idPropsUsed = (isExistingRecord 
+                ? Object.values(idPropertyEnum) 
+                : idOptions 
+                    ? idOptions.map(({ idProp, idValue, searchOperator }) => idProp) 
+                    : Object.keys(idPropDict).length > 0 
+                        ? Object.keys(idPropDict) : Object.values(idPropertyEnum));
             if (fieldDict && Array.isArray(fieldDict.valueFields)) {
                 fieldDict.valueFields = fieldDict.valueFields.filter(({ fieldId, value }, index) => {
                     return !idPropsUsed.includes(fieldId);
@@ -199,12 +203,14 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                         writeLog(LogTypeEnum.DEBUG, 
                             `WARNING! processPostRecordOptions() Invalid sublistId: '${sublistId}'`, 
                             `processPostRecordOptions() Invalid sublistId: '${sublistId}'.`, 
-                            `Sublist ID '${sublistId}' not found in ${recordType} record.`);
+                            `sublistId '${sublistId}' not found in ${recordType} record.`
+                        );
                         continue; // continue to next sublist
                     } else if (!hasNonTrivialKeys(sublistFieldDict)) {
                         writeLog(LogTypeEnum.DEBUG, 
                             `processPostRecordOptions() Invalid sublistDict[${sublistId}]`, 
-                            `processPostRecordOptions()'s options.sublistDict[${sublistId}]: SublistFieldDictionary is undefined or null or not an object or empty.`);
+                            `processPostRecordOptions()'s options.sublistDict[${sublistId}]: SublistFieldDictionary is undefined or null or not an object or empty.`
+                        );
                         continue; // continue to next sublist
                     }
                     rec = processFieldDictionary(rec, recordType, sublistFieldDict, FieldDictTypeEnum.SUBLIST_FIELD_DICT);
@@ -221,8 +227,12 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     try {
                         fieldId = fieldId.toLowerCase();
                         result[fieldId] = rec.getValue({ fieldId });
-                    } catch(e) {
-                        writeLog(LogTypeEnum.ERROR, `Error fetching rec.getValue(responseProps[${index}])`, `responseProps[${index}]='${fieldId}' not found in ${recordType} record.`, e);
+                    } catch (e) {
+                        writeLog(LogTypeEnum.ERROR, 
+                            `Error fetching rec.getValue(responseProps[${index}])`, 
+                            `responseProps[${index}]='${fieldId}' not found in ${recordType} record.`, 
+                            e
+                        );
                         continue;
                     }
                 };
@@ -237,7 +247,8 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         } catch (e) {
             writeLog(LogTypeEnum.ERROR, 
                 `processPostRecordOptions() Error processing dictionaries or fetching responseProps`, 
-                e.message, sublistDict);//JSON.stringify(e));
+                e.message//JSON.stringify(e));
+            );
             return;
         }
     }
@@ -245,7 +256,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     /**
      * @param {RecordTypeEnum} recordType {@link RecordTypeEnum} = record type of parent record
      * @param {Record<[idPropertyEnum: string], string | number> | idSearchOptions[]} idOptionsParam `Record<[`{@link idPropertyEnum}`: string], string | number> |` {@link idSearchOptions}`[]`
-     * @returns {string | undefined} `recId` = {@link SearchResult.id} = the internalid of the record if found in the search, undefined if not found.
+     * @returns {string | undefined} `recId` = {@link SearchResult.id} = the `'internalid'` of the record if found in the search, undefined if not found.
      */
     function searchForRecordById(recordType, idOptionsParam) {
         if (!recordType) {
@@ -269,12 +280,14 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             for (const idProp in idOptionsParam) {
                 idOptions.push({
                     idProp: idProp,
-                    idValue: idProp === idPropertyEnum.INTERNAL_ID ? Number(idOptionsParam[idProp]) : String(idOptionsParam[idProp]),
-                    searchOperator: idProp === idPropertyEnum.INTERNAL_ID ? SearchOperatorEnum.RECORD.ANY_OF : SearchOperatorEnum.TEXT.IS,
+                    idValue: idProp === idPropertyEnum.INTERNAL_ID 
+                        ? Number(idOptionsParam[idProp]) : String(idOptionsParam[idProp]),
+                    searchOperator: idProp === idPropertyEnum.INTERNAL_ID 
+                        ? SearchOperatorEnum.RECORD.ANY_OF : SearchOperatorEnum.TEXT.IS,
                 });
             }
         } else {
-            writeLog(LogTypeEnum.AUDIT,
+            writeLog(LogTypeEnum.DEBUG,
                 `searchForRecordById() Invalid parameters`, 
                 `idOptionsParam must be an idPropDict or an array of idSearchOptions, returning undefined`
             );
@@ -303,7 +316,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     );
                     continue;
                 } else if (resultRange.length === 0) {
-                    writeLog(LogTypeEnum.AUDIT,
+                    writeLog(LogTypeEnum.DEBUG,
                         'searchForRecordById() 0 records found.',
                         `0 '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                     );
@@ -311,7 +324,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 } // else found 1 record
                 const searchResult = resultRange[0];
                 const recId = searchResult.id;
-                writeLog(LogTypeEnum.AUDIT,
+                writeLog(LogTypeEnum.DEBUG,
                     'searchForRecordById() Record found!',
                     `1 '${recordType}' record found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                 );
@@ -336,10 +349,12 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         if (!rec || !fieldType || !fieldOptions) {
             writeLog(LogTypeEnum.ERROR, 
                 'setFieldsByOptionType() Invalid parameters', 
-                'rec, fieldType, fieldOptions are required paramaters of setFieldsByOptionType()');
+                'rec, fieldType, fieldOptions are required paramaters of setFieldsByOptionType()'
+            );
             return rec;
         }
-        /**@type {string[]} */
+
+            /**@type {string[]} */
         let validFieldIds = undefined
         if (fieldType === SetOptionsEnum.FIELD_VALUE) {
             validFieldIds = rec.getFields();
@@ -350,7 +365,8 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 fieldId = fieldId.toLowerCase();
                 if (!validFieldIds.includes(fieldId)) {
                     writeLog(LogTypeEnum.DEBUG, `WARNING! possibly Invalid ${SetOptionsEnum.FIELD_VALUE} fieldId: '${fieldId}'`, 
-                        `valueFields[${i}][${fieldId}] not found in ${recordType} record.getFields()`);
+                        `valueFields[${i}][${fieldId}] not found in ${recordType} record.getFields()`
+                    );
                     // continue; // continue to next valueField
                 }
                 try {
@@ -381,7 +397,10 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 fieldId = fieldId.toLowerCase();
                 validFieldIds = rec.getSublistFields({ sublistId });
                 if (!validFieldIds.includes(fieldId)) {
-                    writeLog(LogTypeEnum.DEBUG, `WARNING! possibly Invalid ${SetOptionsEnum.SUBLIST_VALUE} fieldId: '${fieldId}'`, `valueFields[${i}][${fieldId}] not found in ${recordType} record.getSublistFields(${sublistId})`);
+                    writeLog(LogTypeEnum.DEBUG, 
+                        `WARNING! possibly Invalid ${SetOptionsEnum.SUBLIST_VALUE} fieldId: '${fieldId}'`, 
+                        `valueFields[${i}][${fieldId}] not found in ${recordType} record.getSublistFields(${sublistId})`
+                    );
                     // continue; // continue to next sublist valueField
                 }
                 line = validateSublistLine(rec, sublistId, line);
@@ -427,12 +446,14 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     function processFieldDictionary(rec, recordType, dict, dictType) {
         if (!rec || !recordType || !dict || !dictType) {
             writeLog(LogTypeEnum.ERROR, 'Invalid processFieldDictionary() parameters', 
-                'rec, recordType, dict, dictType are required');
+                'rec, recordType, dict, dictType are required'
+            );
             return rec;
         }
         if (dictType !== FieldDictTypeEnum.FIELD_DICT && dictType !== FieldDictTypeEnum.SUBLIST_FIELD_DICT) {
             writeLog(LogTypeEnum.ERROR, 'processFieldDictionary() Invalid dictType', 
-                `received dictType=${dictType} but dictType must be either ${FieldDictTypeEnum.FIELD_DICT} or ${FieldDictTypeEnum.SUBLIST_FIELD_DICT}`);
+                `received dictType=${dictType} but dictType must be either ${FieldDictTypeEnum.FIELD_DICT} or ${FieldDictTypeEnum.SUBLIST_FIELD_DICT}`
+            );
             return rec;
         }
         try {
@@ -459,7 +480,10 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             }
             return rec;
         } catch (e) {
-            writeLog(LogTypeEnum.ERROR, `Error in processFieldDictionary(recordType=${recordType}, dictType=${dictType})`, e);
+            writeLog(LogTypeEnum.ERROR, 
+                `Error in processFieldDictionary(recordType=${recordType}, dictType=${dictType})`, 
+                e
+            );
             return rec;
         }
     }
@@ -496,13 +520,19 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
      */  
     function processSubrecordOptions(rec, recordType, subrecordOptions) {
         if (!rec || !subrecordOptions) {
-            writeLog(LogTypeEnum.ERROR, `Invalid ${recordType} subrecordOptions`, 'rec and subrecordOptions are required');
+            writeLog(LogTypeEnum.ERROR, 
+                `Invalid ${recordType} subrecordOptions`, 
+                'rec and subrecordOptions are required'
+            );
             return rec;
         }
 
         let { parentSublistId, fieldId, subrecordType, line, fieldDict, sublistDict } = subrecordOptions;
         if (!fieldId || typeof fieldId !== 'string') {
-            writeLog(LogTypeEnum.ERROR, `processSubrecordOptions() - Invalid ${recordType} processSubrecordOptions parameter`, '(fieldId: string) is required property of subrecordOptions');
+            writeLog(LogTypeEnum.ERROR, 
+                `processSubrecordOptions() - Invalid ${recordType} processSubrecordOptions parameter`, 
+                '(fieldId: string) is required property of subrecordOptions'
+            );
             return rec;
         }
         fieldId = fieldId.toLowerCase();
@@ -568,7 +598,10 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
      */
     function validateSublistLine(rec, sublistId, line) {
         if (!rec || !sublistId || (line === undefined || line === null || typeof line !== 'number')) {
-            writeLog(LogTypeEnum.ERROR, 'Invalid validateSublistLine() parameters', 'params (rec: Record, sublistId: string, and line: number) are required');
+            writeLog(LogTypeEnum.ERROR, 
+                'Invalid validateSublistLine() parameters', 
+                'params (rec: Record, sublistId: string, and line: number) are required'
+            );
         }
         const lineCount = rec.getLineCount({ sublistId });
         const lineIndexOutOfBounds = line < 0 || line >= lineCount;
@@ -581,7 +614,10 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
              * you are trying to add or remove lines from a static sublist.
              * {@link https://stoic.software/articles/types-of-sublists/#:~:text=Lastly%2C%20the-,Static%20List,-sublists%20are%20read} 
              * */
-            writeLog(LogTypeEnum.DEBUG, 'validateSublistLine() parameters:', `rec: <rec>, sublistId: ${sublistId}, line: ${line}`);
+            writeLog(LogTypeEnum.DEBUG, 
+                'validateSublistLine() parameters:', 
+                `rec: <rec>, sublistId: ${sublistId}, line: ${line}`
+            );
             rec.insertLine({ sublistId, line: lineCount });
             return lineCount; // return the new line index
         }
@@ -849,11 +885,11 @@ const NOT_DYNAMIC = false;
     }
 
     /**
-     * Calls NetSuite log module and pushes log with timestamp={@link getCurrentPacificTime}() to {@link logArray} to return at end of post request.
+     * Calls NetSuite log module and pushes log with timestamp={@link getCurrentPacificTime}`()` to {@link logArray} to return at end of post request.
      * @reference ~\node_modules\@hitc\netsuite-types\N\log.d.ts
      * @param {LogTypeEnum} type {@link LogTypeEnum}
-     * @param {string} title 
-     * @param {any[]} [details]
+     * @param {string} title `string` - title of the log message.
+     * @param {any[]} [details] `Array<any>` - additional details to log.
      * @returns {void} 
      */
     function writeLog(type, title, ...details) {
@@ -871,7 +907,6 @@ const NOT_DYNAMIC = false;
             .join(' ');
         switch (type) {
             case LogTypeEnum.DEBUG:
-                // I exceeded governance... my bad. 
                 // log.debug(title, payload);
                 break;
             case LogTypeEnum.ERROR:
@@ -1145,7 +1180,6 @@ const LogTypeEnum = {
     /** = `'emergency'` */
     EMERGENCY: 'emergency',
 };
-
 
 /**
  * @enum {string} **`RecordTypeEnum`**
@@ -1438,6 +1472,5 @@ const RecordTypeEnum = {
     WORKPLACE: 'workplace',
     ZONE: 'zone'
 };
-
     return { post };
 });

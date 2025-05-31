@@ -110,7 +110,7 @@ export type FieldValue = Date | number | number[] | string | string[] | boolean 
  * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html}
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  * @interface **`SetFieldValueOptions`**
- * @property {string} fieldId - The internal ID of a standard or custom field.
+ * @property {string} fieldId - The `'internalid'` of a standard or custom field.
  * @property {FieldValue} value 
  * - The {@link FieldValue} to set the field to. 
  * - = `{Date | number | number[] | string | string[] | boolean | null}`
@@ -126,8 +126,8 @@ export interface SetFieldValueOptions {
 /**
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  * @interface **`SetSublistValueOptions`**
- * @property {string} sublistId - The internal ID of the sublist.
- * @property {string} fieldId - The internal ID of a standard or custom sublist field.
+ * @property {string} sublistId - The `'internalid'` of the sublist.
+ * @property {string} fieldId - The `'internalid'` of a standard or custom sublist field.
  * @property {number} [line] - The line number for the field.
  * @property {FieldValue} value - The {@link FieldValue} to set the sublist field to.
  * = `{Date | number | number[] | string | string[] | boolean | null}`
@@ -143,9 +143,9 @@ export interface SetSublistValueOptions {
 
 /**
  * @interface **`SetSubrecordOptions`**
- * @property {string} [parentSublistId] - (If setting subrecord of a sublist) The internal ID of the parent record's sublist that contains a subrecord field. (e.g. 'addressbook')
+ * @property {string} [parentSublistId] - (If setting subrecord of a sublist) The `'internalid'` of the parent record's sublist that contains a subrecord field. (e.g. 'addressbook')
  * @property {number} [line] - `The line number` for the field. (i.e. index of the sublist row) defaults to new line. (can use record.getLineCount(sublistId) to get the number of lines in the sublist)
- * @property {string} fieldId - The internal ID of the field or sublistField that is a subrecord. (e.g. 'addressbookaddress'), 
+ * @property {string} fieldId - The `'internalid'` of the field or sublistField that is a subrecord. (e.g. 'addressbookaddress'), 
  * - If the subrecord is on the main record, use getSubrecord({fieldId}) = getSubrecord(options: GetFieldOptions): Omit<Record, "save">;
  * - If the subrecord is in a sublist, use rec.getSublistSubrecord({sublistId, fieldId})
  * @property {string} subrecordType - The record type of the subrecord. (e.g. 'address', 'inventorydetail', etc.)
