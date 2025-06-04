@@ -14,7 +14,7 @@ import {
     ValueMapping, 
 } from "../../utils/io";
 import { isPerson, firstName, middleName, lastName, entityId, ENTITY_VALUE_OVERRIDES } from "../evaluatorFunctions";
-
+import { CustomerColumnEnum as Columns } from "./customerParseConstants";
 
 export const customerIsPerson = (row: Record<string, any>, entityIdColumn: string): string => {
     if (!row || !entityIdColumn || !row[entityIdColumn]) {
@@ -87,7 +87,11 @@ export const customerCategory = (
     return categoryDict[categoryValue] as FieldValue;
 }
 
-/**You have entered an Invalid Field Value 7 for the following field: entitystatus */
+/**
+ * Error: "You have entered an Invalid Field Value 7 for the following field: entitystatus"
+ * -> not possible to set a customer record to qualified; instead make a 'lead' record, 
+ * just returning CLOSED_WON for now. 
+ * */
 export const customerStatus = (
     row: Record<string, any>,
     categoryColumn: string,
@@ -106,8 +110,8 @@ export const customerStatus = (
 
 export const customerCompany = (
     row: Record<string, any>,
-    entityIdColumn: string,
-    companyNameColumn: string,
+    entityIdColumn: string=Columns.ENTITY_ID,
+    companyNameColumn: string=Columns.COMPANY,
 ): string => {
     if (!row || !entityIdColumn || !companyNameColumn || !row[entityIdColumn]) {
         return '';

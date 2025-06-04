@@ -697,10 +697,10 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
 
 /**
  * @enum {string} **`idPropertyEnum`**
- * @property {string} INTERNAL_ID - The `internalid` (for all records).
- * @property {string} EXTERNAL_ID - The `externalid` (for all records).
- * @property {string} ENTITY_ID - The `entityid` (for relationship records)
- * @property {string} ITEM_ID - The `itemid` (for inventory records)
+ * @property {string} INTERNAL_ID - The `'internalid'` (for all records).
+ * @property {string} EXTERNAL_ID - The `'externalid'` (for all records).
+ * @property {string} ENTITY_ID - The `'entityid'` (for relationship records)
+ * @property {string} ITEM_ID - The `'itemid'` (for inventory records)
  * @readonly
  */
 const idPropertyEnum = {
