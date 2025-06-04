@@ -22,7 +22,7 @@ const DELETE_RECORD_BY_TYPE_DEPLOY_ID = SB_REST_SCRIPTS.DELETE_DeleteRecordByTyp
 /**
  * @param {Array<any>} arr `Array<any>`
  * @param {number} batchSize `number`
- * @returns {Array<Array<any>>} `batches` — `Array<Array<any>>`
+ * @returns {Array<Array<any>>} **`batches`** — `Array<Array<any>>`
  */
 export function partitionArrayBySize(
     arr: Array<any>, 
@@ -41,7 +41,7 @@ export function partitionArrayBySize(
  * @param payload {@link BatchPostRecordRequest}
  * @param scriptId `number`
  * @param deployId `number`
- * @returns `responses` — `Promise<`{@link BatchPostRecordResponse}`[]>`
+ * @returns **`responses`** — `Promise<`{@link BatchPostRecordResponse}`[]>`
  */
 export async function upsertRecordPayload(
     payload: BatchPostRecordRequest, 
@@ -82,7 +82,7 @@ export async function upsertRecordPayload(
                 }
                 responseDataArr.push(res.data as BatchPostRecordResponse);
                 log.debug(`upsertRecordPayload() batchIndex=${i} results: `, 
-                    indentedStringify(((res.data as BatchPostRecordResponse).results as PostRecordResult[]).reduce((acc, postResult) => {
+                    JSON.stringify(((res.data as BatchPostRecordResponse).results as PostRecordResult[]).reduce((acc, postResult) => {
                         acc[postResult.recordType] = (acc[postResult.recordType] || 0) + 1;
                         return acc;
                     }, {} as Record<string, number>))
@@ -210,7 +210,7 @@ export async function GET(
  * @param payload {@link DeleteRecordByTypeRequest}
  * @param scriptId `number` - default = {@link DELETE_RECORD_BY_TYPE_SCRIPT_ID}
  * @param deployId `number` - default = {@link DELETE_RECORD_BY_TYPE_DEPLOY_ID}
- * @returns `Promise<any>` - the response from the RESTlet
+ * @returns **`response`** - `{Promise<any>}`
  */
 export async function deleteRecordByType(
     payload: DeleteRecordByTypeRequest,
@@ -246,7 +246,7 @@ export async function deleteRecordByType(
  * @param scriptId `number`
  * @param deployId `number`
  * @param params `Record<string, any>` to pass as query parameters into the {@link URL}. constructed using {@link createUrlWithParams}
- * @returns `response` - `{Promise<any>}`
+ * @returns **`response`** - `{Promise<any>}`
  */
 export async function DELETE(
     accessToken: string, 

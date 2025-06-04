@@ -21,7 +21,7 @@ import { StringCaseOptions, StringPadOptions, StringStripOptions } from "./types
  * @param padOptions — {@link StringPadOptions} 
  * - `optional` padding options to apply to the string
  * = `{ padLength: number, padChar: string, padLeft: boolean, padRight: boolean }`
- * @returns `s` - the cleaned `string`
+ * @returns **`s`** - the cleaned `string`
  */
 export function cleanString(
     s: string,
@@ -199,7 +199,7 @@ export function doesNotEndWithKnownAbbreviation(s: string): boolean {
         && !stringEndsWithAnyOf(s, singleInitialPattern, RegExpFlagsEnum.IGNORE_CASE);
 }
 
-/** `stripRightCondition`: {@link doesNotEndWithKnownAbbreviation} */
+/** strip leading `.` and trailing `.` if satisfy stripRightCondition: {@link doesNotEndWithKnownAbbreviation} */
 export const STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION: StringStripOptions = {
     char: '.',
     escape: true,
@@ -568,7 +568,6 @@ export function stringStartsWithAnyOf(
 }
 
 /**
- * 
  * @param str The `string` to check.
  * @param substrings possible substring(s).
  * @param flags `Optional` regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}

@@ -19,6 +19,8 @@ import {
     ValueMapping,
     ColumnSliceOptions, 
 } from "../utils/io";
+import { customerCompany } from './customer/customerParseEvaluatorFunctions';
+import { CustomerColumnEnum as CustomerColumns } from './customer/customerParseConstants';
 
 export const ENTITY_VALUE_OVERRIDES: ValueMapping = {
 } 
@@ -166,7 +168,7 @@ export const salutation = (
 
 export const attention = (
     row: Record<string, any>,
-    firstAddressLineColumn: string,
+    streetLineOneColumn: string,
     entityIdColumn: string,
     salutationColumn: string,
     ...nameColumns: string[]
@@ -177,27 +179,87 @@ export const attention = (
     let result = '';
     const entity = entityId(row, entityIdColumn);
     // let { first, middle, last } = name(row, ...nameColumns);
-    const first = firstName(row, 'First Name', ...nameColumns);
-    const middle = middleName(row, 'Middle Name', ...nameColumns);
-    const last = lastName(row, 'Last Name', ...nameColumns);
+    const first = firstName(row, CustomerColumns.FIRST_NAME, ...nameColumns);
+    const middle = middleName(row, CustomerColumns.MIDDLE_NAME, ...nameColumns);
+    const last = lastName(row, CustomerColumns.LAST_NAME, ...nameColumns);
     // mlog.debug(`first="${first}", middle="${middle}", last="${last}"`);
-    const fullName = 
+    const fullName = (
         salutation(row, salutationColumn, ...nameColumns)
         .replace(/\.\s*$/, '') 
         + `. ${first} ${middle} ${last}`
-        .replace(/^\.\s+/, '').replace(/\s+/g, ' ').trim();
+        ).replace(/^\.\s(?=[A-Za-z])/, '').replace(/\s+/g, ' ').trim();
     // mlog.debug(`fullName: "${fullName}"`);
     result = fullName.includes(entity) 
-        || String(row[firstAddressLineColumn]).includes(fullName) ? '' : fullName;
+        || String(row[streetLineOneColumn]).includes(fullName) ? '' : fullName;
     // mlog.debug(`attention(entityIdColumn="${entityIdColumn}", salutationColumn="${salutationColumn}", nameColumns=${nameColumns})`,
-    //     TAB + `      entity: "${entity}"`,
-    //     TAB + `salutation: "${salutation(row, salutationColumn)}"`,
+    //     TAB + `    entity: "${entity}"`,
+    //     TAB + `salutation: "${salutation(row, salutationColumn, ...nameColumns)}"`,
     //     TAB + `  fullName: "${fullName}"`,
     //     TAB + `fullName.includes(entity): ${fullName.includes(entity)}`,
-    //     TAB + `String(row[firstAddressLineColumn]).includes(fullName): ${String(row[firstAddressLineColumn]).includes(fullName)}`,
+    //     TAB + `String(row[firstAddressLineColumn]).includes(fullName): ${String(row[streetLineOneColumn]).includes(fullName)}`,
     //     TAB + `-> return result: "${result}"`
     // );
     return result;
+}
+
+/**
+ * - `if` streetLineNumber === 1 and (row[streetLineOneColumn].includes(attention(row)) || row[streetLineOneColumn].includes(customerCompany(row)))
+ * - - `return` row[streetLineTwoColumn]
+ * - `else if` streetLineNumber === 1: return row[streetLineOneColumn]
+ * - `else if` streetLineNumber === 2 and (row[streetLineOneColumn].includes(attention(row)) || row[streetLineOneColumn].includes(customerCompany(row)))
+ * - - `return` '' because already returned the value for row[streetlineTwoColumn] for when street() was called with line number 1
+ * - `else if` streetLineNumber === 2: return row[streetLineTwoColumn]
+ * @param row `Record<string, any>` - the `row` of data to look for the street line in
+ * @param streetLineNumber `1 | 2` - the street line number to return, either 1 or 2
+ * @param streetLineOneColumn `string` - the column of the `row` to look for the first street line in
+ * @param streetLineTwoColumn `string` - the column of the `row` to look for the second street line in
+ * @param entityIdColumn `string` - the column of the `row` to look for the entity ID in
+ * @param salutationColumn `string` - the column of the `row` to look for the salutation in
+ * @param nameColumns `string[]` - the columns of the `row` to look for the name in, used to extract first, middle, and last names
+ * @returns **`streetLineValue`** `string` - the street line value based on the `streetLineNumber` and the content of the `row` object.
+ */
+export const street = (
+    row: Record<string, any>,
+    streetLineNumber: 1 | 2,
+    streetLineOneColumn: string,
+    streetLineTwoColumn: string,
+    entityIdColumn: string,
+    salutationColumn: string,
+    ...nameColumns: string[]
+): string => {
+    if (!row 
+        || ![1, 2].includes(streetLineNumber) 
+        || !streetLineOneColumn 
+        || !streetLineTwoColumn 
+        || !entityIdColumn 
+        || !salutationColumn
+    ) {
+        mlog.error(`street() called with invalid parameters.`);
+        return '';
+    }        
+    const attentionValue = attention(row, streetLineOneColumn, entityIdColumn, salutationColumn, ...nameColumns);
+    const addresseeValue = customerCompany(row, entityIdColumn)
+    const streetLineOneValue = cleanString(row[streetLineOneColumn]);
+    const streetLineTwoValue = cleanString(row[streetLineTwoColumn]);
+    const lineOneIsRedundant: boolean = (
+        (Boolean(attentionValue) && streetLineOneValue.includes(attentionValue)) 
+        || (Boolean(addresseeValue) && streetLineOneValue.includes(addresseeValue))
+    );
+    if (streetLineNumber === 1 && lineOneIsRedundant) {
+        log.debug(`street(streetLineNumber=${streetLineNumber}, streetLineOneColumn="${streetLineOneColumn}", streetLineTwoColumn="${streetLineTwoColumn}", entityIdColumn="${entityIdColumn}", salutationColumn="${salutationColumn}", nameColumns=${nameColumns})`,
+            TAB + `-> return streetLineTwoValue: "${streetLineTwoValue}"`
+        );
+        return streetLineTwoValue;
+    } else if (streetLineNumber === 1) {
+        return streetLineOneValue;
+    } else if (streetLineNumber === 2 && lineOneIsRedundant) {
+        return '';
+    } else if (streetLineNumber === 2) {
+        return streetLineTwoValue;
+    } else {
+        mlog.error(`street() called with invalid streetLineNumber: ${streetLineNumber}`);
+        return '';
+    }
 }
 
 
@@ -253,7 +315,7 @@ export const firstName = (
         first = name(row, ...([firstNameColumn].concat(nameColumns))).first;
     }
     // mlog.debug(`first after evaluate nameColumns: "${first}"`);
-    return first.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');;
+    return first.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');
 }
 
 

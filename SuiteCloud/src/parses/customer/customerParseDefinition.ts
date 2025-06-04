@@ -14,7 +14,12 @@ import {
 } from "../../utils/api/types";
 import { mainLogger as log } from "src/config/setupLog";
 import { CustomerStatusEnum, CustomerTaxItemEnum } from "../../utils/api/types";
-import { SB_TERM_DICTIONARY as TERM_DICT, CUSTOMER_CATEGORY_MAPPING as CATEGORY_DICT, ColumnSliceOptions } from "src/utils/io";
+import { 
+    SB_TERM_DICTIONARY as TERM_DICT, 
+    CUSTOMER_CATEGORY_MAPPING as CATEGORY_DICT, 
+    ColumnSliceOptions 
+} from "src/utils/io";
+import { CustomerColumnEnum as C } from "./customerParseConstants";
 import * as evaluate from "../evaluatorFunctions";
 import * as prune from "../pruneFunctions";
 import * as customerEval from "./customerParseEvaluatorFunctions";
@@ -23,21 +28,70 @@ import * as contactEval from "../contact/contactParseEvaluatorFunctions";
 /** use to set the field `"isinactive"` to false */
 const NOT_INACTIVE = false;
 export const BILLING_PHONE_COLUMNS = [
-    'Bill to 4', 'Bill to 5', 'Main Phone', 'Work Phone', 'Mobile', 
-    'Alt. Phone', 'Alt. Mobile', 'Home Phone',
+    'Bill to 4', 'Bill to 5', C.PHONE, C.WORK_PHONE, C.MOBILE_PHONE, 
+    C.ALT_PHONE, C.ALT_MOBILE, C.HOME_PHONE,
 ];
 export const SHIPPING_PHONE_COLUMNS = [
-    'Ship to 4', 'Ship to 5', 'Main Phone', 'Work Phone', 'Mobile', 
-    'Alt. Phone', 'Alt. Mobile', 'Home Phone',
+    'Ship to 4', 'Ship to 5', C.PHONE, C.WORK_PHONE, C.MOBILE_PHONE, 
+    C.ALT_PHONE, C.ALT_MOBILE, C.HOME_PHONE,
 ];
-/**if `'First Name'` and `'Last Name'` not filled, 
+/**if `'First Name'` and `Columns.LAST_NAME` not filled, 
  * then look for name to extract from these columns */
 export const NAME_COLUMNS = [
-    'Primary Contact', 'Secondary Contact', 'Customer', 
+    C.PRIMARY_CONTACT, C.SECONDARY_CONTACT, C.ENTITY_ID, 
     'Street1', 'Street2', 'Ship To Street1', 'Ship To Street2', 
     'Bill to 1', 'Ship to 1', 'Bill to 2', 'Ship to 2',
 ]
 
+export const BILLING_NAME_COLUMNS = [
+    C.BILL_TO_ONE, C.BILL_TO_TWO, 
+    C.STREET_ONE, C.STREET_TWO, 
+    C.PRIMARY_CONTACT, C.SECONDARY_CONTACT, C.ENTITY_ID
+]
+
+export const SHIPPING_NAME_COLUMNS = [
+    C.SHIP_TO_ONE, C.SHIP_TO_TWO, 
+    C.SHIP_TO_STREET_ONE, C.SHIP_TO_STREET_TWO,
+    C.PRIMARY_CONTACT, C.SECONDARY_CONTACT, C.ENTITY_ID
+];
+
+/** 
+ * args for the evaluatorFunction {@link evaluate.attention}: 
+ * - `streetLineOneColumn`, `entityIdColumn`, `salutationColumn`, `...nameColumns` 
+ * */
+const BILLING_ATTENTION_ARGS = [
+    C.STREET_ONE, C.ENTITY_ID, C.SALUTATION,
+    ...BILLING_NAME_COLUMNS
+];
+
+/** 
+ * args for the evaluatorFunction {@link evaluate.attention}: 
+ * - `streetLineOneColumn`, `entityIdColumn`, `salutationColumn`, `...nameColumns` 
+ * */
+const SHIPPING_ATTENTION_ARGS = [
+    C.SHIP_TO_STREET_ONE, C.ENTITY_ID, C.SALUTATION,
+    ...SHIPPING_NAME_COLUMNS
+];
+
+/** 
+ * args for the evaluatorFunction {@link evaluate.street}: 
+ * - `streetLineOneColumn`, `streetLineTwoColumn`, `entityIdColumn`, 
+ * `salutationColumn`, `...nameColumns` 
+ * */
+const BILLING_STREET_ARGS = [
+    C.STREET_ONE, C.STREET_TWO, C.ENTITY_ID, C.SALUTATION, 
+    ...BILLING_NAME_COLUMNS
+];
+
+/** 
+ * args for the evaluatorFunction {@link evaluate.street}: 
+ * - `streetLineOneColumn`, `streetLineTwoColumn`, `entityIdColumn`, 
+ * `salutationColumn`, `...nameColumns` 
+ * */
+const SHIPPING_STREET_ARGS = [
+    C.SHIP_TO_STREET_ONE, C.SHIP_TO_STREET_TWO, C.ENTITY_ID, C.SALUTATION, 
+    ...SHIPPING_NAME_COLUMNS
+];
 
 export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions = {
     addressbook: {
@@ -54,22 +108,14 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
                 subrecordType: 'address',
                 fieldDictParseOptions: {
                     fieldValueMapArray: [
-                        { fieldId: 'country', evaluator: evaluate.country, args: ['Country', 'State']},
-                        { fieldId: 'addressee', evaluator: customerEval.customerCompany, args: ['Customer', 'Company'] },
-                        { fieldId: 'attention', 
-                            evaluator: evaluate.attention, 
-                            args: [
-                                'Street1',
-                                'Customer', 
-                                'Mr./Ms./...', 
-                                ['Primary Contact', 'Bill to 1', 'Bill to 2', 'Street1', 'Street2', 'Secondary Contact']
-                            ] 
-                        },
-                        { fieldId: 'addr1', colName: 'Street1' },
-                        { fieldId: 'addr2', colName: 'Street2' },
-                        { fieldId: 'city', colName: 'City' },
-                        { fieldId: 'state', evaluator: evaluate.state, args: ['State']},
-                        { fieldId: 'zip', colName: 'Zip' },
+                        { fieldId: 'country', evaluator: evaluate.country, args: [C.COUNTRY, C.STATE] },
+                        { fieldId: 'addressee', evaluator: customerEval.customerCompany, args: [C.ENTITY_ID, C.COMPANY] },
+                        { fieldId: 'attention', evaluator: evaluate.attention, args: BILLING_ATTENTION_ARGS },
+                        { fieldId: 'addr1', evaluator: evaluate.street, args: [1, ...BILLING_STREET_ARGS] },
+                        { fieldId: 'addr2', evaluator: evaluate.street, args: [2, ...BILLING_STREET_ARGS] },
+                        { fieldId: 'city', colName: C.CITY },
+                        { fieldId: 'state', evaluator: evaluate.state, args: [C.STATE]},
+                        { fieldId: 'zip', colName: C.ZIP },
                         { fieldId: 'addrphone', evaluator: evaluate.phone, args: BILLING_PHONE_COLUMNS },
                     ] as FieldValueMapping[],
                 } as FieldDictionaryParseOptions,
@@ -81,22 +127,14 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
                 subrecordType: 'address',
                 fieldDictParseOptions: {
                     fieldValueMapArray: [
-                        { fieldId: 'country', evaluator: evaluate.country, args: ['Ship To Country', 'Ship To State']},
-                        { fieldId: 'addressee', evaluator: customerEval.customerCompany, args: ['Customer', 'Company'] },
-                        { fieldId: 'attention', 
-                            evaluator: evaluate.attention, 
-                            args: [
-                                'Ship To Street1',
-                                'Customer', 
-                                'Mr./Ms./...',
-                                ['Primary Contact', 'Ship to 1', 'Ship to 2', 'Ship To Street1', 'Ship To Street2', 'Secondary Contact']
-                            ] 
-                        },
-                        { fieldId: 'addr1', colName: 'Ship To Street1' },
-                        { fieldId: 'addr2', colName: 'Ship To Street2' },
-                        { fieldId: 'city', colName: 'Ship To City' },
-                        { fieldId: 'state', evaluator: evaluate.state, args: ['Ship To State']},
-                        { fieldId: 'zip', colName: 'Ship To Zip' },
+                        { fieldId: 'country', evaluator: evaluate.country, args: [C.SHIP_TO_COUNTRY, C.SHIP_TO_STATE]},
+                        { fieldId: 'addressee', evaluator: customerEval.customerCompany, args: [C.ENTITY_ID, C.COMPANY] },
+                        { fieldId: 'attention', evaluator: evaluate.attention, args: SHIPPING_ATTENTION_ARGS },
+                        { fieldId: 'addr1', evaluator: evaluate.street, args: [1, ...SHIPPING_STREET_ARGS] },
+                        { fieldId: 'addr2', evaluator: evaluate.street, args: [2, ...SHIPPING_STREET_ARGS] },
+                        { fieldId: 'city', colName: C.SHIP_TO_CITY },
+                        { fieldId: 'state', evaluator: evaluate.state, args: [C.SHIP_TO_STATE]},
+                        { fieldId: 'zip', colName: C.SHIP_TO_ZIP },
                         { fieldId: 'addrphone', evaluator: evaluate.phone, args: SHIPPING_PHONE_COLUMNS },
                     ] as FieldValueMapping[],
                 } as FieldDictionaryParseOptions,
@@ -106,17 +144,28 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
 };
 
 export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldValueMapping[] = [
-    { fieldId: 'entityid', evaluator: evaluate.entityId, args: ['Customer'] },
+    { fieldId: 'entityid', evaluator: evaluate.entityId, args: [C.ENTITY_ID] },
     { fieldId: 'isinactive', defaultValue: NOT_INACTIVE },
-    { fieldId: 'email', evaluator: evaluate.email, args: ['Main Email', 'Alt. Email 1'] },
-    { fieldId: 'altemail', evaluator: evaluate.email, args: [{colName: 'Main Email', minIndex: 1}, 'Alt. Email 1', 'CC Email'] as Array<string | ColumnSliceOptions>},
-    { fieldId: 'phone', evaluator: evaluate.phone, args: ['Main Phone', 'Alt. Phone', 'Work Phone'] },
-    { fieldId: 'mobilephone', evaluator: evaluate.phone, args: ['Mobile', 'Alt. Mobile',{colName: 'Main Phone', minIndex: 2}] as Array<string | ColumnSliceOptions> },
-    { fieldId: 'homephone', evaluator: evaluate.phone, args: ['Home Phone', {colName: 'Main Phone', minIndex: 3}] as Array<string | ColumnSliceOptions> },
-    { fieldId: 'fax', evaluator: evaluate.phone, args: ['Fax', 'Alt. Fax'] },
-    { fieldId: 'salutation', evaluator: evaluate.salutation, args: ['Mr./Ms./...', 'First Name', 'Primary Contact', 'Secondary Contact', 'Customer'] },
-    { fieldId: 'title', colName: 'Job Title' },
-    { fieldId: 'comments', colName: 'Note' },
+    { fieldId: 'email', evaluator: evaluate.email, args: [C.EMAIL, C.ALT_EMAIL] },
+    { fieldId: 'altemail', 
+        evaluator: evaluate.email, 
+        args: [{colName: C.EMAIL, minIndex: 1}, C.ALT_EMAIL, C.CC_EMAIL] as Array<string | ColumnSliceOptions>
+    },
+    { fieldId: 'phone', evaluator: evaluate.phone, args: [C.PHONE, C.ALT_PHONE, C.WORK_PHONE] },
+    { fieldId: 'mobilephone', 
+        evaluator: evaluate.phone, 
+        args: [C.MOBILE_PHONE, C.ALT_MOBILE,{colName: C.PHONE, minIndex: 2}] as Array<string | ColumnSliceOptions> 
+    },
+    { fieldId: 'homephone', 
+        evaluator: evaluate.phone, 
+        args: [C.HOME_PHONE, {colName: C.PHONE, minIndex: 3}] as Array<string | ColumnSliceOptions> 
+    },
+    { fieldId: 'fax', evaluator: evaluate.phone, args: [C.FAX, C.ALT_FAX] },
+    { fieldId: 'salutation', evaluator: 
+        evaluate.salutation, 
+        args: [C.SALUTATION, ...BILLING_NAME_COLUMNS] },
+    { fieldId: 'title', colName: C.TITLE},
+    { fieldId: 'comments', colName: C.COMMENTS },
 ]
 
 /**
@@ -143,21 +192,24 @@ export const PARSE_CUSTOMER_FROM_CUSTOMER_CSV_OPTIONS: ParseOptions = {
     recordType: RecordTypeEnum.CUSTOMER,
     fieldDictParseOptions: {
         fieldValueMapArray: [
-            { fieldId: 'isperson', evaluator: customerEval.customerIsPerson, args: ['Customer'] },
+            { fieldId: 'isperson', evaluator: customerEval.customerIsPerson, args: [C.ENTITY_ID] },
             ...CONTACT_CUSTOMER_SHARED_FIELDS,
-            { fieldId: 'externalid', evaluator: evaluate.externalId, args: [RecordTypeEnum.CUSTOMER, 'Customer'] },
-            { fieldId: 'altphone', evaluator: evaluate.phone, args: [{colName: 'Main Phone', minIndex: 1}, 'Alt. Phone', 'Work Phone'] as Array<string | ColumnSliceOptions> },
-            { fieldId: 'entitystatus', evaluator: customerEval.customerStatus, args: ['Customer Type'] },
-            { fieldId: 'category', evaluator: customerEval.customerCategory, args: ['Customer Type', CATEGORY_DICT] },
-            { fieldId: 'companyname', evaluator: customerEval.customerCompany, args: ['Customer', 'Company'] },
-            { fieldId: 'firstname', evaluator: customerEval.firstNameIfCustomerIsPerson, args: ['Customer', 'First Name', ...NAME_COLUMNS] },
-            { fieldId: 'middlename', evaluator: customerEval.middleNameIfCustomerIsPerson, args: ['Customer', 'M.I.', ...NAME_COLUMNS] },
-            { fieldId: 'lastname', evaluator: customerEval.lastNameIfCustomerIsPerson, args: ['Customer', 'Last Name', ...NAME_COLUMNS] },
-            { fieldId: 'accountnumber', colName: 'Account No.' },
-            { fieldId: 'terms', evaluator: evaluate.terms, args: ['Terms', TERM_DICT] },
+            { fieldId: 'externalid', evaluator: evaluate.externalId, args: [RecordTypeEnum.CUSTOMER, C.ENTITY_ID] },
+            { fieldId: 'altphone', evaluator: 
+                evaluate.phone, 
+                args: [{colName: C.PHONE, minIndex: 1}, C.ALT_PHONE, C.WORK_PHONE] as Array<string | ColumnSliceOptions> 
+            },
+            { fieldId: 'entitystatus', evaluator: customerEval.customerStatus, args: [C.CATEGORY] },
+            { fieldId: 'category', evaluator: customerEval.customerCategory, args: [C.CATEGORY, CATEGORY_DICT] },
+            { fieldId: 'companyname', evaluator: customerEval.customerCompany, args: [C.ENTITY_ID, C.COMPANY] },
+            { fieldId: 'firstname', evaluator: customerEval.firstNameIfCustomerIsPerson, args: [C.ENTITY_ID, C.FIRST_NAME, ...NAME_COLUMNS] },
+            { fieldId: 'middlename', evaluator: customerEval.middleNameIfCustomerIsPerson, args: [C.ENTITY_ID, C.MIDDLE_NAME, ...NAME_COLUMNS] },
+            { fieldId: 'lastname', evaluator: customerEval.lastNameIfCustomerIsPerson, args: [C.ENTITY_ID, C.LAST_NAME, ...NAME_COLUMNS] },
+            { fieldId: 'accountnumber', colName: C.ACCOUNT_NUMBER },
+            { fieldId: 'terms', evaluator: evaluate.terms, args: [C.TERMS, TERM_DICT] },
             { fieldId: 'taxable', defaultValue: true },
             { fieldId: 'taxitem', defaultValue: CustomerTaxItemEnum.YOUR_TAX_ITEM },
-            { fieldId: 'url', evaluator: evaluate.website, args: ['Website', 'Main Email'] },
+            { fieldId: 'url', evaluator: evaluate.website, args: [C.WEBSITE, C.EMAIL] },
         ] as FieldValueMapping[],
         subrecordMapArray: [] // No body subrecords
     } as FieldDictionaryParseOptions,
@@ -178,12 +230,12 @@ export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
     fieldDictParseOptions: {
         fieldValueMapArray: [
             ...CONTACT_CUSTOMER_SHARED_FIELDS,
-            { fieldId: 'externalid', evaluator: evaluate.externalId, args: [RecordTypeEnum.CONTACT, 'Customer'] },
-            { fieldId: 'officephone', evaluator: evaluate.phone, args: ['Work Phone'] },
-            { fieldId: 'firstname', evaluator: evaluate.firstName, args: ['First Name', ...NAME_COLUMNS] },
-            { fieldId: 'middlename', evaluator: evaluate.middleName, args: ['M.I.', ...NAME_COLUMNS] },
-            { fieldId: 'lastname', evaluator: evaluate.lastName, args: ['Last Name', ...NAME_COLUMNS] },
-            { fieldId: 'company', evaluator: contactEval.contactCompany, args: ['Customer'] },
+            { fieldId: 'externalid', evaluator: evaluate.externalId, args: [RecordTypeEnum.CONTACT, C.ENTITY_ID] },
+            { fieldId: 'officephone', evaluator: evaluate.phone, args: [C.WORK_PHONE] },
+            { fieldId: 'firstname', evaluator: evaluate.firstName, args: [C.FIRST_NAME, ...NAME_COLUMNS] },
+            { fieldId: 'middlename', evaluator: evaluate.middleName, args: [C.MIDDLE_NAME, ...NAME_COLUMNS] },
+            { fieldId: 'lastname', evaluator: evaluate.lastName, args: [C.LAST_NAME, ...NAME_COLUMNS] },
+            { fieldId: 'company', evaluator: contactEval.contactCompany, args: [C.ENTITY_ID] },
             { fieldId: 'contactrole', defaultValue: ContactRoleEnum.PRIMARY_CONTACT },
         ] as FieldValueMapping[],
     } as FieldDictionaryParseOptions,
@@ -191,3 +243,5 @@ export const PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS: ParseOptions = {
     valueOverrides: evaluate.ENTITY_VALUE_OVERRIDES,
     pruneFunc: prune.contact,
 }
+
+

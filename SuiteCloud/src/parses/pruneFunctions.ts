@@ -89,7 +89,7 @@ export const pruneAddressBook = (
     if (isNullLike(options)) {
         return null;
     }
-    const REQUIRED_ADDRESS_FIELDS = ['addr1', 'country'];
+    const REQUIRED_ADDRESS_FIELDS = ['addr1']; // , 'country'
     const linesToPrune: number[] = [];
     try {
         let addressbook = options?.sublistDict?.addressbook as SublistFieldDictionary;
@@ -124,13 +124,13 @@ export const pruneAddressBook = (
             );
         }
         // Remove any valueFields whose line does not have a corresponding subrecordField
-        const validLines = new Set(subrecordFields.map(f => f.line)) as Set<number>;
+        const validLines = new Set(subrecordFields.map(f => f.line));
         valueFields = valueFields.filter(
-            (field) => validLines.has(field.line as number)
+            (field) => validLines.has(field.line)
         );
         // Extra check: only renumber if all remaining fields have the same line value
-        const valueFieldLines = new Set(valueFields.map(f => f.line)) as Set<number>;
-        const subrecFieldLines = new Set(subrecordFields.map(f => f.line)) as Set<number>;
+        const valueFieldLines = new Set(valueFields.map(f => f.line));
+        const subrecFieldLines = new Set(subrecordFields.map(f => f.line));
         if (
             validLines.size === 1 &&
             valueFieldLines.size === 1 &&

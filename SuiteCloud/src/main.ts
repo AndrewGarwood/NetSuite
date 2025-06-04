@@ -17,20 +17,26 @@ import { parseEntityFile, postEntities, postContacts, matchContactsToPostEntityR
 import { EntityRecordTypeEnum, DeleteRecordByTypeRequest, DeleteExcludeOptions, DeleteRecordByTypeResponse, PostRecordOptions, BatchPostRecordResponse } from "./utils/api/types";
 import { parseCsvToPostRecordOptions } from './parseCsvToRequestBody';
 import { SB_REST_SCRIPTS, BATCH_SIZE, deleteRecordByType } from "./utils/api/callApi";
-import * as customerFiles from './parses/customer/parseCustomer';
-/** `main()` is same as {@link postEntitiesAndContacts}`(...)`, but rewrote the logic here because I wanted to check some log output */
+import * as customerFiles from './parses/customer/customerParseConstants';
+
+/** 
+ * `main()` is same as {@link postEntitiesAndContacts}`(...)`, 
+ * but I rewrote the logic here because I wanted to check some log output 
+ * */
 async function main() {
     const entityType = EntityRecordTypeEnum.CUSTOMER;
     const { entities, contacts } = await parseEntityFile(
-        customerFiles.SINGLE_COMPANY_FILE,
+        customerFiles.COMPLETE_FILE,
         entityType,
         [CUSTOMER_OPTIONS, CONTACT_OPTIONS]
     );
-    log.debug(`main() after parseEntityFile()`,
-        TAB+`${entityType}s.length: ${entities.length}`,
-        TAB+`contacts.length: ${contacts.length}`,
-    );
-    // STOP_RUNNING(0, NL+'main.ts: End of main()');
+    // log.debug(`main() after parseEntityFile()`,
+    //     TAB+`${entityType}s.length: ${entities.length}`,
+    //     TAB+`contacts.length: ${contacts.length}`,
+    // );
+    // write(entities, path.join(OUTPUT_DIR, 'parses', 'customer'), `${entityType}s.json`);
+    // write(contacts, path.join(OUTPUT_DIR, 'parses', 'customer'), `contacts.json`);
+    // STOP_RUNNING(0, NL+'main.ts: stopping after parseEntityFile()');
     const entityResponses: BatchPostRecordResponse[] = await postEntities(entities);
     const entityRejects = entityResponses.map(response => response.rejects).flat();
 
