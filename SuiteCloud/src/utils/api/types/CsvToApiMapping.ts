@@ -2,18 +2,36 @@
  * @file src/utils/api/types/CsvToApiMapping.ts
  * @module CsvToApiMapping
  */
-import { RecordTypeEnum } from "../../NS";
+import { RecordTypeEnum, EntityRecordTypeEnum, RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum, NumericOperatorEnum } from "../../NS";
 import { ValueMapping, ValueMappingEntry } from "../../io/types";
-import { 
+import {
+    idPropertyEnum,
     FieldDictionary,
     FieldValue,
     SetFieldValueOptions,
     SetSublistValueOptions,
     SublistDictionary, 
     SublistFieldDictionary,
-    SetSubrecordOptions  
+    SetSubrecordOptions
 } from "./Api";
-import { CreateRecordOptions, PostRecordOptions } from "./PostRequests";
+import { PostRecordOptions, idSearchOptions } from "./PostRequests";
+/**@TODO make idParseOptions */
+/**
+ * @typedefn **`CloneOptions`**
+ * @property {RecordTypeEnum | EntityRecordTypeEnum | string} donorType - {@link RecordTypeEnum} - The type of the NetSuite record to clone from.
+ * @property {RecordTypeEnum | EntityRecordTypeEnum | string} recipientType - {@link RecordTypeEnum} - The type of the NetSuite record to clone to.
+ * @property {idPropertyEnum} idProperty - {@link idPropertyEnum} - The property from the donor's {@link FieldDictionary.valueFields} used to join the donor and recipient records.
+ * @property {Array<string>} fieldIds - `Array<string>` - `fieldIds` to clone from the donor's {@link FieldDictionary}'s ({@link PostRecordOptions}`.fieldDict.valueFields` 
+ * and {@link PostRecordOptions}`.fieldDict.subrecordFields`) to the recipient's {@link FieldDictionary}'s `valueFields` and `subrecordFields`.
+ * @property {Array<string>} sublistIds - `Array<string>` - `sublistIds` to clone from the donor's {@link SublistDictionary}
+ */
+export type CloneOptions = {
+    donorType: RecordTypeEnum | EntityRecordTypeEnum | string;
+    recipientType: RecordTypeEnum | EntityRecordTypeEnum | string;
+    idProperty: idPropertyEnum;
+    fieldIds?: string[];
+    sublistIds?: string[];
+}
 
 /**
  * @typedefn **`RecordParseOptions`**
@@ -27,12 +45,12 @@ export type RecordParseOptions = {
  * @typedefn **`ParseResults`**
  * @property {RecordTypeEnum | string } recordType - {@link RecordTypeEnum} The type of the NetSuite record.
  * @property {Array<PostRecordOptions>} this[recordType].validPostOptions - `Array<`{@link PostRecordOptions}`>` - The valid post options for the record type.
- * @property {Array<ParseOptions>} this[recordType].invalidParseOptions - `Array<`{@link ParseOptions}`>` - array of parse options that resulted in a PostRecordOptions being pruned after running the {@link ParseOptions.pruneFunc}
+ * @property {Array<ParseOptions>} this[recordType].invalidPostOptions - `Array<`{@link PostRecordOptions}`>` - array of pruned PostRecordOptions
  */
 export type ParseResults = {
     [recordType: RecordTypeEnum | string]: {
         validPostOptions: PostRecordOptions[],
-        invalidParseOptions: ParseOptions[],
+        invalidPostOptions: PostRecordOptions[],
     };
 };
 
@@ -42,17 +60,27 @@ export type ParseResults = {
  * @property {FieldDictionaryParseOptions} fieldDictParseOptions - {@link FieldDictionaryParseOptions} The field dictionary parse options for the record.
  * @property {SublistDictionaryParseOptions} sublistDictParseOptions - {@link SublistDictionaryParseOptions} The sublist dictionary parse options for the record.
  * @property {ValueMapping} valueOverrides - {@link ValueMapping} The value overrides for specific field values used in 
- * @property {function} [pruneFunc] - A `function` that takes a {@link PostRecordOptions} object and returns either a {@link PostRecordOptions} object or `null`.
+ * @property {CloneOptions} cloneOptions - {@link CloneOptions} = `{ donorType?: `{@link RecordTypeEnum}`, recipientType?: `{@link RecordTypeEnum}`, idProperty: `{@link idPropertyEnum}`, fieldIds?: string[], sublistIds?: string[] }`
+ * @property {function} [pruneFunc] - `function` that takes a {@link PostRecordOptions} and returns either a {@link PostRecordOptions} or `null`.
  */
 export type ParseOptions = {
     recordType: RecordTypeEnum;
+    idParseOptions?: idSearchParseOptions[];
     fieldDictParseOptions: FieldDictionaryParseOptions;
-    sublistDictParseOptions: SublistDictionaryParseOptions;
+    sublistDictParseOptions?: SublistDictionaryParseOptions;
     valueOverrides?: ValueMapping;
+    /**can only use cloneOptions if this is not the first ParseOptions processed in parseCsvToRequestBody(), b/c cloning from result of previous ParseOptions */
+    cloneOptions?: CloneOptions;
     /**
-     * @property {function} [pruneFunc] - A `function` that takes a {@link PostRecordOptions} object and returns either a {@link PostRecordOptions} or `null`.
+     * @property {function} [pruneFunc] - `function` that takes a {@link PostRecordOptions} and returns either a {@link PostRecordOptions} or `null`.
      */
     pruneFunc?: (options: PostRecordOptions) => PostRecordOptions | null;
+}
+/** {@link idSearchOptions} */
+export type idSearchParseOptions = {
+    idProp: idPropertyEnum;
+    searchOperator: RecordOperatorEnum | SearchOperatorEnum | TextOperatorEnum | NumericOperatorEnum;
+    idValueMapping: FieldValueMapping 
 }
 
 /**

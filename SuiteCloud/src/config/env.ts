@@ -32,12 +32,14 @@ export const ACCOUNT_ID = inProduction
     ? BASE_ACCOUNT_ID as string 
     : (`${BASE_ACCOUNT_ID}-sb1` || 'MISSING_ENV_VARIABLE-ACCOUNT_ID') as string;
 
-export const REST_CLIENT_ID = inProduction 
+export const REST_CLIENT_ID = (inProduction 
     ? (process.env.PROD_REST_CLIENT_ID || 'MISSING_ENV_VARIABLE-REST_CLIENT_ID') as string
-    : (process.env.SB_REST_CLIENT_ID || 'MISSING_ENV_VARIABLE-REST_CLIENT_ID') as string;
-export const REST_CLIENT_SECRET = inProduction
+    : (process.env.SB_REST_CLIENT_ID || 'MISSING_ENV_VARIABLE-REST_CLIENT_ID') as string
+);
+export const REST_CLIENT_SECRET = (inProduction
     ? (process.env.PROD_REST_CLIENT_SECRET || 'MISSING_ENV_VARIABLE-REST_CLIENT_SECRET') as string
-    : (process.env.SB_REST_CLIENT_SECRET || 'MISSING_ENV_VARIABLE-REST_CLIENT_SECRET') as string;
+    : (process.env.SB_REST_CLIENT_SECRET || 'MISSING_ENV_VARIABLE-REST_CLIENT_SECRET') as string
+);
 
 /** `https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/` 
  * @see {@link ACCOUNT_ID}*/
@@ -72,13 +74,13 @@ export const NLAUTH_SIGNATURE = (process.env.NLAUTH_SIGNATURE || 'MISSING_ENV_VA
 export const NLAUTH_ADMIN = '3';
 export const NLAUTH_DEV = '55';
 
-export const AUTHORIZATION_HEADER = `\
-NLAuth nlauth_account=${BASE_ACCOUNT_ID}, \
-nlauth_email=${NLAUTH_EMAIL}, \
-nlauth_signature=${NLAUTH_SIGNATURE}, \
-nlauth_role=${NLAUTH_ADMIN}, \
-nlauth_application_id=${REST_APPLICATION_ID}\
-` as string;
+export const AUTHORIZATION_HEADER: string = [
+    `NLAuth nlauth_account=${BASE_ACCOUNT_ID}`,
+    `nlauth_email=${NLAUTH_EMAIL}`,
+    `nlauth_signature=${NLAUTH_SIGNATURE}`,
+    `nlauth_role=${NLAUTH_ADMIN}`,
+    `nlauth_application_id=${REST_APPLICATION_ID}`
+].join(', ');
 
 /** restlets //,rest_webservices,webservices,suiteanalytics,full,offline */
 export const SCOPE = 'restlets'; //,rest_webservices,webservices,suiteanalytics,full,offline';
@@ -143,14 +145,14 @@ export const OUTPUT_DIR = path.join(NODE_HOME_DIR, '.output') as string;
 /**`/NetSuiteDev/SuiteCloud/.output/error_json` */
 export const ERROR_DIR = path.join(OUTPUT_DIR, 'error_json') as string;
 
-validateDirectory(
+validatePath(
     NODE_HOME_DIR, SRC_DIR, TOKEN_DIR, ONE_DRIVE_DIR, CLOUD_LOG_DIR, 
     DATA_DIR, OUTPUT_DIR, ERROR_DIR
 );
-function validateDirectory(...dirPaths: string[]): void {
-    for (const dirPath of dirPaths) {
-        if (!fs.existsSync(dirPath)) {
-            console.error(`ERROR: Directory does not exist: ${dirPath}`);
+export async function validatePath(...paths: string[]): Promise<void> {
+    for (const path of paths) {
+        if (!fs.existsSync(path)) {
+            console.error(`ERROR validatePath(): path does not exist: ${path}`);
             STOP_RUNNING(1);
         }
     }
@@ -170,17 +172,21 @@ export const READLINE = readline.createInterface({ input, output });
  * @returns {void}
  * */
 export const STOP_RUNNING = (exitCode: number=0, ...msg: any[]): void => {
-    console.log(`STOP_RUNNING() called with exitCode ${exitCode}.`, ...(msg || []));
+    console.log(` > STOP_RUNNING() called with exitCode ${exitCode}.`, ...(msg || []));
     process.exit(exitCode);
 }
 /**
- * @description Pause execution for specified amount of milliseconds 
+ * @description Pause execution for specified amount of milliseconds
+ * - default message =  `'> Pausing for ${ms} milliseconds.'`
+ * - `if` pass in null as second argument, no message will be logged 
  * @param {number} ms - The number of milliseconds to pause execution for.
  * @param {...any} [msg] - `(optional)` The message to log before pausing.
  * @returns {Promise<void>}
  * @example DELAY(1000) // pauses for 1 second
  * */
 export const DELAY = async (ms: number, ...msg: any[]): Promise<void> => {
-    console.log(`Pausing for ${ms} milliseconds:`, ...(msg || []));
+    let pauseMsg = ` > Pausing for ${ms} milliseconds.`;
+    let msgArr = Array.isArray(msg) && msg.length > 0 ? msg : [pauseMsg];
+    if (msgArr[0] !== null) {console.log(...msgArr);}
     return new Promise(resolve => setTimeout(resolve, ms));
 }

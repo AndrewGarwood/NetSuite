@@ -2,7 +2,7 @@
  * @file src/utils/api/types/PostRequests.ts
  */
 import { FieldDictionary, FieldValue, idPropertyEnum, LogStatement, SublistDictionary } from '.';
-import { RecordTypeEnum, EntityRecordTypeEnum, RecordOperatorEnum } from '../../NS';
+import { RecordTypeEnum, EntityRecordTypeEnum, RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum, NumericOperatorEnum } from '../../NS';
 
 
 /**
@@ -84,7 +84,7 @@ export type PostRecordOptions = {
  */
 export type idSearchOptions = {
     idProp: idPropertyEnum;
-    searchOperator: RecordOperatorEnum;
+    searchOperator: RecordOperatorEnum | SearchOperatorEnum | TextOperatorEnum | NumericOperatorEnum;
     idValue: string | number | string[] | number[];
 }
 
@@ -93,7 +93,7 @@ export type idSearchOptions = {
  * @deprecated
  * - `createRecordArray` and `createRecordDict` are mutually exclusive
  * - Definition of Request body for the POST function in POST_BatchCreateRecord.js - Can create record in batches by defining the request's body, reqBody, in two ways. 
- * @typedefn `BatchCreateRecordRequest`
+ * @typedefn **`BatchCreateRecordRequest`**
  * @property {Array<CreateRecordOptions>} [createRecordArray]
  * `Array<`{@link CreateRecordOptions}`>` = `{ recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]`
  * @property {{[K in RecordTypeEnum]?: Array<CreateRecordOptions>}} [createRecordDict] 
@@ -113,7 +113,7 @@ export type BatchCreateRecordRequest = {
 /**
  * @deprecated
  * Definition of the request body for the POST function in POST_CreateRecord.js
- * @typedefn `CreateRecordRequest`
+ * @typedefn **`CreateRecordRequest`**
  * @property {CreateRecordOptions} options - The options for creating the record. {@link CreateRecordOptions} = { `recordType`: {@link RecordTypeEnum}, `isDynamic`?: boolean=false, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary} }.
  * @property {string | string[]} [responseProps] - The properties to include in the response in addition to the record's `'internalid'`.
  */
@@ -124,7 +124,7 @@ export type CreateRecordRequest = {
 
 /**
  * @deprecated
- * @typedefn `CreateRecordResponse`
+ * @typedefn **`CreateRecordResponse`**
  * @property {boolean} success - Indicates if the record was created successfully.
  * @property {PostRecordResult} result - The result of the record creation, including the `'internalid'` and any other properties specified in {@link CreateRecordRequest.responseProps}.
  * @property {string} message - A message indicating the result of the operation.
@@ -141,7 +141,7 @@ export type CreateRecordResponse = {
 /**
  * @deprecated
  * Definition of Response for the POST function in POST_BatchCreateRecord.js
- * @typedefn `BatchCreateRecordResponse`
+ * @typedefn **`BatchCreateRecordResponse`**
  * @property {boolean} success - Indicates if the request was successful.
  * @property {string} message - A message indicating the result of the request.
  * @property {PostRecordResult[]} results - an `Array<`{@link PostRecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully created.
@@ -158,7 +158,7 @@ export type BatchCreateRecordResponse = {
 
 /**
  * @deprecated
- * @typedefn `CreateRecordOptions`
+ * @typedefn **`CreateRecordOptions`**
  * @property {RecordTypeEnum} recordType - The record type to create, see {@link RecordTypeEnum}
  * @property {boolean} [isDynamic=false] - Indicates if the record should be created in dynamic mode. (defaults to false)
  * @property {FieldDictionary} [fieldDict] 

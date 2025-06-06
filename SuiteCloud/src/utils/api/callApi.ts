@@ -3,10 +3,10 @@
  */
 import axios from "axios";
 import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify } from "../io";
-import { mainLogger as log, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "./url";
-import { getAccessToken, AxiosCallEnum, AxiosContentTypeEnum } from "src/server";
+import { getAccessToken, AxiosCallEnum, AxiosContentTypeEnum, validateTokens } from "src/server";
 import { 
     BatchPostRecordRequest, BatchPostRecordResponse, PostRecordOptions, 
     PostRecordResult, RetrieveRecordByIdRequest, ScriptDictionary, DeleteRecordByTypeRequest } from "./types";
@@ -36,7 +36,8 @@ export function partitionArrayBySize(
 }
 
 /**
- * enforces max number of 100 records per post call (see {@link BATCH_SIZE}) e.g. if `payload.upsertRecordArray` > BATCH_SIZE_100,
+ * enforces max number of 100 records per post call (see {@link BATCH_SIZE}) 
+ * - e.g. if `payload.upsertRecordArray` > BATCH_SIZE_100,
  * then split into multiple payloads of at most 100 records each
  * @param payload {@link BatchPostRecordRequest}
  * @param scriptId `number`
@@ -44,12 +45,12 @@ export function partitionArrayBySize(
  * @returns **`responses`** — `Promise<`{@link BatchPostRecordResponse}`[]>`
  */
 export async function upsertRecordPayload(
-    payload: BatchPostRecordRequest, 
+    payload: BatchPostRecordRequest,
     scriptId: number=BATCH_UPSERT_RECORD_SCRIPT_ID, 
     deployId: number=BATCH_UPSERT_RECORD_DEPLOY_ID,
 ): Promise<BatchPostRecordResponse[]> {
     if (!payload || Object.keys(payload).length === 0) {
-        log.error('upsertRecordPayload() payload is undefined or empty. Cannot call RESTlet. Exiting...');
+        mlog.error('upsertRecordPayload() payload is undefined or empty. Cannot call RESTlet. Exiting...');
         STOP_RUNNING(1);
     }
     // const debugLogs: any[] = [];
@@ -63,25 +64,23 @@ export async function upsertRecordPayload(
     ) {
         batches.push(...partitionArrayBySize(upsertRecordArray, BATCH_SIZE));
         for (let i = 0; i < batches.length; i++) {
+            // if (i < 55) { continue; } // continue where last left off
             const batch = batches[i];
             try {
-                const accessToken = await getAccessToken();
+                const accessToken = (await validateTokens()).access_token;//await getAccessToken();
                 const res = await POST(accessToken, scriptId, deployId,
                     { 
                         upsertRecordArray: batch, 
                         responseProps: responseProps 
                     } as BatchPostRecordRequest,
                 );
-                await DELAY(TWO_SECOND_DELAY,
-                    TAB + `finished batch ${i+1} of ${batches.length}`,);
+                await DELAY(TWO_SECOND_DELAY, null);
                 if (!res.data) {
-                    log.debug(
-                        `upsertRecordPayload() batchIndex=${i} res.data is undefined. Skipping...`
-                    );
+                    mlog.warn(`upsertRecordPayload() batchIndex=${i} res.data is undefined. Skipping...`);
                     continue;
                 }
                 responseDataArr.push(res.data as BatchPostRecordResponse);
-                log.debug(`upsertRecordPayload() batchIndex=${i} results: `, 
+                mlog.debug(`upsertRecordPayload() finished batch ${i+1} of ${batches.length}; results: `, 
                     JSON.stringify(((res.data as BatchPostRecordResponse).results as PostRecordResult[]).reduce((acc, postResult) => {
                         acc[postResult.recordType] = (acc[postResult.recordType] || 0) + 1;
                         return acc;
@@ -89,7 +88,7 @@ export async function upsertRecordPayload(
                 );
                 continue;
             } catch (error) {
-                log.error(`Error in callApi.ts upsertRecordPayload().upsertRecordArray.POST(batchIndex=${i}):`);
+                mlog.error(`Error in callApi.ts upsertRecordPayload().upsertRecordArray.POST(batchIndex=${i}):`);
                 write({timestamp: getCurrentPacificTime(), caught: error}, ERROR_DIR, `ERROR_upsertRecordPayload_batch_${i}.json`);
                 continue;
             }
@@ -104,7 +103,7 @@ export async function upsertRecordPayload(
             const res = await POST(accessToken, scriptId, deployId, payload);
             responseDataArr.push(res.data as BatchPostRecordResponse);
         } catch (error) {
-            log.error('Error in callApi.ts upsertRecordPayload().upsertRecordDict.POST():');
+            mlog.error('Error in callApi.ts upsertRecordPayload().upsertRecordDict.POST():');
             write({timestamp: getCurrentPacificTime(), caught: error as any}, ERROR_DIR, 'ERROR_upsertRecordPayload.json');
             // throw error;
         }
@@ -130,15 +129,15 @@ export async function POST(
     contentType: AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN_TEXT = AxiosContentTypeEnum.JSON,
 ): Promise<any> {
     if (!scriptId || !deployId) {
-        log.error('callApi.ts POST().scriptId or deployId is undefined. Cannot call RESTlet.');
+        mlog.error('callApi.ts POST().scriptId or deployId is undefined. Cannot call RESTlet.');
         throw new Error('callApi.ts POST().scriptId or deployId is undefined. Cannot call RESTlet.');
     }
     if (!accessToken) {
-        log.error('callApi.ts POST().accessToken is undefined. Cannot call RESTlet.');
+        mlog.error('callApi.ts POST().accessToken is undefined. Cannot call RESTlet.');
         throw new Error('callApi.ts POST().accessToken is undefined. Cannot call RESTlet.');
     }
     if (!payload) {
-        log.error('callApi.ts POST().payload is undefined. Cannot call RESTlet.');
+        mlog.error('callApi.ts POST().payload is undefined. Cannot call RESTlet.');
         throw new Error('callApi.ts POST().payload is undefined. Cannot call RESTlet.');
     }
     /** = `'${`{@link RESTLET_URL_STEM}`}?script=${scriptId}&deploy=${deployId}'` */
@@ -155,7 +154,7 @@ export async function POST(
         });
         return response;
     } catch (error) {
-        log.error('Error in callApi.ts POST():');//, error);
+        mlog.error('Error in callApi.ts POST():');//, error);
         write({timestamp: getCurrentPacificTime(), caught: error}, ERROR_DIR, 'ERROR_POST.json');
         throw new Error('Failed to call RESTlet with payload');
     }
@@ -175,15 +174,15 @@ export async function GET(
     params: Record<string, any>,
 ): Promise<any> {
     if (!params) {
-        log.error('callApi.ts GET() params is undefined. Cannot call RESTlet.');
+        mlog.error('callApi.ts GET() params is undefined. Cannot call RESTlet.');
         throw new Error('callApi.ts GET() params is undefined. Cannot call RESTlet.');
     }
     if (!scriptId || !deployId) {
-        log.error('callApi.ts GET() scriptId or deployId is undefined. Cannot call RESTlet.');
+        mlog.error('callApi.ts GET() scriptId or deployId is undefined. Cannot call RESTlet.');
         throw new Error('callApi.ts GET() scriptId or deployId is undefined. Cannot call RESTlet.');
     }
     if (!accessToken) {
-        log.error('callApi.ts GET() getAccessToken() is undefined. Cannot call RESTlet.');
+        mlog.error('callApi.ts GET() getAccessToken() is undefined. Cannot call RESTlet.');
         throw new Error('callApi.ts GET() getAccessToken() is undefined. Cannot call RESTlet.');
     }
     const restletUrl = createUrlWithParams(RESTLET_URL_STEM, {
@@ -200,7 +199,7 @@ export async function GET(
         });
         return response;
     } catch (error) {
-        log.error('Error in api.ts GET():', error);
+        mlog.error('Error in api.ts GET():', error);
         throw new Error('Failed to call RESTlet with params');
     }
 }
@@ -218,12 +217,12 @@ export async function deleteRecordByType(
     deployId: number=DELETE_RECORD_BY_TYPE_DEPLOY_ID
 ): Promise<any> {
     if (!payload || Object.keys(payload).length === 0) {
-        log.error('upsertRecordPayload() payload is undefined or empty. Cannot call RESTlet. Exiting...');
+        mlog.error('upsertRecordPayload() payload is undefined or empty. Cannot call RESTlet. Exiting...');
         STOP_RUNNING(1);
     }
     const accessToken = await getAccessToken();
     if (!accessToken) {
-        log.error('upsertRecordPayload() getAccessToken() is undefined. Cannot call RESTlet. Exiting...');
+        mlog.error('upsertRecordPayload() getAccessToken() is undefined. Cannot call RESTlet. Exiting...');
         STOP_RUNNING(1);
     }
     try {
@@ -235,7 +234,7 @@ export async function deleteRecordByType(
         );
         return res;
     } catch (error) {
-        log.error('Error in callApi.ts deleteRecordByType()', error);
+        mlog.error('Error in callApi.ts deleteRecordByType()', error);
         write({error: error}, ERROR_DIR, 'ERROR_deleteRecordByType.json');
         throw error;
     }
@@ -255,15 +254,15 @@ export async function DELETE(
     params: Record<string, any>,
 ): Promise<any> {
     if (!scriptId || !deployId) {
-        log.error('callApi.ts DELETE() scriptId or deployId is undefined. Cannot call RESTlet.');
+        mlog.error('callApi.ts DELETE() scriptId or deployId is undefined. Cannot call RESTlet.');
         throw new Error('callApi.ts DELETE() scriptId or deployId is undefined. Cannot call RESTlet.');
     }
     if (!accessToken) {
-        log.error('callApi.ts DELETE() getAccessToken() is undefined. Cannot call RESTlet.');
+        mlog.error('callApi.ts DELETE() getAccessToken() is undefined. Cannot call RESTlet.');
         throw new Error('callApi.ts DELETE() getAccessToken() is undefined. Cannot call RESTlet.');
     }
     if (!params) {
-        log.error('callApi.ts DELETE() params is undefined. Cannot call RESTlet.');
+        mlog.error('callApi.ts DELETE() params is undefined. Cannot call RESTlet.');
         throw new Error('callApi.ts DELETE() params is undefined. Cannot call RESTlet.');
     }
     const restletUrl = createUrlWithParams(RESTLET_URL_STEM, {
@@ -280,7 +279,7 @@ export async function DELETE(
         });
         return response;
     } catch (error) {
-        log.error('Error in callApi.ts DELETE():', error);
+        mlog.error('Error in callApi.ts DELETE():', error);
         write({error: error}, ERROR_DIR, 'ERROR_DELETE.json');
         throw new Error('Failed to call RESTlet with params: ' + JSON.stringify(params, null, 4));
     }
@@ -294,7 +293,7 @@ export async function retrieveRecordById(
 ): Promise<any> {
     const accessToken = await getAccessToken();
     if (!accessToken) {
-        log.error('accessToken is undefined. Cannot call RESTlet.');
+        mlog.error('accessToken is undefined. Cannot call RESTlet.');
         STOP_RUNNING(1);
     }
     try {
@@ -306,7 +305,7 @@ export async function retrieveRecordById(
         )
         return res;
     } catch (error) {
-        log.error('Error in callApi.ts retrieveRecordById()', error);
+        mlog.error('Error in callApi.ts retrieveRecordById()', error);
         throw error;
     }
 }

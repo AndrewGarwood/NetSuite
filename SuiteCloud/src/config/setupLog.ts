@@ -5,7 +5,7 @@
 import { OUTPUT_DIR, CLOUD_LOG_DIR } from './env';
 import { Logger, ISettingsParam, ISettings, ILogObj, ILogObjMeta, IPrettyLogStyles, IMeta } from 'tslog';
 import path from 'node:path';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 /** LOCAL_LOG_DIR (in onedrive) or `OUTPUT_DIR/logs` */
 const LOCAL_LOG_DIR = path.join(OUTPUT_DIR, "logs");  
 /**`OUTPUT_DIR/logs/DEBUG.txt` */
@@ -13,10 +13,10 @@ const DEFAULT_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, "DEBUG.txt");
 /**`OUTPUT_DIR/logs/ERROR.txt` */
 const ERROR_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, "ERROR.txt"); 
 /** 
- * `INDENT_LOG_LINE =  '\n\t '` = newLine + tab + space
+ * `INDENT_LOG_LINE =  '\n\t'` = newLine + tab
  * - log.debug(s1, INDENT_LOG_LINE + s2, INDENT_LOG_LINE + s3,...) 
  * */
-export const INDENT_LOG_LINE: string = '\n\t ';
+export const INDENT_LOG_LINE: string = '\n\t';
 /** 
  * `NEW_LINE =  '\n > '` = newLine + space + > + space
  * */
@@ -85,7 +85,7 @@ const PRETTY_LOG_STYLES: IPrettyLogStyles = {
         nameWithDelimiterPrefix: ["whiteBright", "bold", "bgBlackBright"],
         nameWithDelimiterSuffix: ["whiteBright", "bold", "bgBlack"],
         errorName: ["red", "bold"],
-        errorMessage: ["red", "bgBlackBright"],
+        errorMessage: "redBright",
 };   
 
 const MAIN_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
@@ -99,12 +99,7 @@ const MAIN_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
     prettyLogTimeZone: "local",
     prettyLogStyles: PRETTY_LOG_STYLES,
 }
-export const mainLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
-mainLogger.attachTransport((logObj: ILogObj & ILogObjMeta) => {
-    appendFileSync(DEFAULT_LOG_FILEPATH, JSON.stringify(logObj) + "\n", { encoding: "utf-8" });
-});
-
-/** `type: hidden` -> suppress logs from being sent to console */
+/** `type: "hidden"` -> suppress logs from being sent to console */
 const PARSE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
     type: "hidden", // "pretty" | "hidden" | "json"
     name: "NS_Parse",
@@ -116,13 +111,44 @@ const PARSE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
     prettyLogTimeZone: "local",
     prettyLogStyles: PRETTY_LOG_STYLES,
 }
+/** `type: "pretty", name: "mainLogger"` */
+export const mainLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
+mainLogger.attachTransport((logObj: ILogObj) => {
+    appendFileSync(DEFAULT_LOG_FILEPATH, JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
+});
 
+/** `type: "pretty", name: "errorLogger"` */
+export const errorLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
+errorLogger.attachTransport((logObj: ILogObj) => { //logObj: ILogObj & ILogObjMeta
+    appendFileSync(ERROR_LOG_FILEPATH, JSON.stringify(logObj) + "\n", { encoding: "utf-8" });
+});
+
+/** `type: "hidden", name: "parseLogger"` */
 export const parseLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
-parseLogger.attachTransport((logObj: ILogObj & ILogObjMeta) => {
+parseLogger.attachTransport((logObj: ILogObj) => {
     appendFileSync(path.join(CLOUD_LOG_DIR, 'PARSE_LOG.txt'), JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
 });
+
+/** `type: "hidden", name: "pruneLogger"` */
 export const pruneLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
-pruneLogger.attachTransport((logObj: ILogObj & ILogObjMeta) => {
+pruneLogger.attachTransport((logObj: ILogObj) => {
     appendFileSync(path.join(CLOUD_LOG_DIR, 'PRUNE_LOG.txt'), JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
 });
 
+
+/**
+ * Clears the content of the specified log file(s).
+ * @param filePaths - The path(s) to the log file(s) to clear.
+ */
+export function clearLogFile(...filePaths: string[]): void {
+    for (const filePath of filePaths) {
+        if (!filePath || !existsSync(filePath)) {
+            mainLogger.warn(`clearLogFile() Log file does not exist: ${filePath}`);
+            continue;
+        }
+        writeFileSync(filePath, '', { encoding: 'utf-8' });
+    }
+}
+export const INFO_LOGS: any[] = []
+export const DEBUG_LOGS: any[] = [];
+export { indentedStringify } from '../utils/io'

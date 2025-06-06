@@ -1,5 +1,5 @@
 /**
- * @file AxiosEnums.ts
+ * @file src/server/types/AxiosEnums.ts
  * @module AxiosEnums
  */
 
