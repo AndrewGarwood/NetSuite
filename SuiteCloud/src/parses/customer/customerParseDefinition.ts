@@ -11,6 +11,10 @@ import {
     SublistSubrecordMapping,
     RecordTypeEnum,
     ContactRoleEnum,
+    SearchOperatorEnum,
+    idPropertyEnum,
+    idSearchOptions,
+    idSearchParseOptions,
 } from "../../utils/api/types";
 import { mainLogger as log } from "src/config/setupLog";
 import { CustomerStatusEnum, CustomerTaxItemEnum } from "../../utils/api/types";
@@ -142,7 +146,13 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
         ] as SublistSubrecordMapping[],
     } as SublistFieldDictionaryParseOptions,
 };
-
+export const ID_PARSE_OPTIONS: idSearchParseOptions[] = [
+    {
+        idProp: idPropertyEnum.ENTITY_ID, 
+        searchOperator: SearchOperatorEnum.TEXT.IS, 
+        idValueMapping: { fieldId: 'entityid', evaluator: evaluate.entityId, args: [C.ENTITY_ID] }
+    }
+]
 export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldValueMapping[] = [
     { fieldId: 'entityid', evaluator: evaluate.entityId, args: [C.ENTITY_ID] },
     { fieldId: 'isinactive', defaultValue: NOT_INACTIVE },
@@ -190,6 +200,7 @@ export const CONTACT_ROLES_SUBLIST_DEFAULT_OPTIONS: SublistDictionaryParseOption
 
 export const PARSE_CUSTOMER_FROM_CUSTOMER_CSV_OPTIONS: ParseOptions = {
     recordType: RecordTypeEnum.CUSTOMER,
+
     fieldDictParseOptions: {
         fieldValueMapArray: [
             { fieldId: 'isperson', evaluator: customerEval.customerIsPerson, args: [C.ENTITY_ID] },

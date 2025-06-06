@@ -8,7 +8,7 @@ import {
     parseCsvForOneToMany
 } from "./utils/io";
 import { TOKEN_DIR, DATA_DIR, OUTPUT_DIR, STOP_RUNNING, CLOUD_LOG_DIR } from "./config/env";
-import { mainLogger as log, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "./config/setupLog";
+import { mainLogger as log, INDENT_LOG_LINE as TAB, NEW_LINE as NL, INFO_LOGS, indentedStringify } from "./config/setupLog";
 import {
     PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS as CONTACT_OPTIONS,
     PARSE_CUSTOMER_FROM_CUSTOMER_CSV_OPTIONS as CUSTOMER_OPTIONS
@@ -24,21 +24,30 @@ import * as customerFiles from './parses/customer/customerParseConstants';
  * but I rewrote the logic here because I wanted to check some log output 
  * */
 async function main() {
+    const startTime = new Date();
+    const filePath = customerFiles.REMAINING_ROWS_FILE;
     const entityType = EntityRecordTypeEnum.CUSTOMER;
+    log.info(NL + `main() starting at ${startTime.toLocaleString()}`,
+        TAB + `  filePath: "${filePath}"`,
+        TAB + `entityType: "${entityType}"`,
+    );
     const { entities, contacts } = await parseEntityFile(
-        customerFiles.COMPLETE_FILE,
+        filePath,
         entityType,
         [CUSTOMER_OPTIONS, CONTACT_OPTIONS]
     );
-    // log.debug(`main() after parseEntityFile()`,
-    //     TAB+`${entityType}s.length: ${entities.length}`,
-    //     TAB+`contacts.length: ${contacts.length}`,
-    // );
-    // write(entities, path.join(OUTPUT_DIR, 'parses', 'customer'), `${entityType}s.json`);
-    // write(contacts, path.join(OUTPUT_DIR, 'parses', 'customer'), `contacts.json`);
-    // STOP_RUNNING(0, NL+'main.ts: stopping after parseEntityFile()');
+    const firstPostStart = new Date();
+    log.info(
+        // `Finished parseEntityFile() at after ${(firstPostStart.getTime() - startTime.getTime() / 1000).toFixed(5)} seconds.`, 
+        `calling postEntities() at ${firstPostStart.toLocaleString()}`,
+    );
     const entityResponses: BatchPostRecordResponse[] = await postEntities(entities);
-    const entityRejects = entityResponses.map(response => response.rejects).flat();
+    const entityRejects = entityResponses.map(
+        response => response.rejects as PostRecordOptions[]
+    ).flat();
+    log.info(`First Post (entities) Elapsed Time: ${
+        ((new Date().getTime() - firstPostStart.getTime()) / 1000).toFixed(5)
+    } seconds.`);
 
     const { companyContacts, unmatchedContacts} 
         = matchContactsToPostEntityResponses(contacts, entityResponses);
@@ -46,24 +55,40 @@ async function main() {
         log.warn(`companyContacts.length === 0. Exiting.`);
         STOP_RUNNING(1);
     }
-    
-    const contactResponses: BatchPostRecordResponse[]= await postContacts(companyContacts);
+    const secondPostStart = new Date();
+    const contactResponses: BatchPostRecordResponse[] = await postContacts(companyContacts);
+    log.info(`Second Post (contacts) Elapsed Time: ${
+        ((new Date().getTime() - secondPostStart.getTime()) / 1000).toFixed(5)
+    } seconds.`,);
     if (contactResponses.length === 0) {
         log.warn(`contactResponses.length === 0. Exiting.`);
         STOP_RUNNING(1);
     }
-    const contactRejects = contactResponses.map(response => response.rejects).flat();
+    const contactRejects = contactResponses.map(
+        response => response.rejects as PostRecordOptions[]
+    ).flat();
     
     const entityUpdates: PostRecordOptions[]
         = generateEntityUpdates(EntityRecordTypeEnum.CUSTOMER, contactResponses);
+    const thirdPostStart = new Date();
     const entityUpdateResponses: BatchPostRecordResponse[] = await postEntities(entityUpdates);
+    log.info(`Third Post (entity updates) Elapsed Time: ${
+        ((new Date().getTime() - thirdPostStart.getTime()) / 1000).toFixed(5)
+    } seconds.`);
     if (entityUpdateResponses.length === 0) {
         log.warn(`entityUpdateResponses.length === 0. Exiting.`);
         STOP_RUNNING(1);
     }
-    const entityUpdateRejects = entityUpdateResponses.map(response => response.rejects).flat();
-
-    log.debug(`parse + post Results for entityType: '${entityType}'`,
+    const entityUpdateRejects = entityUpdateResponses.map(
+        response => response.rejects as PostRecordOptions[]
+    ).flat();
+    const endTime = new Date();
+    log.info(`main() completed at ${endTime.toLocaleString()}`,
+        NL + `Total Elapsed Time: ${(
+            (endTime.getTime() - startTime.getTime()) / 1000
+        ).toFixed(5)} seconds.`,
+        NL  + '-'.repeat(80),
+        NL  + `parse + post Results for entityType: '${entityType}'`,
         NL  + `[1] upsertRecordPayload = ${entityType}s `,
         TAB + `            ${entityType}s.length: ${entities.length}`,
         TAB + `  ${entityType}PostResults.length: ${getPostResults(entityResponses).length}`,

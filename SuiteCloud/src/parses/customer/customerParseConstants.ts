@@ -17,6 +17,8 @@ export const SUBSET_FILE = `${CUSTOMER_DIR}/subset.tsv` as string;
 export const SMALL_SUBSET_FILE = `${CUSTOMER_DIR}/small_subset.tsv` as string;
 /** `${DATA_DIR}/customers/customer.tsv` */
 export const COMPLETE_FILE = `${CUSTOMER_DIR}/customer.tsv` as string;
+/** `${DATA_DIR}/customers/customer_part2.tsv` */
+export const REMAINING_ROWS_FILE = `${CUSTOMER_DIR}/customer_part2.tsv` as string;
 
 
 /** 
