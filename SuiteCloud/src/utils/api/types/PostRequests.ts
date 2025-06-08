@@ -2,7 +2,7 @@
  * @file src/utils/api/types/PostRequests.ts
  */
 import { FieldDictionary, FieldValue, idPropertyEnum, LogStatement, SublistDictionary } from '.';
-import { RecordTypeEnum, EntityRecordTypeEnum, RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum, NumericOperatorEnum } from '../../NS';
+import { RecordTypeEnum, EntityRecordTypeEnum, RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum, NumericOperatorEnum } from '../../ns';
 
 
 /**

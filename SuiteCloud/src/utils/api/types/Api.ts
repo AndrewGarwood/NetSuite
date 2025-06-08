@@ -3,7 +3,7 @@
  * @module Api
  */
 
-import { RecordTypeEnum } from '../../NS/Record/Record';
+import { RecordTypeEnum } from '../../ns/record/Record';
 
 /**
  * @enum {string} **`idPropertyEnum`**

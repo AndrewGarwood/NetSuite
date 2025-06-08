@@ -1,15 +1,11 @@
 /**
  * @file BillOfMaterials.ts
- * @description TypeScript definition for the Bill of Materials record in NetSuite.
- * @module BillOfMaterials
  */
 
-import { RecordRef } from './Record';
+import { RecordRef } from '../Record';
 import { BillOfMaterialsRevision } from './BillOfMaterialsRevision';
 
 /**
- * Bill of Materials, Internal ID: bom
- * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/bom.html
  * @description Bill of Materials record in NetSuite. A Bill of Materials (BOM) defines the component items required to create an assembled item. The Advanced Bill of Materials feature must be enabled.
  * @interface BillOfMaterials
  * @property {boolean} [availableforallassemblies] - If true, all assemblies can use this BOM. If false, only selected assemblies can use this BOM.

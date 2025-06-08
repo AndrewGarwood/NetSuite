@@ -17,6 +17,9 @@
             "N/*": ["node_modules/@hitc/netsuite-types/N/*"]
         }
     },
-    "include": ["src/**/*.ts", "src/**/**/*.ts", "src/server/authServer.ts", "src/*.ts", "src/**/*.d.ts", "src/**/**/*.d.ts"],
-    "exclude": ["node_modules", "src/FileCabinet/SuiteScripts/javascript/**/*.js", "src/FileCabinet/SuiteScripts/javascript/*.mjs", "src/FileCabinet/SuiteScripts/javascript/*.js"]
+    "include": [
+        "src/server/authServer.ts", 
+        "src/main.ts", 
+    ],
+    "exclude": ["node_modules", "src/FileCabinet/SuiteScripts/**/*.js", "src/FileCabinet/SuiteScripts/**/*.js", "src/FileCabinet/SuiteScripts/REST/*.js"]
 }

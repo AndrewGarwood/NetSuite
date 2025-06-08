@@ -2,7 +2,7 @@
  * @file src/utils/api/types/CsvToApiMapping.ts
  * @module CsvToApiMapping
  */
-import { RecordTypeEnum, EntityRecordTypeEnum, RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum, NumericOperatorEnum } from "../../NS";
+import { RecordTypeEnum, EntityRecordTypeEnum, RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum, NumericOperatorEnum } from "../../ns";
 import { ValueMapping, ValueMappingEntry } from "../../io/types";
 import {
     idPropertyEnum,

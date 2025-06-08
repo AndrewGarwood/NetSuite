@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import { AccountEnvironmentEnum, SuiteScriptEnvironment, ScriptDictionary, ScriptDetails } from '../utils/NS/SuiteScriptEnvironment';
+import { AccountEnvironmentEnum, SuiteScriptEnvironment, ScriptDictionary, ScriptDetails } from '../utils/ns/SuiteScriptEnvironment';
 
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
@@ -132,7 +132,6 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
 
 /** Define in .env to use as path stem `C:/Users/${USER}` */
 export const USER = process.env.CURRENT_USER || 'MISSING_ENV_VARIABLE-CURRENT_USER';
-console.log('USER:'.padEnd(13), USER);
 
 /** = `C:/Users/${USER}/OneDrive - ${ENTITY_NAME}` */
 export const ONE_DRIVE_DIR = `C:/Users/${USER}/OneDrive - ENTITY_NAME`;
@@ -144,19 +143,6 @@ export const DATA_DIR = path.join(NODE_HOME_DIR, '../data') as string;
 export const OUTPUT_DIR = path.join(NODE_HOME_DIR, '.output') as string;
 /**`/NetSuiteDev/SuiteCloud/.output/error_json` */
 export const ERROR_DIR = path.join(OUTPUT_DIR, 'error_json') as string;
-
-validatePath(
-    NODE_HOME_DIR, SRC_DIR, TOKEN_DIR, ONE_DRIVE_DIR, CLOUD_LOG_DIR, 
-    DATA_DIR, OUTPUT_DIR, ERROR_DIR
-);
-export async function validatePath(...paths: string[]): Promise<void> {
-    for (const path of paths) {
-        if (!fs.existsSync(path)) {
-            console.error(`ERROR validatePath(): path does not exist: ${path}`);
-            STOP_RUNNING(1);
-        }
-    }
-}
 
 /** 
  * @example 
@@ -189,4 +175,23 @@ export const DELAY = async (ms: number, ...msg: any[]): Promise<void> => {
     let msgArr = Array.isArray(msg) && msg.length > 0 ? msg : [pauseMsg];
     if (msgArr[0] !== null) {console.log(...msgArr);}
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+const TAB = '\n\t';
+console.log(` > Loading env...`,
+    TAB + `        USER: ${USER}`,
+    TAB + `   inSandbox: ${inSandbox}`,
+    TAB + `inProduction: ${inProduction}`
+);
+
+validatePath(
+    NODE_HOME_DIR, SRC_DIR, TOKEN_DIR, ONE_DRIVE_DIR, CLOUD_LOG_DIR, 
+    DATA_DIR, OUTPUT_DIR, ERROR_DIR
+);
+export async function validatePath(...paths: string[]): Promise<void> {
+    for (const path of paths) {
+        if (!fs.existsSync(path)) {
+            console.error(`ERROR validatePath(): path does not exist: ${path}`);
+            STOP_RUNNING(1);
+        }
+    }
 }

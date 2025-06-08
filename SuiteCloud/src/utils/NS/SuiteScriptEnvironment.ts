@@ -1,12 +1,11 @@
 /**
- * @file SuiteScriptEnvironment.ts
- * @module SuiteScriptEnvironment
+ * @file src/utils/ns/SuiteScriptEnvironment.ts
  * @description strucutres to define/hold the scripts one has uploaded/deployed to NetSuite.
  */
 
 
 /**
- * @enum {string} AccountEnvironmentEnum
+ * @enum {string} **`AccountEnvironmentEnum`**
  * @description Enum for NetSuite account environments.
  * @property {string} PRODUCTION - Production environment.
  * @property {string} SANDBOX - Sandbox (development) environment.
@@ -17,7 +16,7 @@ export enum AccountEnvironmentEnum {
 }
 
 /**
- * @typedefn SuiteScriptEnvironment
+ * @typedefn **`SuiteScriptEnvironment`**
  * @description NetSuite Account Environment and Script Type mapping.
  * @property {AccountEnvironmentEnum} production - Production environment.
  * @property {AccountEnvironmentEnum} sandbox - Sandbox environment.
@@ -36,17 +35,17 @@ export type SuiteScriptEnvironment = {
 // }>;
 
 /**
- * @typedefn ScriptDeploymentDict
+ * @typedefn **`ScriptDictionary`**
  * @description dictionary mapping a script's label to its details
  * @property {string} key - The name of the script.
- * @property {ScriptDetails} value - The script details for the script.
+ * @property {ScriptDetails} value {@link ScriptDetails}
  */
 export type ScriptDictionary = { 
     [key: string]: ScriptDetails 
 };
 
 /**
- * @typedefn ScriptDetails
+ * @typedefn **`ScriptDetails`**
  * @description Script details for NetSuite SuiteScript. assume that the script has been uploaded, a script record made, and a script deployment record made.
  * @property {number} scriptId - The ID of the script.
  * @property {string} [scriptName] - The script record's name field on NetSuite.
@@ -61,8 +60,7 @@ export type ScriptDetails = {
 };
 
 /**
- * @enum {string} ScriptTypeEnum
- * @description Enum for NetSuite script types.
+ * @enum {string} **`ScriptTypeEnum`**
  * @reference https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/chapter_4387172495.html
  * 
  * @property {string} BUNDLE_INSTALLATION_SCRIPT - Bundle installation script.

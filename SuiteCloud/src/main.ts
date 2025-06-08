@@ -38,7 +38,7 @@ async function main() {
     );
     const firstPostStart = new Date();
     log.info(
-        // `Finished parseEntityFile() at after ${(firstPostStart.getTime() - startTime.getTime() / 1000).toFixed(5)} seconds.`, 
+        // `Finished parseEntityFile() at after ${((firstPostStart.getTime() - startTime.getTime()) / 1000).toFixed(5)} seconds.`, 
         `calling postEntities() at ${firstPostStart.toLocaleString()}`,
     );
     const entityResponses: BatchPostRecordResponse[] = await postEntities(entities);

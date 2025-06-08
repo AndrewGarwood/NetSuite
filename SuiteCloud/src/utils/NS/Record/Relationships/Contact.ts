@@ -1,13 +1,15 @@
 /**
- * @file src/types/NS/Relationships/Contact.ts
+ * @file src/utils/ns/Relationships/Contact.ts
  * @description TypeScript definitions for Contact Record fields in NetSuite.
- * @module Contact
  * @NetSuiteInternalId contact
  * @reference {@link https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/contact.html}
  */
-import { RecordRef } from '../Record';
-import { Address, AddressBook } from './Address';
-import { GlobalSubscriptionStatusEnum } from '../../Enums';
+
+import { GlobalSubscriptionStatusEnum } from "../../Enums";
+import { RecordRef } from "../Record";
+import { Address, AddressBook } from "./Address";
+
+
 
 /**
  * @interface ContactBase

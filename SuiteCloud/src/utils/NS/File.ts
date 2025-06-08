@@ -1,72 +1,10 @@
 /**
- * @file src/types/NS/File.ts
- * @module File
+ * @file src/utils/ns/File.ts
  * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4205693274.html}
  */
 
 /** 
- * Enumeration that holds the string values for supported character encoding.
- * @example
- * console.log(Encoding.UTF_8); // Output: 0
- *  */
-export enum Encoding {
-    UTF_8,
-    WINDOWS_1252,
-    ISO_8859_1,
-    GB18030,
-    SHIFT_JIS,
-    MAC_ROMAN,
-    GB2312,
-    BIG5,
-}
-
-/** Enumeration that holds the string values for supported file types. */
-export enum Type {
-    APPCACHE,
-    AUTOCAD,
-    BMPIMAGE,
-    CERTIFICATE,
-    CONFIG,
-    CSV,
-    EXCEL,
-    FLASH,
-    FREEMARKER,
-    GIFIMAGE,
-    GZIP,
-    HTMLDOC,
-    ICON,
-    JAVASCRIPT,
-    JPGIMAGE,
-    JSON,
-    MESSAGERFC,
-    MP3,
-    MPEGMOVIE,
-    MSPROJECT,
-    PDF,
-    PJPGIMAGE,
-    PLAINTEXT,
-    PNGIMAGE,
-    POSTSCRIPT,
-    POWERPOINT,
-    QUICKTIME,
-    RTF,
-    SCSS,
-    SMS,
-    STYLESHEET,
-    SVG,
-    TAR,
-    TIFFIMAGE,
-    VISIO,
-    WEBAPPPAGE,
-    WEBAPPSCRIPT,
-    WORD,
-    XMLDOC,
-    XSD,
-    ZIP,
-}
-
-/** 
- * @enum {string} `FileEncodingEnum`
+ * @enum {string} **`NetSuiteFileEncodingEnum`**
  * @description Enumeration that holds the string values for supported character encoding.
  * @property {string} UTF_8 - UTF-8 encoding.
  * @property {string} WINDOWS_1252 - Windows 1252 encoding.
@@ -77,19 +15,19 @@ export enum Type {
  * @property {string} GB2312 - GB2312 encoding.
  * @property {string} BIG5 - Big5 encoding.
  */
-const FileEncodingEnum = {
-    UTF_8 : 'UTF_8',
-    WINDOWS_1252 : 'WINDOWS_1252',
-    ISO_8859_1 : 'ISO_8859_1',
-    GB18030 : 'GB18030',
-    SHIFT_JIS : 'SHIFT_JIS',
-    MAC_ROMAN : 'MAC_ROMAN',
-    GB2312 : 'GB2312',
-    BIG5 : 'BIG5',
+export enum NetSuiteFileEncodingEnum {
+    UTF_8  = 'UTF_8',
+    WINDOWS_1252  = 'WINDOWS_1252',
+    ISO_8859_1  = 'ISO_8859_1',
+    GB18030  = 'GB18030',
+    SHIFT_JIS  = 'SHIFT_JIS',
+    MAC_ROMAN  = 'MAC_ROMAN',
+    GB2312  = 'GB2312',
+    BIG5  = 'BIG5',
 }
 
 /** 
- * @enum {string} `FileTypeEnum`
+ * @enum {string} **`NetSuiteFileTypeEnum`**
  * @description Enumeration that holds the string values for supported file types.
  * @property {string} APPCACHE - Application Cache file.
  * @property {string} AUTOCAD - AutoCAD file.
@@ -133,46 +71,46 @@ const FileEncodingEnum = {
  * @property {string} XSD - XML Schema Definition file.
  * @property {string} ZIP - Zip file.
  */
-const FileTypeEnum = {
-    APPCACHE: 'APPCACHE',
-    AUTOCAD: 'AUTOCAD',
-    BMPIMAGE: 'BMPIMAGE',
-    CERTIFICATE: 'CERTIFICATE',
-    CONFIG: 'CONFIG',
-    CSV: 'CSV',
-    EXCEL: 'EXCEL',
-    FLASH: 'FLASH',
-    FREEMARKER: 'FREEMARKER',
-    GIFIMAGE: 'GIFIMAGE',
-    GZIP: 'GZIP',
-    HTMLDOC: 'HTMLDOC',
-    ICON: 'ICON',
-    JAVASCRIPT: 'JAVASCRIPT',
-    JPGIMAGE: 'JPGIMAGE',
-    JSON: 'JSON',
-    MESSAGERFC: 'MESSAGERFC',
-    MP3: 'MP3',
-    MPEGMOVIE: 'MPEGMOVIE',
-    MSPROJECT: 'MSPROJECT',
-    PDF: 'PDF',
-    PJPGIMAGE: 'PJPGIMAGE',
-    PLAINTEXT: 'PLAINTEXT',
-    PNGIMAGE: 'PNGIMAGE',
-    POSTSCRIPT: 'POSTSCRIPT',
-    POWERPOINT: 'POWERPOINT',
-    QUICKTIME: 'QUICKTIME',
-    RTF: 'RTF',
-    SCSS: 'SCSS',
-    SMS: 'SMS',
-    STYLESHEET: 'STYLESHEET',
-    SVG: 'SVG',
-    TAR: 'TAR',
-    TIFFIMAGE: 'TIFFIMAGE',
-    VISIO: 'VISIO',
-    WEBAPPPAGE: 'WEBAPPPAGE',
-    WEBAPPSCRIPT: 'WEBAPPSCRIPT',
-    WORD: 'WORD',
-    XMLDOC: 'XMLDOC',
-    XSD: 'XSD',
-    ZIP: 'ZIP'
+export enum NetSuiteFileTypeEnum {
+    APPCACHE = 'APPCACHE',
+    AUTOCAD = 'AUTOCAD',
+    BMPIMAGE = 'BMPIMAGE',
+    CERTIFICATE = 'CERTIFICATE',
+    CONFIG = 'CONFIG',
+    CSV = 'CSV',
+    EXCEL = 'EXCEL',
+    FLASH = 'FLASH',
+    FREEMARKER = 'FREEMARKER',
+    GIFIMAGE = 'GIFIMAGE',
+    GZIP = 'GZIP',
+    HTMLDOC = 'HTMLDOC',
+    ICON = 'ICON',
+    JAVASCRIPT = 'JAVASCRIPT',
+    JPGIMAGE = 'JPGIMAGE',
+    JSON = 'JSON',
+    MESSAGERFC = 'MESSAGERFC',
+    MP3 = 'MP3',
+    MPEGMOVIE = 'MPEGMOVIE',
+    MSPROJECT = 'MSPROJECT',
+    PDF = 'PDF',
+    PJPGIMAGE = 'PJPGIMAGE',
+    PLAINTEXT = 'PLAINTEXT',
+    PNGIMAGE = 'PNGIMAGE',
+    POSTSCRIPT = 'POSTSCRIPT',
+    POWERPOINT = 'POWERPOINT',
+    QUICKTIME = 'QUICKTIME',
+    RTF = 'RTF',
+    SCSS = 'SCSS',
+    SMS = 'SMS',
+    STYLESHEET = 'STYLESHEET',
+    SVG = 'SVG',
+    TAR = 'TAR',
+    TIFFIMAGE = 'TIFFIMAGE',
+    VISIO = 'VISIO',
+    WEBAPPPAGE = 'WEBAPPPAGE',
+    WEBAPPSCRIPT = 'WEBAPPSCRIPT',
+    WORD = 'WORD',
+    XMLDOC = 'XMLDOC',
+    XSD = 'XSD',
+    ZIP = 'ZIP'
 }

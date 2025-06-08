@@ -1,7 +1,7 @@
 /**
  * @file src/parseCsvToRequestBody.ts
  */
-import { RecordTypeEnum } from "./utils/NS";
+import { RecordTypeEnum } from "./utils/ns";
 import { 
     mainLogger as mlog, 
     parseLogger as log, 

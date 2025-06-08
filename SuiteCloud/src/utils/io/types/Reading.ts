@@ -1,11 +1,11 @@
 /**
- * @file Reading.ts
+ * @file src/utils/io/Reading.ts
  */
 import { stripCharFromString, toTitleCase } from "../regex"
 import { parseExcelForOneToMany } from "../reading"
 /**
  * 
- * @typedefn {Object} `FileExtensionResult`
+ * @typedefn **`FileExtensionResult`**
  * @property {boolean} isValid - `true` if the `filePath` has the expected extension, `false` otherwise
  * @property {string} validatedFilePath - the `filePath` with the expected extension if it was missing, otherwise the original `filePath`
  */
@@ -15,7 +15,7 @@ export type FileExtensionResult = {
 }
 
 /**
- * @typedefn `ParseOneToManyOptions`
+ * @typedefn **`ParseOneToManyOptions`**
  * @property {StringStripOptions} [keyStripOptions] - options for stripping characters from the key
  * @property {StringStripOptions} [valueStripOptions] - options for stripping characters from the value
  * @property {StringCaseOptions} [keyCaseOptions] - options for changing the case of the key
@@ -38,7 +38,7 @@ export type ParseOneToManyOptions = {
 }
 
 /**
- * @typedefn `StringCaseOptions`
+ * @typedefn **`StringCaseOptions`**
  * @property {boolean} [toUpper] - `true` if the string should be converted to upper case
  * @property {boolean} [toLower] - `true` if the string should be converted to lower case
  * @property {boolean} [toTitle] - `true` if the string should be converted to title case, see {@link toTitleCase}
@@ -50,7 +50,7 @@ export type StringCaseOptions = {
 }
 
 /**
- * @typedefn `StringPadOptions`
+ * @typedefn **`StringPadOptions`**
  * @property {number} padLength - the length of the string after padding
  * @property {string} [padChar] - the character to use for padding, defaults to ' '
  * @property {boolean} [padLeft] - `true` if the padding should be added to the left side of the string
@@ -64,7 +64,7 @@ export type StringPadOptions = {
 }
 
 /**
- * @typedefn `StringStripOptions`
+ * @typedefn **`StringStripOptions`**
  * @property {string} char - the character to strip from the string with {@link stripCharFromString}
  * @property {boolean} [escape] - `true` if the character should be escaped
  * @property {function} [stripLeftCondition] - a function that takes a string and returns `true` if the character should be stripped from the left side of the string
@@ -82,3 +82,19 @@ export type StringStripOptions = {
     stripRightCondition?: (s: string, ...args: any[]) => boolean,
     rightArgs?: any[],
 }
+
+/**
+ * @typedefn **`StringReplaceOptions`**
+ * @property {StringReplaceParams[]} replacements - an array of objects containing `searchValue` and `replaceValue` properties
+ */
+export type StringReplaceOptions = StringReplaceParams[];
+
+/**
+ * @typedefn **`StringReplaceParams`**
+ * @property {string | RegExp} searchValue - the string or regular expression to search for in the string
+ * @property {string} replaceValue - the string to replace the `searchValue` with
+ */
+export type StringReplaceParams = {
+    searchValue: string | RegExp,
+    replaceValue: string,
+};

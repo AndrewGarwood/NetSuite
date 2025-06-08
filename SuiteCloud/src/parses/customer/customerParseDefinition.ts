@@ -32,19 +32,19 @@ import * as contactEval from "../contact/contactParseEvaluatorFunctions";
 /** use to set the field `"isinactive"` to false */
 const NOT_INACTIVE = false;
 export const BILLING_PHONE_COLUMNS = [
-    'Bill to 4', 'Bill to 5', C.PHONE, C.WORK_PHONE, C.MOBILE_PHONE, 
+    C.BILL_TO_FOUR, C.BILL_TO_FIVE, C.PHONE, C.WORK_PHONE, C.MOBILE_PHONE, 
     C.ALT_PHONE, C.ALT_MOBILE, C.HOME_PHONE,
 ];
 export const SHIPPING_PHONE_COLUMNS = [
-    'Ship to 4', 'Ship to 5', C.PHONE, C.WORK_PHONE, C.MOBILE_PHONE, 
+    C.SHIP_TO_FOUR, C.SHIP_TO_FIVE, C.PHONE, C.WORK_PHONE, C.MOBILE_PHONE, 
     C.ALT_PHONE, C.ALT_MOBILE, C.HOME_PHONE,
 ];
 /**if `'First Name'` and `Columns.LAST_NAME` not filled, 
  * then look for name to extract from these columns */
 export const NAME_COLUMNS = [
     C.PRIMARY_CONTACT, C.SECONDARY_CONTACT, C.ENTITY_ID, 
-    'Street1', 'Street2', 'Ship To Street1', 'Ship To Street2', 
-    'Bill to 1', 'Ship to 1', 'Bill to 2', 'Ship to 2',
+    C.STREET_ONE, C.STREET_TWO, C.SHIP_TO_STREET_ONE, C.SHIP_TO_STREET_TWO,
+    C.BILL_TO_ONE, C.SHIP_TO_ONE, C.BILL_TO_TWO,  C.SHIP_TO_TWO,
 ]
 
 export const BILLING_NAME_COLUMNS = [
@@ -61,20 +61,18 @@ export const SHIPPING_NAME_COLUMNS = [
 
 /** 
  * args for the evaluatorFunction {@link evaluate.attention}: 
- * - `streetLineOneColumn`, `entityIdColumn`, `salutationColumn`, `...nameColumns` 
+ * - `entityIdColumn`, `salutationColumn`, `...nameColumns` 
  * */
 const BILLING_ATTENTION_ARGS = [
-    C.STREET_ONE, C.ENTITY_ID, C.SALUTATION,
-    ...BILLING_NAME_COLUMNS
+    C.ENTITY_ID, C.SALUTATION, ...BILLING_NAME_COLUMNS
 ];
 
 /** 
  * args for the evaluatorFunction {@link evaluate.attention}: 
- * - `streetLineOneColumn`, `entityIdColumn`, `salutationColumn`, `...nameColumns` 
+ * - `entityIdColumn`, `salutationColumn`, `...nameColumns` 
  * */
 const SHIPPING_ATTENTION_ARGS = [
-    C.SHIP_TO_STREET_ONE, C.ENTITY_ID, C.SALUTATION,
-    ...SHIPPING_NAME_COLUMNS
+    C.ENTITY_ID, C.SALUTATION, ...SHIPPING_NAME_COLUMNS
 ];
 
 /** 
@@ -206,8 +204,8 @@ export const PARSE_CUSTOMER_FROM_CUSTOMER_CSV_OPTIONS: ParseOptions = {
             { fieldId: 'isperson', evaluator: customerEval.customerIsPerson, args: [C.ENTITY_ID] },
             ...CONTACT_CUSTOMER_SHARED_FIELDS,
             { fieldId: 'externalid', evaluator: evaluate.externalId, args: [RecordTypeEnum.CUSTOMER, C.ENTITY_ID] },
-            { fieldId: 'altphone', evaluator: 
-                evaluate.phone, 
+            { fieldId: 'altphone', 
+                evaluator: evaluate.phone, 
                 args: [{colName: C.PHONE, minIndex: 1}, C.ALT_PHONE, C.WORK_PHONE] as Array<string | ColumnSliceOptions> 
             },
             { fieldId: 'entitystatus', evaluator: customerEval.customerStatus, args: [C.CATEGORY] },

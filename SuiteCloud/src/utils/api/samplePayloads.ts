@@ -9,8 +9,8 @@ import {
     SetFieldValueOptions
 } from "src/utils/api/types"
 import { RADIO_FIELD_FALSE } from "../typeValidation";
-import { NetSuiteCountryEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES } from "src/utils/NS"
-import { RecordTypeEnum } from "src/utils/NS/Record/Record"
+import { NetSuiteCountryEnum, CountryAbbreviationEnum as COUNTRIES, StateAbbreviationEnum as STATES } from "src/utils/ns"
+import { RecordTypeEnum } from "src/utils/ns/record/Record"
 
 const NOT_INACTIVE = false;
 const NOT_DYNAMIC = false;
