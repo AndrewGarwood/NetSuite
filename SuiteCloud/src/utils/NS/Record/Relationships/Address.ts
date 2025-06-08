@@ -1,16 +1,16 @@
 /**
  * @file Address.ts
  * @description TypeScript definition for the Address record and related objects in NetSuite.
- * @module Address
  * @reference {@link https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html}
-
  */
 
-import { NetSuiteCountryEnum, CountryAbbreviationEnum, StateAbbreviationEnum } from "../../Enums";
+import { CountryAbbreviationEnum, NetSuiteCountryEnum, StateAbbreviationEnum } from "../../Enums";
+
+
 
 
 /**
- * @interface Address
+ * @interface **`Address`**
  * @description TypeScript definition for the Address record in NetSuite.
  * @reference {@link https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html}
  * 
@@ -22,11 +22,11 @@ import { NetSuiteCountryEnum, CountryAbbreviationEnum, StateAbbreviationEnum } f
  * @property {string} [addrphone] - Phone - Enter the phone number.
  * @property {string} [attention] - Attention - Enter the name of the person to whom a shipment is addressed, as it should appear on shipping labels. This field is required for UPS Integration.
  * @property {string} [city] - City - Enter the city the way it should appear on all forms except checks.
- * @property {CountryAbbreviationEnum | NetSuiteCountryEnum} [country] - Country {@link CountryAbbreviationEnum} | {@link NetSuiteCountryEnum} - the country to be used for the address.
- * @property {string} [externalid] - ExternalId
+ * @property {CountryAbbreviationEnum | NetSuiteCountryEnum} [country] - Country {@link CountryAbbreviationEnum} | {@link NetSuiteCountryEnum} - the country or ISO country code to be used for the address.
+ * @property {string} [externalid] - External ID
  * @property {string} [internalid] - Internal ID
  * @property {boolean} [override] - Override - Check this box to disable the free-form address text field. When this field is disabled, text entered in the other address fields does not display in the Address text field. Clear this box to allow text entered in the address component fields to appear in the free-form address text field.
- * @property {StateAbbreviationEnum} [state] - State -Enter your company's state or province the way it should appear on all forms except checks.
+ * @property {StateAbbreviationEnum} [state] - State {@link StateAbbreviationEnum}- Enter your company's state or province the way it should appear on all forms except checks.
  * @property {string} [zip] - Zip - Enter the postal code the way it should appear on all forms except checks.
  * @notimplemented {string} [customform] - Custom Form - (custom fields) Not implemented in this definition.
  * @notimplemented {string} [addrtext] - Address - The values entered in the other address fields are displayed here. I assume this field will be automatically populated once the record is made.
@@ -49,12 +49,12 @@ export interface Address {
 }
 
 /**
- * @typedefn AddressBook
+ * @typedefn **`AddressBook`**
  * @description TypeScript definition for the Address Book record in NetSuite.
  * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/vendor.html#:~:text=addressbook%20%2D%20Address%20Book
  * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/other/vendoraddressbook.html?mode=package
  * 
- * @property {Address} [addressbookaddress] - Address Book Address - The address book address.
+ * @property {Address} [addressbookaddress] - {@link Address}.
  * @property {string} [addressid] - Address ID - The address ID.
  * @property {boolean} [defaultbilling] - Default Billing - Check this box to make this address the default billing address.
  * @property {boolean} [defaultshipping] - Default Shipping - Check this box to make this address the default shipping address.
@@ -72,8 +72,3 @@ export interface AddressBookEntry {
 }
 
 export type AddressBook = AddressBookEntry[];
-
-/*
-@reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html
-
-*/

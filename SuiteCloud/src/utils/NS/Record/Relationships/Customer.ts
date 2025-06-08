@@ -1,7 +1,8 @@
 /**
- * @file src/utils/api/types/NS/Record/Relationships/Customer.ts
+ * @file src/utils/ns/Record/Relationships/Customer.ts
  */
-import { RadioFieldBoolean } from "src/utils/typeValidation";
+
+import { RadioFieldBoolean } from "../../../typeValidation";
 import { AddressBook } from "./Address";
 
 /**
@@ -55,7 +56,16 @@ export interface CustomerSublists {
 
 /**
  * @enum {number} **`CustomerCategoryEnum`** 
- * @property {number} CATEGORY_A - `1`
+ * @property {number} EXOSOME - `1`
+ * @property {number} SYLFIRM - `2`
+ * @property {number} MIRACU - `3`
+ * @property {number} BENEV - `4`
+ * @property {number} VIVISCAL - `5`
+ * @property {number} BENEV_BIO - `6`
+ * @property {number} ACARA - `7`
+ * @property {number} INFUSION_SOLUTIONS - `8`
+ * @property {number} PPE - `9`
+ * @property {number} SELLAS - `10`
  */
 export enum CustomerCategoryEnum {
     CATEGORY_A = 1,
@@ -92,9 +102,9 @@ export enum CustomerStatusEnum {
 /**
  * @enum {number} **`CustomerTaxItemEnum`**
  * @property {number} NOT_TAXABLE - `-7`
- * @property {number} YOUR_TAX_ITEM - `100`
+ * @property {number} YOUR_TAX_ITEM - `1`
  */
 export enum CustomerTaxItemEnum {
     NOT_TAXABLE = -7,
-    YOUR_TAX_ITEM = 100,
+    YOUR_TAX_ITEM = 1,
 }

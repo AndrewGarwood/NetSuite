@@ -17,7 +17,7 @@ import {
 } from "../../utils/api/types";
 import { printConsoleGroup as print } from "../../utils/io";
 import { READLINE as rl } from "src/config/env";
-import { ContactRoleEnum, RecordTypeEnum } from "../../utils/NS";
+import { ContactRoleEnum, RecordTypeEnum } from "../../utils/ns";
 import { SB_TERM_DICTIONARY } from "../../utils/io/mappings";
 import { 
     evaluatePhone, evaluateEntityId, evaluateEmail, evaluateVendorCategory,

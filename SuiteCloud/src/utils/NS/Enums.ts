@@ -1,20 +1,22 @@
 /**
- * @file Enums.ts
- * @description TypeScript definitions for various enums used in NetSuite.
- * @module Enums
+ * @file src/utils/ns/Enums.ts
  */
-
-
-export { VendorCategoryEnum } from './Record/Relationships/Vendor'
-export { ContactRoleEnum } from './Record/Relationships/Contact'
-export { CustomerStatusEnum, CustomerTaxItemEnum, CustomerCategoryEnum } from './Record/Relationships/Customer'
 export { 
-    SearchOperatorEnum, FilterOperatorEnum, ColumnSummaryEnum, SearchSortEnum, 
-    MultiSelectOperatorEnum, DateOperatorEnum, NumericOperatorEnum, TextOperatorEnum, 
-    RecordOperatorEnum 
-} from './Search/Search'
+    CustomerCategoryEnum, VendorCategoryEnum, CustomerStatusEnum, 
+    CustomerTaxItemEnum, ContactRoleEnum, 
+    EntityRecordTypeEnum, NetSuiteRecordTypeEnum, RecordTypeEnum 
+} from './record';
+export { 
+    FilterOperatorEnum, SearchSortEnum, DateOperatorEnum, TextOperatorEnum, 
+    ColumnSummaryEnum, RecordOperatorEnum, SearchOperatorEnum, NumericOperatorEnum, 
+    MultiSelectOperatorEnum
+} from './search'
+export { AccountEnvironmentEnum, ScriptTypeEnum } from './SuiteScriptEnvironment';
+export { NetSuiteFileTypeEnum, NetSuiteFileEncodingEnum } from './File';
+
+
 /**
- * @enum {string} `UnitsTypeEnum`
+ * @enum {string} **`UnitsTypeEnum`**
  * @description Enum for unit types in NetSuite. (defined by account user)
  * @property {string} QUANTITY - Quantity unit type.
  * @property {string} WEIGHT - Weight unit type.
@@ -31,8 +33,7 @@ export enum UnitsTypeEnum {
 }
 
 /**
- * @TODO make enums for each of the unit types in {@link UnitsTypeEnum}
- * @enum {string} `UnitsEnum`
+ * @enum {string} **`UnitsEnum`**
  * @description Enum for unit types in NetSuite. (defined by account user)
  * @property {string} EACH - Each unit.
  * @property {string} DOZEN - Dozen unit.
@@ -63,7 +64,7 @@ export enum UnitsEnum {
 }
 
 /**
- * @enum {string} EmailPreferenceEnum
+ * @enum {string} **`EmailPreferenceEnum`**
  * @description Enum for email file attachment preferences in NetSuite.
  * @property {string} HTML - HTML format.
  * @property {string} PDF - PDF format.
@@ -72,9 +73,8 @@ export enum EmailPreferenceEnum {
     HTML = "_HTML",
     PDF = "_PDF",
 }
-
 /**
- * @enum {string} GlobalSubscriptionStatusEnum
+ * @enum {string} **`GlobalSubscriptionStatusEnum`**
  * @description Enum for global subscription status in NetSuite.
  * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/enum/globalsubscriptionstatus.html?mode=package
  * @property {string} CONFIRMED_OPT_IN - Confirmed Opt In
@@ -93,7 +93,7 @@ export enum GlobalSubscriptionStatusEnum {
 /**
  * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/enum/itemsource.html?mode=package
  * - Namespace: urn:types.common.platform.webservices.netsuite.com
- * @enum {string} ItemSourceEnum
+ * @enum {string} **`ItemSourceEnum`**
  * @description Enum for item source types in NetSuite.
  * @property {string} STOCK - Represents stock items.
  * @property {string} PHANTOM - Represents phantom items.
@@ -112,7 +112,7 @@ export enum ItemSourceEnum {
 /**
  * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/enum/country.html?mode=package
  * - Namespace: urn:types.common.platform.webservices.netsuite.com
- * @enum {string} NetSuiteCountryEnum
+ * @enum {string} **`NetSuiteCountryEnum`**
  * @description Enum for country field in NetSuite records.
  * @property {string} AFGHANISTAN - Afghanistan
  * @property {string} UNITED_STATES - United States
@@ -379,9 +379,8 @@ export enum NetSuiteCountryEnum {
     ZIMBABWE = "_zimbabwe"
 }
 
-
 /**
- * @enum {string} CountryAbbreviationEnum
+ * @enum {string} **`CountryAbbreviationEnum`**
  * @description Enum for country two letter abbreviation codes (ISO 3166-1 alpha-2)
  * @reference 
  * - {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4267255811.html#bridgehead_4447485621\}
@@ -652,8 +651,10 @@ export enum CountryAbbreviationEnum {
 
 
 /**
- * @enum {string} StateAbbreviationEnum
+ * @enum {string} **`StateAbbreviationEnum`**
  * @description Enum for US states and territories two letter abbreviations
+ * @property {string} CALIFORNIA - CA
+ * @more ...
  */
 export enum StateAbbreviationEnum {
     ALABAMA = "AL",

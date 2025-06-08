@@ -1,15 +1,8 @@
 /**
- * @file src/utils/api/types/NS/Search/Search.ts
+ * @file src/utils/ns/search/Search.ts
  * @reference ~\node_modules\@hitc\netsuite-types\N\search.d.ts
  * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4345764122.html#subsect_87180423808}
  */
-
-
-
-
-/*
-
-*/
 
 /**
  * @enum {string} **`FilterOperatorEnum`**

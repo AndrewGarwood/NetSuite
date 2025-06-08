@@ -2,36 +2,45 @@
  * @file src/utils/io/regex.ts
  */
 import { parseLogger as log, mainLogger as mlog, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
-import { StateAbbreviationEnum } from '../NS';
-import { StringCaseOptions, StringPadOptions, StringStripOptions } from "./types/Reading";
+import { StringCaseOptions, StringPadOptions, StringStripOptions, StringReplaceParams, StringReplaceOptions } from "./types/Reading";
+import { isNonEmptyArray } from '../typeValidation';
 
 
 /**
- * @TODO implement a StringReplaceOptions
  * @description 
+ * - applies options in this order: StringReplaceOptions, StringStripOptions, StringCaseOptions, StringPadOptions
  * - Removes leading+trailing spaces, extra spaces, commas, and dots from a string (e.g. `'..'` becomes `'.'`)
  * - optionally applies 3 option params with: {@link stripCharFromString}, {@link handleCaseOptions}, and {@link handlePadOptions}.
  * @param s - the `string` to clean
  * @param stripOptions — {@link StringStripOptions}
  * - `optional` strip options to apply to the string
- * = `{ char: string, escape?: boolean, stripLeftCondition?: (s: string, ...args: any[]) => boolean, leftArgs?: any[], stripRightCondition?: (s: string, ...args: any[]) => boolean, rightArgs?: any[] }`
+ * - = `{ char: string, escape?: boolean, stripLeftCondition?: (s: string, ...args: any[]) => boolean, leftArgs?: any[], stripRightCondition?: (s: string, ...args: any[]) => boolean, rightArgs?: any[] }`
  * @param caseOptions — {@link StringCaseOptions} 
  * - `optional` case options to apply to the string
- * = `{ toUpper: boolean, toLower: boolean, toTitle: boolean }`
+ * - = `{ toUpper: boolean, toLower: boolean, toTitle: boolean }`
  * @param padOptions — {@link StringPadOptions} 
  * - `optional` padding options to apply to the string
- * = `{ padLength: number, padChar: string, padLeft: boolean, padRight: boolean }`
+ * - = `{ padLength: number, padChar: string, padLeft: boolean, padRight: boolean }`
+ * @param replaceOptions — {@link StringReplaceOptions}
+ * - `optional` replace options to apply to the string
+ * - = `Array<`{@link StringReplaceParams}`>` = `{ searchValue: string | RegExp, replaceValue: string }[]`
  * @returns **`s`** - the cleaned `string`
  */
 export function cleanString(
     s: string,
     stripOptions?: StringStripOptions, 
     caseOptions?: StringCaseOptions,
-    padOptions?: StringPadOptions
+    padOptions?: StringPadOptions,
+    replaceOptions?: StringReplaceOptions
 ): string {
     if (!s) return '';
     s = String(s).trim();
     s = s.replace(/\s+/g, ' ').replace(/\.{2,}/g, '.');
+    if (replaceOptions && isNonEmptyArray(replaceOptions)) {
+        for (const params of replaceOptions) {
+            s = s.replace(params.searchValue, params.replaceValue)
+        }
+    }
     if (stripOptions) {
         s = stripCharFromString(s, stripOptions);
     }
@@ -191,12 +200,14 @@ export const COMPANY_ABBREVIATION_PATTERN: RegExp =
 export function doesNotEndWithKnownAbbreviation(s: string): boolean {
     if (!s) return false;
     s = s.trim();
-    const singleInitialPattern = /\b[A-Z]\.?\b/;
-    return !s.endsWith('Ph.D.') 
+    /** matches 1 to 2 occurences of a single letter followed by an optional period */
+    const initialsPattern = /\b([A-Z]\.?){1}([A-Z]\.?)?\b/;
+    return (!s.endsWith('Ph.D.') 
         && !stringEndsWithAnyOf(s, /\b[A-Z]{2}\.?\b/) 
         && !stringEndsWithAnyOf(s, JOB_TITLE_SUFFIX_PATTERN, RegExpFlagsEnum.IGNORE_CASE) 
         && !stringEndsWithAnyOf(s, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE) 
-        && !stringEndsWithAnyOf(s, singleInitialPattern, RegExpFlagsEnum.IGNORE_CASE);
+        && !stringEndsWithAnyOf(s, initialsPattern, RegExpFlagsEnum.IGNORE_CASE)
+    );
 }
 
 /** strip leading `.` and trailing `.` if satisfy stripRightCondition: {@link doesNotEndWithKnownAbbreviation} */
@@ -227,10 +238,15 @@ export const EMAIL_REGEX = new RegExp(
     RegExpFlagsEnum.GLOBAL
 );
 
+/**return true if matches {@link EMAIL_REGEX} and does not include substring '@benev'  */
 export function isValidEmail(email: string): boolean {
     if (!email) return false;
     email = email.trim();
-    return EMAIL_REGEX.test(email);
+    return EMAIL_REGEX.test(email) 
+        && !stringContainsAnyOf(
+            email, /@benev/, 
+            RegExpFlagsEnum.IGNORE_CASE, RegExpFlagsEnum.GLOBAL
+        );
 }
 
 /** @returns `email`: `string` - the first email that matches {@link EMAIL_REGEX} or an empty string `''`*/
@@ -252,6 +268,8 @@ export function extractEmail(email: string): RegExpMatchArray | null {
     log.debug(...debugLogs);
     return null;
 }
+
+
 /** `re` = /`^(a(t{1,2})n:)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*`/i */
 export const ATTN_SALUTATION_PREFIX_PATTERN = new RegExp(
     /^((attention|attn|atn):)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*/, 
@@ -267,31 +285,47 @@ export const MIDDLE_INITIAL_REGEX = new RegExp(
     /^[A-Z]{1}\.?$/, 
     RegExpFlagsEnum.IGNORE_CASE
 );
-/** `re` = `/\b(,? ?(MSPA|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|PA-C|MSN-RN|RN|NP|CRNA|FAAD|FNP|PA|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS|FACS|FAC)\.?,?)*\b/g`  */
+/** 
+ * `re` = `/\b(,? ?(MSPA|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|PA-C|MSN-RN|RN|NP|CRNA|FAAD|FNP|PA|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS|FACS|FAC)\.?,?)*\b/g`  
+ * - could also do something like `[A-Z]{1,4}\.?\,?\s*`
+ * */
 export const JOB_TITLE_SUFFIX_PATTERN = new RegExp(
-    /\b(,? ?(MSPA|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|PA-C|MSN-RN|RN|NP|CRNA|FAAD|FNP|PA|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS|FACS|FAC)\.?,?)*\b/, 
+    /(,? ?(MSPA|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|MSN-RN|RN|NP|CRNA|FAAD|FNP|PAC|PA-C|PA|DMD|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS|FACS|FAC)\.?,?)*/, 
     RegExpFlagsEnum.GLOBAL
 ); 
+
 /**
- * **if** `name` starts with a number or contains any of {@link COMPANY_KEYWORDS_PATTERN}, do not attempt to extract name and return empty strings
+ * `re` = `/^\s*([A-Za-z'-]{2,})\s*,\s*(?:(?:[A-Z]{1,4}\.?\,?\s*)+)?([A-Za-z'-]+(?:\s+[A-Za-z.'-]+)*)\s*$/`
+ */
+export const LAST_NAME_COMMA_FIRST_NAME_PATTERN = new RegExp(
+    /^\s*([A-Za-z'-]{2,})\s*,\s*(?:(?:[A-Z]{1,4}\.?\,?\s*)+)?([A-Za-z'-]+(?:\s+[A-Za-z.'-]+)*)\s*$/,
+    RegExpFlagsEnum.IGNORE_CASE
+);
+
+
+/**
+ * **if** `name` contains a digit or contains any of {@link COMPANY_KEYWORDS_PATTERN}, do not attempt to extract name and return empty strings
  * @param name `string` - the full name from which to extract 3 parts: the first, middle, and last names
  * @returns `{first: string, middle?: string, last?: string}` - the first, middle, and last names
  * @example
  * let name = 'John Doe';
  * console.log(extractName(name)); // { first: 'John', middle: '', last: 'Doe' }
- * let name = 'John A. Doe';
+ * name = 'John A. Doe';
  * console.log(extractName(name)); // { first: 'John', middle: 'A.', last: 'Doe' }
  */
-export function extractName(name: string): {
+export function extractName(
+    name: string
+): {
     first: string, 
     middle?: string, 
     last?: string
 } {
     if (!name || typeof name !== 'string') return { first: '', middle: '', last: '' };
+    const originalName = name;
     name = name
-        .replace(/\s+/g, ' ')
         .replace(ATTN_SALUTATION_PREFIX_PATTERN,'')
         .replace(JOB_TITLE_SUFFIX_PATTERN,'')
+        .replace(/\s+/g, ' ')
         .trim();
     const debugLogs: any[] = [];
     if ( // invalid name
@@ -304,18 +338,36 @@ export function extractName(name: string): {
         );
         return { first: '', middle: '', last: '' };
     }
-    const nameSplit = name.split(/\s+/);
+    let nameSplit = name.split(/\s+/);
+    if (nameSplit.length === 0) {
+        return { first: '', middle: '', last: '' };
+    }
+    if (LAST_NAME_COMMA_FIRST_NAME_PATTERN.test(originalName)) {
+        // move last name to the end
+        nameSplit.push(nameSplit.shift() || ''); 
+    }
     nameSplit.map((namePart) => cleanString(
         namePart, 
         STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION
     ).replace(/(^[-+])*/g, ''));
     debugLogs.push(`nameSplit.length == ${nameSplit.length}, nameSplit: [${nameSplit}]`);
     if (nameSplit.length == 1) {
-        return { first: nameSplit[0].replace(/,$/g, ''), middle: '', last: '' };
+        return { 
+            first: nameSplit[0].replace(/(,|\.)$/g, ''), 
+            middle: '', 
+            last: '' 
+        };
     } else if (nameSplit.length == 2) {
-        return { first: nameSplit[0].replace(/,$/g, ''), middle: '', last: nameSplit[1].replace(/,$/g, '') };
+        return { 
+            first: nameSplit[0].replace(/(,|\.)$/g, ''), 
+            middle: '', 
+            last: nameSplit[1].replace(/,$/g, '') 
+        };
     } else if (nameSplit.length > 2) {
-        return { first: nameSplit[0].replace(/,$/g, ''), middle: nameSplit[1].replace(/,$/g, ''), last: nameSplit.slice(2).join(' ').replace(/,$/g, '') };
+        return { 
+            first: nameSplit[0].replace(/(,|\.)$/g, ''), 
+            middle: nameSplit[1].replace(/,$/g, ''), 
+            last: nameSplit.slice(2).join(' ').replace(/(,|\.)$/g, '') };
     }
     debugLogs.push(`extractName() - no valid name parts found, returning empty strings`);
     log.debug(...debugLogs);
@@ -394,7 +446,7 @@ export const KOREA_PHONE_REGEX = new RegExp(
     RegExpFlagsEnum.GLOBAL
 );
 
-const phoneRegexList: {re: RegExp, groupFormat: string}[] = [
+const PHONE_REGEX_LIST: {re: RegExp, groupFormat: string}[] = [
     { re: CHINA_PHONE_REGEX, groupFormat: '$1-$2-$3-$4' },
     { re: HONG_KONG_PHONE_REGEX, groupFormat: '$1-$2-$3' },
     { re: KOREA_PHONE_REGEX, groupFormat: '$1-$2-$3-$4' },
@@ -403,8 +455,8 @@ const phoneRegexList: {re: RegExp, groupFormat: string}[] = [
 ]
 
 /**
- * @param {string} phone - `string` - phone number to test
- * @returns {string} `phone` - formatted phone number or empty string if unable to format it
+ * @param phone - `string` - phone number to test
+ * @returns **`phone`** - formatted phone number or empty string if unable to format it
  * @description test phone on regex in this order:
  * 1. {@link KOREA_PHONE_REGEX} = `/(?:^|\D)(82)[-).\s]?(\d{1,2})?[-.\s]?(\d{3,4})[-.\s]?(\d{4})(?:\D|$)/`
  * 2. {@link HONG_KONG_PHONE_REGEX} = `/(?:^|\D)(852)[-.\s]?(\d{4})[-.\s]?(\d{4})(?:\D|$)/`
@@ -419,7 +471,10 @@ const phoneRegexList: {re: RegExp, groupFormat: string}[] = [
  * 4. `1(999) 999-9999`
  * 5. `999-999-9999 ext 9999`
  */
-export function extractPhone(phone: string): string[] | RegExpMatchArray | null {
+export function extractPhone(
+    phone: string, 
+    phoneRegexList: {re: RegExp, groupFormat: string}[]=PHONE_REGEX_LIST
+): string[] | RegExpMatchArray | null {
     if (!phone) {
         return null;
     }
@@ -454,7 +509,7 @@ export function extractPhone(phone: string): string[] | RegExpMatchArray | null 
  * @param re {@link RegExp} - the regex to use to extract the phone number
  * @param groupFormat `string` - use to format the phone number
  * - `optional` - if not provided, the phone number is returned as is 
- * @returns `phone`: `string` - the formatted phone number
+ * @returns **`phone`** = `string` - the formatted phone number
  */
 export function formatPhone(
     phone: string, 
@@ -480,7 +535,7 @@ export function formatPhone(
  * @param s The `string` to check.
  * @param suffixes An array of possible ending strings.
  * @param flags `Optional` regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}
- * @returns `true` if the string ends with any of the suffixes, `false` otherwise.
+ * @returns **`true`** if the string ends with any of the suffixes, **`false`** otherwise.
  * @example
  * const myString = "hello world";
  * const possibleEndings = ["world", "universe", "planet"];
@@ -530,7 +585,7 @@ export function stringEndsWithAnyOf(
  * @param str The `string` to check.
  * @param prefixes possible starting string(s).
  * @param flags `Optional` regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}
- * @returns 
+ * @returns **`true`** if the string starts with any of the prefixes, **`false`** otherwise.
  */
 export function stringStartsWithAnyOf(
     str: string, 
@@ -568,10 +623,11 @@ export function stringStartsWithAnyOf(
 }
 
 /**
+ * 
  * @param str The `string` to check.
  * @param substrings possible substring(s).
  * @param flags `Optional` regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}
- * @returns 
+ * @returns **`true`** if the string contains any of the substrings, **`false`** otherwise.
  */
 export function stringContainsAnyOf(str: string, substrings: string | string[] | RegExp, ...flags: RegExpFlagsEnum[]): boolean {
     if (!str || !substrings) {

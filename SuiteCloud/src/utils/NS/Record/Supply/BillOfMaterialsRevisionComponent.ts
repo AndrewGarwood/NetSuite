@@ -1,13 +1,11 @@
 /**
  * @file BillOfMaterialsRevisionComponent.ts
- * @description TypeScript definition for the Bill of Materials Revision Component record in NetSuite.
- * @module BillOfMaterialsRevisionComponent
  */
-import { RecordRef } from './Record';
-import { ItemSourceEnum, UnitsEnum } from './Enums';
+
+import { ItemSourceEnum, UnitsEnum } from "../../Enums";
+import { RecordRef } from "../Record";
 
 /**
- * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/bomrevision.html
  * @description Revision Components  belong to one Bill of Materials (BOM) Revision. A BOM Revision Component cannot exist without a BOM Revision. In NetSuite UI it’s represented as a Component sublist. The Advanced Bill of Materials feature must be enabled.
  * @interface BillOfMaterialsRevisionComponent
  * @property {RecordRef} item - ({@link RecordRef}) A reference to the component's associated Inventory Item record's internalId, externalId, or "Item Name/Number" field.
@@ -31,3 +29,26 @@ export interface BillOfMaterialsRevisionComponent  {
     description?: string;
     itemsource?: ItemSourceEnum;
 }
+
+
+
+
+/*
+@reference https://9866738-sb1.app.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/bomrevision.html
+bomrevisioncomponent - Components
+Internal ID	Type	Label	Required	Help
+bomquantity	posfloat	BOM Quantity	false	
+componentyield	percent	Component Yield	false	
+description	textarea	Description	false	
+internalid	integer	ID	false	
+item	select	Item	true	
+itemsource	select	Item Source	false	
+itemsourcelist	text	Item Source options list	false	
+linenumber	integer	Sequence	false	
+quantity	posfloat	Quantity	true	
+unit	select	Units	false	
+
+*/
+// @TODO: handle custom fields in the component
+// import { CustomFieldList, CustomField } from './CustomField';
+// customFieldList?: CustomFieldList;* @property {CustomFieldList} [customFieldList] - (optional) An Array<{@link CustomField}> associated with the component.

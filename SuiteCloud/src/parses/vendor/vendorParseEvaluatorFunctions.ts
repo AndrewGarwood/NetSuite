@@ -17,7 +17,7 @@ import { RecordTypeEnum,
     CountryAbbreviationEnum as COUNTRIES, 
     StateAbbreviationEnum as STATES, 
     TermBase as Term, VendorCategoryEnum 
-} from "../../utils/NS";
+} from "../../utils/ns";
 
 export const VENDOR_VALUE_OVERRIDES: ValueMapping = {
     'A Q Skin Solutions, Inc.': 'AQ Skin Solutions, Inc.' as FieldValue  

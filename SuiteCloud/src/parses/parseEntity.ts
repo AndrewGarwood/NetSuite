@@ -16,7 +16,7 @@ import {
     upsertRecordPayload, PostRecordResult, SetFieldValueOptions, SetSublistValueOptions, 
     SublistDictionary, SublistFieldDictionary 
 } from "src/utils/api";
-import { ContactRoleEnum, EntityRecordTypeEnum, RecordTypeEnum, SearchOperatorEnum } from "src/utils/NS";
+import { ContactRoleEnum, EntityRecordTypeEnum, RecordTypeEnum, SearchOperatorEnum } from "src/utils/ns";
 
 /** = `['entityid', 'companyname', 'isperson', 'email']` */
 export const ENTITY_RESPONSE_PROPS = ['entityid', 'isperson', 'companyname', 'email'];

@@ -14,8 +14,8 @@ import {
 import { 
     extractPhone, cleanString, extractEmail, extractName, stringEndsWithAnyOf, RegExpFlagsEnum,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, COMPANY_KEYWORDS_PATTERN, COMPANY_ABBREVIATION_PATTERN,
-    checkForOverride,
-    SALUTATION_REGEX,
+    checkForOverride, isValidEmail,
+    SALUTATION_REGEX, ATTN_SALUTATION_PREFIX_PATTERN,
     ValueMapping,
     ColumnSliceOptions, 
 } from "../utils/io";
@@ -34,7 +34,11 @@ export const entityId = (row: Record<string, any>, entityIdColumn: string): stri
 }
 
 
-export const externalId = (row: Record<string, any>, recordType: RecordTypeEnum, entityIdColumn: string): string => {
+export const externalId = (
+    row: Record<string, any>, 
+    recordType: RecordTypeEnum, 
+    entityIdColumn: string
+): string => {
     let entity = entityId(row, entityIdColumn);
     const externalId = `${entity}<${recordType}>`;
     return externalId;
@@ -89,7 +93,6 @@ export const isPerson = (
     return true;
 }
 
-
 /**
  * @param row - `Record<string, any>` the `row` of data
  * @param columnOptions `Array<string |` {@link ColumnSliceOptions}`>` the columns of the `row` to look for the fieldValue in
@@ -140,7 +143,8 @@ export const email = (
     row: Record<string, any>,
     ...emailColumnOptions: Array<string | ColumnSliceOptions>
 ): string => {
-    return field(row, extractEmail, ...emailColumnOptions);
+    let emailValue =  field(row, extractEmail, ...emailColumnOptions);
+    return isValidEmail(emailValue) ? emailValue : '';
 }
 
 export const salutation = (
@@ -154,7 +158,11 @@ export const salutation = (
         return '';
     } else { // salutation not found in salutationColumn, let's check nameColumns
         for (const col of nameColumns) {
-            let initialVal = cleanString(row[col], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
+            let initialVal = cleanString(
+                row[col], 
+                STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, undefined, undefined, 
+                [{searchValue: /^((attention|attn|atn):)?\s*/i, replaceValue: '' }]
+            )
             if (!initialVal) {
                 continue;
             } else if (SALUTATION_REGEX.test(initialVal)) {
@@ -166,9 +174,15 @@ export const salutation = (
     }
 }
 
+/**
+ * @param row `Record<string, any>` - the `row` of data to look for the attention person name in
+ * @param entityIdColumn `string`
+ * @param salutationColumn `string`
+ * @param nameColumns `string[]`
+ * @returns **`result`** `string` - the name of the person expected to receive the parcel from the `row` data.
+ */
 export const attention = (
     row: Record<string, any>,
-    streetLineOneColumn: string,
     entityIdColumn: string,
     salutationColumn: string,
     ...nameColumns: string[]
@@ -178,27 +192,27 @@ export const attention = (
     }
     let result = '';
     const entity = entityId(row, entityIdColumn);
-    // let { first, middle, last } = name(row, ...nameColumns);
     const first = firstName(row, CustomerColumns.FIRST_NAME, ...nameColumns);
     const middle = middleName(row, CustomerColumns.MIDDLE_NAME, ...nameColumns);
     const last = lastName(row, CustomerColumns.LAST_NAME, ...nameColumns);
-    // mlog.debug(`first="${first}", middle="${middle}", last="${last}"`);
-    const fullName = (
+    const fullName = ((
         salutation(row, salutationColumn, ...nameColumns)
         .replace(/\.\s*$/, '') 
         + `. ${first} ${middle} ${last}`
-        ).replace(/^\.\s(?=[A-Za-z])/, '').replace(/\s+/g, ' ').trim();
-    // mlog.debug(`fullName: "${fullName}"`);
-    result = fullName.includes(entity) 
-        || String(row[streetLineOneColumn]).includes(fullName) ? '' : fullName;
-    // mlog.debug(`attention(entityIdColumn="${entityIdColumn}", salutationColumn="${salutationColumn}", nameColumns=${nameColumns})`,
-    //     TAB + `    entity: "${entity}"`,
-    //     TAB + `salutation: "${salutation(row, salutationColumn, ...nameColumns)}"`,
-    //     TAB + `  fullName: "${fullName}"`,
-    //     TAB + `fullName.includes(entity): ${fullName.includes(entity)}`,
-    //     TAB + `String(row[firstAddressLineColumn]).includes(fullName): ${String(row[streetLineOneColumn]).includes(fullName)}`,
-    //     TAB + `-> return result: "${result}"`
-    // );
+        )
+        .replace(/^\.\s(?=[A-Za-z])/, '')
+        .replace(/\s+/g, ' ')
+        .replace(/^\s*\.\s*$/, '')
+        .trim()
+    );
+    result = (fullName.includes(entity)) ? '' : fullName;
+    log.debug(`attention(entityIdColumn="${entityIdColumn}", salutationColumn="${salutationColumn}", nameColumns=${nameColumns})`,
+        TAB + `    entity: "${entity}"`,
+        TAB + `salutation: "${salutation(row, salutationColumn, ...nameColumns)}"`,
+        TAB + `  fullName: "${fullName}"`,
+        TAB + `fullName.includes(entity): ${fullName.includes(entity)}`,
+        TAB + `-> return result: "${result}"`
+    );
     return result;
 }
 
@@ -227,17 +241,20 @@ export const street = (
     salutationColumn: string,
     ...nameColumns: string[]
 ): string => {
-    if (!row 
+    const invalidParams = Boolean(!row 
         || ![1, 2].includes(streetLineNumber) 
         || !streetLineOneColumn 
         || !streetLineTwoColumn 
         || !entityIdColumn 
         || !salutationColumn
-    ) {
+    );
+    if (invalidParams) {
         mlog.error(`street() called with invalid parameters.`);
         return '';
     }        
-    const attentionValue = attention(row, streetLineOneColumn, entityIdColumn, salutationColumn, ...nameColumns);
+    const attentionValue = attention(
+        row, streetLineOneColumn, entityIdColumn, salutationColumn, ...nameColumns
+    );
     const addresseeValue = customerCompany(row, entityIdColumn)
     const streetLineOneValue = cleanString(row[streetLineOneColumn]);
     const streetLineTwoValue = cleanString(row[streetLineTwoColumn]);
