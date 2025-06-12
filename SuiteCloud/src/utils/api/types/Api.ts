@@ -1,9 +1,7 @@
 /**
  * @file src/utils/api/types/Api.ts
- * @module Api
  */
 
-import { RecordTypeEnum } from '../../ns/record/Record';
 
 /**
  * @enum {string} **`idPropertyEnum`**
@@ -54,34 +52,19 @@ export type LogStatement = {
 };
 
 /**
- * Fields organized by the fields' value type
  * @typedefn **`FieldDictionary`**
- * @property {Array<SetFieldValueOptions>} [valueFields] 
- * - `Array<`{@link SetFieldValueOptions}`>`= `Array<{ fieldId`: string, `value`: {@link FieldValue}` }>`. 
- * - For record fields: `record.setValue(fieldId, value)`
- * @property {Array<SetSubrecordOptions>} [subrecordFields]
- * - `Array<`{@link SetSubrecordOptions}`>`= `Array<{ parentSublistId`?: string, `line`?: number, fieldId: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}` }>`.
- * - array of subrecord fields in the main record
  */
 export type FieldDictionary = {
-    valueFields?: SetFieldValueOptions[];
-    subrecordFields?: SetSubrecordOptions[];
+    [fieldId: string]: FieldValue | SubrecordValue
 };
 
 /**
- * Set a record's sublist's field values organized by field type
- * @typedefn **`SublistFieldDictionary`**
- * @property {Array<SetSublistValueOptions>} [valueFields]  
- * - `Array<`{@link SetSublistValueOptions}`>` = `Array<{ sublistId`: string, `fieldId`: string, `line`: number, `value`: {@link FieldValue}` }>`. 
- * - For record sublist fields: rec.setSublistValue(sublistId, fieldId, line, value)
- * @property {Array<SetSubrecordOptions>} [subrecordFields]
- * - `Array<`{@link SetSubrecordOptions}`>` = `Array<{ parentSublistId`?: string, `line`?: number, `fieldId`: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistFieldDict`: {@link SublistFieldDictionary}` }>`.
- * - array of subrecord fields in the main record's sublist
- */
-export type SublistFieldDictionary = {
-    valueFields?: SetSublistValueOptions[];
-    subrecordFields?: SetSubrecordOptions[];
-};
+ * either the subrecord itself or the options to set a subrecord
+ * @typedefn **`SubrecordValue`** 
+ * */
+export type SubrecordValue = {
+    [subrecordFieldId: string]: FieldValue; 
+} | SetFieldSubrecordOptions | SetSublistSubrecordOptions;
 
 
 /**
@@ -89,7 +72,68 @@ export type SublistFieldDictionary = {
  * - a key in `SublistDictionary` is a `sublistId {string}` (e.g. 'addressbook', 'item', etc.)
  * - values are {@link SublistFieldDictionary} = { `priorityFields`: `Array<`{@link SetFieldValueOptions}`>`, `textFields`: `Array<`{@link SetSublistTextOptions}`>`, `valueFields`: `Array<`{@link SetSublistValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`
  */
-export type SublistDictionary = Record<string, SublistFieldDictionary>;
+export type SublistDictionary = {
+    [sublistId: string]: Array<SublistLine | {[sublistFieldId: string]: FieldValue | SubrecordValue}>
+};
+
+/**
+ * @TODO confirm if `'id'` is a prop of record sublists or not
+ * @typedefn **`SublistLine`**
+ */
+export type SublistLine = {
+    [sublistFieldId: string]: FieldValue | SubrecordValue;
+} & {
+    line?: number;
+    id?: number;
+    internalid?: number;
+}
+
+/** Type: **`SubrecordDictionary`** {@link SubrecordDictionary} */
+/**
+ * - each key in SubrecordDictionary is the fieldId (`body` or `sublist`) of a field that holds a subrecord object
+ * - distinguish between body subrecords and sublist subrecords by checking if the mapped object has property `'sublistId'`
+ * - - i.e. `mappedObject = SubrecordDictionary[fieldId]; `
+ * - - `if 'sublistId' in mappedObject.keys()`, `then` it's a `sublist` subrecord and vice versa
+ * - {@link SetFieldSubrecordOptions} for body subrecords
+ * - {@link SetSublistSubrecordOptions} for sublist subrecords
+ * @typedefn **`SubrecordDictionary`**
+ */
+export type SubrecordDictionary = {
+    [fieldId: string]: SetFieldSubrecordOptions | SetSublistSubrecordOptions;
+};
+
+/**
+ * @typedefn **`SetFieldSubrecordOptions`**
+ * @property {string} fieldId The `'internalid'` of the main record field that is a subrecord.
+ * -  use `rec.getSubrecord({fieldId})` = `getSubrecord(options: GetFieldOptions): Omit<Record, 'save'>`;
+ * @property {FieldDictionary} [fields] {@link FieldDictionary}
+ * @property {SublistDictionary} [sublists] {@link SublistDictionary}
+ * @property {string} [subrecordType] - The record type of the subrecord.
+ */
+export type SetFieldSubrecordOptions = {
+    subrecordType?: string;
+    fieldId: string;
+    fields?: FieldDictionary;
+    sublists?: SublistDictionary;
+}
+
+/**
+ * @typedefn **`SetSublistSubrecordOptions`**
+ * @property {string} sublistId
+ * @property {string} fieldId (i.e. `sublistFieldId`) The `internalid` of a sublist's field that holds a subrecord
+ * - use `rec.getSublistSubrecord({sublistId, fieldId})`
+ * @property {FieldDictionary} [fields] {@link FieldDictionary}
+ * @property {SublistDictionary} [sublists] {@link SublistDictionary}
+ * @property {string} [subrecordType] - The record type of the subrecord.
+ */
+export type SetSublistSubrecordOptions = {
+    subrecordType?: string;
+    sublistId: string;
+    fieldId: string;
+    fields?: FieldDictionary;
+    sublists?: SublistDictionary;
+}
+
 
 /**
  * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html}
@@ -141,46 +185,7 @@ export interface SetSublistValueOptions {
     inputType?: FieldInputTypeEnum;
 }
 
-/**
- * @interface **`SetSubrecordOptions`**
- * @property {string} [parentSublistId] - (If setting subrecord of a sublist) The `'internalid'` of the parent record's sublist that contains a subrecord field. (e.g. 'addressbook')
- * @property {number} [line] - `The line number` for the field. (i.e. index of the sublist row) defaults to new line. (can use record.getLineCount(sublistId) to get the number of lines in the sublist)
- * @property {string} fieldId - The `'internalid'` of the field or sublistField that is a subrecord. (e.g. 'addressbookaddress'), 
- * - If the subrecord is on the main record, use getSubrecord({fieldId}) = getSubrecord(options: GetFieldOptions): Omit<Record, "save">;
- * - If the subrecord is in a sublist, use rec.getSublistSubrecord({sublistId, fieldId})
- * @property {string} subrecordType - The record type of the subrecord. (e.g. 'address', 'inventorydetail', etc.)
- * @property {FieldDictionary} [fieldDict] - {@link FieldDictionary} = { `valueFields`: `Array<`{@link SetFieldValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`
- * @property {SublistFieldDictionary} [sublistDict] - {@link SublistFieldDictionary} =  { `valueFields`: `Array<`{@link SetSublistValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`
- * - (if subrecord has own sublists) an object containing sublist IDs mapped to a dictionary of field IDs and values.
- * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4687606306.html}
- *  ~\node_modules\@hitc\netsuite-types\N\record.d.ts
- * @description (`Option A` and `Option B` are mutually exclusive)
- * - `Option A:` sublistId is not provided, assume that the subrecord corresponds to a body field of the main record, `rec`. 
- *   - `1.` (maybe optional) verify rec.getFields().includes(fieldId) is true
- *   - `2.` (maybe optional) rec.hasSubrecord(fieldId) is true -> there is an existing subrecord for the fieldId
- *   - `3.` let subrec = rec.getSubrecord({ fieldId }) to get the subrecord.
- *   - `4.` if {@link hasNonTrivialKeys}(`subrecordOptions.fieldDict`),   set `subrec` = {@link processFieldDictionary}(`subrec`, `subrecordOptions.subrecordType`, `subrecordOptions.fieldDict`, {@link FieldDictTypeEnum.FIELD_DICT}) to set the subrecord's field values.
- *   - `5.` if {@link hasNonTrivialKeys}(`subrecordOptions.sublistFieldDict`), 
- *   - `6.` return rec
- * - `Option B:` assume that the subrecord pertains to a sublistField in one of the main record's sublists.
- *   - `1.` verify rec.getSublists().includes(sublistId) is true
- *   - `2.` (maybe optional) verify rec.getSublistFields({ sublistId }).includes(fieldId) is true
- *   - `3.` (maybe optional) rec.hasSublistSubrecord({ fieldId }) is true -> there is an existing subrecord for the sublist fieldId
- *   - `4.` validate that line index is valid for the sublistId i.e. within ( 0 <= line < rec.getLineCount(sublistId) ). 
- *     - call rec.insertLine({ sublistId, line: getLineCount-1 }) if necessary (insert new line at end of sublist).
- *   - `5.` let subrec =  rec.getSublistSubrecord({ sublistId, fieldId, line }) to get the subrecord.
- *   - `6.` if {@link hasNonTrivialKeys}(`subrecordOptions.fieldDict`),   set `subrec` =  {@link processFieldDictionary}(`subrec`, `subrecordOptions.subrecordType`, `subrecordOptions.sublistFieldDict`, {@link FieldDictTypeEnum.FIELD_DICT}) to set the subrecord's sublist field values.
- *   - `7.` if {@link hasNonTrivialKeys}(`subrecordOptions.sublistFieldDict`), 
- *   - `8.` return rec
- */  
-export interface SetSubrecordOptions {
-    parentSublistId?: string;
-    line?: number;
-    fieldId: string;
-    subrecordType: string;
-    fieldDict?: FieldDictionary;
-    sublistDict?: SublistDictionary;
-}
+
 
 /** 
  * @enum {string} **`FieldInputTypeEnum`**

@@ -1,8 +1,8 @@
 /**
  * @file src/utils/ns/Record/Relationships/Customer.ts
  */
-
-import { RadioFieldBoolean } from "../../../typeValidation";
+import { RecordRef } from "../Record";
+import { RadioFieldBoolean } from "src/utils/typeValidation";
 import { AddressBook } from "./Address";
 
 /**
@@ -23,16 +23,29 @@ import { AddressBook } from "./Address";
 export interface CustomerBase {
     entityid: string;
     entitystatus: CustomerStatusEnum;
-    taxable?: RadioFieldBoolean;
+    isperson?: RadioFieldBoolean;
+    category?: CustomerCategoryEnum;
+    taxable?: boolean;
     taxitem?: string;
     email?: string;
     phone?: string;
-    altphone?: string;
-    fax?: string;
     companyname?: string;
+    salutation?: string;
     firstname?: string;
     middlename?: string;
     lastname?: string;
+}
+
+export interface Customer extends CustomerBase {
+    internalid?: string | number | RecordRef;
+    externalid?: string | RecordRef;
+    altemail?: string;
+    altphone?: string;
+    mobilephone?: string;
+    homephone?: string;
+    fax?: string;
+    url?: string;
+    terms?: number
 }
 
 /**
@@ -68,7 +81,16 @@ export interface CustomerSublists {
  * @property {number} SELLAS - `10`
  */
 export enum CustomerCategoryEnum {
-    CATEGORY_A = 1,
+    EXOSOME = 1,
+    SYLFIRM = 2,
+    MIRACU = 3,
+    BENEV = 4,
+    VIVISCAL = 5,
+    BENEV_BIO = 6,
+    ACARA = 7,
+    INFUSION_SOLUTIONS = 8,
+    PPE = 9,
+    SELLAS = 10,
 }
 
 /**

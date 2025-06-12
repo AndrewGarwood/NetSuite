@@ -1,10 +1,11 @@
 /**
+ * @deprecated . need to replace with new sample payloads using new type versions. {@link FieldDictionary} and {@link SublistDictionary}
  * @file src/utils/api/samplePayloads.ts
  * @description Sample payloads for testing API calls
  */
 import { 
     SublistDictionary, PostRecordOptions, FieldDictionary, 
-    SetSubrecordOptions, SublistFieldDictionary, 
+    // SetSubrecordOptions, SublistFieldDictionary, 
     SetSublistValueOptions, 
     SetFieldValueOptions
 } from "src/utils/api/types"
@@ -16,7 +17,7 @@ const NOT_INACTIVE = false;
 const NOT_DYNAMIC = false;
 // const IS_INACTIVE = true;
 
-
+/**@deprecated */
 const ODEGAARD_ADDRESS_SUBRECORD_OPTIONS: SetSubrecordOptions = {
     parentSublistId: 'addressbook',
     line: 0,
@@ -36,6 +37,7 @@ const ODEGAARD_ADDRESS_SUBRECORD_OPTIONS: SetSubrecordOptions = {
     } as FieldDictionary,
 } as SetSubrecordOptions
 
+/**@deprecated */
 const SUZZALLO_ADDRESS_SUBRECORD_OPTIONS: SetSubrecordOptions = {
     parentSublistId: 'addressbook',
     line: 1,
@@ -55,6 +57,7 @@ const SUZZALLO_ADDRESS_SUBRECORD_OPTIONS: SetSubrecordOptions = {
     } as FieldDictionary,
 }
 
+/**@deprecated */
 export const UW_LIBRARIES_UPSERT_VENDOR_OPTIONS: PostRecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
     fieldDict: {
@@ -66,6 +69,7 @@ export const UW_LIBRARIES_UPSERT_VENDOR_OPTIONS: PostRecordOptions = {
     } as FieldDictionary,
 }
 
+/**@deprecated */
 export const UW_LIBRARIES_CREATE_VENDOR_OPTIONS: PostRecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
     // isDynamic: NOT_DYNAMIC,
@@ -102,6 +106,7 @@ export const UW_LIBRARIES_CREATE_VENDOR_OPTIONS: PostRecordOptions = {
     } as SublistDictionary,
 }
 
+/**@deprecated */
 export const MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS: PostRecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
     // isDynamic: NOT_DYNAMIC,

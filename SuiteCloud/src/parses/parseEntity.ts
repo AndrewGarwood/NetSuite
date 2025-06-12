@@ -1,4 +1,5 @@
 /**
+ * @TODO validate behaviour after api type definition changes
  * @file src/parses/parseEntity.ts
  */
 import {
@@ -11,10 +12,10 @@ import { OUTPUT_DIR, ERROR_DIR, STOP_RUNNING, CLOUD_LOG_DIR } from "src/config/e
 import { RadioFieldBoolean, RADIO_FIELD_TRUE } from "src/utils/typeValidation";
 import { parseCsvToPostRecordOptions } from "src/parseCsvToRequestBody";
 import { 
-    BatchPostRecordRequest, BatchPostRecordResponse, FieldDictionary, 
+    PostRecordRequest, PostResponseOptions, FieldDictionary, 
     idPropertyEnum, idSearchOptions, ParseOptions, ParseResults, PostRecordOptions, 
     upsertRecordPayload, PostRecordResult, SetFieldValueOptions, SetSublistValueOptions, 
-    SublistDictionary, SublistFieldDictionary 
+    SublistDictionary, PostRecordResponse 
 } from "src/utils/api";
 import { ContactRoleEnum, EntityRecordTypeEnum, RecordTypeEnum, SearchOperatorEnum } from "src/utils/ns";
 
@@ -77,17 +78,17 @@ export async function parseEntityFile(
  * @description Post entities and their contacts to NetSuite
  * @param entities `Array<`{@link PostRecordOptions}`>`
  * @param responseProps `Array<string>` - properties to return in the response, defaults to {@link ENTITY_RESPONSE_PROPS}
- * @returns **`entityResponses`** `Promise<`{@link BatchPostRecordResponse}`[]`
+ * @returns **`entityResponses`** `Promise<`{@link PostRecordResponse}`[]`
  */
 export async function postEntities(
     entities: PostRecordOptions[],
     responseProps: string[] = ENTITY_RESPONSE_PROPS,
-): Promise<BatchPostRecordResponse[]> {
+): Promise<PostRecordResponse[]> {
     try {
-        const entityResponses: BatchPostRecordResponse[] = await upsertRecordPayload({
-            upsertRecordArray: entities,
-            responseProps: responseProps
-        } as BatchPostRecordRequest);
+        const entityResponses: PostRecordResponse[] = await upsertRecordPayload({
+            postOptions: entities,
+            responseOptions: {responseFields: responseProps}
+        } as PostRecordRequest);
 
         return entityResponses;
     } catch (error) {
@@ -102,17 +103,17 @@ export async function postEntities(
 /**
  * @param contacts `Array<`{@link PostRecordOptions}`>` - should be {@link matchContactsToPostEntityResponses}'s return value, `companyContacts`
  * @param responseProps `Array<string>` - properties to return in the response, defaults to {@link CONTACT_RESPONSE_PROPS}
- * @returns **`contactResponses`** `Promise<`{@link BatchPostRecordResponse}`[]>`
+ * @returns **`contactResponses`** `Promise<`{@link PostRecordResponse}`[]>`
  */
 export async function postContacts(
     contacts: PostRecordOptions[],
     responseProps: string[] = CONTACT_RESPONSE_PROPS
-): Promise<BatchPostRecordResponse[]> {
+): Promise<PostRecordResponse[]> {
     try {
-        const contactResponses: BatchPostRecordResponse[] = await upsertRecordPayload({
-            upsertRecordArray: contacts,
-            responseProps: responseProps
-        } as BatchPostRecordRequest);
+        const contactResponses: PostRecordResponse[] = await upsertRecordPayload({
+            postOptions: contacts,
+            responseOptions: {responseFields: responseProps}
+        } as PostRecordRequest);
         return contactResponses;
     } catch (error) {
         log.error(`postEntityContacts() Error posting contacts.`);
@@ -121,7 +122,7 @@ export async function postContacts(
         );
     }
     log.warn(`postEntityContacts() returning empty array.`);
-    return [] as BatchPostRecordResponse[];
+    return [] as PostRecordResponse[];
 }
 
 /**
@@ -131,21 +132,21 @@ export async function postContacts(
  * @param entityType {@link EntityRecordTypeEnum} - type of the primary entity to update
  * @param entities `Array<`{@link PostRecordOptions}`>`
  * @param contacts `Array<`{@link PostRecordOptions}`>`
- * @returns `Promise<{ entityResponses: `{@link BatchPostRecordResponse}`[], contactResponses: `{@link BatchPostRecordResponse}`[], entityUpdateResponses: `{@link BatchPostRecordResponse}`[] }>`
+ * @returns `Promise<{ entityResponses: `{@link PostRecordResponse}`[], contactResponses: `{@link PostRecordResponse}`[], entityUpdateResponses: `{@link PostRecordResponse}`[] }>`
  * */
 export async function postEntitiesAndContacts(
     entityType: EntityRecordTypeEnum,
     entities: PostRecordOptions[],
     contacts: PostRecordOptions[],
 ): Promise<{
-    entityResponses: BatchPostRecordResponse[],
-    contactResponses: BatchPostRecordResponse[],
-    entityUpdateResponses: BatchPostRecordResponse[]
+    entityResponses: PostRecordResponse[],
+    contactResponses: PostRecordResponse[],
+    entityUpdateResponses: PostRecordResponse[]
 }> {
-    const entityResponses: BatchPostRecordResponse[] = await postEntities(entities);
+    const entityResponses: PostRecordResponse[] = await postEntities(entities);
     const companyContacts: PostRecordOptions[] 
         = matchContactsToPostEntityResponses(contacts, entityResponses).companyContacts;
-    const contactResponses: BatchPostRecordResponse[]
+    const contactResponses: PostRecordResponse[]
         = await postContacts(companyContacts);
     const entityUpdates: PostRecordOptions[]
         = generateEntityUpdates(entityType, contactResponses);
@@ -170,12 +171,12 @@ export async function postEntitiesAndContacts(
 
 /** 
  * @param entityType {@link EntityRecordTypeEnum} - type of the primary entity to update
- * @param contactResponses `Array<`{@link BatchPostRecordResponse}`>` - responses from initial contact post.
+ * @param contactResponses `Array<`{@link PostRecordResponse}`>` - responses from initial contact post.
  * @returns **`entityUpdates`** = `Array<`{@link PostRecordOptions}`>` - represents updates to set entity.contact to internalId of entity-company's corresponding contact 
  * */
 export function generateEntityUpdates(
     entityType: EntityRecordTypeEnum,
-    contactResponses: BatchPostRecordResponse[]
+    contactResponses: PostRecordResponse[]
 ): PostRecordOptions[] {
     const entityUpdates: PostRecordOptions[] = [];
     const contactResults: PostRecordResult[] = getPostResults(contactResponses);    
@@ -186,21 +187,16 @@ export function generateEntityUpdates(
                 { 
                     idProp: idPropertyEnum.INTERNAL_ID, 
                     searchOperator: SearchOperatorEnum.RECORD.ANY_OF, 
-                    idValue: contactResult?.company // = ${entityType}'s internalid
+                    idValue: contactResult?.fields?.company // = ${entityType}'s internalid
                 },
                 { 
                     idProp: idPropertyEnum.ENTITY_ID, 
                     searchOperator: SearchOperatorEnum.TEXT.IS, 
-                    idValue: contactResult?.entityid
+                    idValue: contactResult?.fields?.entityid
                 } 
             ] as idSearchOptions[],
-            fieldDict: {
-                valueFields: [
-                    {
-                        fieldId: 'contact', 
-                        value: contactResult?.internalId 
-                    }
-                ] as SetFieldValueOptions[],
+            fields: {
+                contact: contactResult?.internalid 
             } as FieldDictionary,
         } as PostRecordOptions);
     }
@@ -208,11 +204,11 @@ export function generateEntityUpdates(
 }
 
 /**
- * @param entityResponses `Array<`{@link BatchPostRecordResponse}`>`
+ * @param entityResponses `Array<`{@link PostRecordResponse}`>`
  * @returns **`entityResults`** = `Array<`{@link PostRecordResult}`>`
  */
 export function getPostResults(
-    entityResponses: BatchPostRecordResponse[]
+    entityResponses: PostRecordResponse[]
 ): PostRecordResult[] {
     const entityResults: PostRecordResult[] = [];
     for (let entityResponse of entityResponses) {
@@ -237,10 +233,8 @@ export function countCompanyEntities(entities: PostRecordOptions[]): number {
     let numCompanyEntities = 0;
     for (let i = 0; i < entities.length; i++) {
         const entity: PostRecordOptions = entities[i];
-        let isPersonField = entity.fieldDict?.valueFields?.find(
-            field => field.fieldId === 'isperson'
-        ) as SetFieldValueOptions;
-        const isPerson: RadioFieldBoolean = isPersonField?.value as RadioFieldBoolean;
+        
+        const isPerson: RadioFieldBoolean = entity?.fields?.isperson as RadioFieldBoolean;
         if (isPerson === RADIO_FIELD_TRUE) {
             continue;
         } // else, this entity: {PostRecordOptions} is a company
@@ -252,14 +246,14 @@ export function countCompanyEntities(entities: PostRecordOptions[]): number {
 /**
  * @description match `internalid`s of entity post results to contacts
  * @param contacts `Array<`{@link PostRecordOptions}`>`
- * @param entityResponses `Array<`{@link BatchPostRecordResponse}`>`
+ * @param entityResponses `Array<`{@link PostRecordResponse}`>`
  * @returns `{ companyContacts: Array<`{@link PostRecordOptions}`>, unmatchedContacts: Array<`{@link PostRecordOptions}`> }`
  * - **`companyContacts`**: - contacts corresponding to an entity in netsuite where `entity.isperson === 'F'` (i.e. a company) -> need to make a contact record.
  * - **`unmatchedContacts`**: - contacts corresponding to an entity in netsuite where `entity.isperson === 'T'` (i.e. a person) -> no need to make a contact record.
  */
 export function matchContactsToPostEntityResponses(
     contacts: PostRecordOptions[], 
-    entityResponses: BatchPostRecordResponse[]
+    entityResponses: PostRecordResponse[]
 ): {
     companyContacts: PostRecordOptions[], 
     unmatchedContacts: PostRecordOptions[],
@@ -269,10 +263,11 @@ export function matchContactsToPostEntityResponses(
     const unmatchedContacts: PostRecordOptions[] = [];
     for (let i = 0; i < contacts.length; i++) {
         const contact: PostRecordOptions = contacts[i];
-        let contactCompanyField = contact.fieldDict?.valueFields?.find(
-            field => field.fieldId === 'company'
-        ) as SetFieldValueOptions;
-        const contactCompany: string = contactCompanyField?.value as string;
+        if (!contact || !contact.fields) {
+            log.warn(`contact is undefined or has no fields at contacts[index=${i}]. Continuing...`);
+            continue;
+        }   
+        const contactCompany: string = contact?.fields?.company as string;
         if (!contactCompany) {
             plog.debug(`contactCompany is undefined -> isPerson(entity)===true -> no need to worry about the select field. continuing...`);
             unmatchedContacts.push(contact);
@@ -286,11 +281,11 @@ export function matchContactsToPostEntityResponses(
          * by using indexOf(' ')+1 and slice() to get the part after the first space.
          * */
         const entityInternalId = entityResults.find(entityResult => {
-            let entityId = String(entityResult?.entityid) || '';
+            let entityId = String(entityResult?.fields?.entityid) || '';
             return entityId.slice(entityId.indexOf(' ')+1) === contactCompany
-                || entityResult?.companyname === contactCompany
+                || entityResult?.fields?.companyname === contactCompany
         }
-        )?.internalId;
+        )?.internalid;
         if (!entityInternalId) {
             log.warn(
                 `entityInternalId is undefined for contact with company '${contactCompany}' at contacts[index=${i}].`, 
@@ -299,7 +294,7 @@ export function matchContactsToPostEntityResponses(
             unmatchedContacts.push(contact);
             continue;
         }
-        contactCompanyField.value = entityInternalId;
+        contact.fields.company = entityInternalId;
         companyContacts.push(contact);
     }
     return {
