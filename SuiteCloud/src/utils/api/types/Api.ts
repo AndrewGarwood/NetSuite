@@ -4,54 +4,6 @@
 
 
 /**
- * @enum {string} **`idPropertyEnum`**
- * @property {string} INTERNAL_ID - The `'internalid'` (for all records).
- * @property {string} EXTERNAL_ID - The `'externalid'` (for all records).
- * @property {string} ENTITY_ID - The `'entityid'` (for relationship records). appears on vendor records.
- * @property {string} ITEM_ID - The `'itemid'` (for inventory records)
- * @readonly
- */
-export enum idPropertyEnum {
-    INTERNAL_ID = 'internalid',
-    EXTERNAL_ID = 'externalid',
-    ENTITY_ID = 'entityid',
-    ITEM_ID = 'itemid'
-}
-
-/**
- * @enum {string} **`LogTypeEnum`**
- * @readonly
- * @description Enum for NetSuite's log module types
- * @property {string} DEBUG - Debug log type
- * @property {string} ERROR - Error log type
- * @property {string} AUDIT - Audit log type
- * @property {string} EMERGENCY - Emergency log type
- */
-export enum LogTypeEnum {
-    DEBUG = 'debug',
-    ERROR = 'error',
-    AUDIT = 'audit',
-    EMERGENCY = 'emergency',
-};
-
-/**
- * Definition of elements in the {@link logArray} array
- * @typedefn **`LogStatement`**
- * @property {string} timestamp - The timestamp of the log entry.
- * @property {LogTypeEnum} type - The type of log entry (see {@link LogTypeEnum}).
- * @property {string} title - The title of the log entry.
- * @property {any} details - The details of the log entry.
- * @property {string} [message] - The message of the log entry = concatenated string of details's contents (if details is an array).
- */
-export type LogStatement = {
-    timestamp: string;
-    type: LogTypeEnum;
-    title: string;
-    details: any;
-    message?: string;
-};
-
-/**
  * @typedefn **`FieldDictionary`**
  */
 export type FieldDictionary = {
@@ -226,3 +178,52 @@ export enum FieldInputTypeEnum {
     /** `Inline HTML` fields accept `strings`. Strings containing HTML tags are represented as HTML entities in UI. {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html#:~:text=The%20following%20code%20sample%20shows%20the%20syntax%20for%20INLINEHTML%20fields%20and%20what%20is%20returned.} */
     INLINE_HTML = 'inlinehtml',
 }
+
+
+/**
+ * @enum {string} **`idPropertyEnum`**
+ * @property {string} INTERNAL_ID - The `'internalid'` (for all records).
+ * @property {string} EXTERNAL_ID - The `'externalid'` (for all records).
+ * @property {string} ENTITY_ID - The `'entityid'` (for relationship records). appears on vendor records.
+ * @property {string} ITEM_ID - The `'itemid'` (for inventory records)
+ * @readonly
+ */
+export enum idPropertyEnum {
+    INTERNAL_ID = 'internalid',
+    EXTERNAL_ID = 'externalid',
+    ENTITY_ID = 'entityid',
+    ITEM_ID = 'itemid'
+}
+
+/**
+ * @enum {string} **`LogTypeEnum`**
+ * @readonly
+ * @description Enum for NetSuite's log module types
+ * @property {string} DEBUG - Debug log type
+ * @property {string} ERROR - Error log type
+ * @property {string} AUDIT - Audit log type
+ * @property {string} EMERGENCY - Emergency log type
+ */
+export enum LogTypeEnum {
+    DEBUG = 'debug',
+    ERROR = 'error',
+    AUDIT = 'audit',
+    EMERGENCY = 'emergency',
+};
+
+/**
+ * Definition of elements in the {@link logArray} array
+ * @typedefn **`LogStatement`**
+ * @property {string} timestamp - The timestamp of the log entry.
+ * @property {LogTypeEnum} type - The type of log entry (see {@link LogTypeEnum}).
+ * @property {string} title - The title of the log entry.
+ * @property {any} details - The details of the log entry.
+ * @property {string} [message] - The message of the log entry = concatenated string of details's contents (if details is an array).
+ */
+export type LogStatement = {
+    timestamp: string;
+    type: LogTypeEnum;
+    title: string;
+    details: any;
+    message?: string;
+};
