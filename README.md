@@ -3,15 +3,16 @@
 - There are multiple entry points to create/update/delete data from one's NetSuite account/instance. I prefer the REST entry point: [NetSuite Applications Suite - SuiteScript 2.x RESTlet Script Type](https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4387799403.html)
 - An essential reference: NetSuite's [Record Browser](https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/account.html) 
 
+**Note: In process of rewriting/refactoring some files after simplifying the type definition for Post Request Bodies.** Making the request payloads will be easier - moved complexity to server-side.
+
 ### My current approach is as follows:
 0. Determine desired objective. For example, if I need to upload a substantial amount of data, I can create records through POST requests 
-1. Write API endpoints so I can make requests to them with paylaods (e.g. [POST_BatchUpsertRecord.js](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/FileCabinet/SuiteScripts/REST/POST/POST_BatchUpsertRecord.js))
-2. I wanted to use TypeScript in VSCode, so I set up an Oauth2.0 flow so that I can communicate with these endpoints (see [SuiteCloud/src/server/authServer.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/server/authServer.ts))
-3. In my use case, the goal is to read data from csv files with "parse definitions" and store them into [payloads](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/samplePayloads.ts)
-4. Determine proper mapping by using aforementioned [Record Browser](https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/account.html) and store it into ParseOption objects (types defined in [SuiteCloud/src/utils/api/types/CsvToApiMapping.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/types/CsvToApiMapping.ts)) 
-- (for example usage, see [SuiteCloud/src/parses/customer/customerParseDefinition.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parses/customer/customerParseDefinition.ts), [SuiteCloud/src/parses/evaluatorFunctions.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parses/evaluatorFunctions.ts), and [SuiteCloud/src/parses/pruneFunctions.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parses/pruneFunctions.ts)).
-5. Then use ParseOptions[] as a parameter of [parseCsvToPostRecordOptions](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parseCsvToRequestBody.ts) 
-6. Use authorization tokens generated from authorization flow to make API calls, e.g. in [SuiteCloud/src/parses/parseEntity.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parses/parseEntity.ts) using functions from [SuiteCloud/src/utils/api/callApi.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/callApi.ts)
+1. Write API endpoints so I can make requests to them with paylaods (e.g. [POST_UpsertRecord.js](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/FileCabinet/SuiteScripts/REST/POST/POST_UpsertRecord.js))
+2. I wanted to use TypeScript in VSCode, so I set up an Oauth2.0 flow to communicate with these endpoints (see [SuiteCloud/src/server/authServer.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/server/authServer.ts))
+3. In my use case, the goal is to read data from csv files and store them into payloads
+4. Determine proper mapping by using aforementioned [Record Browser](https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/account.html) ~~and store it into ParseOption objects.~~
+5. (deprecated, pending rewrite) ~~Then use ParseOptions[] as a parameter of [parseCsvToPostRecordOptions](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parseCsvToRequestBody.ts) ~~
+6. (pending tests after rewrite) Use authorization tokens generated from authorization flow to make API calls, e.g. in [SuiteCloud/src/parses/parseEntity.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parses/parseEntity.ts) using functions from [SuiteCloud/src/utils/api/callApi.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/callApi.ts)
 7. Write more features/improvements and refactor as work continues.
 
 #### Guides I found helpful for using SuiteScript: 

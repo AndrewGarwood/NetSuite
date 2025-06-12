@@ -1,4 +1,5 @@
 /**
+ * @deprecated
  * @file src/parseCsvToRequestBody.ts
  */
 import { RecordTypeEnum } from "./utils/ns";
@@ -28,8 +29,8 @@ import {
     SetFieldValueOptions,
     SetSublistValueOptions,
     SublistDictionary, 
-    SublistFieldDictionary,   
-    SetSubrecordOptions,
+    // SublistFieldDictionary, // deprecated   
+    // SetSubrecordOptions, // deprecated
 
     ParseOptions, RecordParseOptions, ParseResults,
     FieldDictionaryParseOptions, 
@@ -51,6 +52,7 @@ let pruneCount: Record<string, number> = {};
  */
 
 /**
+ * @deprecated
  * @param csvPath `string` - The path to the CSV file.
  * @param recordParseOptions - {@link RecordParseOptions}
  * - = `{ [key` in {@link RecordTypeEnum}`]?:` {@link ParseOptions}`[] }`
@@ -184,6 +186,7 @@ export async function parseCsvToPostRecordOptions(
 }
 
 /**
+ * @deprecated
  * @param row `Record<string, any>` - The CSV row to validate.
  * @param fieldDict - {@link FieldDictionaryParseOptions} = `{ fieldValueMapArray: Array<`{@link FieldValueMapping}`>, subrecordMapArray: Array<`{@link FieldSubrecordMapping}`> }`
  * @param sublistDict - {@link SublistDictionaryParseOptions} = `{ [sublistId: string]: { fieldValueMapArray: Array<`{@link SublistFieldValueMapping}`>, subrecordMapArray: Array<`{@link SublistSubrecordMapping}`> } }`
@@ -212,6 +215,7 @@ function validateFieldMappings(
 }
 
 /**
+ * @deprecated
  * @description returns a {@link PostRecordOptions} object for the given row and record type. to use in a request body to make a record in NetSuite in standard mode (`isDynamic = false`).
  * @param row `Record<string, any>`
  * @param recordType - {@link RecordTypeEnum}
@@ -238,6 +242,7 @@ export function generatePostRecordOptions(
 
 
 /**
+ * @deprecated
  * @param row `Record<string, any>`
  * @param fieldDictParseOptions {@link FieldDictionaryParseOptions} = { `fieldValueMapArray`: `Array<`{@link FieldValueMapping}`>`, `subrecordMapArray`: `Array<`{@link FieldSubrecordMapping}`> }`
  * @param valueOverrides {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
@@ -256,6 +261,7 @@ export function generateFieldDictionary(
 }
 
 /**
+ * @deprecated
  * @param row `Record<string, any>`
  * @param sublistDictParseOptions {@link SublistDictionaryParseOptions} = { [`sublistId`: string]: {@link SublistFieldDictionaryParseOptions} }
  * = { [`sublistId`: string]: { `fieldValueMapArray`: `Array<`{@link SublistFieldValueMapping}`>`, `subrecordMapArray`: `Array<`{@link SublistSubrecordMapping}`>` } } 
@@ -280,6 +286,7 @@ export function generateSublistDictionary(
 }
 
 /**
+ * @deprecated
  * @param row `Record<string, any>`
  * @param parentType {@link FieldParentTypeEnum} 
  * @param subrecordMapArray `Array<`{@link FieldSubrecordMapping}`> | Array<`{@link SublistSubrecordMapping}`>`
@@ -331,6 +338,7 @@ export function generateSetSubrecordOptionsArray(
 }
 
 /**
+ * @deprecated
  * @param row `Record<string, any>`
  * @param sublistFieldValueMapArray `Array<`{@link SublistFieldValueMapping}`>` = `{ sublistId`: string, `line`: number, `fieldId`: string, `colName`?: string`, `evaluator`?: `(row: Record<string, any>) => `{@link FieldValue}` }[]`
  * @param valueOverrides {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
@@ -377,6 +385,7 @@ export function generateSetSublistValueOptionsArray(
 }
 
 /**
+ * @deprecated
  * @param row `Record<string, any>`
  * @param fieldValueMapArray `Array<`{@link FieldValueMapping}`>` = `{ fieldId`: string, `colName`?: string, `evaluator`?: `(row: Record<string, any>) => `{@link FieldValue}` }[]` 
  * @param valueOverrides {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
@@ -418,6 +427,7 @@ export function generateSetFieldValueOptionsArray(
 }
 
 /**
+ * @deprecated
  * @param {string} originalValue - The original value to be transformed with valueMapping or default operaitons
  * @param {string} originalKey  - The original column header (key) of the value being transformed
  * @param {string} newKey - The new column header (`fieldId`) (key) of the value being transformed

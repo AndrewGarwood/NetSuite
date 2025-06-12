@@ -4,16 +4,18 @@
  * @reference {@link https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html}
  */
 
-import { CountryAbbreviationEnum, NetSuiteCountryEnum, StateAbbreviationEnum } from "../../Enums";
-
+import { 
+    CountryAbbreviationEnum, 
+    NetSuiteCountryEnum, 
+    StateAbbreviationEnum 
+} from "../../Enums";
+import { RecordRef } from "../Record";
 
 
 
 /**
  * @interface **`Address`**
- * @description TypeScript definition for the Address record in NetSuite.
  * @reference {@link https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/address.html}
- * 
  * @property {string} [addr1] - Address 1 - (street address line 1) Enter the address the way it should appear on forms. For employees, customers, partners, and vendors, what you enter here autofills on forms if this address is marked default for Shipping or Billing. Enter up to 50 characters. This field is required for the Online Bill Pay feature.
  * @property {string} [addr2] - Address 2 - (street address line 2) Enter an optional second address line the way it should appear on forms. For employees, customers, partners, and vendors, what you enter here autofills on forms if this address is marked default for Shipping or Billing. Enter up to 50 characters.
  * @property {string} [addr3] - Address 3 - (street address line 3)
@@ -41,19 +43,19 @@ export interface Address {
     addrphone?: string;
     city?: string;
     country: CountryAbbreviationEnum | NetSuiteCountryEnum;
-    externalid?: string;
-    internalid?: string;
+    externalid?: string | RecordRef;
+    internalid?: number;
+    id?: number;
     override?: boolean;
     state?: StateAbbreviationEnum;
     zip?: string;
 }
 
 /**
- * @typedefn **`AddressBook`**
- * @description TypeScript definition for the Address Book record in NetSuite.
+ * @typedefn **`AddressBookEntry`**
+ * @description addressbook sublist list entry in NetSuite.
  * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/vendor.html#:~:text=addressbook%20%2D%20Address%20Book
  * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/other/vendoraddressbook.html?mode=package
- * 
  * @property {Address} [addressbookaddress] - {@link Address}.
  * @property {string} [addressid] - Address ID - The address ID.
  * @property {boolean} [defaultbilling] - Default Billing - Check this box to make this address the default billing address.
@@ -71,4 +73,10 @@ export interface AddressBookEntry {
     label?: string;
 }
 
+/**
+ * definition for the Address Book sublist of Relationship records in NetSuite.
+ * @typedefn **`AddressBook`**
+ * = {@link AddressBookEntry}`[]` 
+ * - = `{ addressbookaddress?: `{@link Address}`, addressid?: string, defaultbilling?: boolean, defaultshipping?: boolean, internalid?: number, label?: string}[]`
+ */
 export type AddressBook = AddressBookEntry[];
