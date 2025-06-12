@@ -11,7 +11,7 @@
 2. I wanted to use TypeScript in VSCode, so I set up an Oauth2.0 flow to communicate with these endpoints (see [SuiteCloud/src/server/authServer.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/server/authServer.ts))
 3. In my use case, the goal is to read data from csv files and store them into payloads
 4. Determine proper mapping by using aforementioned [Record Browser](https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/account.html) ~~and store it into ParseOption objects.~~
-5. (deprecated, pending rewrite) ~~Then use ParseOptions[] as a parameter of [parseCsvToPostRecordOptions](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parseCsvToRequestBody.ts) ~~
+5. (deprecated, pending rewrite) ~~Then use ParseOptions[] as a parameter of [parseCsvToPostRecordOptions](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parseCsvToRequestBody.ts)~~
 6. (pending tests after rewrite) Use authorization tokens generated from authorization flow to make API calls, e.g. in [SuiteCloud/src/parses/parseEntity.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parses/parseEntity.ts) using functions from [SuiteCloud/src/utils/api/callApi.ts](https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/callApi.ts)
 7. Write more features/improvements and refactor as work continues.
 
