@@ -29,9 +29,9 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
 
     
     /**
-     * @param {PostRecordRequest} reqBody {@link PostRecordRequest} 
+     * @param {PostRecordRequest} reqBody **{@link PostRecordRequest}**
      * - = `{ postOptions: `{@link PostRecordOptions}` | Array<`{@link PostRecordOptions}`>, responseOptions: `{@link PostResponseOptions}` }`
-     * @returns {PostRecordResponse} **`response`** {@link PostRecordResponse} = `{ success: boolean, message: string, results?: `{@link PostRecordResult}`[], rejects?: `{@link PostRecordOptions}`[], error?: string, logArray: `{@link LogStatement}`[] }`
+     * @returns {PostRecordResponse} **`response`** **{@link PostRecordResponse}** = `{ success: boolean, message: string, results?: `{@link PostRecordResult}`[], rejects?: `{@link PostRecordOptions}`[], error?: string, logArray: `{@link LogStatement}`[] }`
      */
     const post = (reqBody) => {
         const { postOptions, responseOptions } = reqBody;
@@ -632,6 +632,9 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 /**@type {SublistLine} */
                 const sublistLine = {
                     line: i,
+                    id: rec.getSublistValue({
+                        sublistId, fieldId: 'id', line: i
+                    }),
                     internalid: rec.getSublistValue({ 
                         sublistId, fieldId: idPropertyEnum.INTERNAL_ID, line: i 
                     })
@@ -783,6 +786,7 @@ function getCurrentPacificTime() {
 /**
  * @consideration make an enum for subrecord types
  * assumes that the input value is a subrecord object if it is an object and not an array and not a Date object
+ * - {@link SetFieldSubrecordOptions} or {@link SetSublistSubrecordOptions}
  * @param {any | SubrecordValue} value 
  * @returns **`isSubrecord`** `boolean` = **`true`** `if` `value` is a subrecord object, **`false`** `otherwise`.
  */
@@ -797,7 +801,7 @@ function isSubrecord(value) {
         && !value.hasOwnProperty('toLocaleString')
     );
     const isSetSubrecordOptions = Boolean(value 
-        && value.hasOwnProperty('fieldId') 
+        && (value.hasOwnProperty('fieldId') || value.hasOwnProperty('subrecordType'))
         && (value.hasOwnProperty('fields') || value.hasOwnProperty('sublists'))
     );
     const isSubrecord = Boolean(isNonEmptyObject 
@@ -964,8 +968,8 @@ const NOT_DYNAMIC = false;
  * lineIdProp?: string;
  * }} SublistLine
  * @property {number} [line] `number` - the `lineIndex` of the list entry
- * @property {number} [lineIdProp] `string` - the `'fieldId'` of the list entry 
- * with definded value for SublistLine[fieldId] that you want to use to search for existing lines
+ * @property {number} [lineIdProp] `string` - the `'sublistFieldId'` of the list entry 
+ * with defined value at `SublistLine[sublistFieldId]` that you want to use to search for existing lines
  */
 
 /** Type: **`SubrecordDictionary`** {@link SubrecordDictionary} */

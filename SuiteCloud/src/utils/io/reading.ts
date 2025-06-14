@@ -3,24 +3,20 @@
  */
 import fs from 'fs';
 import xlsx from 'xlsx';
-import csv from 'csv-parser'; // ~\node_modules\csv-parser\index.d.ts
-import { Options as CsvOptions } from "csv-parser"; 
-import { Transform, pipeline, TransformOptions } from 'stream';
-import { FileExtensionResult, ParseOneToManyOptions } from './types/Reading';
+import { ParseOneToManyOptions } from './types/Reading';
 import { FieldValue } from 'src/utils/api/types/Api';
-import {ValueMapping, ColumnMapping, isValueMappingEntry, DelimitedFileTypeEnum, MappedRow, DelimiterCharacterEnum } from './types/Csv';
+import {ValueMapping, isValueMappingEntry, DelimitedFileTypeEnum, DelimiterCharacterEnum } from './types/Csv';
 import { stripCharFromString, cleanString, UNCONDITIONAL_STRIP_DOT_OPTIONS } from './regex';
-import { BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES } from '../typeValidation';
-import { mainLogger as log } from 'src/config/setupLog';
+import { mainLogger as log, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
 
 
 
 /**
- * @param {string} filePath `string`
- * @param {string} sheetName `string`
- * @param {string} keyColumn `string`
- * @param {string} valueColumn `string`
- * @param {ParseOneToManyOptions} options - {@link ParseOneToManyOptions}
+ * @param filePath `string`
+ * @param sheetName `string`
+ * @param keyColumn `string`
+ * @param valueColumn `string`
+ * @param options - {@link ParseOneToManyOptions}
  * = `{ keyStripOptions`?: {@link StringStripOptions}, `valueStripOptions`?: {@link StringStripOptions}, keyCaseOptions`?: {@link StringCaseOptions}, `valueCaseOptions`?: {@link StringCaseOptions}, `keyPadOptions`?: {@link StringPadOptions}, `valuePadOptions`?: {@link StringPadOptions} `}`
  * - {@link StringStripOptions} = `{ char`: `string`, `escape`?: `boolean`, `stripLeftCondition`?: `(s: string, ...args: any[]) => boolean`, `leftArgs`?: `any[]`, `stripRightCondition`?: `(s: string, ...args: any[]) => boolean`, `rightArgs`?: `any[] }`
  * - {@link StringCaseOptions} = `{ toUpper`?: `boolean`, `toLower`?: `boolean`, `toTitle`?: `boolean }`
@@ -71,13 +67,12 @@ export function parseExcelForOneToMany(
         return dict;
     } catch (err) {
         log.error('Error reading or parsing the Excel file:', err, 
-            '\n\t Given File Path:', '"' + filePath + '"');
+            TAB+'Given File Path:', '"' + filePath + '"');
         return {} as Record<string, Array<string>>;
     }
 }
 
 /**
- * 
  * @param filePath `string`
  * @param keyColumn `string`
  * @param valueColumn `string`
@@ -95,10 +90,6 @@ export function parseCsvForOneToMany(
     delimiter: DelimiterCharacterEnum | string = DelimiterCharacterEnum.COMMA,
     options: ParseOneToManyOptions = {},
 ): Record<string, Array<string>> {
-    filePath = validateFileExtension(
-        filePath, 
-        DelimitedFileTypeEnum.CSV
-    ).validatedFilePath;
     try {
         const { 
             keyStripOptions, valueStripOptions, 
@@ -140,128 +131,12 @@ export function parseCsvForOneToMany(
         return dict;
     } catch (err) {
         log.error('Error reading or parsing the CSV file:', err, 
-            '\n\t Given File Path:', '"' + filePath + '"');
+            TAB+'Given File Path:', '"' + filePath + '"');
         return {} as Record<string, Array<string>>;
     }
 }
 
-
 /**
- * Parses a delimited text file (CSV/TSV) and maps columns to new names
- * @param filePath Path to the file
- * @param columnMapping Dictionary for column name mapping {@link ColumnMapping}
- * @param valueMapping Optional mapping for specific values {@link ValueMapping}
- * @returns {Promise<MappedRow<T>[]>} Promise with array of mapped objects {@link MappedRow}
- * @param fileType File type ('csv', 'tsv', or 'auto' for detection) {@link DelimitedFileTypeEnum}
- * @throws Error if file reading or parsing fails
- * @example
- * const filePath = 'path/to/file.csv';
- * const columnMapping = {
- *     'First Name': 'firstname',
- *     'Last Name': 'lastname',
- *     'Email Address': 'email',
- * };
- * const csvData = await parseDelimitedFileWithMapping(filePath, columnMapping, DelimitedFileTypeEnum.CSV);
- * console.log(csvData); // prints the mapped data below
- * // [
- * //    { firstname: 'John', lastname: 'Doe', email: 'john@example.com' },
- * //    { firstname: 'Jane', lastname: 'Smith', email: 'jane@example.com' },
- * // ]
- */
-export async function parseDelimitedFileWithMapping<T extends ColumnMapping>(
-    filePath: string,
-    columnMapping: T,
-    valueMapping?: ValueMapping,
-    fileType: DelimitedFileTypeEnum = DelimitedFileTypeEnum.AUTO,
-): Promise<MappedRow<T>[]> {
-    return new Promise((resolve, reject) => {
-        const results: MappedRow<T>[] = [];
-        const mapper = new Transform({
-            objectMode: true,
-            transform(row: Record<string, string>, _, callback) {
-                try {
-                    /**
-                     * construct mappedRow by processing each [ originalKey: string, newKeys: string|string[] ] entry in columnMapping
-                     */
-                    const mappedRow = Object.entries(columnMapping).reduce((
-                        acc, // accumulator object for mapped row
-                        [originalKey, newKeys]
-                    ) => {
-                        const rawValue = row[originalKey]?.trim() || '';
-                        let transformedValue = transformValue(rawValue, originalKey, valueMapping) || '';
-                        transformedValue = typeof transformedValue === 'string' 
-                            ? transformedValue.replace(/(\s{2,})/g, ' ').replace(/(\.{2,})/g, '.')
-                            : transformedValue; 
-                        /** mappedRow[d] = transformedValue for d in destinations */
-                        const destinations = Array.isArray(newKeys) ? newKeys : [newKeys];
-                        
-                        for (const newKey of destinations) {
-                            if (newKey in acc) {
-                                log.debug(`parseDelimitedFileWithMapping(), mappedRow = Object.entries(columnMapping).reduce(...) Overwriting existing field: ${newKey}`);
-                            }
-                            acc[newKey] = transformedValue;
-                        }             
-                        return acc;
-                    },
-                    {} as Record<string, FieldValue>);
-                    this.push(mappedRow);
-                    callback();
-                } catch (error) {
-                    callback(error as Error);
-                }
-            },
-        });
-        const delimiter = getDelimiterFromFilePath(filePath, fileType);
-        /**{@link CsvOptions} */
-        // let csvParserOptions: CsvOptions = { separator: delimiter };
-        pipeline(
-            fs.createReadStream(filePath),
-            csv(
-                { separator: delimiter }
-            ),
-            mapper,
-            (error) => error && reject(error)
-        );
-        mapper
-            .on('data', (data) => results.push(data))
-            .on('end', () => resolve(results))
-            .on('error', reject);
-    });
-}
-
-/**
- * @deprecated
- * @param {string} originalValue - The original value to be transformed with valueMapping or default operaitons
- * @param {string} originalKey  - The original column header (`key`) of the value being transformed
- * @param {ValueMapping} [valueMapping] {@link ValueMapping}
- * @returns `transformedValue` {@link FieldValue}
- */
-export function transformValue(
-    originalValue: string, 
-    originalKey: string, 
-    valueMapping?: ValueMapping
-): FieldValue {
-    let trimmedValue = originalValue.trim();
-    if (valueMapping && trimmedValue in valueMapping) {
-        return checkForOverride(trimmedValue, originalKey, valueMapping);
-    }
-
-    // Fallback to automatic type conversion
-    try {
-        if (BOOLEAN_TRUE_VALUES.includes(trimmedValue.toLowerCase())) return true;
-        if (BOOLEAN_FALSE_VALUES.includes(trimmedValue.toLowerCase())) return false;
-        
-        // const parsedDate = new Date(trimmedVal`ue);
-        // if (!isNaN(parsedDate.getTime())) return parsedDate;
-        
-        return trimmedValue;
-    } catch (error) {
-        log.warn(`Could not parse value: ${trimmedValue}`);
-        return trimmedValue;
-    }
-}
-/**
- * 
  * @param originalValue - the initial value to check if it should be overwritten
  * @param originalKey - the original column header (`key`) of the value being transformed
  * @param valueOverrides see {@link ValueMapping}
@@ -317,11 +192,9 @@ export function getDelimiterFromFilePath(
     }
 }
 
-
 /**
- * 
- * @param {string} filePath `string`
- * @returns {Array<string>} `jsonData` — `Array<string>`
+ * @param filePath `string`
+ * @returns {Array<string>} **`jsonData`** — `Array<string>`
  */
 export function readFileLinesIntoArray(filePath: string): Array<string> {
     const result: string[] = [];
@@ -341,8 +214,8 @@ export function readFileLinesIntoArray(filePath: string): Array<string> {
 
 /**
  * 
- * @param {string} filePath `string`
- * @returns {Record<string, any> | null} `jsonData` — `Record<string, any> | null` - JSON data as an object or null if an error occurs
+ * @param filePath `string`
+ * @returns {Record<string, any> | null} **`jsonData`** — `Record<string, any> | null` - JSON data as an object or null if an error occurs
  */
 export function readJsonFileAsObject(filePath: string): Record<string, any> | null {
     filePath = validateFileExtension(filePath, 'json').validatedFilePath;
@@ -352,18 +225,18 @@ export function readJsonFileAsObject(filePath: string): Record<string, any> | nu
         return jsonData;
     } catch (err) {
         log.error('Error reading or parsing the JSON file:', err, 
-            '\n\t Given File Path:', '"' + filePath + '"');
+            TAB+'Given File Path:', '"' + filePath + '"');
         return null;
     }
 }
 
 
 /**
- * @param {string} filePath `string`
- * @param {string} expectedExtension `string`
- * @returns `result`: {@link FileExtensionResult} = `{ isValid`: `boolean`, `validatedFilePath`: `string }`
+ * @param filePath `string`
+ * @param expectedExtension `string`
+ * @returns **`result`** = `{ isValid`: `boolean`, `validatedFilePath`: `string }`
  */
-export function validateFileExtension(filePath: string, expectedExtension: string): FileExtensionResult {
+export function validateFileExtension(filePath: string, expectedExtension: string): {isValid: boolean, validatedFilePath: string} {
     let isValid = false;
     let validatedFilePath = filePath;
     if (filePath && filePath.endsWith(`.${expectedExtension}`)) {

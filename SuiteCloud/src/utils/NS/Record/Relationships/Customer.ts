@@ -1,5 +1,5 @@
 /**
- * @file src/utils/ns/Record/Relationships/Customer.ts
+ * @file src/utils/ns/record/relationships/Customer.ts
  */
 import { RecordRef } from "../Record";
 import { RadioFieldBoolean } from "src/utils/typeValidation";
@@ -69,28 +69,9 @@ export interface CustomerSublists {
 
 /**
  * @enum {number} **`CustomerCategoryEnum`** 
- * @property {number} EXOSOME - `1`
- * @property {number} SYLFIRM - `2`
- * @property {number} MIRACU - `3`
- * @property {number} BENEV - `4`
- * @property {number} VIVISCAL - `5`
- * @property {number} BENEV_BIO - `6`
- * @property {number} ACARA - `7`
- * @property {number} INFUSION_SOLUTIONS - `8`
- * @property {number} PPE - `9`
- * @property {number} SELLAS - `10`
  */
 export enum CustomerCategoryEnum {
-    EXOSOME = 1,
-    SYLFIRM = 2,
-    MIRACU = 3,
-    BENEV = 4,
-    VIVISCAL = 5,
-    BENEV_BIO = 6,
-    ACARA = 7,
-    INFUSION_SOLUTIONS = 8,
-    PPE = 9,
-    SELLAS = 10,
+    CATEGORY_A = 1,
 }
 
 /**

@@ -3,16 +3,7 @@
  */
 import { stripCharFromString, toTitleCase } from "../regex"
 import { parseExcelForOneToMany } from "../reading"
-/**
- * 
- * @typedefn **`FileExtensionResult`**
- * @property {boolean} isValid - `true` if the `filePath` has the expected extension, `false` otherwise
- * @property {string} validatedFilePath - the `filePath` with the expected extension if it was missing, otherwise the original `filePath`
- */
-export type FileExtensionResult = {
-    isValid: boolean,
-    validatedFilePath: string
-}
+
 
 /**
  * @typedefn **`ParseOneToManyOptions`**
@@ -83,6 +74,7 @@ export type StringStripOptions = {
     rightArgs?: any[],
 }
 
+// maybe just make StringReplaceOptions a { RegExp: string } dictionary?
 /**
  * @typedefn **`StringReplaceOptions`**
  * @property {StringReplaceParams[]} replacements - an array of objects containing `searchValue` and `replaceValue` properties
