@@ -4,6 +4,8 @@
  */
 import { DATA_DIR } from "src/config/env";
 import { parseEntityFile } from "../parseEntity";
+import { ValueMapping } from "src/utils/io";
+import { CustomerCategoryEnum } from "src/utils/ns";
 
 /** `${DATA_DIR}/customers` */
 export const CUSTOMER_DIR = `${DATA_DIR}/customers` as string;
@@ -74,4 +76,9 @@ export enum CustomerColumnEnum {
     COMMENTS = 'Note',
     TITLE = 'Job Title',
     CLASS = 'Class',
+}
+
+
+export const CUSTOMER_CATEGORY_MAPPING: ValueMapping = {
+    'Category A': CustomerCategoryEnum.CATEGORY_A,
 }

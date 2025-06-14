@@ -13,7 +13,7 @@
 3. In my use case, the goal is to read data from csv files and store them into [payloads][sample_payloads_file]
 4. Determine proper mapping by using aforementioned [Record Browser][record_browser] ~~and store it into ParseOption objects.~~
 5. (deprecated, pending rewrite) ~~Then use ParseOptions[] as a parameter of parseCsvToPostRecordOptions~~
-6. (pending tests after rewrite) Use authorization tokens generated from authorization flow to make API calls, e.g. in [parseEntity.ts][parse_entity_file] using functions from [callApi.ts][call_api_file]
+6. (deprecated, pending rewrite) Use authorization tokens generated from authorization flow to make API calls, e.g. in [parseEntity.ts][parse_entity_file] using functions from [callApi.ts][call_api_file]
 7. Write more features/improvements and refactor as work continues.
 
 #### Guides I found helpful for using SuiteScript: 

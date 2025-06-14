@@ -26,21 +26,7 @@ import {
     PostRecordOptions, 
     FieldDictionary,
     FieldValue,
-    SetFieldValueOptions,
-    SetSublistValueOptions,
     SublistDictionary, 
-    // SublistFieldDictionary, // deprecated   
-    // SetSubrecordOptions, // deprecated
-
-    ParseOptions, RecordParseOptions, ParseResults,
-    FieldDictionaryParseOptions, 
-    FieldParentTypeEnum, 
-    FieldSubrecordMapping, 
-    FieldValueMapping, 
-    SublistDictionaryParseOptions, 
-    SublistFieldDictionaryParseOptions, 
-    SublistFieldValueMapping, 
-    SublistSubrecordMapping 
 } from "./utils/api/types";
 /** use to set the field `"isinactive"` to false */
 const NOT_DYNAMIC = false;
@@ -48,383 +34,380 @@ let rowIndex = 0;
 let pruneCount: Record<string, number> = {};
 
 /**
- * @TODO write a function that appends ParseResults contents of one record type to another
- */
-
-/**
  * @deprecated
  * @param csvPath `string` - The path to the CSV file.
- * @param recordParseOptions - {@link RecordParseOptions}
- * - = `{ [key` in {@link RecordTypeEnum}`]?:` {@link ParseOptions}`[] }`
- * - {@link ParseOptions} =
+ * @param recordParseOptions - {@link DEPRECATED_RecordParseOptions}
+ * - = `{ [key` in {@link RecordTypeEnum}`]?:` {@link DEPRECATED_ParseOptions}`[] }`
+ * - {@link DEPRECATED_ParseOptions} =
  * - -  `{ recordType: `{@link RecordTypeEnum}, `fieldDictParseOptions: `{@link FieldDictionaryParseOptions}, `sublistDictParseOptions: `{@link SublistDictionaryParseOptions}` }`
  * @returns **`results`** - `Promise<`{@link ParseResults}`>` 
  * = `{ [key` in {@link RecordTypeEnum}`]?:` `{ validPostOptions: Array<`{@link PostRecordOptions}`>, invalidPostOptions: Array<`{@link PostRecordOptions}`> } }`
  * - {@link PostRecordOptions} = `{ recordType: `{@link RecordTypeEnum}, `isDynamic: boolean`, `fieldDict: `{@link FieldDictionary}, `sublistDict: `{@link SublistDictionary}` }`
  */
-export async function parseCsvToPostRecordOptions(
-    csvPath: string,
-    recordParseOptions: RecordParseOptions
-): Promise<ParseResults>
+// export async function parseCsvToPostRecordOptions(
+//     csvPath: string,
+//     recordParseOptions: DEPRECATED_RecordParseOptions
+// ): Promise<ParseResults>
 
-export async function parseCsvToPostRecordOptions(
-    csvPath: string,
-    parseOptionsArray: ParseOptions[],
-): Promise<ParseResults>
+// export async function parseCsvToPostRecordOptions(
+//     csvPath: string,
+//     parseOptionsArray: DEPRECATED_ParseOptions[],
+// ): Promise<ParseResults>
 
-export async function parseCsvToPostRecordOptions(
-    csvPath: string,
-    /** `arg2` = {@link ParseOptions}`[]` or {@link RecordParseOptions} */
-    arg2: RecordParseOptions | ParseOptions[],
-): Promise<ParseResults> {
-    if (!csvPath || typeof csvPath !== 'string') {
-        throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No csvPath provided.`);
-    }
-    if (!fs.existsSync(csvPath)) {
-        throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: File not found: ${csvPath}`);
-    }
-    if (!arg2 
-        || (Array.isArray(arg2) && arg2.length === 0) 
-        || (typeof arg2 === 'object' && Object.keys(arg2).length === 0)
-    ) {
-        throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No arg2: (parseOptionsArray OR recordParseOptions) provided.`);
-    }
-    const recordParseOptions = {} as RecordParseOptions;
-    // handle overload when arg2 is an array of ParseOptions
-    if (Array.isArray(arg2)) { 
-        arg2.forEach((parseOptions, index) => {
-            const recordType = parseOptions.recordType;
-            if (!recordType) {
-                throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No recordType provided in parseOptions at arg2 parseOptionsArray[${index}].`);
-            }
-            if (recordParseOptions[recordType]) {
-                recordParseOptions[recordType].push(parseOptions);
-            } else {
-                recordParseOptions[recordType] = [parseOptions];
-            }
-        })
-    }
-    if (!recordParseOptions || Object.keys(recordParseOptions).length === 0) {
-        throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No parse options provided.`);
-    }
-    const results: ParseResults = {};
-    Object.keys(recordParseOptions).forEach(recordKey => {
-        results[recordKey] = { validPostOptions: [], invalidPostOptions: [] };
-    });
-    const startTime = new Date();
-    mlog.info(`Started processing CSV file at ${startTime.toLocaleString()}.`,)
-    return new Promise((resolve, reject) => {
-        rowIndex = 0;
-        fs.createReadStream(csvPath)
-            .pipe(csv({ separator: getDelimiterFromFilePath(csvPath)}))
-            .on('data', (row: Record<string, any>) => {
-                for (let recordKey of Object.keys(recordParseOptions)) {
-                    const parseOptionsArray = recordParseOptions[recordKey] as ParseOptions[];
-                    if (!Array.isArray(parseOptionsArray) || parseOptionsArray.length === 0) {
-                        mlog.error(`ERROR in parseCsvToPostRecordOptions() No parse options provided for recordParseOptions["${recordKey}"].`);
-                    }
-                    for (let [arrIndex, parseOptions] of Object.entries(parseOptionsArray)) {
-                        try {
-                            const { 
-                                recordType, 
-                                fieldDictParseOptions, 
-                                sublistDictParseOptions, 
-                                valueOverrides, 
-                                pruneFunc 
-                            } = parseOptions as ParseOptions;
-                            if (recordKey !== recordType) {
-                                mlog.error(`ERROR in parseCsvToPostRecordOptions() recordType ${recordKey} does not match parseOptions recordType ${recordType}.`);
-                                continue;
-                            }   
-                            validateFieldMappings(row, fieldDictParseOptions, sublistDictParseOptions as SublistDictionaryParseOptions);
-                            let postOptions: PostRecordOptions | null = generatePostRecordOptions(
-                                row,
-                                recordType,
-                                fieldDictParseOptions,
-                                sublistDictParseOptions as SublistDictionaryParseOptions,
-                                valueOverrides
-                            );
-                            let pruneResult: PostRecordOptions | null = null;
-                            if (pruneFunc) {
-                                pruneResult = pruneFunc(postOptions);
-                            }
-                            if (!pruneResult) {
-                                pruneCount[recordType] = (pruneCount[recordType] || 0) + 1;
-                                results[recordType]?.invalidPostOptions.push(postOptions);
-                                continue;
-                            }
-                            results[recordType]?.validPostOptions.push(postOptions);
-                        } catch (error) {
-                            mlog.error(`ERROR in parseCsvToPostRecordOptions() Error processing row ${rowIndex} at recordType ${recordKey}'s parseOptionsArray[${arrIndex}]:`, error);
-                            reject(error);
-                        }
-                    }
-                }
-                rowIndex++;
-            })
-            .on('end', () => {
-                const parseSummary: Record<string, any> = {};
-                Object.keys(results).forEach(recordKey => {
-                    parseSummary[recordKey] = {
-                        validPostOptions: results[recordKey]?.validPostOptions.length || 0,
-                        invalidPostOptions: results[recordKey]?.invalidPostOptions.length || 0,
-                        pruneCount: pruneCount[recordKey] || 0,
-                    }
-                });
-                const endTime = new Date();
-                mlog.info(`Finished processing CSV file at ${endTime.toLocaleString()}.`,
-                    TAB + ` Elapsed Time: ${((endTime.getTime() - startTime.getTime()) / 1000).toFixed(5)} seconds`,
-                    TAB + `Last rowIndex: ${rowIndex}`,
-                    TAB + `recordType(s): [${Object.keys(recordParseOptions).join(', ')}]`, 
-                    TAB + `parseSummary:`, indentedStringify(parseSummary),
-                    TAB + `csvPath: "${csvPath}"`
-                );
-                resolve(results)
-            })
-            .on('error', reject);
-    });
-}
+// export async function parseCsvToPostRecordOptions(
+//     csvPath: string,
+//     /** `arg2` = {@link DEPRECATED_ParseOptions}`[]` or {@link DEPRECATED_RecordParseOptions} */
+//     arg2: DEPRECATED_RecordParseOptions | DEPRECATED_ParseOptions[],
+// ): Promise<ParseResults> {
+//     if (!csvPath || typeof csvPath !== 'string') {
+//         throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No csvPath provided.`);
+//     }
+//     if (!fs.existsSync(csvPath)) {
+//         throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: File not found: ${csvPath}`);
+//     }
+//     if (!arg2 
+//         || (Array.isArray(arg2) && arg2.length === 0) 
+//         || (typeof arg2 === 'object' && Object.keys(arg2).length === 0)
+//     ) {
+//         throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No arg2: (parseOptionsArray OR recordParseOptions) provided.`);
+//     }
+//     const recordParseOptions = {} as DEPRECATED_RecordParseOptions;
+//     // handle overload when arg2 is an array of ParseOptions
+//     if (Array.isArray(arg2)) { 
+//         arg2.forEach((parseOptions, index) => {
+//             const recordType = parseOptions.recordType;
+//             if (!recordType) {
+//                 throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No recordType provided in parseOptions at arg2 parseOptionsArray[${index}].`);
+//             }
+//             if (recordParseOptions[recordType]) {
+//                 recordParseOptions[recordType].push(parseOptions);
+//             } else {
+//                 recordParseOptions[recordType] = [parseOptions];
+//             }
+//         })
+//     }
+//     if (!recordParseOptions || Object.keys(recordParseOptions).length === 0) {
+//         throw new Error(`ERROR in parseCsvToPostRecordOptions() Unable to Start: No parse options provided.`);
+//     }
+//     const results: ParseResults = {};
+//     Object.keys(recordParseOptions).forEach(recordKey => {
+//         results[recordKey] = { validPostOptions: [], invalidPostOptions: [] };
+//     });
+//     const startTime = new Date();
+//     mlog.info(`Started processing CSV file at ${startTime.toLocaleString()}.`,)
+//     return new Promise((resolve, reject) => {
+//         rowIndex = 0;
+//         fs.createReadStream(csvPath)
+//             .pipe(csv({ separator: getDelimiterFromFilePath(csvPath)}))
+//             .on('data', (row: Record<string, any>) => {
+//                 for (let recordKey of Object.keys(recordParseOptions)) {
+//                     const parseOptionsArray = recordParseOptions[recordKey] as DEPRECATED_ParseOptions[];
+//                     if (!Array.isArray(parseOptionsArray) || parseOptionsArray.length === 0) {
+//                         mlog.error(`ERROR in parseCsvToPostRecordOptions() No parse options provided for recordParseOptions["${recordKey}"].`);
+//                     }
+//                     for (let [arrIndex, parseOptions] of Object.entries(parseOptionsArray)) {
+//                         try {
+//                             // const { 
+//                             //     recordType, 
+//                             //     // fieldDictParseOptions, 
+//                             //     // sublistDictParseOptions, 
+//                             //     valueOverrides, 
+//                             //     pruneFunc 
+//                             // } = parseOptions as DEPRECATED_ParseOptions;
+//                             // if (recordKey !== recordType) {
+//                             //     mlog.error(`ERROR in parseCsvToPostRecordOptions() recordType ${recordKey} does not match parseOptions recordType ${recordType}.`);
+//                             //     continue;
+//                             // }   
+//                             // validateFieldMappings(row, fieldDictParseOptions, sublistDictParseOptions as SublistDictionaryParseOptions);
+//                             // let postOptions: PostRecordOptions | null = generatePostRecordOptions(
+//                             //     row,
+//                             //     recordType,
+//                             //     fieldDictParseOptions,
+//                             //     sublistDictParseOptions as SublistDictionaryParseOptions,
+//                             //     valueOverrides
+//                             // );
+//                             // let pruneResult: PostRecordOptions | null = null;
+//                             // if (pruneFunc) {
+//                             //     pruneResult = pruneFunc(postOptions);
+//                             // }
+//                             // if (!pruneResult) {
+//                             //     pruneCount[recordType] = (pruneCount[recordType] || 0) + 1;
+//                             //     results[recordType]?.invalidPostOptions.push(postOptions);
+//                             //     continue;
+//                             // }
+//                             // results[recordType]?.validPostOptions.push(postOptions);
+//                         } catch (error) {
+//                             mlog.error(`ERROR in parseCsvToPostRecordOptions() Error processing row ${rowIndex} at recordType ${recordKey}'s parseOptionsArray[${arrIndex}]:`, error);
+//                             reject(error);
+//                         }
+//                     }
+//                 }
+//                 rowIndex++;
+//             })
+//             .on('end', () => {
+//                 const parseSummary: Record<string, any> = {};
+//                 Object.keys(results).forEach(recordKey => {
+//                     parseSummary[recordKey] = {
+//                         validPostOptions: results[recordKey]?.validPostOptions.length || 0,
+//                         invalidPostOptions: results[recordKey]?.invalidPostOptions.length || 0,
+//                         pruneCount: pruneCount[recordKey] || 0,
+//                     }
+//                 });
+//                 const endTime = new Date();
+//                 mlog.info(`Finished processing CSV file at ${endTime.toLocaleString()}.`,
+//                     TAB + ` Elapsed Time: ${((endTime.getTime() - startTime.getTime()) / 1000).toFixed(5)} seconds`,
+//                     TAB + `Last rowIndex: ${rowIndex}`,
+//                     TAB + `recordType(s): [${Object.keys(recordParseOptions).join(', ')}]`, 
+//                     TAB + `parseSummary:`, indentedStringify(parseSummary),
+//                     TAB + `csvPath: "${csvPath}"`
+//                 );
+//                 resolve(results)
+//             })
+//             .on('error', reject);
+//     });
+// }
 
 /**
  * @deprecated
  * @param row `Record<string, any>` - The CSV row to validate.
- * @param fieldDict - {@link FieldDictionaryParseOptions} = `{ fieldValueMapArray: Array<`{@link FieldValueMapping}`>, subrecordMapArray: Array<`{@link FieldSubrecordMapping}`> }`
- * @param sublistDict - {@link SublistDictionaryParseOptions} = `{ [sublistId: string]: { fieldValueMapArray: Array<`{@link SublistFieldValueMapping}`>, subrecordMapArray: Array<`{@link SublistSubrecordMapping}`> } }`
+ * @param fieldDict - {@link FieldDictionaryParseOptions} = `{ fieldValueMapArray: Array<`{@link FieldValueParseOptions}`>, subrecordMapArray: Array<`{@link FieldSubrecordParseOptions}`> }`
+ * @param sublistDict - {@link SublistDictionaryParseOptions} = `{ [sublistId: string]: { fieldValueMapArray: Array<`{@link SublistFieldValueParseOptions}`>, subrecordMapArray: Array<`{@link SublistSubrecordParseOptions}`> } }`
  * @throws `Error` if any of the required fields are missing in the CSV row
  */
-function validateFieldMappings(
-    row: Record<string, any>,
-    fieldDict: FieldDictionaryParseOptions,
-    sublistDict: SublistDictionaryParseOptions
-): void {
-    // Validate body field mappings
-    fieldDict.fieldValueMapArray?.forEach(mapping => {
-        if ('colName' in mapping && mapping.colName && !(mapping.colName in row)) {
-            throw new Error(`Missing CSV column for field mapping: ${mapping.colName}`);
-        }
-    });
+// function validateFieldMappings(
+//     row: Record<string, any>,
+//     fieldDict: FieldDictionaryParseOptions,
+//     sublistDict: SublistDictionaryParseOptions
+// ): void {
+//     // Validate body field mappings
+//     // fieldDict.fieldValues?.forEach(mapping => {
+//     //     if ('colName' in mapping && mapping.colName && !(mapping.colName in row)) {
+//     //         throw new Error(`Missing CSV column for field mapping: ${mapping.colName}`);
+//     //     }
+//     // });
 
-    // Validate sublist field mappings
-    Object.values(sublistDict).forEach(sublist => {
-        sublist.fieldValueMapArray?.forEach(mapping => {
-            if ('colName' in mapping && mapping.colName && !(mapping.colName in row)) {
-                throw new Error(`Missing CSV column for sublist mapping: ${mapping.colName}`);
-            }
-        });
-    });
-}
+//     // // Validate sublist field mappings
+//     // Object.values(sublistDict).forEach(sublist => {
+//     //     sublist.fieldValues?.forEach(mapping => {
+//     //         if ('colName' in mapping && mapping.colName && !(mapping.colName in row)) {
+//     //             throw new Error(`Missing CSV column for sublist mapping: ${mapping.colName}`);
+//     //         }
+//     //     });
+//     // });
+// }
 
 /**
  * @deprecated
  * @description returns a {@link PostRecordOptions} object for the given row and record type. to use in a request body to make a record in NetSuite in standard mode (`isDynamic = false`).
  * @param row `Record<string, any>`
  * @param recordType - {@link RecordTypeEnum}
- * @param fieldDictParseOptions - {@link FieldDictionaryParseOptions} = `{ fieldValueMapArray: Array<`{@link FieldValueMapping}`>, subrecordMapArray: Array<`{@link FieldSubrecordMapping}`> }`
- * @param sublistDictParseOptions - {@link SublistDictionaryParseOptions} = `{ [sublistId: string]: { fieldValueMapArray: Array<`{@link SublistFieldValueMapping}`>, subrecordMapArray: Array<`{@link SublistSubrecordMapping}`> } }`
+ * @param fieldDictParseOptions - {@link FieldDictionaryParseOptions} = `{ fieldValueMapArray: Array<`{@link FieldValueParseOptions}`>, subrecordMapArray: Array<`{@link FieldSubrecordParseOptions}`> }`
+ * @param sublistDictParseOptions - {@link SublistDictionaryParseOptions} = `{ [sublistId: string]: { fieldValueMapArray: Array<`{@link SublistFieldValueParseOptions}`>, subrecordMapArray: Array<`{@link SublistSubrecordParseOptions}`> } }`
  * @param valueOverrides - {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
  * @returns **`postOptions`** - {@link PostRecordOptions} = `{ recordType: string, isDynamic: boolean=false, fieldDict: `{@link FieldDictionary},` sublistDict: `{@link SublistDictionary}` }`
  */
-export function generatePostRecordOptions(
-    row: Record<string, any>, 
-    recordType: RecordTypeEnum, 
-    fieldDictParseOptions: FieldDictionaryParseOptions, 
-    sublistDictParseOptions: SublistDictionaryParseOptions,
-    valueOverrides?: ValueMapping
-): PostRecordOptions {
-    let postOptions = { 
-        recordType: recordType,
-        isDynamic: NOT_DYNAMIC,
-        fieldDict: generateFieldDictionary(row, fieldDictParseOptions, valueOverrides) as FieldDictionary,
-        sublistDict: generateSublistDictionary(row, sublistDictParseOptions, valueOverrides) as SublistDictionary,
-    }
-    return postOptions as PostRecordOptions;
-}
+// export function generatePostRecordOptions(
+//     row: Record<string, any>, 
+//     recordType: RecordTypeEnum, 
+//     fieldDictParseOptions: FieldDictionaryParseOptions, 
+//     sublistDictParseOptions: SublistDictionaryParseOptions,
+//     valueOverrides?: ValueMapping
+// ): PostRecordOptions {
+//     let postOptions = { 
+//         recordType: recordType,
+//         isDynamic: NOT_DYNAMIC,
+//         fieldDict: generateFieldDictionary(row, fieldDictParseOptions, valueOverrides) as FieldDictionary,
+//         sublistDict: generateSublistDictionary(row, sublistDictParseOptions, valueOverrides) as SublistDictionary,
+//     }
+//     return postOptions as PostRecordOptions;
+// }
 
 
 /**
  * @deprecated
  * @param row `Record<string, any>`
- * @param fieldDictParseOptions {@link FieldDictionaryParseOptions} = { `fieldValueMapArray`: `Array<`{@link FieldValueMapping}`>`, `subrecordMapArray`: `Array<`{@link FieldSubrecordMapping}`> }`
+ * @param fieldDictParseOptions {@link FieldDictionaryParseOptions} = { `fieldValueMapArray`: `Array<`{@link FieldValueParseOptions}`>`, `subrecordMapArray`: `Array<`{@link FieldSubrecordParseOptions}`> }`
  * @param valueOverrides {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
  * @returns **`fieldDict`** — {@link FieldDictionary} = { `valueFields`: `Array<`{@link SetFieldValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`> }`
  */
-export function generateFieldDictionary(
-    row: Record<string, any>,
-    fieldDictParseOptions: FieldDictionaryParseOptions, 
-    valueOverrides?: ValueMapping
-): FieldDictionary {
-    const fieldDict = {
-        valueFields: generateSetFieldValueOptionsArray(row, fieldDictParseOptions.fieldValueMapArray, valueOverrides) as SetFieldValueOptions[],
-        subrecordFields: generateSetSubrecordOptionsArray(row, FieldParentTypeEnum.BODY, fieldDictParseOptions.subrecordMapArray || [], valueOverrides) as SetSubrecordOptions[],
-    } as FieldDictionary;
-    return fieldDict;
-}
+// export function generateFieldDictionary(
+//     row: Record<string, any>,
+//     fieldDictParseOptions: FieldDictionaryParseOptions, 
+//     valueOverrides?: ValueMapping
+// ): FieldDictionary {
+//     const fieldDict = {
+//         // valueFields: generateSetFieldValueOptionsArray(row, fieldDictParseOptions.fieldMapping, valueOverrides) as SetFieldValueOptions[],
+//         // subrecordFields: generateSetSubrecordOptionsArray(row, FieldParentTypeEnum.BODY, fieldDictParseOptions.fieldSubrecordMapping || [], valueOverrides) as SetSubrecordOptions[],
+//     } as FieldDictionary;
+//     return fieldDict;
+// }
 
 /**
  * @deprecated
  * @param row `Record<string, any>`
- * @param sublistDictParseOptions {@link SublistDictionaryParseOptions} = { [`sublistId`: string]: {@link SublistFieldDictionaryParseOptions} }
- * = { [`sublistId`: string]: { `fieldValueMapArray`: `Array<`{@link SublistFieldValueMapping}`>`, `subrecordMapArray`: `Array<`{@link SublistSubrecordMapping}`>` } } 
+ * @param sublistDictParseOptions {@link SublistDictionaryParseOptions} = { [`sublistId`: string]: {@link SublistLineParseOptions} }
+ * = { [`sublistId`: string]: { `fieldValueMapArray`: `Array<`{@link SublistFieldValueParseOptions}`>`, `subrecordMapArray`: `Array<`{@link SublistSubrecordParseOptions}`>` } } 
  * @param valueOverrides {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
  * @returns **`sublistDict`** — {@link SublistDictionary} = { [`sublistId`: string]: {@link SublistFieldDictionary} }
  * = { [`sublistId`: string]: { `valueFields`: `Array<`{@link SetSublistValueOptions}`>`, `subrecordFields`: `Array<`{@link SetSubrecordOptions}`>` } }
  */
-export function generateSublistDictionary(
-    row: Record<string, any>, 
-    sublistDictParseOptions: SublistDictionaryParseOptions,
-    valueOverrides?: ValueMapping
-): SublistDictionary {
-    const sublistDict = {} as SublistDictionary;
-    for (let sublistId of Object.keys(sublistDictParseOptions)) {
-        let sublistFieldDictOptions: SublistFieldDictionaryParseOptions = sublistDictParseOptions[sublistId];
-        sublistDict[sublistId] = {
-            valueFields: generateSetSublistValueOptionsArray(row, sublistFieldDictOptions.fieldValueMapArray, valueOverrides) as SetSublistValueOptions[],
-            subrecordFields: generateSetSubrecordOptionsArray(row, FieldParentTypeEnum.SUBLIST, sublistFieldDictOptions.subrecordMapArray || [], valueOverrides) as SetSubrecordOptions[],
-        } as SublistFieldDictionary;
-    }
-    return sublistDict;
-}
+// export function generateSublistDictionary(
+//     row: Record<string, any>, 
+//     sublistDictParseOptions: SublistDictionaryParseOptions,
+//     valueOverrides?: ValueMapping
+// ): SublistDictionary {
+//     const sublistDict = {} as SublistDictionary;
+//     for (let sublistId of Object.keys(sublistDictParseOptions)) {
+//         let sublistFieldDictOptions: SublistLineParseOptions = sublistDictParseOptions[sublistId];
+//         sublistDict[sublistId] = []; 
+//         // {
+//             // valueFields: generateSetSublistValueOptionsArray(row, sublistFieldDictOptions.fieldValueMapArray, valueOverrides) as SetSublistValueOptions[],
+//             // subrecordFields: generateSetSubrecordOptionsArray(row, FieldParentTypeEnum.SUBLIST, sublistFieldDictOptions.subrecordMapArray || [], valueOverrides) as SetSubrecordOptions[],
+//         // };
+//     }
+//     return sublistDict;
+// }
 
 /**
  * @deprecated
  * @param row `Record<string, any>`
  * @param parentType {@link FieldParentTypeEnum} 
- * @param subrecordMapArray `Array<`{@link FieldSubrecordMapping}`> | Array<`{@link SublistSubrecordMapping}`>`
+ * @param subrecordMapArray `Array<`{@link FieldSubrecordParseOptions}`> | Array<`{@link SublistSubrecordParseOptions}`>`
  * @returns **`arr`** — `Array<`{@link SetSubrecordOptions}`>` = `{ parentSublistId`?: string, `line`?: string, `fieldId`: string, `subrecordType`: string, `fieldDict`: {@link FieldDictionary}, `sublistDict`: {@link SublistDictionary}` }[]`
  */
-export function generateSetSubrecordOptionsArray(
-    row: Record<string, any>, 
-    parentType: FieldParentTypeEnum, 
-    subrecordMapArray: FieldSubrecordMapping[] | SublistSubrecordMapping[],
-    valueOverrides?: ValueMapping
-): SetSubrecordOptions[] {
-    let arr = [] as SetSubrecordOptions[];    
-    if (parentType === FieldParentTypeEnum.BODY) {
-        for (let subrecordMap of subrecordMapArray) {
-            let { fieldId, subrecordType, fieldDictOptions, sublistDictOptions } = subrecordMap as FieldSubrecordMapping;
-            let fieldSubrecOptions: SetSubrecordOptions = {
-                fieldId: fieldId,
-                subrecordType: subrecordType,
-            }
-            if (fieldDictOptions) {
-                fieldSubrecOptions.fieldDict = generateFieldDictionary(row, fieldDictOptions, valueOverrides);
-            }
-            if (sublistDictOptions) {
-                fieldSubrecOptions.sublistDict = generateSublistDictionary(row, sublistDictOptions, valueOverrides);
-            }
-            arr.push(fieldSubrecOptions);
-        }
-    } else if (parentType === FieldParentTypeEnum.SUBLIST) {
-        for (let [index, subrecordMap] of Object.entries(subrecordMapArray)) {
-            let { parentSublistId, line, fieldId, subrecordType, fieldDictParseOptions: fieldDictOptions, sublistDictParseOptions: sublistDictOptions } = subrecordMap as SublistSubrecordMapping;
-            let sublistSubrecOptions: SetSubrecordOptions = {
-                parentSublistId: parentSublistId,
-                line: line === undefined || line === null ? parseInt(index) : line,
-                fieldId: fieldId,
-                subrecordType: subrecordType,
-            }
-            if (fieldDictOptions) {
-                sublistSubrecOptions.fieldDict = generateFieldDictionary(row, fieldDictOptions, valueOverrides);
-            }
-            if (sublistDictOptions) {
-                sublistSubrecOptions.sublistDict = generateSublistDictionary(row, sublistDictOptions, valueOverrides);
-            }
-            arr.push(sublistSubrecOptions);
-        }
-    } else {
-        throw new Error(`generateSetSubrecordOptionsArray() Invalid parentType: ${parentType}`);
-    }
-    return arr;
-}
+// export function generateSetSubrecordOptionsArray(
+//     row: Record<string, any>, 
+//     parentType: FieldParentTypeEnum, 
+//     subrecordMapArray: FieldSubrecordParseOptions[] | SublistSubrecordParseOptions[],
+//     valueOverrides?: ValueMapping
+// ): any[]{//SetSubrecordOptions[] {
+//     let arr = [] as any[];    
+//     // if (parentType === FieldParentTypeEnum.BODY) {
+//     //     for (let subrecordMap of subrecordMapArray) {
+//     //         let { fieldId, subrecordType, fieldDictOptions, sublistDictOptions } = subrecordMap as FieldSubrecordMapping;
+//     //         let fieldSubrecOptions: SetSubrecordOptions = {
+//     //             fieldId: fieldId,
+//     //             subrecordType: subrecordType,
+//     //         }
+//     //         if (fieldDictOptions) {
+//     //             fieldSubrecOptions.fieldDict = generateFieldDictionary(row, fieldDictOptions, valueOverrides);
+//     //         }
+//     //         if (sublistDictOptions) {
+//     //             fieldSubrecOptions.sublistDict = generateSublistDictionary(row, sublistDictOptions, valueOverrides);
+//     //         }
+//     //         arr.push(fieldSubrecOptions);
+//     //     }
+//     // } else if (parentType === FieldParentTypeEnum.SUBLIST) {
+//     //     for (let [index, subrecordMap] of Object.entries(subrecordMapArray)) {
+//     //         let { sublistId: parentSublistId, line, fieldId, subrecordType, fieldDictParseOptions: fieldDictOptions, sublistDictParseOptions: sublistDictOptions } = subrecordMap as SublistSubrecordMapping;
+//     //         let sublistSubrecOptions: SetSubrecordOptions = {
+//     //             parentSublistId: parentSublistId,
+//     //             line: line === undefined || line === null ? parseInt(index) : line,
+//     //             fieldId: fieldId,
+//     //             subrecordType: subrecordType,
+//     //         }
+//     //         if (fieldDictOptions) {
+//     //             sublistSubrecOptions.fieldDict = generateFieldDictionary(row, fieldDictOptions, valueOverrides);
+//     //         }
+//     //         if (sublistDictOptions) {
+//     //             sublistSubrecOptions.sublistDict = generateSublistDictionary(row, sublistDictOptions, valueOverrides);
+//     //         }
+//     //         arr.push(sublistSubrecOptions);
+//     //     }
+//     // } else {
+//     //     throw new Error(`generateSetSubrecordOptionsArray() Invalid parentType: ${parentType}`);
+//     // }
+//     return arr;
+// }
 
 /**
  * @deprecated
  * @param row `Record<string, any>`
- * @param sublistFieldValueMapArray `Array<`{@link SublistFieldValueMapping}`>` = `{ sublistId`: string, `line`: number, `fieldId`: string, `colName`?: string`, `evaluator`?: `(row: Record<string, any>) => `{@link FieldValue}` }[]`
+ * @param sublistFieldValueMapArray `Array<`{@link SublistFieldValueParseOptions}`>` = `{ sublistId`: string, `line`: number, `fieldId`: string, `colName`?: string`, `evaluator`?: `(row: Record<string, any>) => `{@link FieldValue}` }[]`
  * @param valueOverrides {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
  * @returns **`arr`** — `Array<`{@link SetSublistValueOptions}`>` = `{ sublistId`: string, `line`: number, `fieldId`: string, `value`: string | number | boolean | Date` }[]`
  */
-export function generateSetSublistValueOptionsArray(
-    row: Record<string, any>,
-    sublistFieldValueMapArray: SublistFieldValueMapping[],
-    valueOverrides?: ValueMapping
-): SetSublistValueOptions[] {
-    let arr = [] as SetSublistValueOptions[];
-    for (let [index, sublistFieldValueMap] of Object.entries(sublistFieldValueMapArray)) {
-        try {
-            let { sublistId, line, fieldId, defaultValue, colName, evaluator, args } = sublistFieldValueMap;
-            if (!fieldId || (isNullLike(defaultValue) && !colName && !evaluator)) {
-                throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or evaluator or defaultValue`);
-            }     
-            let rowValue: FieldValue = null;    
-            if (evaluator) {
-                rowValue = evaluator(row, ...(args || []));
-            } else if (colName) {
-                rowValue = transformValue(String(row[colName]), colName, fieldId, valueOverrides);
-            } 
+// export function generateSetSublistValueOptionsArray(
+//     row: Record<string, any>,
+//     sublistFieldValueMapArray: SublistFieldValueParseOptions[],
+//     valueOverrides?: ValueMapping
+// ): SetSublistValueOptions[] {
+//     let arr = [] as SetSublistValueOptions[];
+//     for (let [index, sublistFieldValueMap] of Object.entries(sublistFieldValueMapArray)) {
+//         try {
+//             let { sublistId, line, fieldId, defaultValue, colName, evaluator, args } = sublistFieldValueMap;
+//             if (!fieldId || (isNullLike(defaultValue) && !colName && !evaluator)) {
+//                 throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or evaluator or defaultValue`);
+//             }     
+//             let rowValue: FieldValue = null;    
+//             if (evaluator) {
+//                 rowValue = evaluator(row, ...(args || []));
+//             } else if (colName) {
+//                 rowValue = transformValue(String(row[colName]), colName, fieldId, valueOverrides);
+//             } 
             
-            if (defaultValue !== undefined && isNullLike(rowValue)) {
-                rowValue = defaultValue;
-            }
+//             if (defaultValue !== undefined && isNullLike(rowValue)) {
+//                 rowValue = defaultValue;
+//             }
 
-            if (isNullLike(rowValue)) {
-                continue;
-            }
-            arr.push({
-                sublistId: sublistId, 
-                line: line === undefined || line === null ? parseInt(index) : line, 
-                fieldId: fieldId, 
-                value: rowValue 
-            });
-        } catch (error) {
-            mlog.error(`rowIndex ${rowIndex}: generateSetSublistValueOptionsArray() Error processing sublistFieldValueMapArray[${index}]:`, 
-                `${sublistFieldValueMap}`, error);
-        }
-    }
-    return arr;
-}
+//             if (isNullLike(rowValue)) {
+//                 continue;
+//             }
+//             arr.push({
+//                 sublistId: sublistId, 
+//                 line: line === undefined || line === null ? parseInt(index) : line, 
+//                 fieldId: fieldId, 
+//                 value: rowValue 
+//             });
+//         } catch (error) {
+//             mlog.error(`rowIndex ${rowIndex}: generateSetSublistValueOptionsArray() Error processing sublistFieldValueMapArray[${index}]:`, 
+//                 `${sublistFieldValueMap}`, error);
+//         }
+//     }
+//     return arr;
+// }
 
 /**
  * @deprecated
  * @param row `Record<string, any>`
- * @param fieldValueMapArray `Array<`{@link FieldValueMapping}`>` = `{ fieldId`: string, `colName`?: string, `evaluator`?: `(row: Record<string, any>) => `{@link FieldValue}` }[]` 
+ * @param fieldValueMapArray `Array<`{@link FieldValueParseOptions}`>` = `{ fieldId`: string, `colName`?: string, `evaluator`?: `(row: Record<string, any>) => `{@link FieldValue}` }[]` 
  * @param valueOverrides {@link ValueMapping} = `{ [originalValue: string]: `{@link FieldValue} | {@link ValueMappingEntry}` }`
  * @returns **`arr`** — `Array<`{@link SetFieldValueOptions}`>` = `{ fieldId`: string, `value`: string | number | boolean | Date` }[]`
  */
-export function generateSetFieldValueOptionsArray(
-    row: Record<string, any>, 
-    fieldValueMapArray: FieldValueMapping[],
-    valueOverrides?: ValueMapping
-): SetFieldValueOptions[] {
-    let arr = [] as SetFieldValueOptions[];
-    for (let [index, fieldValueMap] of Object.entries(fieldValueMapArray)) {
-        try {
-            let { fieldId, defaultValue, colName, evaluator, args } = fieldValueMap;
-            if (!fieldId || (isNullLike(defaultValue) && !colName && !evaluator)) {
-                throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or evaluator or defaultValue`);
-            }     
-            let rowValue: FieldValue = null;
-            if (evaluator) {
-                rowValue = evaluator(row, ...(args || []));
-            } else if (colName) {
-                rowValue = transformValue(String(row[colName]), colName, fieldId, valueOverrides);
-            }
+// export function generateSetFieldValueOptionsArray(
+//     row: Record<string, any>, 
+//     fieldValueMapArray: FieldValueParseOptions[],
+//     valueOverrides?: ValueMapping
+// ): SetFieldValueOptions[] {
+//     let arr = [] as SetFieldValueOptions[];
+//     // for (let [index, fieldValueMap] of Object.entries(fieldValueMapArray)) {
+//     //     try {
+//     //         let { fieldId, defaultValue, colName, evaluator, args } = fieldValueMap;
+//     //         if (!fieldId || (isNullLike(defaultValue) && !colName && !evaluator)) {
+//     //             throw new Error(`generateSetFieldValueOptionsArray(), fieldValueMapArray[${index}], invalid mapping for ${fieldId} must have fieldId and colName or evaluator or defaultValue`);
+//     //         }     
+//     //         let rowValue: FieldValue = null;
+//     //         if (evaluator) {
+//     //             rowValue = evaluator(row, ...(args || []));
+//     //         } else if (colName) {
+//     //             rowValue = transformValue(String(row[colName]), colName, fieldId, valueOverrides);
+//     //         }
 
-            if (defaultValue !== undefined && isNullLike(rowValue)) {
-                rowValue = defaultValue;
-            }   
+//     //         if (defaultValue !== undefined && isNullLike(rowValue)) {
+//     //             rowValue = defaultValue;
+//     //         }   
             
-            if (isNullLike(rowValue)) {
-                continue;
-            }
-            arr.push({fieldId: fieldId, value: rowValue })
-        } catch (error) {
-            mlog.error(`rowIndex ${rowIndex}: generateSetFieldValueOptionsArray() Error processing fieldValueMapArray[${index}]:`, 
-                `${fieldValueMap}`, error);
-        }
-    }
-    return arr;
-}
+//     //         if (isNullLike(rowValue)) {
+//     //             continue;
+//     //         }
+//     //         arr.push({fieldId: fieldId, value: rowValue })
+//     //     } catch (error) {
+//     //         mlog.error(`rowIndex ${rowIndex}: generateSetFieldValueOptionsArray() Error processing fieldValueMapArray[${index}]:`, 
+//     //             `${fieldValueMap}`, error);
+//     //     }
+//     // }
+//     return arr;
+// }
 
 /**
  * @deprecated

@@ -106,14 +106,6 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
                 scriptId: 167,
                 deployId: 1,
             },
-            POST_CreateRecord: {
-                scriptId: 168,
-                deployId: 1,
-            },
-            POST_BatchCreateRecord: {
-                scriptId: 169,
-                deployId: 1,
-            },
             GET_RetrieveRecordById: {
                 scriptId: 171,
                 deployId: 1,
@@ -126,15 +118,19 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
                 scriptId: 173,
                 deployId: 1,
             },
+            POST_UpsertRecord: {
+                scriptId: 174,
+                deployId: 1,
+            },
         } as ScriptDictionary,
     }
 }
 
-/** Define in .env to use as path stem `C:/Users/${USER}` */
-export const USER = process.env.CURRENT_USER || 'MISSING_ENV_VARIABLE-CURRENT_USER';
-
-/** = `C:/Users/${USER}/OneDrive - ${ENTITY_NAME}` */
-export const ONE_DRIVE_DIR = `C:/Users/${USER}/OneDrive - ENTITY_NAME`;
+export const USER = process.cwd().split(path.sep)[2];
+console.log(`USER = '${USER}'`);
+const ORGANIZATION = process.env.ORGANIZATION || 'MISSING_ENV_VAR-ORGANIZATION';
+/** `C:/Users/${USER}/OneDrive - ${ORGANIZATION}` */
+export const ONE_DRIVE_DIR = `C:/Users/${USER}/OneDrive - ${ORGANIZATION}` as string;
 /** `${`{@link ONE_DRIVE_DIR}`}/NetSuite/logs` (not part of git repo so no worry about file size) */
 export const CLOUD_LOG_DIR = path.join(ONE_DRIVE_DIR, 'NetSuite', 'logs') as string;
 /** = {@link NODE_HOME_DIR}`/../data` = `root/data` */

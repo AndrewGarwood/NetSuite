@@ -5,5 +5,5 @@ export * from "./Api";
 export * from "./GetRequests";
 export * from "./PostRequests";
 export * from "./DeleteRequests";
-export * from "./CsvToApiMapping";
+export * from "./CsvParseOptions";
 export * from "../../ns";

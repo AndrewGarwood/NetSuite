@@ -1,21 +1,9 @@
 /**
- * @file src/types/io/Csv.ts
- * @description Types and Enums for handling CSV files, including column mappings and delimiters.
- * @module Csv
+ * @file src/utils/io/types/Csv.ts
  */
 import { 
     FieldValue,
 } from "../../api/types/Api";
-import { parseDelimitedFileWithMapping } from "src/utils/io/reading";
-// --------------------------------------------------------------------
-/** types for the {@link parseDelimitedFileWithMapping}`()` function */
-
-/**
- * @deprecated 
- * Mapping of original column names to NetSuite column names
- * - Record<string, string>, entry = [originalKey, newKey(s)] 
- */
-export type ColumnMapping = Record<string, string | string[]>;
 
 /**
  * only set oldValue to newValue if the column name is in validColumns
@@ -56,31 +44,6 @@ export function isValueMappingEntry(value: any): value is ValueMappingEntry {
  * - - a {@link ValueMappingEntry} -> override occurences of `key` only in specified columns (see {@link ValueMappingEntry.validColumns}) with {@link ValueMappingEntry.newValue}.
  */
 export type ValueMapping = Record<string, FieldValue | ValueMappingEntry>;
-
-/**
- * @deprecated 
- * @description The MappedRow type remaps the keys of the input 
- * type T (a {@link ColumnMapping}) to its values, and assigns the type string to all 
- * the new keys
- * @Notes
- * - `T extends ColumnMapping` - ensures that T is an object with string keys and string values, see {@link ColumnMapping}
- * Mapped Type Syntax: `{ [K in keyof T as T[K]]: string }`
- * - ` [K in keyof T` - iterates over the keys of T using `keyof T` and creates a new object type. 
- *   - For each key K in T, the ` as T[K]` clause renames the key in the resulting type to the value of T[K]
- *   - ` as T[K]]}` transforms the keys of the resulting type. Instead of keeping the original keys from T, it uses the values of T as the new keys
- * - `: string`- specifies that the value type of the new object is always a string.
- */
-export type MappedRow<T extends ColumnMapping> = {
-    [K in keyof T as 
-        T[K] extends string 
-            ? T[K] 
-            : T[K] extends Array<string> 
-                ? T[K][number] 
-                : never
-    ]: FieldValue;
-};
-// 
-// type MappedRow<T extends ColumnMapping> = { [K in keyof T as T[K]]: string};
 
 /**
  * @description The DelimitedFileTypeEnum enum defines the possible file types for delimited files.

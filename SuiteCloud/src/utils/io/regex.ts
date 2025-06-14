@@ -4,13 +4,14 @@
 import { parseLogger as log, mainLogger as mlog, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
 import { StringCaseOptions, StringPadOptions, StringStripOptions, StringReplaceParams, StringReplaceOptions } from "./types/Reading";
 import { isNonEmptyArray } from '../typeValidation';
+import { distance as levenshteinDistance } from 'fastest-levenshtein';
 
 
 /**
  * @description 
- * - applies options in this order: StringReplaceOptions, StringStripOptions, StringCaseOptions, StringPadOptions
+ * - applies options in this order: `StringReplaceOptions`, `StringStripOptions`, `StringCaseOptions`, `StringPadOptions`
  * - Removes leading+trailing spaces, extra spaces, commas, and dots from a string (e.g. `'..'` becomes `'.'`)
- * - optionally applies 3 option params with: {@link stripCharFromString}, {@link handleCaseOptions}, and {@link handlePadOptions}.
+ * - optionally applies 4 option params with: {@link String.replace}, {@link stripCharFromString}, {@link handleCaseOptions}, and {@link handlePadOptions}.
  * @param s - the `string` to clean
  * @param stripOptions — {@link StringStripOptions}
  * - `optional` strip options to apply to the string
@@ -35,7 +36,7 @@ export function cleanString(
 ): string {
     if (!s) return '';
     s = String(s).trim();
-    s = s.replace(/\s+/g, ' ').replace(/\.{2,}/g, '.');
+    s = s.replace(/\s+/g, ' ').replace(/\.{2,}/g, '.').replace(/,{2,}/g, ',');
     if (replaceOptions && isNonEmptyArray(replaceOptions)) {
         for (const params of replaceOptions) {
             s = s.replace(params.searchValue, params.replaceValue)
@@ -119,7 +120,7 @@ export function handlePadOptions(
     return s;
 }
 
-
+// TODO maybe rename this to handleStripOptions
 /**
  * @param {string} s `string`
  * @param {StringStripOptions} stripOptions — {@link StringStripOptions} 
@@ -270,9 +271,9 @@ export function extractEmail(email: string): RegExpMatchArray | null {
 }
 
 
-/** `re` = /`^(a(t{1,2})n:)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*`/i */
+/** `re` = /`^\s*((attention|attn|atn):)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*`/`i` */
 export const ATTN_SALUTATION_PREFIX_PATTERN = new RegExp(
-    /^((attention|attn|atn):)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*/, 
+    /^\s*((attention|attn|atn):)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*/, 
     RegExpFlagsEnum.IGNORE_CASE
 );
 /** `re` = /`^(Mr\.|Ms\.|Mrs\.|Dr\.|Mx\.)`/i */
@@ -286,13 +287,15 @@ export const MIDDLE_INITIAL_REGEX = new RegExp(
     RegExpFlagsEnum.IGNORE_CASE
 );
 /** 
- * `re` = `/\b(,? ?(MSPA|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|PA-C|MSN-RN|RN|NP|CRNA|FAAD|FNP|PA|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS|FACS|FAC)\.?,?)*\b/g`  
- * - could also do something like `[A-Z]{1,4}\.?\,?\s*`
+ * `re` = `/(,? ?(MSPA|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|MSN-RN|R\.?N|N\.?P|CRNA|FAAD|FNP|P.?A.?C|PA-C|PA|DMD|NMD|MD|M\.D|DO|L\.?E\.?|CMA|O.?M|Frcs|FRCS|FACS|FAC)\.?,?){asterisk}/g`  
  * */
 export const JOB_TITLE_SUFFIX_PATTERN = new RegExp(
-    /(,? ?(MSPA|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|MSN-RN|RN|NP|CRNA|FAAD|FNP|PAC|PA-C|PA|DMD|NMD|MD|M\.D|DO|LE|CMA|OM|Frcs|FRCS|FACS|FAC)\.?,?)*/, 
+    /(,? ?(MSPA|APRN|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|MSN-RN|R\.?N|N\.?P|CRNA|FAAD|FNP|P.?A.?C|PA-C|PA|DMD|NMD|MD|M\.D|DO|L\.?E\.?|CMA|O.?M|Frcs|FRCS|FACS|FAC)\.?,?)*/, 
     RegExpFlagsEnum.GLOBAL
 ); 
+
+/** `re` = `/((([A-Z]\.){1})*|([A-Z]{1,4}(\.|-)?)){asterisk}/` */
+export const CREDENTIAL_PATTERN = /((([A-Z]\.){1})*|([A-Z]{1,4}(\.|-)?))*/;
 
 /**
  * `re` = `/^\s*([A-Za-z'-]{2,})\s*,\s*(?:(?:[A-Z]{1,4}\.?\,?\s*)+)?([A-Za-z'-]+(?:\s+[A-Za-z.'-]+)*)\s*$/`
@@ -301,10 +304,22 @@ export const LAST_NAME_COMMA_FIRST_NAME_PATTERN = new RegExp(
     /^\s*([A-Za-z'-]{2,})\s*,\s*(?:(?:[A-Z]{1,4}\.?\,?\s*)+)?([A-Za-z'-]+(?:\s+[A-Za-z.'-]+)*)\s*$/,
     RegExpFlagsEnum.IGNORE_CASE
 );
-
+export const REMOVE_ATTN_SALUTATION_PREFIX: StringReplaceOptions = [
+    {searchValue: ATTN_SALUTATION_PREFIX_PATTERN, replaceValue: ''}
+];
+export const REMOVE_JOB_TITLE_SUFFIX: StringReplaceOptions = [
+    {searchValue: JOB_TITLE_SUFFIX_PATTERN, replaceValue: ''}
+];
+export const CLEAN_NAME_REPLACE_OPTIONS: StringReplaceOptions = [
+    ...REMOVE_ATTN_SALUTATION_PREFIX,
+    ...REMOVE_JOB_TITLE_SUFFIX,
+    { searchValue: /\s+/g, replaceValue: ' ' }, // replace multiple spaces with a single space
+    { searchValue: /,$/g, replaceValue: '' }, // remove trailing comma
+]
 
 /**
- * **if** `name` contains a digit or contains any of {@link COMPANY_KEYWORDS_PATTERN}, do not attempt to extract name and return empty strings
+ * **if** `name` contains a digit or contains any of {@link COMPANY_KEYWORDS_PATTERN} or `/[0-9!#&@]/`, 
+ * - `then` do not attempt to extract name and return empty strings
  * @param name `string` - the full name from which to extract 3 parts: the first, middle, and last names
  * @returns `{first: string, middle?: string, last?: string}` - the first, middle, and last names
  * @example
@@ -322,11 +337,12 @@ export function extractName(
 } {
     if (!name || typeof name !== 'string') return { first: '', middle: '', last: '' };
     const originalName = name;
-    name = name
-        .replace(ATTN_SALUTATION_PREFIX_PATTERN,'')
-        .replace(JOB_TITLE_SUFFIX_PATTERN,'')
-        .replace(/\s+/g, ' ')
-        .trim();
+    // name = name
+    //     .replace(ATTN_SALUTATION_PREFIX_PATTERN,'')
+    //     .replace(JOB_TITLE_SUFFIX_PATTERN,'')
+    //     .replace(/\s+/g, ' ')
+    //     .trim();
+    name = cleanString(name, undefined, undefined, undefined, CLEAN_NAME_REPLACE_OPTIONS)
     const debugLogs: any[] = [];
     if ( // invalid name
         stringContainsAnyOf(name, /[0-9!#&@]/) 
@@ -581,7 +597,6 @@ export function stringEndsWithAnyOf(
 
 
 /**
- * 
  * @param str The `string` to check.
  * @param prefixes possible starting string(s).
  * @param flags `Optional` regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}
@@ -623,13 +638,16 @@ export function stringStartsWithAnyOf(
 }
 
 /**
- * 
  * @param str The `string` to check.
  * @param substrings possible substring(s).
  * @param flags `Optional` regex flags to use when creating the {@link RegExp} object. see {@link RegExpFlagsEnum}
  * @returns **`true`** if the string contains any of the substrings, **`false`** otherwise.
  */
-export function stringContainsAnyOf(str: string, substrings: string | string[] | RegExp, ...flags: RegExpFlagsEnum[]): boolean {
+export function stringContainsAnyOf(
+    str: string, 
+    substrings: string | string[] | RegExp, 
+    ...flags: RegExpFlagsEnum[]
+): boolean {
     if (!str || !substrings) {
         return false;
     }
@@ -652,4 +670,63 @@ export function stringContainsAnyOf(str: string, substrings: string | string[] |
         return false; // Invalid substrings type
     }
     return regex.test(str);
+}
+
+/**
+ * @consideration add parameter to ignore case. currently: 
+ * - converts s1 & s2 to lowercase and removes all non-alphanumeric characters from both strings,
+ * - sorts the characters in both strings,
+ * - then compares the two strings for equivalence.
+ * @param s1 `string`
+ * @param s2 `string`
+ * @param tolerance `number` - a number between 0 and 1, default is `0.90`
+ * @returns **`boolean`** 
+ * -`true` `if` the two alphanumeric strings are equivalent, 
+ * - `false` `otherwise`.
+ */
+export function equivalentAlphanumericStrings(
+    s1: string, 
+    s2: string, 
+    tolerance: number = 0.90,
+): boolean {
+    if (!s1 || !s2) return false;
+    let s1Alphabetical = cleanString(s1,
+        undefined, 
+        { toLower: true } as StringCaseOptions, 
+        undefined, 
+        [{searchValue: /[^A-Za-z0-9]/g, replaceValue: '' }] as StringReplaceOptions
+    ).split('').sort().join('');
+    let s2Alphabetical = cleanString(s2, 
+        undefined, 
+        { toLower: true } as StringCaseOptions, 
+        undefined, 
+        [{searchValue: /[^A-Za-z0-9]/g, replaceValue: '' }] as StringReplaceOptions
+    ).split('').sort().join('');
+    if (s1Alphabetical.length === 0 || s2Alphabetical.length === 0) {
+        return false;
+    }
+    if (s1Alphabetical === s2Alphabetical) { // exact match
+        return true;
+    } 
+    const maxLevenshteinDistance = Math.max(
+        Math.floor(s1Alphabetical.length * (1 - tolerance)), 
+        Math.floor(s2Alphabetical.length * (1 - tolerance)), 
+    );
+    if (levenshteinDistance(s1Alphabetical, s2Alphabetical) <= maxLevenshteinDistance) { 
+        return true;
+    }
+    const s1IncludesTolerableS2 = (!isNaN(tolerance) &&
+        s1Alphabetical.length >= s2Alphabetical.length
+        && s2Alphabetical.length / s1Alphabetical.length >= tolerance 
+        && s1Alphabetical.includes(s2Alphabetical)
+    );
+    const s2IncludesTolerableS1 = (!isNaN(tolerance) &&
+        s2Alphabetical.length >= s1Alphabetical.length
+        && s1Alphabetical.length / s2Alphabetical.length >= tolerance
+        && s2Alphabetical.includes(s1Alphabetical)
+    );
+    if (s1IncludesTolerableS2 || s2IncludesTolerableS1) { 
+        return true;
+    }
+    return false;
 }
