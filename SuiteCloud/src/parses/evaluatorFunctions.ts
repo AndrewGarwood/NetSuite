@@ -15,15 +15,15 @@ import {
     extractPhone, cleanString, extractEmail, extractName, stringEndsWithAnyOf, RegExpFlagsEnum,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, COMPANY_KEYWORDS_PATTERN, COMPANY_ABBREVIATION_PATTERN,
     checkForOverride, isValidEmail,
-    SALUTATION_REGEX, ATTN_SALUTATION_PREFIX_PATTERN,
+    SALUTATION_REGEX, ATTN_SALUTATION_PREFIX_PATTERN, LAST_NAME_COMMA_FIRST_NAME_PATTERN,
     ValueMapping,
-    ColumnSliceOptions, 
+    ColumnSliceOptions, StringReplaceOptions, equivalentAlphanumericStrings
 } from "../utils/io";
 import { customerCompany } from './customer/customerParseEvaluatorFunctions';
-import { CustomerColumnEnum as CustomerColumns } from './customer/customerParseConstants';
 
 export const ENTITY_VALUE_OVERRIDES: ValueMapping = {
 } 
+
 
 /** 
  * @returns **`entity`** = {@link checkForOverride}`(`{@link cleanString}`(row[entityIdColumn],...),...)`
@@ -33,7 +33,12 @@ export const entityId = (row: Record<string, any>, entityIdColumn: string): stri
     return checkForOverride(entity, entityIdColumn, ENTITY_VALUE_OVERRIDES) as string;
 }
 
-
+/**
+ * @param row `Record<string, any>` - the `row` of data
+ * @param recordType {@link RecordTypeEnum} - the type of record being parsed from the `row`
+ * @param entityIdColumn `string` - the column of the `row` to look for the `'entityid'` in
+ * @returns **`externalId`** `string` = `'${`{@link entity}`(entityIdColumn)}<${recordType}>'`
+ */
 export const externalId = (
     row: Record<string, any>, 
     recordType: RecordTypeEnum, 
@@ -174,29 +179,41 @@ export const salutation = (
     }
 }
 
+/** 
+ * arguments for the {@link attention}`(row, args)` function 
+ * to find the name of the person expected to receive the parcel from the `row` data. 
+ * */
+export type AttentionArguments = {
+    entityIdColumn: string;
+    salutationColumn: string;
+    firstNameColumn: string;
+    middleNameColumn: string;
+    lastNameColumn: string;
+    nameColumns?: string[];
+}
+
 /**
+ * `if fullName.includes(`{@link entityId}`(row, args.entityIdColumn))`, 
+ * - `then` the attention value is redundant because the addressee value is already set to entityId -> return an empty string.
  * @param row `Record<string, any>` - the `row` of data to look for the attention person name in
- * @param entityIdColumn `string`
- * @param salutationColumn `string`
- * @param nameColumns `string[]`
+ * @param args {@link AttentionArguments} - the arguments to use for the attention evaluation
  * @returns **`result`** `string` - the name of the person expected to receive the parcel from the `row` data.
  */
 export const attention = (
     row: Record<string, any>,
-    entityIdColumn: string,
-    salutationColumn: string,
-    ...nameColumns: string[]
+    args: AttentionArguments
 ): string => {
-    if (!row || !entityIdColumn) {
+    if (!row || !args.entityIdColumn) {
         return '';
     }
     let result = '';
-    const entity = entityId(row, entityIdColumn);
-    const first = firstName(row, CustomerColumns.FIRST_NAME, ...nameColumns);
-    const middle = middleName(row, CustomerColumns.MIDDLE_NAME, ...nameColumns);
-    const last = lastName(row, CustomerColumns.LAST_NAME, ...nameColumns);
+    const entity = entityId(row, args.entityIdColumn);
+    const salutationValue = salutation(row, args.salutationColumn, ...(args.nameColumns || []));
+    const first = firstName(row, args.firstNameColumn, ...args.nameColumns || []);
+    const middle = middleName(row, args.middleNameColumn, ...args.nameColumns || []);
+    const last = lastName(row, args.lastNameColumn, ...args.nameColumns || []);
     const fullName = ((
-        salutation(row, salutationColumn, ...nameColumns)
+        salutationValue
         .replace(/\.\s*$/, '') 
         + `. ${first} ${middle} ${last}`
         )
@@ -206,16 +223,21 @@ export const attention = (
         .trim()
     );
     result = (fullName.includes(entity)) ? '' : fullName;
-    log.debug(`attention(entityIdColumn="${entityIdColumn}", salutationColumn="${salutationColumn}", nameColumns=${nameColumns})`,
+    log.debug(`attention(entityIdColumn="${args.entityIdColumn}", salutationColumn="${args.salutationColumn}", nameColumns=${args.nameColumns || []})`,
         TAB + `    entity: "${entity}"`,
-        TAB + `salutation: "${salutation(row, salutationColumn, ...nameColumns)}"`,
+        TAB + `salutation: "${salutationValue}"`,
         TAB + `  fullName: "${fullName}"`,
         TAB + `fullName.includes(entity): ${fullName.includes(entity)}`,
         TAB + `-> return result: "${result}"`
     );
     return result;
 }
-
+export type StreetArguments = {
+    streetLineOneColumn: string;
+    streetLineTwoColumn: string;
+    companyNameColumn: string;
+    addresseeFunction: (row: Record<string, any>, entityIdColumn: string, companyNameColumn: string) => string;
+} & AttentionArguments;
 /**
  * - `if` streetLineNumber === 1 and (row[streetLineOneColumn].includes(attention(row)) || row[streetLineOneColumn].includes(customerCompany(row)))
  * - - `return` row[streetLineTwoColumn]
@@ -225,45 +247,41 @@ export const attention = (
  * - `else if` streetLineNumber === 2: return row[streetLineTwoColumn]
  * @param row `Record<string, any>` - the `row` of data to look for the street line in
  * @param streetLineNumber `1 | 2` - the street line number to return, either 1 or 2
- * @param streetLineOneColumn `string` - the column of the `row` to look for the first street line in
- * @param streetLineTwoColumn `string` - the column of the `row` to look for the second street line in
- * @param entityIdColumn `string` - the column of the `row` to look for the entity ID in
- * @param salutationColumn `string` - the column of the `row` to look for the salutation in
- * @param nameColumns `string[]` - the columns of the `row` to look for the name in, used to extract first, middle, and last names
+ * @param args {@link StreetArguments} - the arguments to use for the street evaluation
  * @returns **`streetLineValue`** `string` - the street line value based on the `streetLineNumber` and the content of the `row` object.
  */
 export const street = (
     row: Record<string, any>,
     streetLineNumber: 1 | 2,
-    streetLineOneColumn: string,
-    streetLineTwoColumn: string,
-    entityIdColumn: string,
-    salutationColumn: string,
-    ...nameColumns: string[]
+    args: StreetArguments
 ): string => {
-    const invalidParams = Boolean(!row 
+    const invalidParams = Boolean(!row || !args
         || ![1, 2].includes(streetLineNumber) 
-        || !streetLineOneColumn 
-        || !streetLineTwoColumn 
-        || !entityIdColumn 
-        || !salutationColumn
+        || !args.streetLineOneColumn 
+        || !args.streetLineTwoColumn 
+        || !args.entityIdColumn 
+        || !args.salutationColumn
     );
     if (invalidParams) {
         mlog.error(`street() called with invalid parameters.`);
         return '';
     }        
-    const attentionValue = attention(
-        row, streetLineOneColumn, entityIdColumn, salutationColumn, ...nameColumns
-    );
-    const addresseeValue = customerCompany(row, entityIdColumn)
-    const streetLineOneValue = cleanString(row[streetLineOneColumn]);
-    const streetLineTwoValue = cleanString(row[streetLineTwoColumn]);
+    const attentionValue = attention(row, args);
+    const addresseeValue = args.addresseeFunction(row, args.entityIdColumn, args.companyNameColumn)
+    const streetLineOneValue = cleanString(row[args.streetLineOneColumn]);
+    const streetLineTwoValue = cleanString(row[args.streetLineTwoColumn]);
     const lineOneIsRedundant: boolean = (
-        (Boolean(attentionValue) && streetLineOneValue.includes(attentionValue)) 
-        || (Boolean(addresseeValue) && streetLineOneValue.includes(addresseeValue))
+        (Boolean(attentionValue) && (streetLineOneValue.includes(attentionValue)
+            || equivalentAlphanumericStrings(streetLineOneValue, attentionValue)
+        )) 
+        || 
+        (Boolean(addresseeValue) && (streetLineOneValue.includes(addresseeValue)
+            || equivalentAlphanumericStrings(streetLineOneValue, addresseeValue)
+        ))
     );
     if (streetLineNumber === 1 && lineOneIsRedundant) {
-        log.debug(`street(streetLineNumber=${streetLineNumber}, streetLineOneColumn="${streetLineOneColumn}", streetLineTwoColumn="${streetLineTwoColumn}", entityIdColumn="${entityIdColumn}", salutationColumn="${salutationColumn}", nameColumns=${nameColumns})`,
+        log.debug(`street(streetLineNumber=${streetLineNumber}, streetLineOneColumn="${args.streetLineOneColumn}", streetLineTwoColumn="${args.streetLineTwoColumn}",`,
+            TAB + `entityIdColumn="${args.entityIdColumn}", salutationColumn="${args.salutationColumn}", nameColumns=${args.nameColumns})`,
             TAB + `-> return streetLineTwoValue: "${streetLineTwoValue}"`
         );
         return streetLineTwoValue;
@@ -318,8 +336,8 @@ export const name = (
  * @param nameColumns 
  * @returns **`first`** - `{string}` 
  * - the value from `row[firstNameColumn]` if it is not empty, 
- * - otherwise returns the `name.first` from the first `nameColumn` with a non-empty `name.first` and `name.last` using {@link extractName}`(name=row[col])` for col in `nameColumns`
- * - otherwise empty string.
+ * - `otherwise` returns the `name.first` from the first `nameColumn` with a non-empty `name.first` and `name.last` using {@link extractName}`(name=row[col])` for col in `nameColumns`
+ * - `otherwise` empty string.
  */
 export const firstName = (
     row: Record<string, any>,

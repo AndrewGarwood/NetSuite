@@ -1,5 +1,5 @@
 /**
- * @TODO validate behaviour after api type definition changes
+ * @deprecated
  * @file src/parses/parseEntity.ts
  */
 import {
@@ -12,9 +12,9 @@ import { OUTPUT_DIR, ERROR_DIR, STOP_RUNNING, CLOUD_LOG_DIR } from "src/config/e
 import { RadioFieldBoolean, RADIO_FIELD_TRUE } from "src/utils/typeValidation";
 import { parseCsvToPostRecordOptions } from "src/parseCsvToRequestBody";
 import { 
-    PostRecordRequest, PostResponseOptions, FieldDictionary, 
-    idPropertyEnum, idSearchOptions, ParseOptions, ParseResults, PostRecordOptions, 
-    upsertRecordPayload, PostRecordResult, SetFieldValueOptions, SetSublistValueOptions, 
+    PostRecordRequest, RecordResponseOptions, FieldDictionary, 
+    idPropertyEnum, idSearchOptions, DEPRECATED_ParseOptions, ParseResults, PostRecordOptions, 
+    upsertRecordPayload, RecordResult, SetFieldValueOptions, SetSublistValueOptions, 
     SublistDictionary, PostRecordResponse 
 } from "src/utils/api";
 import { ContactRoleEnum, EntityRecordTypeEnum, RecordTypeEnum, SearchOperatorEnum } from "src/utils/ns";
@@ -32,13 +32,13 @@ export const CONTACT_RESPONSE_PROPS = ['entityid', 'company', 'firstname', 'last
  * - ...so let's make the entities first and get their `internalid`(s) in the Post Response
  * @param filePath - `string` - path to the csv file containing the entity data 
  * @param entityType - {@link EntityRecordTypeEnum} - type of the primary entity to parse from file at filePath
- * @param parseOptions - `Array<`{@link ParseOptions}`>` - apply parse definitions to the file's rows
+ * @param parseOptions - `Array<`{@link DEPRECATED_ParseOptions}`>` - apply parse definitions to the file's rows
  * @returns `Promise<{ entities: `{@link PostRecordOptions}`[], contacts: `PostRecordOptions`[] }>`
  */
 export async function parseEntityFile(
     filePath: string,
     entityType: EntityRecordTypeEnum,
-    parseOptions: ParseOptions[]
+    parseOptions: DEPRECATED_ParseOptions[]
 ): Promise<{
     entities: PostRecordOptions[], 
     contacts: PostRecordOptions[],
@@ -159,8 +159,8 @@ export async function postEntitiesAndContacts(
         };
     }
     const entityUpdateResponses = await upsertRecordPayload({ 
-        upsertRecordArray: entityUpdates,
-        responseProps: ENTITY_RESPONSE_PROPS
+        postOptions: entityUpdates,
+        responseOptions: {responseFields: ENTITY_RESPONSE_PROPS}
     });
     return {
         entityResponses: entityResponses,
@@ -179,7 +179,7 @@ export function generateEntityUpdates(
     contactResponses: PostRecordResponse[]
 ): PostRecordOptions[] {
     const entityUpdates: PostRecordOptions[] = [];
-    const contactResults: PostRecordResult[] = getPostResults(contactResponses);    
+    const contactResults: RecordResult[] = getPostResults(contactResponses);    
     for (let contactResult of contactResults) {
         entityUpdates.push({
             recordType: entityType,
@@ -205,18 +205,18 @@ export function generateEntityUpdates(
 
 /**
  * @param entityResponses `Array<`{@link PostRecordResponse}`>`
- * @returns **`entityResults`** = `Array<`{@link PostRecordResult}`>`
+ * @returns **`entityResults`** = `Array<`{@link RecordResult}`>`
  */
 export function getPostResults(
     entityResponses: PostRecordResponse[]
-): PostRecordResult[] {
-    const entityResults: PostRecordResult[] = [];
+): RecordResult[] {
+    const entityResults: RecordResult[] = [];
     for (let entityResponse of entityResponses) {
         if (!entityResponse || !entityResponse.results) {
             log.error(`entityResponse or entityResponse.results is undefined. Continuing...`);
             continue;
         }
-        entityResults.push(...entityResponse.results as PostRecordResult[]);
+        entityResults.push(...entityResponse.results as RecordResult[]);
     }
     if (entityResults.length === 0) {
         log.warn(`No entityResults found. Returning empty array.`);
@@ -258,7 +258,7 @@ export function matchContactsToPostEntityResponses(
     companyContacts: PostRecordOptions[], 
     unmatchedContacts: PostRecordOptions[],
 } {
-    const entityResults: PostRecordResult[] = getPostResults(entityResponses);
+    const entityResults: RecordResult[] = getPostResults(entityResponses);
     const companyContacts: PostRecordOptions[] = [];
     const unmatchedContacts: PostRecordOptions[] = [];
     for (let i = 0; i < contacts.length; i++) {

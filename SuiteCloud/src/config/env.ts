@@ -106,10 +106,6 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
                 scriptId: 167,
                 deployId: 1,
             },
-            GET_RetrieveRecordById: {
-                scriptId: 171,
-                deployId: 1,
-            },
             POST_BatchUpsertRecord: {
                 scriptId: 172,
                 deployId: 1,
@@ -122,9 +118,14 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
                 scriptId: 174,
                 deployId: 1,
             },
+            GET_Record: {
+                scriptId: 175,
+                deployId: 1,
+            },
         } as ScriptDictionary,
     }
 }
+
 
 export const USER = process.cwd().split(path.sep)[2];
 console.log(`USER = '${USER}'`);

@@ -674,7 +674,7 @@ export function stringContainsAnyOf(
 
 /**
  * @consideration add parameter to ignore case. currently: 
- * - converts s1 & s2 to lowercase and removes all non-alphanumeric characters from both strings,
+ * - converts `s1` & `s2` to lowercase and removes all non-alphanumeric characters from both strings,
  * - sorts the characters in both strings,
  * - then compares the two strings for equivalence.
  * @param s1 `string`
@@ -712,7 +712,9 @@ export function equivalentAlphanumericStrings(
         Math.floor(s1Alphabetical.length * (1 - tolerance)), 
         Math.floor(s2Alphabetical.length * (1 - tolerance)), 
     );
-    if (levenshteinDistance(s1Alphabetical, s2Alphabetical) <= maxLevenshteinDistance) { 
+    if (levenshteinDistance(s1, s2) <= maxLevenshteinDistance
+        || levenshteinDistance(s1Alphabetical, s2Alphabetical) <= maxLevenshteinDistance
+    ) { 
         return true;
     }
     const s1IncludesTolerableS2 = (!isNaN(tolerance) &&

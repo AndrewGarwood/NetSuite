@@ -1,22 +1,7 @@
 /**
  * @file src/utils/api/types/Api.ts
+ * @description Types specific to NetSuite's internal API (copies, analogs, or extensions of NetSuite's `N/record` module types).
  */
-
-
-/**
- * @enum {string} **`idPropertyEnum`**
- * @property {string} INTERNAL_ID - The `'internalid'` (for all records).
- * @property {string} EXTERNAL_ID - The `'externalid'` (for all records).
- * @property {string} ENTITY_ID - The `'entityid'` (for relationship records). appears on vendor records.
- * @property {string} ITEM_ID - The `'itemid'` (for inventory records)
- * @readonly
- */
-export enum idPropertyEnum {
-    INTERNAL_ID = 'internalid',
-    EXTERNAL_ID = 'externalid',
-    ENTITY_ID = 'entityid',
-    ITEM_ID = 'itemid'
-}
 
 /**
  * @enum {string} **`LogTypeEnum`**
@@ -50,89 +35,6 @@ export type LogStatement = {
     details: any;
     message?: string;
 };
-
-/**
- * @typedefn **`FieldDictionary`**
- */
-export type FieldDictionary = {
-    [fieldId: string]: FieldValue | SubrecordValue
-};
-
-/**
- * either the subrecord itself or the options to set a subrecord
- * @typedefn **`SubrecordValue`** 
- * */
-export type SubrecordValue = ({
-    subrecordType?: string;
-} & {
-    [subrecordFieldId: string]: FieldValue; 
-}) | SetFieldSubrecordOptions | SetSublistSubrecordOptions;
-
-
-/**
- * @typedefn **`SublistDictionary`**
- */
-export type SublistDictionary = {
-    [sublistId: string]: Array<SublistLine> | Array<{[sublistFieldId: string]: FieldValue | SubrecordValue}>
-};
-
-/**
- * @TODO confirm if `'id'` is a prop of record sublists or not
- * @typedefn **`SublistLine`**
- */
-export type SublistLine = {
-    [sublistFieldId: string]: FieldValue | SubrecordValue;
-} & {
-    line?: number;
-    /**`string` - the `'sublistFieldId'` of the list entry with defined value at `SublistLine[sublistFieldId]` that you want to use to search for existing lines */
-    lineIdProp?: string;
-}
-
-/** Type: **`SubrecordDictionary`** {@link SubrecordDictionary} */
-/**
- * - each key in SubrecordDictionary is the fieldId (`body` or `sublist`) of a field that holds a subrecord object
- * - distinguish between body subrecords and sublist subrecords by checking if the mapped object has property `'sublistId'`
- * - - i.e. `mappedObject = SubrecordDictionary[fieldId]; `
- * - - `if 'sublistId' in mappedObject.keys()`, `then` it's a `sublist` subrecord and vice versa
- * - {@link SetFieldSubrecordOptions} for body subrecords
- * - {@link SetSublistSubrecordOptions} for sublist subrecords
- * @typedefn **`SubrecordDictionary`**
- */
-export type SubrecordDictionary = {
-    [fieldId: string]: SetFieldSubrecordOptions | SetSublistSubrecordOptions;
-};
-
-/**
- * @typedefn **`SetFieldSubrecordOptions`**
- * @property {string} fieldId The `'internalid'` of the main record field that is a subrecord.
- * -  use `rec.getSubrecord({fieldId})` = `getSubrecord(options: GetFieldOptions): Omit<Record, 'save'>`;
- * @property {FieldDictionary} [fields] {@link FieldDictionary}
- * @property {SublistDictionary} [sublists] {@link SublistDictionary}
- * @property {string} [subrecordType] - The record type of the subrecord.
- */
-export type SetFieldSubrecordOptions = {
-    subrecordType?: string;
-    fieldId: string;
-    fields?: FieldDictionary;
-    sublists?: SublistDictionary;
-}
-
-/**
- * @typedefn **`SetSublistSubrecordOptions`**
- * @property {string} sublistId
- * @property {string} fieldId (i.e. `sublistFieldId`) The `internalid` of a sublist's field that holds a subrecord
- * - use `rec.getSublistSubrecord({sublistId, fieldId})`
- * @property {FieldDictionary} [fields] {@link FieldDictionary}
- * @property {SublistDictionary} [sublists] {@link SublistDictionary}
- * @property {string} [subrecordType] - The record type of the subrecord.
- */
-export type SetSublistSubrecordOptions = {
-    subrecordType?: string;
-    sublistId: string;
-    fieldId: string;
-    fields?: FieldDictionary;
-    sublists?: SublistDictionary;
-}
 
 
 /**

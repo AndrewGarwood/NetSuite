@@ -6,17 +6,21 @@ import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify } 
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "./url";
-import { getAccessToken, AxiosCallEnum, AxiosContentTypeEnum, validateTokens } from "src/server";
+import { getAccessToken, AxiosCallEnum, AxiosContentTypeEnum } from "src/server";
 import { 
-    BatchPostRecordRequest, BatchPostRecordResponse, PostRecordOptions, 
-    PostRecordResult, RetrieveRecordByIdRequest, ScriptDictionary, DeleteRecordByTypeRequest } from "./types";
+    PostRecordRequest, PostRecordResponse, PostRecordOptions, RecordResponseOptions,
+    RecordResult, DeleteRecordByTypeRequest, 
+} from "./types";
+import { ScriptDictionary } from "../ns";
 
 export const SB_REST_SCRIPTS = SE.sandbox?.restlet || {} as ScriptDictionary;
 export const BATCH_SIZE = 100;
-const TWO_SECOND_DELAY = 2000;
+const TWO_SECONDS = 2000;
 
-const BATCH_UPSERT_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.POST_BatchUpsertRecord.scriptId as number;
-const BATCH_UPSERT_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.POST_BatchUpsertRecord.deployId as number;
+// const BATCH_UPSERT_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.POST_BatchUpsertRecord.scriptId as number;
+// const BATCH_UPSERT_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.POST_BatchUpsertRecord.deployId as number;
+const UPSERT_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.POST_UpsertRecord.scriptId as number;
+const UPSERT_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.POST_UpsertRecord.deployId as number;
 const DELETE_RECORD_BY_TYPE_SCRIPT_ID = SB_REST_SCRIPTS.DELETE_DeleteRecordByType.scriptId as number;
 const DELETE_RECORD_BY_TYPE_DEPLOY_ID = SB_REST_SCRIPTS.DELETE_DeleteRecordByType.deployId as number;
 /**
@@ -37,78 +41,58 @@ export function partitionArrayBySize(
 
 /**
  * enforces max number of 100 records per post call (see {@link BATCH_SIZE}) 
- * - e.g. if `payload.upsertRecordArray` > BATCH_SIZE_100,
+ * - e.g. if `payload.postOptions.length` > BATCH_SIZE_100,
  * then split into multiple payloads of at most 100 records each
- * @param payload {@link BatchPostRecordRequest}
+ * @param payload {@link PostRecordRequest}
  * @param scriptId `number`
  * @param deployId `number`
- * @returns **`responses`** — `Promise<`{@link BatchPostRecordResponse}`[]>`
+ * @returns **`responses`** — `Promise<`{@link PostRecordResponse}`[]>`
  */
 export async function upsertRecordPayload(
-    payload: BatchPostRecordRequest,
-    scriptId: number=BATCH_UPSERT_RECORD_SCRIPT_ID, 
-    deployId: number=BATCH_UPSERT_RECORD_DEPLOY_ID,
-): Promise<BatchPostRecordResponse[]> {
+    payload: PostRecordRequest,
+    scriptId: number=UPSERT_RECORD_SCRIPT_ID, 
+    deployId: number=UPSERT_RECORD_DEPLOY_ID,
+): Promise<PostRecordResponse[]> {
     if (!payload || Object.keys(payload).length === 0) {
-        mlog.error('upsertRecordPayload() payload is undefined or empty. Cannot call RESTlet. Exiting...');
+        mlog.error(`upsertRecordPayload() 'payload' parameter is undefined or empty. Cannot call RESTlet. Exiting...`);
         STOP_RUNNING(1);
     }
-    // const debugLogs: any[] = [];
-    const { upsertRecordArray, upsertRecordDict, responseProps } = payload;
-    const responseDataArr: BatchPostRecordResponse[] = [];
+    const { postOptions, responseOptions } = payload;
+    const upsertRecordArray = Array.isArray(postOptions) ? postOptions : [postOptions];
+    const responseDataArr: PostRecordResponse[] = [];
     // normalize payload size
-    const batches: PostRecordOptions[][] = [];
-    if (!upsertRecordDict 
-        && Array.isArray(upsertRecordArray) 
-        && upsertRecordArray.length > BATCH_SIZE
-    ) {
-        batches.push(...partitionArrayBySize(upsertRecordArray, BATCH_SIZE));
-        for (let i = 0; i < batches.length; i++) {
-            // if (i < 55) { continue; } // continue where last left off
-            const batch = batches[i];
-            try {
-                const accessToken = (await validateTokens()).access_token;//await getAccessToken();
-                const res = await POST(accessToken, scriptId, deployId,
-                    { 
-                        upsertRecordArray: batch, 
-                        responseProps: responseProps 
-                    } as BatchPostRecordRequest,
-                );
-                await DELAY(TWO_SECOND_DELAY, null);
-                if (!res.data) {
-                    mlog.warn(`upsertRecordPayload() batchIndex=${i} res.data is undefined. Skipping...`);
-                    continue;
-                }
-                responseDataArr.push(res.data as BatchPostRecordResponse);
-                mlog.debug(`upsertRecordPayload() finished batch ${i+1} of ${batches.length}; results: `, 
-                    JSON.stringify(((res.data as BatchPostRecordResponse).results as PostRecordResult[]).reduce((acc, postResult) => {
-                        acc[postResult.recordType] = (acc[postResult.recordType] || 0) + 1;
-                        return acc;
-                    }, {} as Record<string, number>))
-                );
-                continue;
-            } catch (error) {
-                mlog.error(`Error in callApi.ts upsertRecordPayload().upsertRecordArray.POST(batchIndex=${i}):`);
-                write({timestamp: getCurrentPacificTime(), caught: error}, ERROR_DIR, `ERROR_upsertRecordPayload_batch_${i}.json`);
+    const batches: PostRecordOptions[][] = partitionArrayBySize(upsertRecordArray, BATCH_SIZE);
+    for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        try {
+            const accessToken = await getAccessToken(); //(await validateTokens()).access_token;//
+            const res = await POST(
+                accessToken, scriptId, deployId, { 
+                    postOptions: batch, 
+                    responseOptions: responseOptions, 
+                } as PostRecordRequest,
+            );
+            await DELAY(TWO_SECONDS, null);
+            if (!res || !res.data) {
+                mlog.warn(`upsertRecordPayload() batchIndex=${i} res.data is undefined. Skipping...`);
                 continue;
             }
-        }
-    } else {
-        // else if ((upsertRecordDict && !upsertRecordArray) || upsertRecordArray) {
-        // @TODO: handle upsertRecordDict size normalization
-        // i.e. when (Object.values(upsertRecordDict).some((array) => Array.isArray(array) 
-        // && array.length > BATCH_SIZE))   
-        const accessToken = await getAccessToken();
-        try {
-            const res = await POST(accessToken, scriptId, deployId, payload);
-            responseDataArr.push(res.data as BatchPostRecordResponse);
+            responseDataArr.push(res.data as PostRecordResponse);
+            mlog.debug(`upsertRecordPayload() finished batch ${i+1} of ${batches.length}; results: `, 
+                indentedStringify(((res.data as PostRecordResponse).results as RecordResult[])
+                    .reduce((acc, postResult) => {
+                        acc[postResult.recordType] = (acc[postResult.recordType] || 0) + 1;
+                        return acc;
+                    }, 
+                    {} as Record<string, number>
+                )));
+            continue;
         } catch (error) {
-            mlog.error('Error in callApi.ts upsertRecordPayload().upsertRecordDict.POST():');
-            write({timestamp: getCurrentPacificTime(), caught: error as any}, ERROR_DIR, 'ERROR_upsertRecordPayload.json');
-            // throw error;
+            mlog.error(`Error in callApi.ts upsertRecordPayload().upsertRecordArray.POST(batchIndex=${i}):`);
+            write({timestamp: getCurrentPacificTime(), caught: error}, ERROR_DIR, `ERROR_upsertRecordPayload_batch_${i}.json`);
+            continue;
         }
     }
-    // log.debug(`upsertRecordPayload() responseDataArr: `, responseDataArr);  
     return responseDataArr;
 }
 
@@ -205,42 +189,6 @@ export async function GET(
 }
 
 /**
- * 
- * @param payload {@link DeleteRecordByTypeRequest}
- * @param scriptId `number` - default = {@link DELETE_RECORD_BY_TYPE_SCRIPT_ID}
- * @param deployId `number` - default = {@link DELETE_RECORD_BY_TYPE_DEPLOY_ID}
- * @returns **`response`** - `{Promise<any>}`
- */
-export async function deleteRecordByType(
-    payload: DeleteRecordByTypeRequest,
-    scriptId: number=DELETE_RECORD_BY_TYPE_SCRIPT_ID,
-    deployId: number=DELETE_RECORD_BY_TYPE_DEPLOY_ID
-): Promise<any> {
-    if (!payload || Object.keys(payload).length === 0) {
-        mlog.error('upsertRecordPayload() payload is undefined or empty. Cannot call RESTlet. Exiting...');
-        STOP_RUNNING(1);
-    }
-    const accessToken = await getAccessToken();
-    if (!accessToken) {
-        mlog.error('upsertRecordPayload() getAccessToken() is undefined. Cannot call RESTlet. Exiting...');
-        STOP_RUNNING(1);
-    }
-    try {
-        const res = await DELETE(
-            accessToken, 
-            scriptId, 
-            deployId, 
-            payload
-        );
-        return res;
-    } catch (error) {
-        mlog.error('Error in callApi.ts deleteRecordByType()', error);
-        write({error: error}, ERROR_DIR, 'ERROR_deleteRecordByType.json');
-        throw error;
-    }
-}
-
-/**
  * @param accessToken `string`
  * @param scriptId `number`
  * @param deployId `number`
@@ -286,26 +234,39 @@ export async function DELETE(
 }
 
 
-export async function retrieveRecordById(
-    payload: RetrieveRecordByIdRequest,
-    scriptId: number=SB_REST_SCRIPTS.GET_RetrieveRecordById.scriptId,
-    deployId: number=SB_REST_SCRIPTS.GET_RetrieveRecordById.deployId,
+
+/**
+ * 
+ * @param payload {@link DeleteRecordByTypeRequest}
+ * @param scriptId `number` - default = {@link DELETE_RECORD_BY_TYPE_SCRIPT_ID}
+ * @param deployId `number` - default = {@link DELETE_RECORD_BY_TYPE_DEPLOY_ID}
+ * @returns **`response`** - `{Promise<any>}`
+ */
+export async function deleteRecordByType(
+    payload: DeleteRecordByTypeRequest,
+    scriptId: number=DELETE_RECORD_BY_TYPE_SCRIPT_ID,
+    deployId: number=DELETE_RECORD_BY_TYPE_DEPLOY_ID
 ): Promise<any> {
+    if (!payload || Object.keys(payload).length === 0) {
+        mlog.error('upsertRecordPayload() payload is undefined or empty. Cannot call RESTlet. Exiting...');
+        STOP_RUNNING(1);
+    }
     const accessToken = await getAccessToken();
     if (!accessToken) {
-        mlog.error('accessToken is undefined. Cannot call RESTlet.');
+        mlog.error('upsertRecordPayload() getAccessToken() is undefined. Cannot call RESTlet. Exiting...');
         STOP_RUNNING(1);
     }
     try {
-        const res = await GET(
-            accessToken,
-            scriptId,
-            deployId,
-            payload,
-        )
+        const res = await DELETE(
+            accessToken, 
+            scriptId, 
+            deployId, 
+            payload
+        );
         return res;
     } catch (error) {
-        mlog.error('Error in callApi.ts retrieveRecordById()', error);
+        mlog.error('Error in callApi.ts deleteRecordByType()', error);
+        write({error: error}, ERROR_DIR, 'ERROR_deleteRecordByType.json');
         throw error;
     }
 }

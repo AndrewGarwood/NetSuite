@@ -1,174 +1,189 @@
 /**
  * @NApiVersion 2.1
  * @NScriptType Restlet
- * @NScriptName POST_UpsertRecord
+ * @NScriptName GET_Record
  * @PROD_ScriptId NOT_DEPLOYED
  * @PROD_DeployId NOT_DEPLOYED
- * @SB_ScriptId 174
+ * @SB_ScriptId 175
  * @SB_DeployId 1
  */
 
-/**
- * @consideration could use rec.submitFields() instead of rec.setValue() and rec.setSublistValue(), but initially 
- * went with the latter because I wanted granular logging and thought I could wrap each setValue in a try catch to check for errors.
- * @consideration make an enum for subrecord fieldIds so don't have to use less robust isSubrecordValue()
- * @consideration make an enum for sublistIds (of non static sublists) {@link https://stoic.software/articles/types-of-sublists/#:~:text=Lastly%2C%20the-,Static%20List,-sublists%20are%20read} 
- */
-define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
+define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     /**
      * @type {LogStatement[]} - `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
      * @see {@link writeLog}`(type, title, ...details)`
      * @description return logArray in response so can process in client
      * */
     const logArray = [];
-
-    
     /**
-     * @param {PostRecordRequest} reqBody **{@link PostRecordRequest}**
-     * - = `{ postOptions: `{@link PostRecordOptions}` | Array<`{@link PostRecordOptions}`>, responseOptions: `{@link RecordResponseOptions}` }`
-     * @returns {PostRecordResponse} **`response`** **{@link PostRecordResponse}** = `{ success: boolean, message: string, results?: `{@link RecordResult}`[], rejects?: `{@link PostRecordOptions}`[], error?: string, logArray: `{@link LogStatement}`[] }`
+     * Get a single record
+     * @param {GetRecordRequest} reqParams {@link GetRecordRequest}
+     * @returns {GetRecordResponse} **`response`** {@link GetRecordResponse}
      */
-    const post = (reqBody) => {
-        const { postOptions, responseOptions } = reqBody;
-        if (!postOptions || !isNonEmptyArray(postOptions)) {
-            writeLog(LogTypeEnum.ERROR, 'post() Invalid Request Parameter', 'non-empty postOptions is required');
-            return { status: false, message: 'post() Invalid Request Parameter', error: 'non-empty postOptions is required', logArray };
-        }
-        if (!Array.isArray(postOptions)) {
-            postOptions = [postOptions];
-        }
-        /**@type {RecordResult[]} */
-        const results = [];
-        /**@type {PostRecordOptions[]} */
-        const rejects = [];
-        writeLog(LogTypeEnum.AUDIT, `post() received valid postOptions of length: ${postOptions.length}`);
-        try {
-            for (let i = 0; i < postOptions.length; i++) {
-                const options = postOptions[i];
-                const result = processPostRecordOptions(options, responseOptions);
-                if (!result) {
-                    writeLog(LogTypeEnum.ERROR,
-                        `post() Invalid PostRecordOptions at index ${i}:`,
-                    )
-                    rejects.push(options);
-                    continue;
-                }
-                results.push(result);
-            }
-            
-            writeLog(LogTypeEnum.AUDIT, `End of POST_UpsertRecord:`, { 
-                numRecordsProcessed: results.length,
-                numRejects: rejects.length,
-                numErrorLogs: logArray.filter(log => log.type === LogTypeEnum.ERROR).length,
-            });
-            /**@type {PostRecordResponse} */
-            return {
-                status: 200,
-                message: `POST_UpsertRecord completed, processed ${results.length} record(s)`,
-                results: results,
-                rejects: rejects,
-                logArray: logArray,
-            };
-        } catch (e) {
-            writeLog(LogTypeEnum.ERROR, `Error in POST_UpsertRecord:`, { 
-                numRecordsProcessed: results.length,
-                numRejects: rejects.length,
-                numErrorLogs: logArray.filter(log => log.type === LogTypeEnum.ERROR).length,
-            }, JSON.stringify(e));
-            /**@type {PostRecordResponse} */
-            return {
-                status: 500,
-                message: 'Error in POST_UpsertRecord: upsert failed after processing ' + results.length + ` records.`,
-                error: String(e),
-                logArray: logArray,
-                results: results,
-                rejects: rejects
-            }
-        }
-    }
-
-    /**
-     * @param {PostRecordOptions} options 
-     * @param {RecordResponseOptions} [responseOptions]
-     * @returns {RecordResult | null} **`result`** {@link RecordResult} = `{ internalid: number, recordType: string | RecordTypeEnum, fields?: `{@link FieldDictionary}`, sublists?: `{@link SublistDictionary}` }`
-     */
-    function processPostRecordOptions(options, responseOptions) {
-        if (!options || typeof options !== 'object') {
+    const get = (/**@type {GetRecordRequest}*/reqParams) => {
+        if (!reqParams) {
             writeLog(LogTypeEnum.ERROR, 
-                `ERROR: processPostRecordOptions() Invalid Options:`, 
-                `options must be an object of type PostRecordOptions`,
-                `= { recordType: RecordTypeEnum, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
+                'ERROR: GET_Record.get() Invalid request parameters', 
+                `reqParams is empty or undefined`
             );
-            return null;
+            return {}; // as `GetRecordResponse`
         }
-        let { recordType, isDynamic, idOptions, fields, sublists } = options;
+        let { isDynamic, recordType, idOptions, responseOptions } = reqParams;
+        isDynamic = typeof isDynamic !== 'boolean' ? NOT_DYNAMIC : isDynamic;
         recordType = validateRecordType(recordType);
         if (!recordType) {
             writeLog(LogTypeEnum.ERROR,
-                `ERROR: processPostRecordOptions() Invalid Options:`,
-                `options is Missing 'recordType' property`,
-                `= { recordType: RecordTypeEnum, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
+                'ERROR: GET_Record.get() Invalid reqParams.recordType',
+                `recordType must be a valid RecordTypeEnum string, received: '${reqParams.recordType}'`
             );
-            return null;
         }
-        const missingFieldsAndSublists = (
-            (!fields || typeof fields !== 'object') 
-            && (!sublists || typeof sublists !== 'object')
-        );
-        if (missingFieldsAndSublists) {
-            writeLog(LogTypeEnum.ERROR, 
-                `ERROR: processPostRecordOptions() Invalid Options`,
-                `options is Missing 'fields' and 'sublists' property (must have at least one)`, 
-                `options must be an object of type PostRecordOptions`,
-                `= { recordType: RecordTypeEnum, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
+        if (!idOptions || isEmptyArray(idOptions)) {
+            writeLog(LogTypeEnum.ERROR,
+                'ERROR: GET_Record.get() Invalid idOptions',
+                `idOptions must be a non-empty array of idSearchOptions,`
             );
-            return null;
         }
+        /**@type {GetRecordResponse} {@link GetRecordResponse} */
+        const response = {}
         /**@type {object | undefined} */
         let rec = undefined;
-        isDynamic = typeof isDynamic !== 'boolean' ? NOT_DYNAMIC : isDynamic;
-        const recId = searchForRecordById(recordType, idOptions, fields);
-        let isExistingRecord = typeof recId === 'number' && recId > 0;
-        if (isExistingRecord && fields && isNonEmptyArray(Object.keys(fields))) { 
-            //remove idPropertyEnum values from keys of fields
-            for (const idPropFieldId of Object.values(idPropertyEnum)) {
-                if (fields[idPropFieldId]) { 
-                    delete fields[idPropFieldId];
-                }
-            }
-            rec = record.load({type: recordType, id: recId, isDynamic });
-            writeLog(LogTypeEnum.DEBUG, 
-                `Loading Existing ${recordType} record with internalid: '${recId}'`, 
+        const recId = searchForRecordById(recordType, idOptions);
+        if (isNaN(recId) || recId === null) {
+            writeLog(LogTypeEnum.AUDIT,
+                'GET_Record.get() No record found',
+                `No record found for recordType '${recordType}' with idOptions ${JSON.stringify(idOptions)}`
             );
-        } else {
-            writeLog(LogTypeEnum.DEBUG, 
-                `processPostRecordOptions() creating new '${recordType}' record`, 
-                `processPostRecordOptions() No existing '${recordType}' record found.`,
-                `-> Creating new '${recordType}' record...`
-            );
-            rec = record.create({type: recordType, isDynamic });
+            response.status = 404;
+            response.error = 'Record Not Found';
+            response.message = `No '${recordType}' record found with idOptions ${JSON.stringify(idOptions)}`;
+            response.logArray = logArray;
+            return response;
         }
-        if (fields && isNonEmptyArray(Object.keys(fields))) {
-            rec = processFieldDictionary(rec, recordType, fields);
-        }
-        if (sublists && isNonEmptyArray(Object.keys(sublists))) {
-            rec = processSublistDictionary(rec, recordType, sublists);
-        }
-        /**@type {RecordResult} {@link RecordResult} */
-        const result = {
-            recordType,
-            internalid: rec.save({ enableSourcing: true, ignoreMandatoryFields: true }), //isExistingRecord ? recId : rec.save({ enableSourcing: true, ignoreMandatoryFields: true }),
+        response.status = 200;
+        response.message = `Found '${recordType}' record with idOptions ${JSON.stringify(idOptions)}`;
+        response.record = {
+            internalid: recId, 
+            recordType, 
+            fields: {}, 
+            sublists: {}
         };
+        rec = record.load({type: recordType, id: recId, isDynamic });
+        writeLog(LogTypeEnum.DEBUG, 
+            `Loading Existing ${recordType} record with internalid: '${recId}'`, 
+        );
         if (responseOptions && responseOptions.responseFields) {
-            result.fields = getResponseFields(rec, responseOptions.responseFields);
+            response.record.fields = getResponseFields(rec, responseOptions.responseFields);
         }
         if (responseOptions && responseOptions.responseSublists) {
-            result.sublists = getResponseSublists(rec, responseOptions.responseSublists);
+            response.record.sublists = getResponseSublists(rec, responseOptions.responseSublists);
         }
-        return result;   
-    }
-
+        response.logArray = logArray;
+        writeLog(LogTypeEnum.AUDIT, 
+            `GET_Record.get() Successfully retrieved record`, 
+            `recordType: '${recordType}', internalid: '${recId}'`,
+            `response: ${JSON.stringify(response, null, 4)}`
+        );
+        return response;
+    };
+    
     /**
+     * @param {object} rec 
+     * @param {string | string[]} responseFields = {@link RecordResponseOptions.responseFields}
+     * @returns {FieldDictionary} **`fields`** = {@link FieldDictionary}
+     */
+    function getResponseFields(rec, responseFields) {
+        if (!rec || !responseFields || (typeof responseFields !== 'string' && !isNonEmptyArray(responseFields))) {
+            writeLog(LogTypeEnum.ERROR, 
+                'getResponseFields() Invalid parameters', 
+                'rec {object} and responseFields {string | string[]} are required'
+            );
+            return {};
+        }
+        /**@type {FieldDictionary} */
+        const fields = {internalid: rec.getValue({ fieldId: idPropertyEnum.INTERNAL_ID })};
+        /**@type {string[]} */
+        responseFields = (typeof responseFields === 'string'
+            ? [responseFields]
+            : responseFields
+        );
+        for (let fieldId of responseFields) {
+            fieldId = fieldId.toLowerCase();
+            /**@type {FieldValue | SubrecordValue} */
+            const value = (rec.hasSubrecord({fieldId}) 
+                ? rec.getSubrecord({fieldId}) // as Subrecord 
+                : rec.getValue({ fieldId }) // as FieldValue
+            );
+            if (value === undefined || value === null) { continue; }
+            fields[fieldId] = value;
+        };
+        return fields;
+    }
+    /**
+     * `if` a value of responseSublists is empty or undefined, `return` all fields of the sublist
+     * @param {object} rec 
+     * @param {{[sublistId: string]: string | string[]}} responseSublists = {@link RecordResponseOptions.responseSublists}
+     * @returns {SublistDictionary | {[sublistId: string]: SublistLine[]}} **`sublists`** = {@link SublistDictionary} = `{[sublistId: string]: `{@link SublistLine}`[]}`
+     */
+    function getResponseSublists(rec, responseSublists) {
+        if (!rec || !responseSublists || isEmptyArray(Object.keys(responseSublists))) {
+            writeLog(LogTypeEnum.ERROR, 
+                'getResponseSublists() Invalid parameters', 
+                'rec and responseSublists are required'
+            );
+            return {};
+        }
+        /**@type {SublistDictionary | {[sublistId: string]: SublistLine[]}} */
+        const sublists = {};    
+        for (const sublistId in responseSublists) {
+            if (!rec.getSublist({ sublistId })) {
+                writeLog(LogTypeEnum.ERROR, 
+                    `getResponseSublists() Invalid sublistId:`, 
+                    `sublistId '${sublistId}' not found on record`
+                );
+                continue;
+            }
+            sublists[sublistId] = [];
+            const lineCount = rec.getLineCount({ sublistId });
+            if (lineCount === 0) {
+                writeLog(LogTypeEnum.DEBUG, 
+                    `getResponseSublists() No lines found for sublistId '${sublistId}'`, 
+                );
+                continue;
+            }
+            /**@type {string[]} */
+            const responseFields = (typeof responseSublists[sublistId] === 'string'
+                ? [responseSublists[sublistId]]
+                : (!responseSublists[sublistId] || isEmptyArray(responseSublists[sublistId])
+                    ? rec.getSublistFields({ sublistId })
+                    : responseSublists[sublistId]
+            )); // as string[]
+            for (let i = 0; i < lineCount; i++) {
+                /**@type {SublistLine} sublistLine {@link SublistLine}*/
+                const sublistLine = {
+                    line: i,
+                    id: rec.getSublistValue({
+                        sublistId, fieldId: 'id', line: i
+                    }),
+                    internalid: rec.getSublistValue({ 
+                        sublistId, fieldId: idPropertyEnum.INTERNAL_ID, line: i 
+                    })
+                };
+                
+                for (const fieldId of responseFields) {
+                    /**@type {FieldValue | SubrecordValue} */
+                    const value = (rec.hasSublistSubrecord({ sublistId, fieldId, line: i })
+                        ? rec.getSublistSubrecord({ sublistId, fieldId, line: i }) // as Subrecord 
+                        : rec.getSublistValue({ sublistId, fieldId, line: i }) // as FieldValue
+                    );
+                    if (value === undefined || value === null) { continue; }
+                    sublistLine[fieldId] = value;
+                }
+                sublists[sublistId].push(sublistLine);
+            }
+        }
+        return sublists;
+    }
+        /**
      * @note does not yet handle searching for multiple records and returning their ids
      * @param {RecordTypeEnum | string} recordType 
      * @param {idSearchOptions[]} [idOptions] `Array<`{@link idSearchOptions}`>` = `{ idProp`: {@link idPropertyEnum}, `searchOperator`: {@link RecordOperatorEnum}, `idValue`: string | number` }[]`
@@ -276,421 +291,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         }
         return recordId ? Number(recordId) : null; // null if no record found
     }
-    /**
-     * 
-     * @param {object} rec 
-     * @param {RecordTypeEnum} recordType 
-     * @param {string} fieldId 
-     * @param {FieldValue} value
-     * @returns {object} **`rec`** - the record object with field value set or unchanged if `originalValue === value`. 
-     */
-    function upsertFieldValue(rec, recordType, fieldId, value) {
-        if (!rec || !recordType || !fieldId || typeof fieldId !== 'string') {
-            writeLog(LogTypeEnum.ERROR, 
-                `ERROR: upsertFieldValue() Invalid Parameters:`,
-                `rec, recordType, fieldId, and value are required parameters`,
-                `received { recordType: ${recordType}, fieldId: ${fieldId}, value: ${value} }`,
-            );
-            return rec;
-        }
-        /**@type {SetFieldValueOptions} */
-        const setOptions = { fieldId, value };
-        try {
-            const originalValue = rec.getValue({ fieldId });
-            if (originalValue === value) {
-                return rec;
-            }
-            writeLog(LogTypeEnum.DEBUG, 
-                `upsertFieldValue() attempting <${recordType}>rec.setValue();`,
-                `<${recordType}>rec.setValue({ fieldId: '${fieldId}', value: '${value}' });`,
-                `originalValue === newValue ? ${originalValue === value}`,
-                `originalValue: '${originalValue}'`, 
-                `     newValue: '${value}'`, 
-            ); 
-            rec.setValue(setOptions);
-        } catch (e) {
-            writeLog(LogTypeEnum.ERROR, 
-                `ERROR: upsertFieldValue() Error setting value for fieldId '${fieldId}' on recordType '${recordType}':`,
-                `<${recordType}>rec.setValue({ fieldId: '${fieldId}', value: '${value}' })`,
-                `originalValue: '${rec.getValue({ fieldId })}'`,
-                `        Error: ${JSON.stringify(e)}`,
-            );
-        }
-        return rec;
-    }
-
-    /**
-     * @param {object} rec 
-     * @param {RecordTypeEnum} recordType 
-     * @param {string} sublistId 
-     * @param {string} fieldId 
-     * @param {number} lineIndex 
-     * @param {FieldValue} value 
-     * @returns **`rec`** - the record object with sublist field value set or unchanged if `originalValue === value`.
-     */
-    function upsertSublistFieldValue(rec, recordType, sublistId, fieldId, lineIndex, value) {
-        if (!rec || !recordType || !sublistId || !fieldId ) {
-            writeLog(LogTypeEnum.ERROR, 
-                `ERROR: upsertSublistFieldValue() Invalid Parameters:`,
-                `rec, recordType, sublistId, fieldId, and value are required parameters`,
-                `received { recordType: ${recordType}, sublistId: ${sublistId}, fieldId: ${fieldId}, value: ${value} }`,
-            );
-            return rec;
-        }
-        /**@type {SetSublistValueOptions} */
-        const setOptions = {sublistId, fieldId, value, line: lineIndex};
-        try {
-            const originalValue = rec.getSublistValue({ sublistId, fieldId, line: lineIndex });
-            if (originalValue === value) {
-                return rec;
-            }
-            writeLog(LogTypeEnum.DEBUG, 
-                `upsertFieldValue() attempting <${recordType}>rec.setSublistValue();`,
-                `<${recordType}>rec.setSublistValue({ sublistId: '${sublistId}', fieldId: '${fieldId}', value: '${value}', line: ${lineIndex} });`,
-                `originalValue === newValue ? ${originalValue === value}`,
-                `originalValue: '${originalValue}'`, 
-                `     newValue: '${value}'`, 
-            );
-            rec.setSublistValue(setOptions); 
-        } catch (e) {
-            writeLog(LogTypeEnum.ERROR, 
-                `ERROR: upsertSublistFieldValue() Error setting value for fieldId '${fieldId}' on sublistId '${sublistId}' of recordType '${recordType}':`,
-                `<${recordType}>rec.setSublistValue({ sublistId: '${sublistId}', fieldId: '${fieldId}', value: '${value}', line: ${lineIndex} })`,
-                `originalValue: '${rec.getSublistValue({ sublistId, fieldId, line: lineIndex })}'`,
-                `        Error: ${JSON.stringify(e)}`,
-            );
-        }
-        return rec;
-    }
-
-    /**
-     * @param {object} rec the record object created or loaded by the `record` module
-     * @param {RecordTypeEnum | string} recordType {@link RecordTypeEnum} | `string`
-     * @param {FieldDictionary} fields {@link FieldDictionary} = `{ [fieldId: string]: FieldValue | SubrecordValue }`
-     * @returns {object} **`rec`** - the record object with field values set.
-     */
-    function processFieldDictionary(rec, recordType, fields) {
-        if (!rec || !recordType || !fields || isEmptyArray(Object.keys(fields))) {
-            writeLog(LogTypeEnum.ERROR, 
-                `ERROR: processFieldDictionary() Invalid Parameters:`,
-                `rec, recordType, and fields are required parameters`,
-            );
-            return rec;
-        }
-        for (const fieldId in fields) {
-            const value = fields[fieldId];
-            if (isSubrecord(value)){
-                rec = processFieldSubrecordOptions(rec, recordType, value);
-            } else {
-                rec = upsertFieldValue(rec, recordType, fieldId, value);
-            }
-        }
-        return rec;
-    }
-
-    /**
-     * @param {object} rec 
-     * @param {RecordTypeEnum | string} recordType 
-     * @param {SublistDictionary} sublists 
-     * @returns {object} **`rec`**
-     */
-    function processSublistDictionary(rec, recordType, sublists) {
-        if (!rec || !recordType || !sublists || isEmptyArray(Object.keys(sublists))) {
-            writeLog(LogTypeEnum.ERROR, 
-                `ERROR: processSublistDictionary() Invalid Parameters:`,
-                `rec, recordType, and sublists are required parameters`,
-            );
-            return rec;
-        }
-        for (const sublistId in sublists) {
-            if (!sublistId || !rec.getSublist({sublistId})) {
-                writeLog(LogTypeEnum.ERROR, 
-                    `ERROR: processSublistDictionary() Invalid sublistId:`,
-                    `sublistId '${sublistId}' not found on record type '${recordType}'`
-                );
-                continue;
-            }
-            const sublistLines = sublists[sublistId];
-            if (!sublistLines || isEmptyArray(sublistLines)) {
-                continue;
-            }
-            for (let i = 0; i < sublistLines.length; i++) {
-                /**@type {SublistLine} */
-                const sublistLine = sublistLines[i];
-                let { line, lineIdProp } = sublistLine;
-                const remainingSublistFieldIds = Object.keys(sublistLine).filter(
-                    key => key !== 'line' && key !== idPropertyEnum.INTERNAL_ID
-                );
-                let lineIndices = [];
-                const wantToEditExistingLine = (
-                    typeof line !== 'number' 
-                    && lineIdProp !== undefined 
-                    && sublistLine[lineIdProp] !== undefined
-                );
-                if (typeof line === 'number') { 
-                    lineIndices.push(line); 
-                } else if (wantToEditExistingLine) {
-                    lineIndices.push(...getSublistLineIndexByFieldValue(
-                        rec, 
-                        sublistId, 
-                        sublistLine[lineIdProp], 
-                        lineIdProp || idPropertyEnum.INTERNAL_ID
-                    ));
-                } else if (typeof line !== 'number') {
-                    lineIndices.push(i); 
-                }
-                if (lineIndices.length === 0) { 
-                    // default to new line if no line specified or no existing lines found
-                    lineIndices.push(rec.getLineCount({sublistId})); 
-                }
-                lineIndices = lineIndices.map(index => 
-                    validateSublistLineIndex(rec, sublistId, index)
-                );
-                for (const lineIndex of lineIndices) {
-                    for (const fieldId of remainingSublistFieldIds) {
-                        const value = sublistLine[fieldId];
-                        if (isSubrecord(value)) {
-                            rec = processSublistSubrecordOptions(
-                                rec, recordType, sublistId, fieldId, lineIndex, value
-                            );
-                            continue;
-                        }
-                        rec = upsertSublistFieldValue(
-                            rec, recordType, sublistId, fieldId, lineIndex, value
-                        );
-                    }
-                }
-            }
-        }
-        return rec;
-    }
-
-    /**
-     * @param {object} rec 
-     * @param {RecordTypeEnum} parentRecordType 
-     * @param {string} parentSublistId
-     * @param {string} parentFieldId 
-     * @param {number} lineIndex
-     * @param {SetSublistSubrecordOptions} subrecordOptions 
-     * @returns {object} **`rec`**
-     */
-    function processSublistSubrecordOptions(
-        rec, 
-        parentRecordType, 
-        parentSublistId,
-        parentFieldId, 
-        lineIndex, 
-        subrecordOptions
-    ) {
-        if (!rec || !parentRecordType || typeof parentSublistId !== 'string' || typeof parentFieldId !== 'string'
-            || typeof lineIndex !== 'number' || !subrecordOptions || isEmptyArray(Object.keys(subrecordOptions))) {
-            writeLog(LogTypeEnum.ERROR, 
-                `ERROR: processSublistSubrecordOptions() Invalid Parameters:`,
-                `rec, parentRecordType, parentSublistId, fieldId, lineIndex, and subrecordOptions are required parameters`,
-            );
-            return rec;
-        }
-        const { sublistId, fieldId, fields, sublists, subrecordType } = subrecordOptions;
-        if (sublistId !== parentSublistId || fieldId !== parentFieldId) {
-            writeLog(LogTypeEnum.ERROR,
-                `ERROR: processSublistSubrecordOptions() Invalid subrecordOptions:`,
-                `sublistId '${sublistId}' and fieldId '${fieldId}' must match parentSublistId '${parentSublistId}' and parentFieldId '${parentFieldId}'`,
-            );
-            return rec;
-        }
-        let sublistSubrec = rec.getSublistSubrecord({ 
-            sublistId: parentSublistId, fieldId: parentFieldId, line: lineIndex 
-        });
-        if (!sublistSubrec) {
-            writeLog(LogTypeEnum.ERROR,
-                `ERROR: processSublistSubrecordOptions() Invalid subrecord fieldId:`,
-                `fieldId '${parentFieldId}' is not a subrecord field of a '${parentRecordType}' record's '${parentSublistId}' sublist`
-            );
-        }
-        if (fields && isNonEmptyArray(Object.keys(fields))) {
-            sublistSubrec = processFieldDictionary(sublistSubrec, subrecordType, fields);
-        }
-        if (sublists && isNonEmptyArray(Object.keys(sublists))) {
-            sublistSubrec = processSublistDictionary(sublistSubrec, subrecordType, sublists);
-        }
-        return rec;
-    }
-
-    /**
-     * @param {object} rec 
-     * @param {RecordTypeEnum} parentRecordType 
-     * @param {SetFieldSubrecordOptions} subrecordOptions 
-     * @returns {object} **`rec`**
-     */
-    function processFieldSubrecordOptions(rec, parentRecordType, subrecordOptions) {
-        if (!rec || !parentRecordType || !subrecordOptions || isEmptyArray(Object.keys(subrecordOptions))) {
-            writeLog(LogTypeEnum.ERROR, 
-                `ERROR: processFieldSubrecordOptions() Invalid Parameters:`,
-                `rec, parentRecordType, and subrecordOptions are required parameters`,
-            );
-            return rec;
-        }
-        let { fieldId, fields, sublists, subrecordType } = subrecordOptions;
-        if (!fieldId || typeof fieldId !== 'string') {
-            writeLog(LogTypeEnum.ERROR, 
-                `processFieldSubrecordOptions() - Invalid parameter: subrecordOptions`, 
-                '(fieldId: string) is required property of subrecordOptions'
-            );
-            return rec;
-        }
-        fieldId = fieldId.toLowerCase();
-        let subrec = rec.getSubrecord({ fieldId });
-        if (!subrec) {
-            writeLog(LogTypeEnum.ERROR,
-                `processFieldSubrecordOptions() - Invalid subrecord fieldId:`,
-                `fieldId '${fieldId}' is not a subrecord field of a '${parentRecordType}' record`
-            );
-            return rec;
-        }
-        if (fields && isNonEmptyArray(Object.keys(fields))) {
-            subrec = processFieldDictionary(subrec, subrecordType, fields);
-        }
-        if (sublists && isNonEmptyArray(Object.keys(sublists))) {
-            subrec = processSublistDictionary(subrec, subrecordType, sublists);
-        }
-        return rec;
-    }
-
-    /**
-     * @param {object} rec 
-     * @param {string | string[]} responseFields 
-     * @returns {FieldDictionary} **`fields`** = {@link FieldDictionary}
-     */
-    function getResponseFields(rec, responseFields) {
-        if (!rec || !responseFields || (typeof responseFields !== 'string' && !isNonEmptyArray(responseFields))) {
-            writeLog(LogTypeEnum.ERROR, 
-                'getResponseFields() Invalid parameters', 
-                'rec {object} and responseFields {string | string[]} are required'
-            );
-            return {};
-        }
-        /**@type {FieldDictionary} */
-        const fields = {internalid: rec.getValue({ fieldId: idPropertyEnum.INTERNAL_ID })};
-        /**@type {string[]} */
-        responseFields = (typeof responseFields === 'string'
-            ? [responseFields]
-            : responseFields
-        );
-        for (let fieldId of responseFields) {
-            fieldId = fieldId.toLowerCase();
-            /**@type {FieldValue | SubrecordValue} */
-            const value = (rec.hasSubrecord({fieldId}) 
-                ? rec.getSubrecord({fieldId}) // as Subrecord 
-                : rec.getValue({ fieldId }) // as FieldValue
-            );
-            if (value === undefined || value === null) { continue; }
-            fields[fieldId] = value;
-        };
-        return fields;
-    }
-    /**
-     * `if` a value of responseSublists is empty or undefined, `return` all fields of the sublist
-     * @param {object} rec 
-     * @param {{[sublistId: string]: string | string[]}} responseSublists
-     * @returns {SublistDictionary | {[sublistId: string]: SublistLine[]}} **`sublists`** = {@link SublistDictionary}
-     */
-    function getResponseSublists(rec, responseSublists) {
-        if (!rec || !responseSublists || isEmptyArray(Object.keys(responseSublists))) {
-            writeLog(LogTypeEnum.ERROR, 
-                'getResponseSublists() Invalid parameters', 
-                'rec and responseSublists are required'
-            );
-            return {};
-        }
-        /**@type {SublistDictionary | {[sublistId: string]: SublistLine[]}} */
-        const sublists = {};    
-        for (const sublistId in responseSublists) {
-            if (!rec.getSublist({ sublistId })) {
-                writeLog(LogTypeEnum.ERROR, 
-                    `getResponseSublists() Invalid sublistId:`, 
-                    `sublistId '${sublistId}' not found on record`
-                );
-                continue;
-            }
-            sublists[sublistId] = [];
-            const lineCount = rec.getLineCount({ sublistId });
-            if (lineCount === 0) {
-                writeLog(LogTypeEnum.DEBUG, 
-                    `getResponseSublists() No lines found for sublistId '${sublistId}'`, 
-                );
-                continue;
-            }
-            /**@type {string[]} */
-            const responseFields = (typeof responseSublists[sublistId] === 'string'
-                ? [responseSublists[sublistId]]
-                : (!responseSublists[sublistId] || isEmptyArray(responseSublists[sublistId])
-                    ? rec.getSublistFields({ sublistId }) // as string[]
-                    : responseSublists[sublistId] // as string[]
-            ));
-            for (let i = 0; i < lineCount; i++) {
-                /**@type {SublistLine} sublistLine {@link SublistLine}*/
-                const sublistLine = {
-                    line: i,
-                    id: rec.getSublistValue({
-                        sublistId, fieldId: 'id', line: i
-                    }),
-                    internalid: rec.getSublistValue({ 
-                        sublistId, fieldId: idPropertyEnum.INTERNAL_ID, line: i 
-                    })
-                };
-                
-                for (const fieldId of responseFields) {
-                    /**@type {FieldValue | SubrecordValue} */
-                    const value = rec.hasSublistSubrecord({ sublistId, fieldId, line: i })
-                        ? rec.getSublistSubrecord({ sublistId, fieldId, line: i }) // as Subrecord 
-                        : rec.getSublistValue({ sublistId, fieldId, line: i }); // as FieldValue
-                    if (value === undefined || value === null) { continue; }
-                    sublistLine[fieldId] = value;
-                }
-                sublists[sublistId].push(sublistLine);
-            }
-        }
-        return sublists;
-    }
-
 /*---------------------------- [ Helper Functions ] ----------------------------*/
-
-/**
- * @TODO decide if this is necessary abstraction or if should just use `Array.isArray() and arr.length > 0` everywhere
- * @param {any} arr 
- * @returns {boolean} **`true`** `if` `arr` is an array and has at least one element, **`false`** `otherwise`.
- */
-function isNonEmptyArray(arr) {
-    return Array.isArray(arr) && arr.length > 0;
-}
-function isEmptyArray(arr) { return Array.isArray(arr) && arr.length === 0; }
-
-/**
- * @description Check if an object has any non-empty keys (not undefined, null, or empty string). 
- * - passing in an array will return `false`.
- * @param {object} obj - The `object` to check.
- * @returns {boolean} **`true`** if the object has any non-empty keys, **`false`** `otherwise`.
- */
-function hasNonTrivialKeys(obj) {
-    if (!obj || typeof obj !== 'object' || isEmptyArray(Object.keys(obj))) {
-        return false;
-    }
-    for (const key in obj) { // return true if any key is non-empty
-        let value = obj[key];
-        let valueIsNonTrivial = (obj.hasOwnProperty(key)
-            && value !== undefined
-            && value !== null
-            && (value !== ''
-                || isNonEmptyArray(value)
-                || (typeof value === 'object' && isNonEmptyArray(Object.entries(value)))
-            )
-        );
-        if (valueIsNonTrivial) {
-            return true;
-        }
-    }
-    return false;
-}
 /**
  * @enum {string} **`LogTypeEnum`**
  * @description `Enum` for NetSuite's log module types
@@ -710,7 +311,7 @@ const LogTypeEnum = {
     /** = `'emergency'` */
     EMERGENCY: 'emergency',
 };
-/**max number of times allowed to call `log.debug(title, details)` per `post()` call */
+/**max number of times allowed to call `log.debug(title, details)` per `get()` call */
 const MAX_LOGS_PER_LEVEL = 500;
 /**@type {{[logType: LogTypeEnum]: {count: number, limit: number}}} */
 const logDict = {
@@ -771,7 +372,6 @@ function writeLog(type, title, ...details) {
     }
     logArray.push({ timestamp: getCurrentPacificTime(), type, title, details });//, message: payload });
 }
-
 /**
  * Gets the current date and time in Pacific Time
  * @returns {string} The current date and time in Pacific Time
@@ -779,34 +379,6 @@ function writeLog(type, title, ...details) {
 function getCurrentPacificTime() {
     return new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
 }
-/**
- * @consideration make an enum for subrecord types
- * assumes that the input value is a subrecord object if it is an object and not an array and not a Date object
- * - {@link SetFieldSubrecordOptions} or {@link SetSublistSubrecordOptions}
- * @param {any | SubrecordValue} value 
- * @returns **`isSubrecord`** `boolean` = **`true`** `if` `value` is a subrecord object, **`false`** `otherwise`.
- */
-function isSubrecord(value) {
-    const isNonEmptyObject = Boolean(value 
-        && typeof value === 'object' 
-        && !Array.isArray(value) 
-        && isNonEmptyArray(Object.keys(value))
-    );
-    const isNotDate = Boolean(value 
-        && !value.hasOwnProperty('getVarDate') 
-        && !value.hasOwnProperty('toLocaleString')
-    );
-    const isSetSubrecordOptions = Boolean(value 
-        && (value.hasOwnProperty('fieldId') || value.hasOwnProperty('subrecordType'))
-        && (value.hasOwnProperty('fields') || value.hasOwnProperty('sublists'))
-    );
-    const isSubrecord = Boolean(isNonEmptyObject 
-        && (isSetSubrecordOptions || isNotDate)
-    );
-    return isSubrecord;
-}
-
-
 /**
  * @param {RecordTypeEnum | string} recordType {@link RecordTypeEnum} | `string`
  * @returns {RecordTypeEnum | null} **`recordType`** - the validated record type as a `RecordTypeEnum` value, or `null` if the record type is invalid.
@@ -821,105 +393,39 @@ function validateRecordType(recordType) {
     if (isValue) { return recordType.toLowerCase(); }
     return null;
 }
-
 /**
- * get all line indices with sublist[idProp] === idValue
- * @param {object} rec 
- * @param {string} sublistId 
- * @param {FieldValue} idValue 
- * @param {string} lineIdProp 
- * @returns {number[]} **`lineIndices`**
+ * @TODO decide if this is necessary abstraction or if should just use `Array.isArray() and arr.length > 0` everywhere
+ * @param {any} arr 
+ * @returns {boolean} **`true`** `if` `arr` is an array and has at least one element, **`false`** `otherwise`.
  */
-function getSublistLineIndexByFieldValue(rec, sublistId, idValue, lineIdProp = idPropertyEnum.INTERNAL_ID) {
-    if (!rec || !sublistId || !idValue) {
-        writeLog(LogTypeEnum.ERROR, 
-            `ERROR: getSublistLineIndexById() Invalid Parameters:`,
-            `rec, sublistId, and lineId are required parameters`,
-        );
-        return [];
-    }
-    /**@type {number[]} */
-    const lineIndices = [];
-    const lineCount = rec.getLineCount({ sublistId });
-    for (let i = 0; i < lineCount; i++) {
-        const sublistValue = rec.getSublistValue({ sublistId, fieldId: lineIdProp, line: i });
-        if (sublistValue === idValue) {
-            lineIndices.push(i);
-        }
-    }
-    return lineIndices;
+function isNonEmptyArray(arr) {
+    return Array.isArray(arr) && arr.length > 0;
 }
-
-/**
- * @description Validate the line index for a sublist. 
- * `If` the line index is out of bounds, `insert` a new line at the end 
- * of the sublist and `return` it as the `new line index`.
- * @param {object} rec a record or subrecord object
- * @param {string} sublistId id of rec's sublist
- * @param {number} line index in sublist
- * @returns {number} the input `line {number}` if valid, otherwise `insert` a new line at the end of the sublist and `return` it as the new line index. 
- */
-function validateSublistLineIndex(rec, sublistId, line) {
-    if (!rec || !sublistId || typeof sublistId !== 'string' || typeof line !== 'number') {
-        writeLog(LogTypeEnum.ERROR, 
-            'Invalid validateSublistLineIndex() parameters', 
-            'params (rec: Record, sublistId: string, and line: number) are required'
-        );
-    }
-    const lineCount = rec.getLineCount({ sublistId });
-    const lineIndexOutOfBounds = line < 0 || line >= lineCount;
-    if (lineIndexOutOfBounds) {
-        writeLog(LogTypeEnum.DEBUG, 
-            `validateSublistLine() Inserting new line.`,
-            `Inserting new line at end of sublist because input line was out of bounds or sublist was empty`, 
-            `rec: <rec>, sublistId: ${sublistId}, line: ${line}`
-        );
-        rec.insertLine({ sublistId, line: lineCount });
-        return lineCount; // return the new line index
-    }
-    return line; // return the original line index because it is valid
-}
-
+function isEmptyArray(arr) { return Array.isArray(arr) && arr.length === 0; }
 /*------------------------ [ Types, Enums, Constants ] ------------------------*/
 /** create/load a record in standard mode by setting `isDynamic` = `false` = `NOT_DYNAMIC`*/
 const NOT_DYNAMIC = false;
 
-/**Type: PostRecordRequest {@link PostRecordRequest} */
 /**
- * @typedef {Object} PostRecordRequest
- * @property {PostRecordOptions | Array<PostRecordOptions>} postOptions = {@link PostRecordOptions} | `Array<`{@link PostRecordOptions}`>`
- * - {@link PostRecordOptions} = `{ recordType: `{@link RecordTypeEnum}`, isDynamic?: boolean, idOptions?: `{@link idSearchOptions}`[], fields?: `{@link FieldDictionary}`, sublists?: `{@link SublistDictionary}` }`
- * @property {RecordResponseOptions} [responseOptions] = {@link RecordResponseOptions} = `{ responseFields: string | string[], responseSublists: Record<string, string | string[]> }`
- */
-
-/**Type: PostRecordResponse {@link PostRecordResponse} */
-/**
- * @typedef {Object} PostRecordResponse
- * @property {string | number} status - Indicates status of the request.
- * @property {string} message - A message indicating the result of the request.
- * @property {RecordResult[]} [results] - an `Array<`{@link RecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully upserted.
- * @property {PostRecordOptions[]} [rejects] - an `Array<`{@link PostRecordOptions}`>` containing the record options that were not successfully upserted.
- * @property {string} [error] - An error message if the request was not successful.
- * @property {LogStatement[]} logArray - an `Array<`{@link LogStatement}`>` generated during the request processing.
- */
-
-
-/**
- * @typedef {Object} RecordResponseOptions
- * @property {string | string[]} [responseFields] - `fieldId(s)` of the main record to return in the response.
- * @property {Record<string, string | string[]>} [responseSublists] `sublistId(s)` mapped to `sublistFieldId(s)` to return in the response.
+ * - {@link RecordTypeEnum}
+ * - {@link idSearchOptions}
+ * - {@link RecordResponseOptions} = `{ responseFields?: string | string[], responseSublists?: Record<string, string | string[]> }`
+ * @typedef {{
+ * isDynamic?: boolean; 
+ * recordType: string | RecordTypeEnum;
+ * idOptions: idSearchOptions[],
+ * responseOptions: RecordResponseOptions,
+ * }} GetRecordRequest
  */
 
 /**
- * = `{ recordType: RecordTypeEnum, isDynamic?: boolean, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
- * @typedef {Object} PostRecordOptions
- * @property {RecordTypeEnum} recordType - The record type to post, see {@link RecordTypeEnum}
- * @property {boolean} [isDynamic=false] - Indicates if the record should be created/loaded in dynamic mode. (defaults to {@link NOT_DYNAMIC} = `false`)
- * @property {idSearchOptions[]} [idOptions] options to search for an existing record to upsert 
- * - = `Array<`{@link idSearchOptions}`>` 
- * - = `{ idProp`: {@link idPropertyEnum}, `searchOperator`: {@link RecordOperatorEnum}, `idValue`: string | number` }[]`
- * @property {FieldDictionary | { [fieldId: string]: FieldValue | SubrecordValue } } [fields]
- * @property {SublistDictionary | { [sublistId: string]: Array<SublistLine | {[sublistFieldId: string]: FieldValue | SubrecordValue}> } } [sublists]
+ * @typedef {{
+ * status: number;
+ * message: string;
+ * error?: string;
+ * logArray: LogStatement[];
+ * record?: RecordResult; 
+ * }} GetRecordResponse
  */
 
 /**
@@ -928,6 +434,11 @@ const NOT_DYNAMIC = false;
  * @property {string | RecordTypeEnum} recordType
  * @property {FieldDictionary | { [fieldId: string]: FieldValue | SubrecordValue } } fields
  * @property {SublistDictionary | { [sublistId: string]: Array<SublistLine | {[sublistFieldId: string]: FieldValue | SubrecordValue}> } } sublists
+ */
+/**
+ * @typedef {Object} RecordResponseOptions
+ * @property {string | string[]} [responseFields] - `fieldId(s)` of the main record to return in the response.
+ * @property {Record<string, string | string[]>} [responseSublists] `sublistId(s)` mapped to `sublistFieldId(s)` to return in the response.
  */
 
 
@@ -1002,7 +513,7 @@ const NOT_DYNAMIC = false;
 
 /** Type: **`SetSublistSubrecordOptions`** {@link SetSublistSubrecordOptions} */
 /**
- * \@extends {@link SetFieldSubrecordOptions}
+ * - extends {@link SetFieldSubrecordOptions}
  * @typedef {Object} SetSublistSubrecordOptions
  * @property {string} sublistId
  * @property {string} fieldId (i.e. `sublistFieldId`) The `internalid` of a sublist's field that holds a subrecord
@@ -1022,31 +533,6 @@ const NOT_DYNAMIC = false;
  * @typedef {Date | number | number[] | string | string[] | boolean | null
  * } FieldValue 
  */
-
-/** Type: **`SetFieldValueOptions`** {@link SetFieldValueOptions} */
-/**
- * @typedef {Object} SetFieldValueOptions
- * @property {string} fieldId - The `internalid` of a standard or custom field.
- * @property {FieldValue} value 
- * - The {@link FieldValue} to set the field to. 
- * - = `{Date | number | number[] | string | string[] | boolean | null}`
- * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
- */
-
-
-/** Type: **`SetSublistValueOptions`** {@link SetSublistValueOptions} */
-/**
- * - \@extends {@link SetFieldValueOptions}
- * @typedef {Object} SetSublistValueOptions
- * @property {string} sublistId - The `internalid` of the sublist.
- * @property {string} fieldId - The `internalid` of a standard or custom sublist field.
- * @property {number} [line] - The line number for the field. (i.e. index of the sublist row) (can use record.getLineCount(sublistId) to get the number of lines in the sublist)
- * @property {FieldValue} value 
- * - The {@link FieldValue} to set the sublist field to.
- * - = `{Date | number | number[] | string | string[] | boolean | null}`
- * @property {FieldInputTypeEnum} [inputType] - The input type of the field. (see {@link FieldInputTypeEnum})
- */
-
 /** Type: **`LogStatement`** {@link LogStatement} */
 /**
  * @typedef {Object} LogStatement
@@ -1095,6 +581,7 @@ const NOT_DYNAMIC = false;
  */
 
 /**@typedef {{ value: string, text: string }} LookupValueObject */
+
 /** Type: **`SearchColumnSetWhenOrderedByOptions`** {@link SearchColumnSetWhenOrderedByOptions} */
 /**
  * - `name` = The name of the search column for which the minimal or maximal value should be found.
@@ -1311,47 +798,6 @@ const SearchOperatorEnum = {
     TEXT: TextOperatorEnum,
     MULTI_SELECT: MultiSelectOperatorEnum
 };
-
-/** 
- * @note not used in implementation yet
- * @enum {string} **`FieldInputTypeEnum`**
- * @reference {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html}
- * @property {string} TEXT `'text'`
- * @property {string} RADIO `'radio'`
- * @property {string} SELECT `'select'`
- * @property {string} MULTISELECT `'multiselect'`
- * @property {string} CHECKBOX `'checkbox'`
- * @property {string} DATE `'date'`
- * @property {string} INTEGER `'integer'`
- * @property {string} FLOAT `'float'`
- * @property {string} CURRENCY `'currency'`
- * @property {string} PERCENT `'percent'`
- * @property {string} INLINE_HTML `'inlinehtml'`
- * */
-const FieldInputTypeEnum = {
-    /** `Text` fields accept `string` values. */
-    TEXT: 'text',
-    /** `Radio` fields accept `string` values. */
-    RADIO: 'radio',
-    /** `Select` fields accept `string` and `number` values. */
-    SELECT: 'select',
-    /** `Multi-Select` fields accept `arrays` of `string` or `number` values. */
-    MULTISELECT: 'multiselect',
-    /** `Checkbox` fields accept `boolean` values. */
-    CHECKBOX: 'checkbox',
-    /** `Date` and `DateTime` fields accept {@link Date} values. */
-    DATE: 'date',
-    /** `Integer` fields accept `number` values. */
-    INTEGER: 'integer',
-    /** `Float` fields accept `number` values. */
-    FLOAT: 'float',
-    /** `Currency` fields accept `number` values. */
-    CURRENCY: 'currency',
-    /** `Percent` fields accept `number` values. */
-    PERCENT: 'percent',
-    /** `Inline HTML` fields accept `strings`. Strings containing HTML tags are represented as HTML entities in UI. {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html#:~:text=The%20following%20code%20sample%20shows%20the%20syntax%20for%20INLINEHTML%20fields%20and%20what%20is%20returned.} */
-    INLINE_HTML: 'inlinehtml',
-}
 
 /**
  * @enum {string} **`RecordTypeEnum`**
@@ -1643,5 +1089,5 @@ const RecordTypeEnum = {
     WORKPLACE: 'workplace',
     ZONE: 'zone'
 };
-    return { post };
+    return { get };
 });
