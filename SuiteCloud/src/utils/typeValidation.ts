@@ -63,7 +63,9 @@ export function isNullLike(value: any): boolean {
 export function isNonEmptyArray(arr: any): boolean {
     return Array.isArray(arr) && arr.length > 0;
 }
-export function isEmptyArray(arr: any): boolean { return !isNonEmptyArray(arr); }
+export function isEmptyArray(arr: any): boolean { 
+    return Array.isArray(arr) && arr.length === 0; 
+}
 /**
  * @description Check if an object has any non-empty keys (not `undefined`, `null`, or empty string). 
  * - passing in an array will return `false`.

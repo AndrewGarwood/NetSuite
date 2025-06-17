@@ -13,11 +13,12 @@ import {
 } from '../config/env';
 import { createUrlWithParams } from 'src/utils/api/url';
 import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from './types';
-import { writeObjectToJson as write, getCurrentPacificTime, readJsonFileAsObject as read, printConsoleGroup as print, calculateDifferenceOfDateStrings, TimeUnitEnum, } from 'src/utils/io';
+import { writeObjectToJson as write, getCurrentPacificTime, readJsonFileAsObject as read, calculateDifferenceOfDateStrings, TimeUnitEnum, } from 'src/utils/io';
 import { mainLogger as mlog, errorLogger as elog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
 
+const infoLogs: any[] = []
 /** `src/server/tokens/STEP2_tokens.json` */
 const STEP2_TOKENS_PATH = path.join(TOKEN_DIR, 'STEP2_tokens.json') as string;
 /** `src/server/tokens/STEP3_tokens.json` */
@@ -31,17 +32,17 @@ app.use(bodyParser.urlencoded({ extended: true }));
 let server: Server | any | undefined;
 
 /**
- * @description close the {@link server}: {@link Server} listening for oauth 2.0 
+ * @description close the {@link server} listening for oauth 2.0 
  * callback if it is running.
  * @returns {void}
  */
 export const CLOSE_SERVER = (): void => {
     if (server) {
         server.close(() => {
-            // mlog.info('Server closed successfully.');
+            infoLogs.push(NL + 'Server closed successfully.');
         });
     } else {
-        // mlog.info('Server is not running or already closed.');
+        infoLogs.push(NL + 'Server is not running or already closed.');
     }
 }
 
@@ -65,7 +66,7 @@ export async function getAuthCode(): Promise<string> {
             }
         });
         server = app.listen(SERVER_PORT, () => {
-            mlog.info(`Server is listening on port ${SERVER_PORT} for oauth callback -> Opening authURL...`);
+            infoLogs.push(NL + `Server is listening on port ${SERVER_PORT} for oauth callback -> Opening authURL...`);
             const authLink = createUrlWithParams(AUTH_URL, {
                 response_type: 'code',
                 redirect_uri: REDIRECT_URI,
@@ -156,10 +157,10 @@ export async function initiateAuthFlow(
     initiateToRefresh: boolean=false, 
     pathToOriginalTokens: string=STEP2_TOKENS_PATH,
 ): Promise<TokenResponse> {
-    // if (initiateToRefresh || !existsSync(pathToOriginalTokens)) {
-    //     elog.error(`initiateAuthFlow(initiateToRefresh=true) - File does not exist: ${pathToOriginalTokens}`,);
-    //     throw new Error(`File does not exist: ${pathToOriginalTokens}. Please run the authorization flow first, initiateAuthFlow(false)`);
-    // }
+    if (initiateToRefresh || !existsSync(pathToOriginalTokens)) {
+        elog.error(`initiateAuthFlow(initiateToRefresh=true) - File does not exist: ${pathToOriginalTokens}`,);
+        throw new Error(`File does not exist: ${pathToOriginalTokens}. Please run the authorization flow first, initiateAuthFlow(false)`);
+    }
     if (!initiateToRefresh) {
         // Step 1: Get the authorization code
         const authCode = await getAuthCode();
@@ -209,23 +210,25 @@ export async function getAccessToken(): Promise<string> {
     const refreshTokenIsExpired = localTokensHaveExpired(STEP2_TOKENS_PATH);
     try {
         if ((!accessToken || accessTokenIsExpired) && refreshToken && !refreshTokenIsExpired) {
-            mlog.info(
+            infoLogs.push(
                 '(Access token is undefined or expired) AND (Refresh token is available and has not yet expired).',
                 TAB + '-> Initiating auth flow from exchangeRefreshTokenForNewTokens()...'
             );
             let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_IS_AVAILABLE) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
         } else if ((!accessToken || accessTokenIsExpired) && (!refreshToken || refreshTokenIsExpired)) {
-            mlog.info(
+            infoLogs.push(
                 '(Access token is undefined or expired) AND (Refresh token is undefined or expired).', 
                 TAB + '-> Initiating auth flow from the beginning...'
             );
             let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_IS_NOT_AVAILABLE) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
         } else {
-            mlog.info(`Access token is valid. Proceeding with REST call...`);
+            infoLogs.push(`Access token is valid. Proceeding with REST call...`);
         }
         CLOSE_SERVER();
+        mlog.info(...infoLogs);
+        infoLogs.length = 0;
         return accessToken as string;
     } catch (error) {
         mlog.error('Error in main.ts getAccessToken()', error);
@@ -261,7 +264,7 @@ export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): bool
         ) as number;
         const haveExpired = (msDiff != 0 && msDiff >= tokenLifespan * 1000 - FIVE_MINUTES);
         if (haveExpired) {
-            mlog.info(`Local access token has reached or exceeded 5 minute buffer`,
+            infoLogs.push((infoLogs.length > 0 ? NL : '')+`localTokensHaveExpired(): token has reached or exceeded 5 minute buffer`,
                 TAB + `  tokenPath: ${filePath}.`,
                 TAB + `lastUpdated: ${lastUpdatedTime}`, 
                 TAB + `currentTime: ${currentTime}`
@@ -272,50 +275,6 @@ export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): bool
         mlog.error('Error in localTokensHaveExpired(), return default (true):', error);
         return true;
     } 
-}
-
-/**
- * @param filePath `string`
- * @returns **`tokenResponse`** = {@link TokenResponse} - The token response containing the access token and refresh token.
- */
-export async function validateTokens(
-    filePath: string=STEP2_TOKENS_PATH
-): Promise<TokenResponse> {
-    if (!filePath || !existsSync(filePath)) {
-        elog.error(`validateTokens() - File does not exist: ${filePath}`,
-            TAB + `Boolean(filePath): ${Boolean(filePath)}`,
-            TAB + `existsSync(filePath): ${existsSync(filePath)}`,
-            NL + `Restarting auth flow from the beginning...`
-        );
-        return await initiateAuthFlow(REFRESH_TOKEN_IS_NOT_AVAILABLE);
-    }
-    const tokenResponse = read(filePath) as TokenResponse;
-    const {
-        lastUpdated, expires_in: expiresIn, refresh_token: refreshToken
-    } = tokenResponse;
-    if (!lastUpdated || !expiresIn || !refreshToken) {
-        elog.error(`validateTokens() - TokenResponse is missing required properties: lastUpdated, expires_in, refresh_token`,
-            TAB + `lastUpdated: ${lastUpdated}`,
-            TAB + `expires_in: ${expiresIn}`,
-            TAB + `refresh_token: ${refreshToken}`,
-            NL + `Restarting auth flow from the beginning...`
-        );
-        return await initiateAuthFlow(REFRESH_TOKEN_IS_NOT_AVAILABLE) as TokenResponse;
-    }
-
-    const expiresAt = new Date(lastUpdated as string).getTime() + expiresIn*1000;
-    if (Date.now() > expiresAt - FIVE_MINUTES) { // refresh if <5 min remaining
-        return await exchangeRefreshTokenForNewTokens(refreshToken);
-    }
-    return tokenResponse;
-}
-
-
-// Helper to check if a token is valid for at least 5 more minutes
-function isTokenValid(lastUpdated?: string, expiresIn?: number): boolean {
-    if (!lastUpdated || !expiresIn) return false;
-    const expiresAt = new Date(lastUpdated).getTime() + expiresIn * 1000;
-    return Date.now() < (expiresAt - FIVE_MINUTES);
 }
 
 /**

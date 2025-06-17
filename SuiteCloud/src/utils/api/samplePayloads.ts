@@ -1,6 +1,6 @@
 /**
  * @file src/utils/api/samplePayloads.ts
- * @description Sample payloads for testing API calls
+ * @description Sample payloads for testing API endpoints from src/FileCabinet/SuiteScripts/REST
  */
 
 import { CountryAbbreviationEnum, StateAbbreviationEnum, RecordTypeEnum } from "../ns";
@@ -19,7 +19,7 @@ const ODEGAARD_ADDRESS_SUBRECORD_OPTIONS: SetSublistSubrecordOptions = {
         'country': CountryAbbreviationEnum.UNITED_STATES,
         'addr1': '4060 George Washington Ln.',
         'addr2': 'Room 326',
-        'addressee': 'dubs',
+        'attention': 'dubs',
         'addrphone': '206-543-2990',
         'city': 'Seattle',
         'state': StateAbbreviationEnum.WASHINGTON,
@@ -35,7 +35,7 @@ const SUZZALLO_ADDRESS_SUBRECORD_OPTIONS: SetSublistSubrecordOptions = {
         'country': CountryAbbreviationEnum.UNITED_STATES,
         'addr1': '4000 15th Ave NE',
         'addr2': 'Room 102',
-        'addressee': 'dubs',
+        'attention': 'dubs',
         'addrphone': '206-543-0242',
         'city': 'Seattle',
         'state': StateAbbreviationEnum.WASHINGTON,
@@ -55,13 +55,13 @@ export const UW_LIBRARIES_POST_VENDOR_OPTIONS: PostRecordOptions = {
     sublists: {
         addressbook: [
             {
-                label: 'Odegaard Library' , 
-                line: 0,
+                // label: 'Odegaard Library' , 
+                // line: 0,
                 addressbookaddress: ODEGAARD_ADDRESS_SUBRECORD_OPTIONS,
             },                
             { 
-                label: 'Suzzallo and Allen Libraries', 
-                line: 1, 
+                // label: 'Suzzallo and Allen Libraries', 
+                // line: 1, 
                 addressbookaddress: SUZZALLO_ADDRESS_SUBRECORD_OPTIONS, 
             } 
         ] as SublistLine[]
@@ -84,7 +84,7 @@ const MISSION_VIEJO_LIBRARY_ADDRESS_SUBRECORD_OPTIONS: SetSublistSubrecordOption
     } as FieldDictionary,
 };
 
-export const MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS: PostRecordOptions = {
+export const MISSION_VIEJO_LIBRARY_POST_VENDOR_OPTIONS: PostRecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
     isDynamic: NOT_DYNAMIC,
     fields: {
@@ -95,10 +95,32 @@ export const MISSION_VIEJO_LIBRARY_CREATE_VENDOR_OPTIONS: PostRecordOptions = {
     sublists: {
         'addressbook': [
             {  
-                line: 0, 
-                label: 'Primary Address',
+                // line: 0, 
+                // label: 'Primary Address',
                 addressbookaddress: MISSION_VIEJO_LIBRARY_ADDRESS_SUBRECORD_OPTIONS,     
             }
         ] as SublistLine[],
     } as SublistDictionary,
 };
+
+export const SAMPLE_POST_CUSTOMER_OPTIONS: PostRecordOptions = {
+    recordType: RecordTypeEnum.CUSTOMER,
+    isDynamic: NOT_DYNAMIC,
+    fields: {
+        'companyname': 'Sample Customer Company Name',
+        'entityid': 'Sample Customer Company Name',
+        'isperson': RADIO_FIELD_FALSE,  
+        'isinactive': NOT_INACTIVE,
+        'email': 'sample.customer@email.com'
+    } as FieldDictionary,
+    sublists: {
+        addressbook: [
+            {
+                addressbookaddress: ODEGAARD_ADDRESS_SUBRECORD_OPTIONS,
+            },                
+            { 
+                addressbookaddress: SUZZALLO_ADDRESS_SUBRECORD_OPTIONS, 
+            } 
+        ] as SublistLine[]
+    } as SublistDictionary,
+}

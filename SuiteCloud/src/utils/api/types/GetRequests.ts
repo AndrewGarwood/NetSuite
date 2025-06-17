@@ -1,30 +1,28 @@
 /**
  * @file src/utils/api/types/GetRequests.ts
  */
-import { idPropertyEnum, RecordTypeEnum } from ".";
-
+import { idPropertyEnum, idSearchOptions, LogStatement, RecordResponseOptions, RecordResult, RecordTypeEnum } from ".";
 
 /**
- * @typedefn **`RetrieveRecordByIdRequest`**
- * @property {RecordTypeEnum} recordType - The type of the record to retrieve. see {@link RecordTypeEnum}
- * @property {idPropertyEnum} idProperty - The property to search for the record. see {@link idPropertyEnum}
- * @property {string} searchTerm - The name of the record to search for.
+ * @typedefn **`GetRecordRequest`**
+ * @property {boolean} [isDynamic=false] - Indicates if the record should be loaded in dynamic mode. Defaults to `false`.
+ * @property {string | RecordTypeEnum} recordType - The record type to get, see {@link RecordTypeEnum}.
+ * @property {idSearchOptions} [idOptions] {@link idSearchOptions}
+ * @property {RecordResponseOptions} [responseOptions] {@link RecordResponseOptions} = `{ responseFields?: string | string[], responseSublists?: Record<string, string | string[]> }`
  */
-export type RetrieveRecordByIdRequest = {
-    recordType: RecordTypeEnum;
-    idProperty: idPropertyEnum;
-    searchTerm: string;
+export type GetRecordRequest = {
+    isDynamic?: boolean;
+    recordType: string | RecordTypeEnum;
+    idOptions: idSearchOptions[];
+    responseOptions?: RecordResponseOptions;
 };
-
-
 /**
- * @typedefn **`RetrieveRecordByIdResponse`**
- * @property {boolean} success - Whether the record was found or not.
- * @property {string} message - The message to return.
- * @property {string | number} [internalId] - The internal ID of the record, if found.
+ * @typedefn **`GetRecordResponse`**
  */
-export type RetrieveRecordByIdResponse ={
-    success: boolean;
+export type GetRecordResponse = {
+    status: number;
     message: string;
-    internalId?: string | number;
+    error?: string;
+    logArray: LogStatement[];
+    record?: RecordResult;
 };

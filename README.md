@@ -4,7 +4,7 @@
 - An essential reference: NetSuite's [Record Browser][record_browser] to determine the structure & properties of records and subrecords.
 
 **Note: In process of rewriting/refactoring some files after simplifying the data structures used in Post Request Bodies.** 
-- (i.e. I simplified the types in [PostRequests.ts][post_requests_file] and [Api.ts][api_file] because I decided to make [POST_UpsertRecord.js][upsert_file] handle the complexity of conforming to SuiteScript's syntax/data structures; So creating payloads will be easier. (e.g. compare [samplePayloads.ts][sample_payloads_file]'s [previous format][old_post_options_image] to its [new format][new_post_options_image]))
+- (i.e. I simplified the types in [Requests.ts][requests_file] and [Api.ts][api_file] because I decided to make [POST_UpsertRecord.js][upsert_file] handle the complexity of conforming to SuiteScript's internal API syntax/data structures; So creating payloads will be easier. (e.g. compare [samplePayloads.ts][sample_payloads_file]'s [previous format][old_post_options_image] to its [new format][new_post_options_image]))
 
 ### My current approach is as follows:
 0. Determine desired objective. For example, if I need to upload a substantial amount of data, I can create records through POST requests 
@@ -26,7 +26,7 @@
 [suitescript_docs]: https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/article_4140956840.html
 [restlet_docs]: https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4387799403.html
 [record_browser]: https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/account.html
-[post_requests_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/types/PostRequests.ts
+[requests_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/types/Requests.ts
 [api_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/types/Api.ts
 [upsert_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/FileCabinet/SuiteScripts/REST/POST/UpsertRecord.js
 [ouath_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/server/authServer.ts

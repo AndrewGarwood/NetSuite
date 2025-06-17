@@ -14,9 +14,7 @@ import {
     PARSE_CUSTOMER_FROM_CUSTOMER_CSV_OPTIONS as CUSTOMER_OPTIONS
 } from "./parses/customer/customerParseDefinition";
 import { parseEntityFile, postEntities, postContacts, matchContactsToPostEntityResponses, countCompanyEntities, postEntitiesAndContacts, generateEntityUpdates, getPostResults } from "./parses/parseEntity";
-import { EntityRecordTypeEnum, DeleteRecordByTypeRequest, DeleteExcludeOptions, DeleteRecordByTypeResponse, PostRecordOptions, BatchPostRecordResponse } from "./utils/api/types";
-import { parseCsvToPostRecordOptions } from './parseCsvToRequestBody';
-import { SB_REST_SCRIPTS, BATCH_SIZE, deleteRecordByType } from "./utils/api/callApi";
+import { EntityRecordTypeEnum, DeleteRecordByTypeRequest, DeleteExcludeOptions, DeleteRecordByTypeResponse, PostRecordOptions, PostRecordResponse } from "./utils/api/types";
 import * as customerFiles from './parses/customer/customerParseConstants';
 
 /** 
@@ -41,7 +39,7 @@ async function main() {
         // `Finished parseEntityFile() at after ${((firstPostStart.getTime() - startTime.getTime()) / 1000).toFixed(5)} seconds.`, 
         `calling postEntities() at ${firstPostStart.toLocaleString()}`,
     );
-    const entityResponses: BatchPostRecordResponse[] = await postEntities(entities);
+    const entityResponses: PostRecordResponse[] = await postEntities(entities);
     const entityRejects = entityResponses.map(
         response => response.rejects as PostRecordOptions[]
     ).flat();
@@ -56,7 +54,7 @@ async function main() {
         STOP_RUNNING(1);
     }
     const secondPostStart = new Date();
-    const contactResponses: BatchPostRecordResponse[] = await postContacts(companyContacts);
+    const contactResponses: PostRecordResponse[] = await postContacts(companyContacts);
     log.info(`Second Post (contacts) Elapsed Time: ${
         ((new Date().getTime() - secondPostStart.getTime()) / 1000).toFixed(5)
     } seconds.`,);
@@ -71,7 +69,7 @@ async function main() {
     const entityUpdates: PostRecordOptions[]
         = generateEntityUpdates(EntityRecordTypeEnum.CUSTOMER, contactResponses);
     const thirdPostStart = new Date();
-    const entityUpdateResponses: BatchPostRecordResponse[] = await postEntities(entityUpdates);
+    const entityUpdateResponses: PostRecordResponse[] = await postEntities(entityUpdates);
     log.info(`Third Post (entity updates) Elapsed Time: ${
         ((new Date().getTime() - thirdPostStart.getTime()) / 1000).toFixed(5)
     } seconds.`);

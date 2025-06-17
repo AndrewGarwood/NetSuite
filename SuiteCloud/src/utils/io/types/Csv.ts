@@ -3,7 +3,7 @@
  */
 import { 
     FieldValue,
-} from "../../api/types/Api";
+} from "../../api/types/InternalApi";
 
 /**
  * only set oldValue to newValue if the column name is in validColumns

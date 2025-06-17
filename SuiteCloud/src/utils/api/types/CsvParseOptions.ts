@@ -2,10 +2,11 @@
  * @file src/utils/api/types/CsvParseOptions.ts
  */
 
-import { PostRecordOptions } from ".";
-import { RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum, NumericOperatorEnum, RecordTypeEnum, EntityRecordTypeEnum } from "../../ns";
-import { idPropertyEnum, FieldValue } from "./Api";
-
+import { 
+    RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum, NumericOperatorEnum, 
+    RecordTypeEnum, EntityRecordTypeEnum 
+} from "../../ns";
+import {FieldValue, PostRecordOptions, idPropertyEnum} from '.';
 // newRecordCondition
 
 /**
@@ -26,7 +27,7 @@ export type SublistDictionaryParseOptions = {
 
 
 // /**
-//  * @typedefn **`SublistFieldDictionaryParseOptions`**
+//  * @typedefn **`SublistLineParseOptions`**
 //  */
 // export type SublistLineParseOptions = { 
     
@@ -61,8 +62,8 @@ export type FieldParseOptions =  {
  */
 export type SubrecordParseOptions = {
     subrecordType: string;
-    fieldDictionaryOptions?: FieldDictionaryParseOptions;
-    sublistDictionaryOptions?: SublistDictionaryParseOptions;
+    fieldOptions?: FieldDictionaryParseOptions;
+    sublistOptions?: SublistDictionaryParseOptions;
 }
 
 
