@@ -1,11 +1,9 @@
 /**
- * @file src/parses/customer/parseCustomer.ts
- * @see {@link parseEntityFile}
+ * @file src/parses/customer/customerConstants.ts
  */
-import { DATA_DIR } from "src/config/env";
-import { parseEntityFile } from "../parseEntity";
-import { ValueMapping } from "src/utils/io";
-import { CustomerCategoryEnum } from "src/utils/ns";
+import { DATA_DIR } from "../../config";
+import { ValueMapping } from "../../utils/io";
+import { CustomerCategoryEnum } from "../../utils/ns";
 
 /** `${DATA_DIR}/customers` */
 export const CUSTOMER_DIR = `${DATA_DIR}/customers` as string;
@@ -19,14 +17,16 @@ export const SUBSET_FILE = `${CUSTOMER_DIR}/subset.tsv` as string;
 export const SMALL_SUBSET_FILE = `${CUSTOMER_DIR}/small_subset.tsv` as string;
 /** `${DATA_DIR}/customers/customer.tsv` */
 export const COMPLETE_FILE = `${CUSTOMER_DIR}/customer.tsv` as string;
+/** `${DATA_DIR}/customers/customer_part1.tsv` */
+export const FIRST_PART_FILE = `${CUSTOMER_DIR}/customer_part1.tsv` as string;
 /** `${DATA_DIR}/customers/customer_part2.tsv` */
-export const REMAINING_ROWS_FILE = `${CUSTOMER_DIR}/customer_part2.tsv` as string;
-
-
+export const SECOND_PART_FILE = `${CUSTOMER_DIR}/customer_part2.tsv` as string;
+/** `${DATA_DIR}/customers/customer_part2.tsv` */
+export const EDGE_CASES_FILE = `${CUSTOMER_DIR}/customer_part2.tsv` as string;
 /** 
  * maybe this is unnecessary... but I like enums 
  * @enum {string} **`CustomerColumnEnum`**
- */
+ * */
 export enum CustomerColumnEnum {
     ENTITY_ID = 'Customer',
     CATEGORY = 'Customer Type',
@@ -80,5 +80,4 @@ export enum CustomerColumnEnum {
 
 
 export const CUSTOMER_CATEGORY_MAPPING: ValueMapping = {
-    'Category A': CustomerCategoryEnum.CATEGORY_A,
 }

@@ -2,8 +2,10 @@
  * @file src/parses/evaluatorFunctions.ts
  */
 
-import { parseLogger as log, mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
-import { HUMAN_VENDORS_TRIMMED } from './vendor/vendorParseEvaluatorFunctions';
+import { parseLogger as log, mainLogger as mlog, 
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL 
+} from '../config';
+import { HUMAN_VENDORS_TRIMMED } from './vendor/vendorEvaluatorFunctions';
 import { 
     FieldValue, 
     StateAbbreviationEnum as STATES, 
@@ -19,7 +21,7 @@ import {
     ValueMapping,
     ColumnSliceOptions, StringReplaceOptions, equivalentAlphanumericStrings
 } from "../utils/io";
-import { customerCompany } from './customer/customerParseEvaluatorFunctions';
+import { customerCompany } from './customer/customerEvaluatorFunctions';
 
 export const ENTITY_VALUE_OVERRIDES: ValueMapping = {
 } 
@@ -185,10 +187,10 @@ export const salutation = (
  * */
 export type AttentionArguments = {
     entityIdColumn: string;
-    salutationColumn: string;
-    firstNameColumn: string;
-    middleNameColumn: string;
-    lastNameColumn: string;
+    salutationColumn?: string;
+    firstNameColumn?: string;
+    middleNameColumn?: string;
+    lastNameColumn?: string;
     nameColumns?: string[];
 }
 
@@ -196,7 +198,7 @@ export type AttentionArguments = {
  * `if fullName.includes(`{@link entityId}`(row, args.entityIdColumn))`, 
  * - `then` the attention value is redundant because the addressee value is already set to entityId -> return an empty string.
  * @param row `Record<string, any>` - the `row` of data to look for the attention person name in
- * @param args {@link AttentionArguments} - the arguments to use for the attention evaluation
+ * @param args {@link AttentionArguments} - arguments of column names to look for the attention person name in the `row` data.
  * @returns **`result`** `string` - the name of the person expected to receive the parcel from the `row` data.
  */
 export const attention = (
@@ -208,7 +210,10 @@ export const attention = (
     }
     let result = '';
     const entity = entityId(row, args.entityIdColumn);
-    const salutationValue = salutation(row, args.salutationColumn, ...(args.nameColumns || []));
+    const salutationValue = (args.salutationColumn 
+        ? salutation(row, args.salutationColumn, ...(args.nameColumns || []))
+        : ''
+    );
     const first = firstName(row, args.firstNameColumn, ...args.nameColumns || []);
     const middle = middleName(row, args.middleNameColumn, ...args.nameColumns || []);
     const last = lastName(row, args.lastNameColumn, ...args.nameColumns || []);
@@ -217,17 +222,18 @@ export const attention = (
         .replace(/\.\s*$/, '') 
         + `. ${first} ${middle} ${last}`
         )
-        .replace(/^\.\s(?=[A-Za-z])/, '')
+        .replace(/^\.\s(?=[A-Za-z])/, '') // removes the leading dot+space if no salutation value
         .replace(/\s+/g, ' ')
         .replace(/^\s*\.\s*$/, '')
         .trim()
     );
     result = (fullName.includes(entity)) ? '' : fullName;
-    log.debug(`attention(entityIdColumn="${args.entityIdColumn}", salutationColumn="${args.salutationColumn}", nameColumns=${args.nameColumns || []})`,
+    log.debug(`End of evaluate.attention()`,
+        NL+`attention(entityIdColumn="${args.entityIdColumn}", salutationColumn="${args.salutationColumn}", nameColumns.length=${args.nameColumns?.length || 0})`,
         TAB + `    entity: "${entity}"`,
         TAB + `salutation: "${salutationValue}"`,
         TAB + `  fullName: "${fullName}"`,
-        TAB + `fullName.includes(entity): ${fullName.includes(entity)}`,
+        TAB + `fullName.includes(entity) ? ${fullName.includes(entity)}`,
         TAB + `-> return result: "${result}"`
     );
     return result;
@@ -235,8 +241,8 @@ export const attention = (
 export type StreetArguments = {
     streetLineOneColumn: string;
     streetLineTwoColumn: string;
-    companyNameColumn: string;
-    addresseeFunction: (row: Record<string, any>, entityIdColumn: string, companyNameColumn: string) => string;
+    companyNameColumn?: string;
+    addresseeFunction: (row: Record<string, any>, entityIdColumn: string, companyNameColumn?: string) => string;
 } & AttentionArguments;
 /**
  * - `if` streetLineNumber === 1 and (row[streetLineOneColumn].includes(attention(row)) || row[streetLineOneColumn].includes(customerCompany(row)))
@@ -259,11 +265,13 @@ export const street = (
         || ![1, 2].includes(streetLineNumber) 
         || !args.streetLineOneColumn 
         || !args.streetLineTwoColumn 
-        || !args.entityIdColumn 
-        || !args.salutationColumn
+        || !args.entityIdColumn
     );
     if (invalidParams) {
-        mlog.error(`street() called with invalid parameters.`);
+        mlog.error(`street() called with invalid parameters.`,
+            TAB + `street() requries row, streetLineNumber, and`,
+            TAB + `args object with defined args.streetLineOneColumn, args.streetLineTwoColumn, args.entityIdColumn`,
+        );
         return '';
     }        
     const attentionValue = attention(row, args);
@@ -280,9 +288,15 @@ export const street = (
         ))
     );
     if (streetLineNumber === 1 && lineOneIsRedundant) {
-        log.debug(`street(streetLineNumber=${streetLineNumber}, streetLineOneColumn="${args.streetLineOneColumn}", streetLineTwoColumn="${args.streetLineTwoColumn}",`,
-            TAB + `entityIdColumn="${args.entityIdColumn}", salutationColumn="${args.salutationColumn}", nameColumns=${args.nameColumns})`,
-            TAB + `-> return streetLineTwoValue: "${streetLineTwoValue}"`
+        mlog.debug(`streetLineNumber === 1 && lineOneIsRedundant is true!`,
+            TAB + `street(streetLineNumber=${streetLineNumber}, streetLineOneColumn="${args.streetLineOneColumn}", streetLineTwoColumn="${args.streetLineTwoColumn}",`,
+            TAB + `entityIdColumn="${args.entityIdColumn}", salutationColumn="${args.salutationColumn}", nameColumns.length=${args.nameColumns?.length})`,
+            NL + `streetLineOneValue: "${streetLineOneValue}" is redundant...`,
+            TAB + `                      streetLineOneValue.includes(attentionValue) ? ${streetLineOneValue.includes(attentionValue)}`,
+            TAB + `equivalentAlphanumericStrings(streetLineOneValue, attentionValue) ? ${equivalentAlphanumericStrings(streetLineOneValue, attentionValue)}`,
+            TAB + `                      streetLineOneValue.includes(addresseeValue) ? ${streetLineOneValue.includes(addresseeValue)}`,
+            TAB + `equivalentAlphanumericStrings(streetLineOneValue, addresseeValue) ? ${equivalentAlphanumericStrings(streetLineOneValue, addresseeValue)}`,
+            NL + `-> return streetLineTwoValue: "${streetLineTwoValue}"`
         );
         return streetLineTwoValue;
     } else if (streetLineNumber === 1) {
@@ -341,38 +355,49 @@ export const name = (
  */
 export const firstName = (
     row: Record<string, any>,
-    firstNameColumn: string, 
+    firstNameColumn?: string, 
     ...nameColumns: string[]
 ): string => {
-    let first = cleanString(row[firstNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
-    // log.debug(`cleanString(row[firstNameColumn]): "${first}"`);
+    let first = (firstNameColumn 
+        ? cleanString(row[firstNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
+        : ''
+    );
+    // mlog.debug(`cleanString(row[firstNameColumn]): "${first}"`);
     if (!first || first.split(' ').length > 1) {
-        first = name(row, ...([firstNameColumn].concat(nameColumns))).first;
+        first = name(row, 
+            ...(firstNameColumn ? [firstNameColumn] : []) //if data entry error when someone put whole name in firstNameColumn,
+                .concat(nameColumns)
+        ).first;
     }
     // mlog.debug(`first after evaluate nameColumns: "${first}"`);
     return first.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');
 }
 
-
 export const middleName = (
     row: Record<string, any>, 
-    middleNameColumn: string,
+    middleNameColumn?: string,
     ...nameColumns: string[]
 ): string => {
-    let middle = cleanString(row[middleNameColumn]);
+    let middle = (middleNameColumn 
+        ? cleanString(row[middleNameColumn])
+        : ''
+    );
     if (!middle || middle.split(' ').length > 1) {
         middle = name(row, ...nameColumns).middle;
     }
-    // log.debug(`middle after evaluate nameColumns: "${middle}"`);
+    // mlog.debug(`middle after evaluate nameColumns: "${middle}"`);
     return middle.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');
 }
 
 export const lastName = (
     row: Record<string, any>, 
-    lastNameColumn: string,
+    lastNameColumn?: string,
     ...nameColumns: string[]
 ): string => {
-    let last = cleanString(row[lastNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
+    let last = (lastNameColumn 
+        ? cleanString(row[lastNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
+        : ''
+    );
     // log.debug(`cleanString(row[lastNameColumn]): "${last}"`);
     if (!last) {
         last = name(row, ...nameColumns).last;

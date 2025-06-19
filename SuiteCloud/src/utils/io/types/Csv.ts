@@ -6,46 +6,6 @@ import {
 } from "../../api/types/InternalApi";
 
 /**
- * only set oldValue to newValue if the column name is in validColumns
- * @property {FieldValue} newValue - The new value to set for the column.
- * @property {string | string[]} validColumns - The column names that this mapping applies to. Can be a single string or an array of strings.
- */
-export type ValueMappingEntry = {
-    newValue: FieldValue;
-    validColumns: string | string[];
-};
-
-/**
- * @description use when row[columnName] might contain multiple values e.g. `row[columnName] = "email1; email2; email3"`
- * @property {string} col - The column name to extract a value from.
- * @property {number} [minIndex] - Accept values from col starting at this index of regex matchResults returned from extractor(row[col])
- */
-export type ColumnSliceOptions = {
-    /**The column name to extract a value from. */
-    colName: string;
-    /**Accept values from col starting at this index of regex matchResults returned from extractor(row[col]) */
-    minIndex?: number
-};
-
-/**
- * @description Checks if the given value is a {@link ValueMappingEntry} = `{ newValue`: {@link FieldValue}, `validColumns`: `string | string[] }`.
- * @param value - The value to check.
- */
-export function isValueMappingEntry(value: any): value is ValueMappingEntry {
-    return typeof value === 'object' && 'newValue' in value && 'validColumns' in value;
-}
-
-
-/**
- * @description
- * - `keys` - an explicit value that you want to override
- * - `value` can be: 
- * - - a {@link FieldValue} -> override occurrences of `key` in any column it's found in with the `FieldValue`
- * - - a {@link ValueMappingEntry} -> override occurences of `key` only in specified columns (see {@link ValueMappingEntry.validColumns}) with {@link ValueMappingEntry.newValue}.
- */
-export type ValueMapping = Record<string, FieldValue | ValueMappingEntry>;
-
-/**
  * @description The DelimitedFileTypeEnum enum defines the possible file types for delimited files.
  * @enum {string} **`DelimitedFileTypeEnum`**
  * @property {string} CSV - Comma-separated values (CSV) file type.

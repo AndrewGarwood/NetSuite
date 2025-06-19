@@ -1,17 +1,13 @@
 /**
- * @file src/parses/vcontact/contactParseEvaluatorFunctions.ts
+ * @file src/parses/contact/contactEvaluatorFunctions.ts
  */
 import { 
     FieldValue,
 } from "../../utils/api/types";
-import { mainLogger as log } from 'src/config/setupLog';
-import { isNullLike, BOOLEAN_TRUE_VALUES, RADIO_FIELD_TRUE, RADIO_FIELD_FALSE } from "../../utils/typeValidation";
-import { stringEndsWithAnyOf, COMPANY_KEYWORDS_PATTERN, 
-    extractPhone, stripCharFromString, 
+import { mainLogger as log } from '../../config/setupLog';
+import { 
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, cleanString, extractName, formatPhone,
-    extractEmail, EMAIL_REGEX, ValueMapping, isValueMappingEntry, RegExpFlagsEnum, 
-    stringStartsWithAnyOf} from "../../utils/io";
-import { READLINE as rl } from "src/config/env";
+} from "../../utils/io";
 import { HUMAN_VENDORS_ORIGINAL_TEXT,  } from '../../config/constants'
 import { RecordTypeEnum, 
     CountryAbbreviationEnum as COUNTRIES, 
@@ -19,6 +15,7 @@ import { RecordTypeEnum,
     TermBase as Term, VendorCategoryEnum 
 } from "../../utils/ns";
 import { entityId, isPerson } from "../evaluatorFunctions";
+// import { name as evaluateName} from "../generalEvaluatorFunctions";
 
 export const HUMAN_VENDORS_TRIMMED = HUMAN_VENDORS_ORIGINAL_TEXT.map(
     (name) => cleanString(name, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION));

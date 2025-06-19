@@ -1,22 +1,24 @@
 /**
- * @file src/parses/customer/customerParseEvaluatorFunctions.ts
+ * @file src/parses/customer/customerEvaluatorFunctions.ts
  */
 import { 
     CustomerStatusEnum,
     FieldValue,
 } from "../../utils/api/types";
-import { parseLogger as log } from 'src/config/setupLog';
+import { parseLogger as log } from "../../config";
 import { RADIO_FIELD_TRUE, RADIO_FIELD_FALSE } from "../../utils/typeValidation";
 import { 
     checkForOverride,
     cleanString,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION,
-    ValueMapping, 
+    ValueMapping, equivalentAlphanumericStrings
 } from "../../utils/io";
 import { isPerson, firstName, middleName, lastName, entityId, ENTITY_VALUE_OVERRIDES } from "../evaluatorFunctions";
-import { CustomerColumnEnum as Columns } from "./customerParseConstants";
 
-export const customerIsPerson = (row: Record<string, any>, entityIdColumn: string): string => {
+export const customerIsPerson = (
+    row: Record<string, any>, 
+    entityIdColumn: string
+): string => {
     if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return RADIO_FIELD_FALSE;
     }
@@ -27,10 +29,10 @@ export const customerIsPerson = (row: Record<string, any>, entityIdColumn: strin
 export const firstNameIfCustomerIsPerson = (
     row: Record<string, any>,
     entityIdColumn: string,
-    firstNameColumn: string,
+    firstNameColumn?: string,
     ...nameColumns: string[]
 ): string => {
-    if (!row || !entityIdColumn || !firstNameColumn || !row[entityIdColumn]) {
+    if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return '';
     }
     if (!isPerson(row, entityIdColumn)) {
@@ -43,10 +45,10 @@ export const firstNameIfCustomerIsPerson = (
 export const middleNameIfCustomerIsPerson = (
     row: Record<string, any>,
     entityIdColumn: string,
-    middleNameColumn: string,
+    middleNameColumn?: string,
     ...nameColumns: string[]
 ): string => {
-    if (!row || !entityIdColumn || !middleNameColumn || !row[entityIdColumn]) {
+    if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return '';
     }
     if (!isPerson(row, entityIdColumn)) {
@@ -59,10 +61,10 @@ export const middleNameIfCustomerIsPerson = (
 export const lastNameIfCustomerIsPerson = (
     row: Record<string, any>,
     entityIdColumn: string,
-    lastNameColumn: string,
+    lastNameColumn?: string,
     ...nameColumns: string[]
 ): string => {
-    if (!row || !entityIdColumn || !lastNameColumn || !row[entityIdColumn]) {
+    if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return '';
     }
     if (!isPerson(row, entityIdColumn)) {
@@ -110,21 +112,24 @@ export const customerStatus = (
 
 export const customerCompany = (
     row: Record<string, any>,
-    entityIdColumn: string=Columns.ENTITY_ID,
-    companyNameColumn: string=Columns.COMPANY,
+    entityIdColumn: string,
+    companyNameColumn?: string,
 ): string => {
-    if (!row || !entityIdColumn || !companyNameColumn || !row[entityIdColumn]) {
+    if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return '';
     }
     let entity = entityId(row, entityIdColumn);
     if (!isPerson(row, entityIdColumn, companyNameColumn)) {
         return entity;
     }
-    let companyName = checkForOverride(
-        cleanString(row[companyNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION), 
-        companyNameColumn, 
-        ENTITY_VALUE_OVERRIDES
-    ) as string;   
+    let companyName = (companyNameColumn 
+        ? checkForOverride(
+            cleanString(row[companyNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION), 
+            companyNameColumn, 
+            ENTITY_VALUE_OVERRIDES
+        ) as string
+        : ''
+    );   
     if (companyName 
         && companyName.toLowerCase().replace(/\W*/g, '') !== entity.toLowerCase().replace(/\W*/g, '')
         //  && COMPANY_KEYWORD_REGEX.test(companyName)

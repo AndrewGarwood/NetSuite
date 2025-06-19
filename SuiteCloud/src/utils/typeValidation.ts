@@ -36,7 +36,7 @@ export const isBooleanFieldId = (fieldId: string): boolean => {
  * 
  * @param value the value to check
  * @returns **`isNullLike`** `boolean` 
- * - `true` if the value is null, undefined, empty object, empty array, or empty string
+ * - `true` if the value is null, undefined, empty object (no keys), empty array, or empty string
  * - `false` otherwise
  */
 export function isNullLike(value: any): boolean {
@@ -47,7 +47,7 @@ export function isNullLike(value: any): boolean {
         return false;
     }
     // Check for empty object or array
-    if (typeof value === 'object' && Object.keys(value).length === 0) {
+    if (typeof value === 'object' && isEmptyArray(Object.keys(value))) {
         return true;
     }
     if (typeof value === 'string' && (value.trim() === '' || value.toLowerCase() === 'undefined' || value.toLowerCase() === 'null') ) {
@@ -58,7 +58,7 @@ export function isNullLike(value: any): boolean {
 
 /**
  * @param arr 
- * @returns {boolean} **`true`** if `arr` is an array and has at least one element, **`false`** otherwise.
+ * @returns **`true`** if `arr` is an array and has at least one element, **`false`** otherwise.
  */
 export function isNonEmptyArray(arr: any): boolean {
     return Array.isArray(arr) && arr.length > 0;
@@ -67,30 +67,37 @@ export function isEmptyArray(arr: any): boolean {
     return Array.isArray(arr) && arr.length === 0; 
 }
 /**
- * @description Check if an object has any non-empty keys (not `undefined`, `null`, or empty string). 
+ * @description Check if an object has at least 1 key with value that is non-empty (not `undefined`, `null`, or empty string). 
  * - passing in an array will return `false`.
  * @param obj - The object to check.
- * @returns {boolean} `true` if the object has any non-empty keys, `false` otherwise.
+ * @returns **`true`** if the object has any non-empty keys, **`false`** otherwise.
  */
 export function hasNonTrivialKeys(obj: any): boolean {
     if (typeof obj !== 'object' || !obj || Array.isArray(obj)) {
         return false;
     }
-    for (const key in obj) { // return true if any key is non-empty
-        let value = obj[key];
-        let valueIsNonTrivial = (obj.hasOwnProperty(key) 
-            && value !== undefined 
-            && value !== null 
-            && (value !== '' 
-                || isNonEmptyArray(value) 
-                || (typeof value === 'object' && isNonEmptyArray(Object.entries(value)))
-            )
+    const hasKeyWithNonTrivialValue = Object.values(obj).some(value => {
+        return value !== undefined && value !== null &&
+            (value !== '' || isNonEmptyArray(value) 
+            || (typeof value === 'object' && isNonEmptyArray(Object.entries(value)))
         );
-        if (valueIsNonTrivial) {
-            return true;
-        }
-    }
-    return false;
+    });
+    return hasKeyWithNonTrivialValue;
+    // for (const key in obj) { // return true if any key is non-empty
+    //     let value = obj[key];
+    //     let valueIsNonTrivial = (obj.hasOwnProperty(key) 
+    //         && value !== undefined 
+    //         && value !== null 
+    //         && (value !== '' 
+    //             || isNonEmptyArray(value) 
+    //             || (typeof value === 'object' && isNonEmptyArray(Object.entries(value)))
+    //         )
+    //     );
+    //     if (valueIsNonTrivial) {
+    //         return true;
+    //     }
+    // }
+    // return false;
 }
 
 /**

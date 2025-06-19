@@ -266,7 +266,7 @@ export function extractEmail(email: string): RegExpMatchArray | null {
         return match;
     }
     debugLogs.push(`-> match is null -> returning null`);
-    log.debug(...debugLogs);
+    mlog.debug(...debugLogs);
     return null;
 }
 
@@ -310,6 +310,13 @@ export const REMOVE_ATTN_SALUTATION_PREFIX: StringReplaceOptions = [
 export const REMOVE_JOB_TITLE_SUFFIX: StringReplaceOptions = [
     {searchValue: JOB_TITLE_SUFFIX_PATTERN, replaceValue: ''}
 ];
+
+/**
+ * - {@link REMOVE_ATTN_SALUTATION_PREFIX}
+ * - {@link REMOVE_JOB_TITLE_SUFFIX}
+ * - replace double spaces with a single space
+ * - remove trailing comma
+ */
 export const CLEAN_NAME_REPLACE_OPTIONS: StringReplaceOptions = [
     ...REMOVE_ATTN_SALUTATION_PREFIX,
     ...REMOVE_JOB_TITLE_SUFFIX,
@@ -344,10 +351,11 @@ export function extractName(
     //     .trim();
     name = cleanString(name, undefined, undefined, undefined, CLEAN_NAME_REPLACE_OPTIONS)
     const debugLogs: any[] = [];
-    if ( // invalid name
-        stringContainsAnyOf(name, /[0-9!#&@]/) 
+    const containsInvalidCharsOrCompanyKeywords = (
+        stringContainsAnyOf(name, /[0-9!#&@]/)
         || stringContainsAnyOf(name, COMPANY_KEYWORDS_PATTERN, RegExpFlagsEnum.IGNORE_CASE)
-    ) {
+    );
+    if (containsInvalidCharsOrCompanyKeywords) {
         debugLogs.push(`extractName()`,
             TAB + `stringContainsAnyOf("${name}", /[0-9!#&@]/) = ${stringContainsAnyOf(name, /[0-9!#&@]/)}`, 
             TAB + `or stringContainsAnyOf("${name}", COMPANY_KEYWORDS_PATTERN) = ${stringContainsAnyOf(name, COMPANY_KEYWORDS_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`
@@ -386,7 +394,7 @@ export function extractName(
             last: nameSplit.slice(2).join(' ').replace(/(,|\.)$/g, '') };
     }
     debugLogs.push(`extractName() - no valid name parts found, returning empty strings`);
-    log.debug(...debugLogs);
+    mlog.debug(...debugLogs);
     return { first: '', middle: '', last: '' }; 
 }
 
