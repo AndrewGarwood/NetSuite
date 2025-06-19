@@ -3,3 +3,4 @@
  */
 export * from './Reading'
 export * from './Csv'
+export * from './CsvParseOptions';

@@ -16,7 +16,7 @@ import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from './types';
 import { writeObjectToJson as write, getCurrentPacificTime, readJsonFileAsObject as read, calculateDifferenceOfDateStrings, TimeUnitEnum, } from 'src/utils/io';
 import { mainLogger as mlog, errorLogger as elog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
 import path from 'node:path';
-import { existsSync } from 'node:fs';
+import * as fs from 'fs';
 
 const infoLogs: any[] = []
 /** `src/server/tokens/STEP2_tokens.json` */
@@ -157,10 +157,10 @@ export async function initiateAuthFlow(
     initiateToRefresh: boolean=false, 
     pathToOriginalTokens: string=STEP2_TOKENS_PATH,
 ): Promise<TokenResponse> {
-    if (initiateToRefresh || !existsSync(pathToOriginalTokens)) {
-        elog.error(`initiateAuthFlow(initiateToRefresh=true) - File does not exist: ${pathToOriginalTokens}`,);
-        throw new Error(`File does not exist: ${pathToOriginalTokens}. Please run the authorization flow first, initiateAuthFlow(false)`);
-    }
+    // if (initiateToRefresh || !fs.existsSync(pathToOriginalTokens)) {
+    //     elog.error(`initiateAuthFlow(initiateToRefresh=true) - File does not exist: ${pathToOriginalTokens}`,);
+    //     throw new Error(`File does not exist: ${pathToOriginalTokens}. Please run the authorization flow first, initiateAuthFlow(false)`);
+    // }
     if (!initiateToRefresh) {
         // Step 1: Get the authorization code
         const authCode = await getAuthCode();

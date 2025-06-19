@@ -4,8 +4,8 @@
  * General types used to interact with NetSuite's internal API.
  */
 
-import { NumericOperatorEnum, RecordOperatorEnum, RecordTypeEnum, SearchOperatorEnum, TextOperatorEnum } from "src/utils/ns";
 import { FieldValue } from "./InternalApi";
+import { NumericOperatorEnum, RecordOperatorEnum, RecordTypeEnum, SearchOperatorEnum, TextOperatorEnum } from "src/utils/ns";
 
 /**
  * @typedefn **`FieldDictionary`**

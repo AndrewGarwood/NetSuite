@@ -8,34 +8,44 @@ import { exchangeAuthCodeForTokens, exchangeRefreshTokenForNewTokens } from "src
 
 
 export type SearchParamValue = string | number | boolean;
+export function isSearchParamValue(value: any): value is SearchParamValue {
+    return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+}
+
+/**
+ * @consideration currently accepts values passed as objects by the "any" type in the function signature, but maybe 
+ * I should rewrite the GET endpoints to only have primitives or array of primitives as search parameters
+ */
+
 /**
  * Creates a URL object with search parameters from a dictionary.
  * @note do not encode values in the dictionary, as they will be encoded by the URL automatically when appended to searchParams.
- * @param {string} baseUrl - The base URL as a string.
- * @param {Record<string, SearchParamValue | Array<SearchParamValue>>} searchParamsDict - An object containing key-value pairs for search parameters ({@link SearchParamValue} = `string | number | boolean`).
- * @returns {URL} A new {@link URL} object with the search parameters added.
+ * @param baseUrl - The base URL as a string.
+ * @param searchParamsDict - An object containing key-value pairs for search parameters ({@link SearchParamValue} = `string | number | boolean`).
+ * @returns **`url`** = a new {@link URL} object with the search parameters added.
  * @example createUrlWithParams(baseUrl: "https://example.com/api", searchParamsDict: { record: "true", hydrate: "FAVORITE" }) => url 
  * url.toString() = "https://example.com/api?record=true&hydrate=FAVORITE"
  */
 export function createUrlWithParams(
     baseUrl: string, 
-    searchParamsDict: { [s: string]: SearchParamValue | Array<SearchParamValue>; }
+    searchParamsDict: { [s: string]: SearchParamValue | Array<SearchParamValue> | any; }
 ): URL {
     if (!baseUrl || typeof baseUrl !== "string") {
-        throw new Error("baseUrlString must be a valid string.");
+        throw new Error("createUrlWithParams() baseUrlString must be a valid string.");
     }
     if (!searchParamsDict || typeof searchParamsDict !== "object") {
-        throw new Error("searchParamsDict must be a valid object.");
+        throw new Error("createUrlWithParams() searchParamsDict must be a valid object.");
     }
-
     const url = new URL(baseUrl);
     for (const [key, value] of Object.entries(searchParamsDict)) {
-        if (typeof value === "string" || typeof value === "number") {
+        if (typeof value !== "object") {
             url.searchParams.append(key, String(value));
-        } else if (Array.isArray(value)) {
-            value.forEach(val => url.searchParams.append(key, String(val)));
+        // (see note) } else if (Array.isArray(value)) {
+        //     value.forEach(val => url.searchParams.append(key, isSearchParamValue(value) ? String(val) : JSON.stringify(value)));        
+        } else if (typeof value === "object") {
+            url.searchParams.append(key, JSON.stringify(value));
         } else {
-            throw new Error(`Value for key ${key} must be a primitives or an array of primitives.`);
+            throw new Error(`createUrlWithParams() Value for key '${key}'`);// must be a primitives or an array of primitives.`);
         }
     }
     return url;

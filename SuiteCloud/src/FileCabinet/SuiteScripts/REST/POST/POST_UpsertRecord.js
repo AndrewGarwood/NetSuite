@@ -11,7 +11,6 @@
 /**
  * @consideration could use rec.submitFields() instead of rec.setValue() and rec.setSublistValue(), but initially 
  * went with the latter because I wanted granular logging and thought I could wrap each setValue in a try catch to check for errors.
- * @consideration make an enum for subrecord fieldIds so don't have to use less robust isSubrecordValue()
  * @consideration make an enum for sublistIds (of non static sublists) {@link https://stoic.software/articles/types-of-sublists/#:~:text=Lastly%2C%20the-,Static%20List,-sublists%20are%20read} 
  */
 define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
@@ -579,7 +578,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         for (let fieldId of responseFields) {
             fieldId = fieldId.toLowerCase();
             /**@type {FieldValue | SubrecordValue} */
-            const value = (rec.hasSubrecord({fieldId}) 
+            const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSubrecord({fieldId}) 
                 ? rec.getSubrecord({fieldId}) // as Subrecord 
                 : rec.getValue({ fieldId }) // as FieldValue
             );
@@ -641,9 +640,10 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 
                 for (const fieldId of responseFields) {
                     /**@type {FieldValue | SubrecordValue} */
-                    const value = rec.hasSublistSubrecord({ sublistId, fieldId, line: i })
+                    const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSublistSubrecord({ sublistId, fieldId, line: i }) 
                         ? rec.getSublistSubrecord({ sublistId, fieldId, line: i }) // as Subrecord 
-                        : rec.getSublistValue({ sublistId, fieldId, line: i }); // as FieldValue
+                        : rec.getSublistValue({ sublistId, fieldId, line: i }) // as FieldValue
+                    ); 
                     if (value === undefined || value === null) { continue; }
                     sublistLine[fieldId] = value;
                 }
@@ -883,6 +883,14 @@ function validateSublistLineIndex(rec, sublistId, line) {
 /*------------------------ [ Types, Enums, Constants ] ------------------------*/
 /** create/load a record in standard mode by setting `isDynamic` = `false` = `NOT_DYNAMIC`*/
 const NOT_DYNAMIC = false;
+
+/**
+ * values are fieldIds or sublistFieldIds where hasSubrecord() is true
+ * @enum {string} **`SubrecordFieldEnum`**
+ */
+const SubrecordFieldEnum = {
+    ADDRESS: 'addressbookaddress'
+}
 
 /**Type: PostRecordRequest {@link PostRecordRequest} */
 /**

@@ -6,6 +6,8 @@ import { pruneLogger as plog, mainLogger as mlog, INDENT_LOG_LINE as TAB } from 
 import { 
     FieldDictionary,
     PostRecordOptions,
+    SetFieldValueOptions,
+    SetSublistValueOptions,
     SublistLine,
 } from "../utils/api/types";
 import { isNullLike, RADIO_FIELD_TRUE } from "../utils/typeValidation";

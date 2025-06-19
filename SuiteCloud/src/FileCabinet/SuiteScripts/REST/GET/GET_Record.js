@@ -8,6 +8,14 @@
  * @SB_DeployId 1
  */
 
+/**
+ * @consideration because NetSuite RESTlet GET request bodies are sourced from request url search parameter and not an actual object payload,
+ * maybe I should refactor GetRecordRequest to only have primitives or array of primitives as values.
+ * - i.e. `Record<string, string | number | boolean | string[] | number[] | boolean[]>`
+ * - or maybe make it a post request but just have functions that call it be named 'get..' on client side?
+ */
+
+
 define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     /**
      * @type {LogStatement[]} - `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
@@ -28,7 +36,11 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
             );
             return {}; // as `GetRecordResponse`
         }
-        let { isDynamic, recordType, idOptions, responseOptions } = reqParams;
+        let { isDynamic, recordType} = reqParams;
+        /**@type {idSearchOptions[]} */
+        let idOptions = JSON.parse(reqParams.idOptions || '[]');
+        /**@type {RecordResponseOptions} */
+        let responseOptions = JSON.parse(reqParams.responseOptions || '{}');
         isDynamic = typeof isDynamic !== 'boolean' ? NOT_DYNAMIC : isDynamic;
         recordType = validateRecordType(recordType);
         if (!recordType) {
@@ -36,12 +48,14 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
                 'ERROR: GET_Record.get() Invalid reqParams.recordType',
                 `recordType must be a valid RecordTypeEnum string, received: '${reqParams.recordType}'`
             );
+            return {}; // as `GetRecordResponse`
         }
         if (!idOptions || isEmptyArray(idOptions)) {
             writeLog(LogTypeEnum.ERROR,
                 'ERROR: GET_Record.get() Invalid idOptions',
                 `idOptions must be a non-empty array of idSearchOptions,`
             );
+            return {}; // as `GetRecordResponse`
         }
         /**@type {GetRecordResponse} {@link GetRecordResponse} */
         const response = {}
@@ -51,16 +65,16 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
         if (isNaN(recId) || recId === null) {
             writeLog(LogTypeEnum.AUDIT,
                 'GET_Record.get() No record found',
-                `No record found for recordType '${recordType}' with idOptions ${JSON.stringify(idOptions)}`
+                `No record found for recordType '${recordType}' with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`
             );
             response.status = 404;
             response.error = 'Record Not Found';
-            response.message = `No '${recordType}' record found with idOptions ${JSON.stringify(idOptions)}`;
+            response.message = `No '${recordType}' record found with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`;
             response.logArray = logArray;
             return response;
         }
         response.status = 200;
-        response.message = `Found '${recordType}' record with idOptions ${JSON.stringify(idOptions)}`;
+        response.message = `Found '${recordType}' record with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`;
         response.record = {
             internalid: recId, 
             recordType, 
@@ -81,7 +95,6 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
         writeLog(LogTypeEnum.AUDIT, 
             `GET_Record.get() Successfully retrieved record`, 
             `recordType: '${recordType}', internalid: '${recId}'`,
-            `response: ${JSON.stringify(response, null, 4)}`
         );
         return response;
     };
@@ -109,7 +122,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
         for (let fieldId of responseFields) {
             fieldId = fieldId.toLowerCase();
             /**@type {FieldValue | SubrecordValue} */
-            const value = (rec.hasSubrecord({fieldId}) 
+            const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSubrecord({fieldId}) 
                 ? rec.getSubrecord({fieldId}) // as Subrecord 
                 : rec.getValue({ fieldId }) // as FieldValue
             );
@@ -171,10 +184,10 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
                 
                 for (const fieldId of responseFields) {
                     /**@type {FieldValue | SubrecordValue} */
-                    const value = (rec.hasSublistSubrecord({ sublistId, fieldId, line: i })
+                    const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSublistSubrecord({ sublistId, fieldId, line: i }) 
                         ? rec.getSublistSubrecord({ sublistId, fieldId, line: i }) // as Subrecord 
                         : rec.getSublistValue({ sublistId, fieldId, line: i }) // as FieldValue
-                    );
+                    ); 
                     if (value === undefined || value === null) { continue; }
                     sublistLine[fieldId] = value;
                 }
@@ -799,6 +812,12 @@ const SearchOperatorEnum = {
     MULTI_SELECT: MultiSelectOperatorEnum
 };
 
+/**
+ * @enum {string} **`SubrecordFieldEnum`**
+ */
+const SubrecordFieldEnum = {
+    ADDRESS: 'addressbookaddress'
+}
 /**
  * @enum {string} **`RecordTypeEnum`**
  * @readonly

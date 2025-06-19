@@ -3,15 +3,16 @@
  */
 export { 
     CustomerCategoryEnum, VendorCategoryEnum, CustomerStatusEnum, 
-    CustomerTaxItemEnum, ContactRoleEnum, 
-    EntityRecordTypeEnum, NetSuiteRecordTypeEnum, RecordTypeEnum 
+    CustomerTaxItemEnum, ContactRoleEnum, SubrecordTypeEnum, 
+    EntityRecordTypeEnum, NetSuiteRecordTypeEnum, RecordTypeEnum, 
+    LeadSourceEnum, LeadStatusEnum 
 } from './record';
+export { AccountEnvironmentEnum, ScriptTypeEnum } from './SuiteScriptEnvironment';
 export { 
     FilterOperatorEnum, SearchSortEnum, DateOperatorEnum, TextOperatorEnum, 
     ColumnSummaryEnum, RecordOperatorEnum, SearchOperatorEnum, NumericOperatorEnum, 
     MultiSelectOperatorEnum
 } from './search'
-export { AccountEnvironmentEnum, ScriptTypeEnum } from './SuiteScriptEnvironment';
 export { NetSuiteFileTypeEnum, NetSuiteFileEncodingEnum } from './File';
 
 

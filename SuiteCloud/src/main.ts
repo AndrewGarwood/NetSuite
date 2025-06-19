@@ -7,117 +7,76 @@ import {
     writeObjectToJson as write,
     parseCsvForOneToMany
 } from "./utils/io";
-import { TOKEN_DIR, DATA_DIR, OUTPUT_DIR, STOP_RUNNING, CLOUD_LOG_DIR } from "./config/env";
-import { mainLogger as log, INDENT_LOG_LINE as TAB, NEW_LINE as NL, INFO_LOGS, indentedStringify } from "./config/setupLog";
-import {
-    PARSE_CONTACT_FROM_VENDOR_CSV_PARSE_OPTIONS as CONTACT_OPTIONS,
-    PARSE_CUSTOMER_FROM_CUSTOMER_CSV_OPTIONS as CUSTOMER_OPTIONS
-} from "./parses/customer/customerParseDefinition";
+import { TOKEN_DIR, DATA_DIR, OUTPUT_DIR, STOP_RUNNING, CLOUD_LOG_DIR, SCRIPT_ENVIRONMENT as SE } from "./config/env";
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, INFO_LOGS, indentedStringify } from "./config/setupLog";
 import { parseEntityFile, postEntities, postContacts, matchContactsToPostEntityResponses, countCompanyEntities, postEntitiesAndContacts, generateEntityUpdates, getPostResults } from "./parses/parseEntity";
-import { EntityRecordTypeEnum, DeleteRecordByTypeRequest, DeleteExcludeOptions, DeleteRecordByTypeResponse, PostRecordOptions, PostRecordResponse } from "./utils/api/types";
-import * as customerFiles from './parses/customer/customerParseConstants';
+import { 
+    EntityRecordTypeEnum, PostRecordOptions, PostRecordRequest, PostRecordResponse, RecordResult, idPropertyEnum,
+    RecordResponseOptions, upsertRecordPayload, getRecordById, GetRecordResponse,
+    ScriptDictionary, SAMPLE_POST_CUSTOMER_OPTIONS as SAMPLE_CUSTOMER,
+    RecordTypeEnum, 
+} from "./utils/api";
+import { CUSTOMER_PARSE_OPTIONS, CONTACT_PARSE_OPTIONS } from "src/parses/customer/customerParseDefinition"
+import * as customerFiles from './parses/customer/customerConstants';
+import { parseRecords } from "./csvParser";
+import { ParseOptions, ParseResults, RecordParseOptions } from './utils/io';
+/**
+ * - goal: read a salesorder tsv -> parse customers, contacts, addresses
+ * - post entities and customers
+ * - get customer internalids and use as RecordRef when making salesorder
+ * - - in salesorder shipgroup sublist, figure out how to select address from available addresses.
+ */
 
-/** 
- * `main()` is same as {@link postEntitiesAndContacts}`(...)`, 
- * but I rewrote the logic here because I wanted to check some log output 
- * */
+
+/**
+ * 
+ */
 async function main() {
-    const startTime = new Date();
-    const filePath = customerFiles.REMAINING_ROWS_FILE;
-    const entityType = EntityRecordTypeEnum.CUSTOMER;
-    log.info(NL + `main() starting at ${startTime.toLocaleString()}`,
-        TAB + `  filePath: "${filePath}"`,
-        TAB + `entityType: "${entityType}"`,
-    );
-    const { entities, contacts } = await parseEntityFile(
-        filePath,
-        entityType,
-        [CUSTOMER_OPTIONS, CONTACT_OPTIONS]
-    );
-    const firstPostStart = new Date();
-    log.info(
-        // `Finished parseEntityFile() at after ${((firstPostStart.getTime() - startTime.getTime()) / 1000).toFixed(5)} seconds.`, 
-        `calling postEntities() at ${firstPostStart.toLocaleString()}`,
-    );
-    const entityResponses: PostRecordResponse[] = await postEntities(entities);
-    const entityRejects = entityResponses.map(
-        response => response.rejects as PostRecordOptions[]
-    ).flat();
-    log.info(`First Post (entities) Elapsed Time: ${
-        ((new Date().getTime() - firstPostStart.getTime()) / 1000).toFixed(5)
-    } seconds.`);
-
-    const { companyContacts, unmatchedContacts} 
-        = matchContactsToPostEntityResponses(contacts, entityResponses);
-    if (companyContacts.length === 0) {
-        log.warn(`companyContacts.length === 0. Exiting.`);
-        STOP_RUNNING(1);
+    const parseOptions: ParseOptions = {
+        [RecordTypeEnum.CUSTOMER]: CUSTOMER_PARSE_OPTIONS,
+        [RecordTypeEnum.CONTACT]: CONTACT_PARSE_OPTIONS
     }
-    const secondPostStart = new Date();
-    const contactResponses: PostRecordResponse[] = await postContacts(companyContacts);
-    log.info(`Second Post (contacts) Elapsed Time: ${
-        ((new Date().getTime() - secondPostStart.getTime()) / 1000).toFixed(5)
-    } seconds.`,);
-    if (contactResponses.length === 0) {
-        log.warn(`contactResponses.length === 0. Exiting.`);
-        STOP_RUNNING(1);
-    }
-    const contactRejects = contactResponses.map(
-        response => response.rejects as PostRecordOptions[]
-    ).flat();
-    
-    const entityUpdates: PostRecordOptions[]
-        = generateEntityUpdates(EntityRecordTypeEnum.CUSTOMER, contactResponses);
-    const thirdPostStart = new Date();
-    const entityUpdateResponses: PostRecordResponse[] = await postEntities(entityUpdates);
-    log.info(`Third Post (entity updates) Elapsed Time: ${
-        ((new Date().getTime() - thirdPostStart.getTime()) / 1000).toFixed(5)
-    } seconds.`);
-    if (entityUpdateResponses.length === 0) {
-        log.warn(`entityUpdateResponses.length === 0. Exiting.`);
-        STOP_RUNNING(1);
-    }
-    const entityUpdateRejects = entityUpdateResponses.map(
-        response => response.rejects as PostRecordOptions[]
-    ).flat();
-    const endTime = new Date();
-    log.info(`main() completed at ${endTime.toLocaleString()}`,
-        NL + `Total Elapsed Time: ${(
-            (endTime.getTime() - startTime.getTime()) / 1000
-        ).toFixed(5)} seconds.`,
-        NL  + '-'.repeat(80),
-        NL  + `parse + post Results for entityType: '${entityType}'`,
-        NL  + `[1] upsertRecordPayload = ${entityType}s `,
-        TAB + `            ${entityType}s.length: ${entities.length}`,
-        TAB + `  ${entityType}PostResults.length: ${getPostResults(entityResponses).length}`,
-        TAB + `      ${entityType}Rejects.length: ${entityRejects.length}`,
-        NL  + `[2] upsertRecordPayload = companyContacts`,
-        TAB + `              contacts.length: ${contacts.length}`,
-        TAB + `       companyContacts.length: ${companyContacts.length}`,
-        // TAB + `     unmatchedContacts.length: ${unmatchedContacts.length}`,
-        TAB + `        contactResults.length: ${getPostResults(contactResponses).length}`,
-        TAB + `        contactRejects.length: ${contactRejects.length}`,
-        NL  + `[3] upsertRecordPayload = ${entityType}Updates`,
-        TAB + `      ${entityType}Updates.length: ${entityUpdates.length}`,
-        TAB + `${entityType}UpdateResults.length: ${getPostResults(entityUpdateResponses).length}`,
-        TAB + `${entityType}UpdateRejects.length: ${entityUpdateRejects.length}`,
+    const results: ParseResults = await parseRecords(
+        customerFiles.SINGLE_COMPANY_FILE, parseOptions
     );
-    write(
-        {entityRejects, contactRejects, entityUpdateRejects} as Record<string, any>, 
-        CLOUD_LOG_DIR, `${entityType}CumulativeRejects.json`
-    );
-    STOP_RUNNING(0, NL + 'main.ts: End of main()');
+    write(results, path.join(OUTPUT_DIR, 'test_parseRecords_SingleCompany.json'));
+    mlog.debug(`End of main()`);
+    STOP_RUNNING(0);
 }
 main().catch(error => {
-    log.error('Error executing main() function', Object.keys(error));
+    mlog.error('Error executing main() function', Object.keys(error));
     STOP_RUNNING(1);
 });
+/** 
+ * {@link RecordResponseOptions}
+ * - `responseFields: ['entityid', 'companyname', 'email']` 
+ * - `responseSublists: { 'addressbook': [...] }` 
+ * */
+const entityResponseOptions: RecordResponseOptions = {
+    responseFields: ['entityid', 'companyname', 'email'],
+    responseSublists: { 'addressbook': [
+        'addressid', 'label', 'defaultbilling', 'defaultshipping', // 'addressbookaddress'
+    ] }
+};
+async function test_getRecordById() {
+    mlog.debug(`Start of test_getRecordById()`);
+    const recordType = EntityRecordTypeEnum.CUSTOMER;
+    // mlog.debug(`recordType: ${recordType}`);
+    const id = 41810;
+    // mlog.debug(`recordInternalId: ${id}`);
+    const response = await getRecordById(
+        recordType, id, undefined, entityResponseOptions
+    ) as GetRecordResponse;
+    write(response, path.join(OUTPUT_DIR, 'test_getRecordById_Response.json'));
+    mlog.debug(`End of test_getRecordById()`);
+}
 
-
-
-
-
-
-
-
-
+async function test_upsertRecordPayload() {
+    const payload: PostRecordRequest = {
+        postOptions: [SAMPLE_CUSTOMER] as PostRecordOptions[],
+        responseOptions: entityResponseOptions,
+    };
+    const responses = await upsertRecordPayload(payload) as PostRecordResponse[];
+    mlog.debug(`End of testUpsertRecordPayload()`);
+    write(responses, path.join(OUTPUT_DIR, 'test_upsertRecordPayload_Response.json'));
+}

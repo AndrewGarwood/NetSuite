@@ -53,16 +53,14 @@ export interface Address {
 
 /**
  * @typedefn **`AddressBookEntry`**
- * @description addressbook sublist list entry in NetSuite.
- * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/vendor.html#:~:text=addressbook%20%2D%20Address%20Book
- * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/other/vendoraddressbook.html?mode=package
  * @property {Address} [addressbookaddress] - {@link Address}.
- * @property {string} [addressid] - Address ID - The address ID.
+ * @property {string} [addressid] - Address ID - The address ID. = id = internalid
  * @property {boolean} [defaultbilling] - Default Billing - Check this box to make this address the default billing address.
  * @property {boolean} [defaultshipping] - Default Shipping - Check this box to make this address the default shipping address.
  * @property {number} [internalid] - Internal ID - The internal ID of the address book record.
  * @property {string} [label] - Label - The label for the address book record.
- * @notimplemented {number} [id] - redundant? of the address book record.
+ * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/vendor.html#:~:text=addressbook%20%2D%20Address%20Book
+ * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/other/vendoraddressbook.html?mode=package
  */
 export interface AddressBookEntry {
     addressbookaddress?: Address;

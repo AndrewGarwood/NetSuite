@@ -1,13 +1,35 @@
 /**
- * @file src/utils/api/types/CsvParseOptions.ts
+ * @file src/utils/io/types/CsvParseOptions.ts
  */
 
 import { 
     RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum, NumericOperatorEnum, 
     RecordTypeEnum, EntityRecordTypeEnum 
 } from "../../ns";
-import {FieldValue, PostRecordOptions, idPropertyEnum} from '.';
-// newRecordCondition
+import { FieldValue, PostRecordOptions, idPropertyEnum } from '../../api/types';
+
+export type ParseOptions = {
+    [recordType: RecordTypeEnum | string]: RecordParseOptions | {
+        keyColumn: string,
+        fieldOptions?: FieldDictionaryParseOptions,
+        sublistOptions?: SublistDictionaryParseOptions,
+    };
+}
+
+export type RecordParseOptions = {
+    keyColumn: string;
+    fieldOptions?: FieldDictionaryParseOptions;
+    sublistOptions?: SublistDictionaryParseOptions;
+}
+
+export type IntermediateParseResults = {
+    [recordType: RecordTypeEnum | string]: {
+        [recordId: string]: PostRecordOptions
+    }
+};
+export type ParseResults = {
+    [recordType: RecordTypeEnum | string]: PostRecordOptions[]
+};
 
 /**
  * @typedefn **`FieldDictionaryParseOptions`**
@@ -20,19 +42,22 @@ export type FieldDictionaryParseOptions = {
  * @typedefn **`SublistDictionaryParseOptions`**
  */
 export type SublistDictionaryParseOptions = {
-    [sublistId: string] : {
-        [sublistFieldId: string]: FieldParseOptions | SubrecordParseOptions
-    };
+    [sublistId: string] : Array<SublistLineParseOptions>;
 };
 
 
-// /**
-//  * @typedefn **`SublistLineParseOptions`**
-//  */
-// export type SublistLineParseOptions = { 
-    
-// }
+/**
+ * @typedefn **`SublistLineParseOptions`**
+ */
+export type SublistLineParseOptions = { 
+    [sublistFieldId: string]: FieldParseOptions | SubrecordParseOptions
+}
+/*
+ * @property {string} sublistLineKeyColumn - If there is a column name that uniquely identifies a sublist line,
+ * - e.g. distinguish entries for the `'addressbook'` sublist if the csv has a column the concatenates all `'addressbookaddress'` values 
 
+{sublistLineKeyColumn?: string} & 
+*/
 
 /**
  * `evaluator` and `colName` are mutually exclusive.
@@ -67,7 +92,9 @@ export type SubrecordParseOptions = {
 }
 
 
-/** options for parsing a csv to extract an {@link idSearchOptions} object */
+/** 
+ * options for parsing a csv to extract an {@link idSearchOptions} object 
+ * */
 export type idSearchParseOptions = {
     idProp: idPropertyEnum;
     searchOperator: RecordOperatorEnum | SearchOperatorEnum | TextOperatorEnum | NumericOperatorEnum;
@@ -111,3 +138,45 @@ export enum FieldParentTypeEnum {
     /**The subrecord corresponds to a body field in its parent record. */
     BODY = 'body',
 }
+
+
+/**
+ * only set oldValue to newValue if the column name is in validColumns
+ * @property {FieldValue} newValue - The new value to set for the column.
+ * @property {string | string[]} validColumns - The column names that this mapping applies to. Can be a single string or an array of strings.
+ */
+export type ValueMappingEntry = {
+    newValue: FieldValue;
+    validColumns: string | string[];
+};
+
+/**
+ * @description use when row[columnName] might contain multiple values e.g. `row[columnName] = "email1; email2; email3"`
+ * @property {string} col - The column name to extract a value from.
+ * @property {number} [minIndex] - Accept values from col starting at this index of regex matchResults returned from extractor(row[col])
+ */
+export type ColumnSliceOptions = {
+    /**The column name to extract a value from. */
+    colName: string;
+    /**Accept values from col starting at this index of regex matchResults returned from extractor(row[col]) */
+    minIndex?: number
+};
+
+/**
+ * @description Checks if the given value is a {@link ValueMappingEntry} = `{ newValue`: {@link FieldValue}, `validColumns`: `string | string[] }`.
+ * @param value - The value to check.
+ */
+export function isValueMappingEntry(value: any): value is ValueMappingEntry {
+    return typeof value === 'object' && 'newValue' in value && 'validColumns' in value;
+}
+
+
+/**
+ * @description
+ * - `keys` - an explicit value that you want to override
+ * - `value` can be: 
+ * - - a {@link FieldValue} -> override occurrences of `key` in any column it's found in with the `FieldValue`
+ * - - a {@link ValueMappingEntry} -> override occurences of `key` only in specified columns (see {@link ValueMappingEntry.validColumns}) with {@link ValueMappingEntry.newValue}.
+ */
+export type ValueMapping = Record<string, FieldValue | ValueMappingEntry>;
+

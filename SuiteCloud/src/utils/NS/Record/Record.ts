@@ -5,6 +5,13 @@
 import * as HITCRecord from '@hitc/netsuite-types/N/record';
 
 /**
+ * @enum {string} **`SubrecordTypeEnum`**
+ */
+export enum SubrecordTypeEnum {
+    ADDRESS = 'addressbookaddress',
+}
+
+/**
  * @description Represents a valid key that can be used to refer to a record in NetSuite.
  * @property {string} [externalId] - The external ID of the record.
  * @property {string} [internalId] - The internal ID of the record.
