@@ -153,22 +153,14 @@ export type ValueMappingEntry = {
 /**
  * @description use when row[columnName] might contain multiple values e.g. `row[columnName] = "email1; email2; email3"`
  * @property {string} col - The column name to extract a value from.
- * @property {number} [minIndex] - Accept values from col starting at this index of regex matchResults returned from extractor(row[col])
+ * @property {number} [minIndex] - Accept values from col starting at this index of `matchResults RegExpArray` returned from `extractor(row[col])`
  */
 export type ColumnSliceOptions = {
     /**The column name to extract a value from. */
     colName: string;
-    /**Accept values from col starting at this index of regex matchResults returned from extractor(row[col]) */
+    /** *`(zero-based)`* Accept values from col starting at this index of `matchResults RegExpArray` returned from `extractor(row[col])` */
     minIndex?: number
 };
-
-/**
- * @description Checks if the given value is a {@link ValueMappingEntry} = `{ newValue`: {@link FieldValue}, `validColumns`: `string | string[] }`.
- * @param value - The value to check.
- */
-export function isValueMappingEntry(value: any): value is ValueMappingEntry {
-    return typeof value === 'object' && 'newValue' in value && 'validColumns' in value;
-}
 
 
 /**

@@ -56,12 +56,10 @@ export const UW_LIBRARIES_POST_VENDOR_OPTIONS: PostRecordOptions = {
         addressbook: [
             {
                 // label: 'Odegaard Library' , 
-                // line: 0,
                 addressbookaddress: ODEGAARD_ADDRESS_SUBRECORD_OPTIONS,
             },                
             { 
                 // label: 'Suzzallo and Allen Libraries', 
-                // line: 1, 
                 addressbookaddress: SUZZALLO_ADDRESS_SUBRECORD_OPTIONS, 
             } 
         ] as SublistLine[]
@@ -95,8 +93,8 @@ export const MISSION_VIEJO_LIBRARY_POST_VENDOR_OPTIONS: PostRecordOptions = {
     sublists: {
         'addressbook': [
             {  
-                // line: 0, 
-                // label: 'Primary Address',
+                /** label will default to subrecOptions.fields.addr1 after saving record in POST endpoint */
+                // label: ${addr1}
                 addressbookaddress: MISSION_VIEJO_LIBRARY_ADDRESS_SUBRECORD_OPTIONS,     
             }
         ] as SublistLine[],
@@ -115,12 +113,8 @@ export const SAMPLE_POST_CUSTOMER_OPTIONS: PostRecordOptions = {
     } as FieldDictionary,
     sublists: {
         addressbook: [
-            {
-                addressbookaddress: ODEGAARD_ADDRESS_SUBRECORD_OPTIONS,
-            },                
-            { 
-                addressbookaddress: SUZZALLO_ADDRESS_SUBRECORD_OPTIONS, 
-            } 
+            { addressbookaddress: ODEGAARD_ADDRESS_SUBRECORD_OPTIONS },                
+            { addressbookaddress: SUZZALLO_ADDRESS_SUBRECORD_OPTIONS } 
         ] as SublistLine[]
     } as SublistDictionary,
 }

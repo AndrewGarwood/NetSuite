@@ -4,12 +4,64 @@
 import fs from 'fs';
 import xlsx from 'xlsx';
 import { ParseOneToManyOptions } from './types/Reading';
-import { FieldValue } from 'src/utils/api/types/Api';
-import {ValueMapping, isValueMappingEntry, DelimitedFileTypeEnum, DelimiterCharacterEnum } from './types/Csv';
 import { stripCharFromString, cleanString, UNCONDITIONAL_STRIP_DOT_OPTIONS } from './regex';
-import { mainLogger as log, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
+import { DelimiterCharacterEnum, ValueMapping, DelimitedFileTypeEnum } from './types';
+import { FieldValue } from '../api/types/InternalApi';
+import { isValueMappingEntry } from '../typeValidation';
 
 
+/**
+ * @param filePath `string`
+ * @param delimiter `string` {@link DelimiterCharacterEnum}
+ * @returns **`isValidCsv`** `boolean`
+ * - `true` if the CSV file at `filePath` is valid (all rows have the same number of columns as the header),
+ * - `false` `otherwise`. 
+ */
+export function isValidCsv(
+    filePath: string, 
+    delimiter: DelimiterCharacterEnum | string,
+): boolean {
+    if (!filePath || !fs.existsSync(filePath)) {
+        mlog.error(`ERROR isValidCsv(): path does not exist: ${filePath}`);
+        return false;
+    }
+    if (!delimiter || delimiter.length === 0) {
+        mlog.error(`ERROR isValidCsv(): invalid delimiter: ${delimiter}`);
+        return false;
+    }   
+    const data = fs.readFileSync(filePath, 'utf8');
+    const lines = data.split('\n');
+    if (lines.length < 2) {
+        mlog.error(`ERROR isValidCsv(): file has less than 2 lines: ${filePath}`);
+        return false;
+    }
+    const header: string[] = lines[0].split(delimiter).map(col => col.trim());
+    if (header.length < 1) {
+        mlog.error(`ERROR isValidCsv(): no header found in file: ${filePath}`);
+        return false;
+    }
+    // Check if all rows have the same number of columns as the header
+    for (let i = 1; i < lines.length; i++) {
+        const rowValues: string[] = lines[i].split(delimiter).map(col => col.trim());
+        if (header.length !== rowValues.length 
+            && i !== lines.length-1 // allow for empty last row in files.
+        ) {
+            mlog.warn(`isValidCsv(): Invalid row found: header.length !== rowValues.length`,
+                TAB+`   header.length: ${header.length},`,
+                TAB+`rowValues.length: ${rowValues.length}`,
+                TAB+` -> Difference =  ${header.length - rowValues.length}`,
+                TAB+`   header: ${JSON.stringify(header)}`,
+                TAB+`rowValues: ${JSON.stringify(rowValues)}`,
+                TAB+` rowIndex: ${i},`,
+                TAB+` filePath: '${filePath}'`,
+                NL+`returning false...`
+            );
+            return false;
+        }
+    }
+    return true;
+}
 
 /**
  * @param filePath `string`
@@ -66,7 +118,7 @@ export function parseExcelForOneToMany(
         });
         return dict;
     } catch (err) {
-        log.error('Error reading or parsing the Excel file:', err, 
+        mlog.error('Error reading or parsing the Excel file:', err, 
             TAB+'Given File Path:', '"' + filePath + '"');
         return {} as Record<string, Array<string>>;
     }
@@ -130,7 +182,7 @@ export function parseCsvForOneToMany(
         }
         return dict;
     } catch (err) {
-        log.error('Error reading or parsing the CSV file:', err, 
+        mlog.error('Error reading or parsing the CSV file:', err, 
             TAB+'Given File Path:', '"' + filePath + '"');
         return {} as Record<string, Array<string>>;
     }
@@ -207,7 +259,7 @@ export function readFileLinesIntoArray(filePath: string): Array<string> {
             }
         }
     } catch (err) {
-        log.error('Error reading the file:', err);
+        mlog.error('Error reading the file:', err);
     }
     return result;
 }
@@ -224,7 +276,7 @@ export function readJsonFileAsObject(filePath: string): Record<string, any> | nu
         const jsonData = JSON.parse(data);
         return jsonData;
     } catch (err) {
-        log.error('Error reading or parsing the JSON file:', err, 
+        mlog.error('Error reading or parsing the JSON file:', err, 
             TAB+'Given File Path:', '"' + filePath + '"');
         return null;
     }

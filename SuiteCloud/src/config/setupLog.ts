@@ -7,16 +7,16 @@ import { Logger, ISettingsParam, ISettings, ILogObj, ILogObjMeta, IPrettyLogStyl
 import path from 'node:path';
 import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 /** LOCAL_LOG_DIR (in onedrive) or `OUTPUT_DIR/logs` */
-const LOCAL_LOG_DIR = path.join(OUTPUT_DIR, "logs");  
+export const LOCAL_LOG_DIR = path.join(OUTPUT_DIR, "logs");  
 /**`OUTPUT_DIR/logs/DEBUG.txt` */
-const DEFAULT_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, "DEBUG.txt");
+export const DEFAULT_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, "DEBUG.txt");
 /**`OUTPUT_DIR/logs/ERROR.txt` */
-const ERROR_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, "ERROR.txt"); 
+export const ERROR_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, "ERROR.txt"); 
 /** 
- * `INDENT_LOG_LINE =  '\n\t'` = newLine + tab
+ * `INDENT_LOG_LINE =  '\n\t• '` = newLine + tab + bullet + space
  * - log.debug(s1, INDENT_LOG_LINE + s2, INDENT_LOG_LINE + s3,...) 
  * */
-export const INDENT_LOG_LINE: string = '\n\t';
+export const INDENT_LOG_LINE: string = '\n\t• ';
 /** 
  * `NEW_LINE =  '\n > '` = newLine + space + > + space
  * */
