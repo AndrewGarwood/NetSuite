@@ -7,8 +7,12 @@ import {
     writeObjectToJson as write,
     parseCsvForOneToMany
 } from "./utils/io";
-import { TOKEN_DIR, DATA_DIR, OUTPUT_DIR, STOP_RUNNING, CLOUD_LOG_DIR, SCRIPT_ENVIRONMENT as SE } from "./config/env";
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, INFO_LOGS, indentedStringify } from "./config/setupLog";
+import { TOKEN_DIR, DATA_DIR, OUTPUT_DIR, STOP_RUNNING, CLOUD_LOG_DIR, 
+    SCRIPT_ENVIRONMENT as SE, 
+    mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, INFO_LOGS, 
+    indentedStringify, DEFAULT_LOG_FILEPATH, clearLogFile,
+    ERROR_LOG_FILEPATH
+} from "./config";
 import { parseEntityFile, postEntities, postContacts, matchContactsToPostEntityResponses, countCompanyEntities, postEntitiesAndContacts, generateEntityUpdates, getPostResults } from "./parses/parseEntity";
 import { 
     EntityRecordTypeEnum, PostRecordOptions, PostRecordRequest, PostRecordResponse, RecordResult, idPropertyEnum,
@@ -32,6 +36,8 @@ import { ParseOptions, ParseResults, RecordParseOptions } from './utils/io';
  * 
  */
 async function main() {
+    clearLogFile(DEFAULT_LOG_FILEPATH, ERROR_LOG_FILEPATH)
+    mlog.info(`Start of main()`);
     const parseOptions: ParseOptions = {
         [RecordTypeEnum.CUSTOMER]: CUSTOMER_PARSE_OPTIONS,
         [RecordTypeEnum.CONTACT]: CONTACT_PARSE_OPTIONS
@@ -40,7 +46,7 @@ async function main() {
         customerFiles.SINGLE_COMPANY_FILE, parseOptions
     );
     write(results, path.join(OUTPUT_DIR, 'test_parseRecords_SingleCompany.json'));
-    mlog.debug(`End of main()`);
+    mlog.info(`End of main()`);
     STOP_RUNNING(0);
 }
 main().catch(error => {

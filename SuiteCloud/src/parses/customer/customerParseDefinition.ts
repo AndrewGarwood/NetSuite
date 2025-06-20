@@ -1,6 +1,7 @@
 /**
  * @file src/parses/customer/customerParseDefinition.ts
  */
+import { mainLogger as mlog } from "../../config";
 import { 
     RecordTypeEnum,
     ContactRoleEnum,
@@ -42,7 +43,10 @@ export const SHIPPING_PHONE_COLUMNS = [
  * */
 export const NAME_COLUMNS = [
     C.PRIMARY_CONTACT, C.SECONDARY_CONTACT, C.ENTITY_ID, 
-    C.STREET_ONE, C.STREET_TWO, C.SHIP_TO_STREET_ONE, C.SHIP_TO_STREET_TWO,
+    C.STREET_ONE, 
+    C.STREET_TWO, 
+    C.SHIP_TO_STREET_ONE, 
+    C.SHIP_TO_STREET_TWO,
     C.BILL_TO_ONE, C.SHIP_TO_ONE, C.BILL_TO_TWO,  C.SHIP_TO_TWO,
 ]
 /** Look for {@link evaluate.attention} names in these columns for the billing address */
@@ -113,6 +117,7 @@ const SHIPPING_STREET_ARGS: evaluate.StreetArguments = {
     ...SHIPPING_ATTENTION_ARGS
 }
 
+/**@TODO maybe allow addrphone values to be an altphone of the contact/customer */
 export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions = {
     'entityid': { evaluator: evaluate.entityId, args: [C.ENTITY_ID] },
     'isinactive': { defaultValue: NOT_INACTIVE },
@@ -129,7 +134,10 @@ export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions = {
     },
     'fax': { evaluator: evaluate.phone, args: [C.FAX, C.ALT_FAX] },
     'salutation': { evaluator: evaluate.salutation, 
-        args: [C.SALUTATION, ...BILLING_NAME_COLUMNS] },
+        args: [C.SALUTATION, ...NAME_COLUMNS] },
+    'firstname': { evaluator: evaluate.firstName, args: [C.FIRST_NAME, ...NAME_COLUMNS] },
+    'middlename': { evaluator: evaluate.middleName, args: [C.MIDDLE_NAME, ...NAME_COLUMNS] },
+    'lastname': { evaluator: evaluate.lastName, args: [C.LAST_NAME, ...NAME_COLUMNS] },
     'title': { colName: C.TITLE},
     'comments': { colName: C.COMMENTS },
 }
@@ -170,7 +178,7 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions =
         { addressbookaddress: SHIPPING_ADDRESS_OPTIONS },  
     ] as SublistLineParseOptions[],
 };
-
+/**@TODO handle removal of name fields if isperson === 'F' in post processing */
 export const CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: C.ENTITY_ID,
     fieldOptions: {
@@ -183,29 +191,29 @@ export const CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
         'entitystatus': { evaluator: customerEval.customerStatus, args: [C.CATEGORY] },
         'category': { evaluator: customerEval.customerCategory, args: [C.CATEGORY, CATEGORY_DICT] },
         'companyname': { evaluator: customerEval.customerCompany, args: [C.ENTITY_ID, C.COMPANY] },
-        'firstname': { evaluator: customerEval.firstNameIfCustomerIsPerson, args: [C.ENTITY_ID, C.FIRST_NAME, ...NAME_COLUMNS] },
-        'middlename': { evaluator: customerEval.middleNameIfCustomerIsPerson, args: [C.ENTITY_ID, C.MIDDLE_NAME, ...NAME_COLUMNS] },
-        'lastname': { evaluator: customerEval.lastNameIfCustomerIsPerson, args: [C.ENTITY_ID, C.LAST_NAME, ...NAME_COLUMNS] },
+        // 'firstname': { evaluator: customerEval.firstNameIfCustomerIsPerson, args: [C.ENTITY_ID, C.FIRST_NAME, ...NAME_COLUMNS] },
+        // 'middlename': { evaluator: customerEval.middleNameIfCustomerIsPerson, args: [C.ENTITY_ID, C.MIDDLE_NAME, ...NAME_COLUMNS] },
+        // 'lastname': { evaluator: customerEval.lastNameIfCustomerIsPerson, args: [C.ENTITY_ID, C.LAST_NAME, ...NAME_COLUMNS] },
         'accountnumber': { colName: C.ACCOUNT_NUMBER },
         'terms': { evaluator: evaluate.terms, args: [C.TERMS, TERM_DICT] },
         'taxable': {defaultValue: true },
-        'taxitem': {defaultValue: CustomerTaxItemEnum.AVATAX },
+        'taxitem': {defaultValue: CustomerTaxItemEnum.YOUR_TAX_ITEM },
         'url': { evaluator: evaluate.website, args: [C.WEBSITE, C.EMAIL] },
         
     } as FieldDictionaryParseOptions,
     sublistOptions: ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,
 };
 
-
+/**@TODO do not include {@link CONTACT_CUSTOMER_SHARED_FIELDS} in fieldOptions, instead handle value cloning in post processing */
 export const CONTACT_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: C.ENTITY_ID,
     fieldOptions: {
         ...CONTACT_CUSTOMER_SHARED_FIELDS,
         'externalid': { evaluator: evaluate.externalId, args: [RecordTypeEnum.CONTACT, C.ENTITY_ID] },
         'officephone': { evaluator: evaluate.phone, args: [C.WORK_PHONE] },
-        'firstname': { evaluator: evaluate.firstName, args: [C.FIRST_NAME, ...NAME_COLUMNS] },
-        'middlename': { evaluator: evaluate.middleName, args: [C.MIDDLE_NAME, ...NAME_COLUMNS] },
-        'lastname': { evaluator: evaluate.lastName, args: [C.LAST_NAME, ...NAME_COLUMNS] },
+        // 'firstname': { evaluator: evaluate.firstName, args: [C.FIRST_NAME, ...NAME_COLUMNS] },
+        // 'middlename': { evaluator: evaluate.middleName, args: [C.MIDDLE_NAME, ...NAME_COLUMNS] },
+        // 'lastname': { evaluator: evaluate.lastName, args: [C.LAST_NAME, ...NAME_COLUMNS] },
         'company': { evaluator: contactEval.contactCompany, args: [C.ENTITY_ID] },
         'contactrole': {defaultValue: ContactRoleEnum.PRIMARY_CONTACT },
         

@@ -1,14 +1,18 @@
 /**
  * @file src/utils/io/regex.ts
  */
-import { parseLogger as log, mainLogger as mlog, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
+import { DEBUG_LOGS, 
+    parseLogger as log, 
+    mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL 
+} from 'src/config/setupLog';
 import { StringCaseOptions, StringPadOptions, StringStripOptions, StringReplaceParams, StringReplaceOptions } from "./types/Reading";
 import { isNonEmptyArray } from '../typeValidation';
 import { distance as levenshteinDistance } from 'fastest-levenshtein';
 
 
 /**
- * @description 
+ * @description
+ * - converts to string and trims, then: 
  * - applies options in this order: `StringReplaceOptions`, `StringStripOptions`, `StringCaseOptions`, `StringPadOptions`
  * - Removes leading+trailing spaces, extra spaces, commas, and dots from a string (e.g. `'..'` becomes `'.'`)
  * - optionally applies 4 option params with: {@link String.replace}, {@link stripCharFromString}, {@link handleCaseOptions}, and {@link handlePadOptions}.
@@ -56,7 +60,7 @@ export function cleanString(
 /**
  * 
  * @param s `string` - the string to convert to title case
- * @returns `string` - the string in title case 
+ * @returns **`s`** `string` - the string in title case 
  * (i.e. first letter of each word, determined by the `\b` boundary metacharacter, is capitalized)
  */
 export function toTitleCase(s: string): string {
@@ -67,12 +71,11 @@ export function toTitleCase(s: string): string {
 }
 
 /**
- * 
  * @param s `string` - the string to handle case options for
  * @param caseOptions — {@link StringCaseOptions} - `optional` case options to apply to the string
  * = `{ toUpper: boolean, toLower: boolean, toTitle: boolean }`
  * - applies the first case option that is `true` and ignores the rest
- * @returns `s` - the string with case options applied
+ * @returns **`s`** - the string with case options applied
  */
 export function handleCaseOptions(
     s: string, 
@@ -91,13 +94,12 @@ export function handleCaseOptions(
 }
 
 /**
- * 
  * @param s `string` - the string to handle padding options for
  * @param padOptions — {@link StringPadOptions} - `optional` padding options to apply to the string
  * = `{ padLength: number, padChar: string, padLeft: boolean, padRight: boolean }`
  * - applies the first padding option that is `true` and ignores the rest
- * @returns `s` - the string with padding options applied
- * @note if `s.length >= padLength`, no padding is applied
+ * @returns **`s`** - the string with padding options applied
+ * @note `if` `s.length >= padLength`, no padding is applied
  */
 export function handlePadOptions(
     s: string,
@@ -106,7 +108,7 @@ export function handlePadOptions(
     if (!s) return '';
     const { padLength, padChar, padLeft, padRight } = padOptions;
     if (typeof padLength !== 'number' || padLength < 0) {
-        console.warn('handlePadOptions() Invalid padLength. Expected a positive integer, but received:', padLength);
+        mlog.warn('handlePadOptions() Invalid padLength. Expected a positive integer, but received:', padLength);
         return s;
     }
     if (s.length >= padLength) {
@@ -239,7 +241,7 @@ export const EMAIL_REGEX = new RegExp(
     RegExpFlagsEnum.GLOBAL
 );
 
-/**return true if matches {@link EMAIL_REGEX} and does not include substring '@benev'  */
+/**return true if matches {@link EMAIL_REGEX} and does not include substring `'@benev'`  */
 export function isValidEmail(email: string): boolean {
     if (!email) return false;
     email = email.trim();
@@ -250,23 +252,20 @@ export function isValidEmail(email: string): boolean {
         );
 }
 
-/** @returns `email`: `string` - the first email that matches {@link EMAIL_REGEX} or an empty string `''`*/
+/** @returns **`email`**: `string` - the first email that matches {@link EMAIL_REGEX} or an empty string `''`*/
 export function extractEmail(email: string): RegExpMatchArray | null {
     if (!email) return null;
     email = email.trim();
-    const debugLogs: any[] = [];
     const match = email.match(EMAIL_REGEX);
-    debugLogs.push(
-        `extractEmail() EMAIL_REGEX.test("${email}") = ${EMAIL_REGEX.test(email)}`, 
-        TAB + `match=${JSON.stringify(match)}`
-    );
+    // DEBUG_LOGS.push(
+    //     NL + `extractEmail() EMAIL_REGEX.test("${email}") = ${EMAIL_REGEX.test(email)}`, 
+    //     TAB + `match=${JSON.stringify(match)}`
+    // );
     if (match) {
-        debugLogs.push(`-> match not null -> returning ${JSON.stringify(match)}`);
-        log.debug(...debugLogs);
+        // DEBUG_LOGS.push(NL+`-> match not null -> returning ${JSON.stringify(match)}`);
         return match;
     }
-    debugLogs.push(`-> match is null -> returning null`);
-    mlog.debug(...debugLogs);
+    // DEBUG_LOGS.push(NL+`-> match is null -> returning null`);
     return null;
 }
 
@@ -276,7 +275,7 @@ export const ATTN_SALUTATION_PREFIX_PATTERN = new RegExp(
     /^\s*((attention|attn|atn):)?\s*((Mr|Ms|Mrs|Dr|Prof)\.?)*\s*/, 
     RegExpFlagsEnum.IGNORE_CASE
 );
-/** `re` = /`^(Mr\.|Ms\.|Mrs\.|Dr\.|Mx\.)`/i */
+/** `re` = /`^(Mr\.|Ms\.|Mrs\.|Dr\.|Mx\.)`/`i` */
 export const SALUTATION_REGEX = new RegExp(
     /^(Mr\.|Ms\.|Mrs\.|Dr\.|Mx\.)/, 
     RegExpFlagsEnum.IGNORE_CASE
@@ -344,19 +343,13 @@ export function extractName(
 } {
     if (!name || typeof name !== 'string') return { first: '', middle: '', last: '' };
     const originalName = name;
-    // name = name
-    //     .replace(ATTN_SALUTATION_PREFIX_PATTERN,'')
-    //     .replace(JOB_TITLE_SUFFIX_PATTERN,'')
-    //     .replace(/\s+/g, ' ')
-    //     .trim();
     name = cleanString(name, undefined, undefined, undefined, CLEAN_NAME_REPLACE_OPTIONS)
-    const debugLogs: any[] = [];
     const containsInvalidCharsOrCompanyKeywords = (
         stringContainsAnyOf(name, /[0-9!#&@]/)
         || stringContainsAnyOf(name, COMPANY_KEYWORDS_PATTERN, RegExpFlagsEnum.IGNORE_CASE)
     );
     if (containsInvalidCharsOrCompanyKeywords) {
-        debugLogs.push(`extractName()`,
+        DEBUG_LOGS.push(NL + `extractName()`,
             TAB + `stringContainsAnyOf("${name}", /[0-9!#&@]/) = ${stringContainsAnyOf(name, /[0-9!#&@]/)}`, 
             TAB + `or stringContainsAnyOf("${name}", COMPANY_KEYWORDS_PATTERN) = ${stringContainsAnyOf(name, COMPANY_KEYWORDS_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`
         );
@@ -374,7 +367,7 @@ export function extractName(
         namePart, 
         STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION
     ).replace(/(^[-+])*/g, ''));
-    debugLogs.push(`nameSplit.length == ${nameSplit.length}, nameSplit: [${nameSplit}]`);
+    // DEBUG_LOGS.push(NL + `nameSplit.length == ${nameSplit.length}, nameSplit: [${nameSplit}]`);
     if (nameSplit.length == 1) {
         return { 
             first: nameSplit[0].replace(/(,|\.)$/g, ''), 
@@ -393,8 +386,7 @@ export function extractName(
             middle: nameSplit[1].replace(/,$/g, ''), 
             last: nameSplit.slice(2).join(' ').replace(/(,|\.)$/g, '') };
     }
-    debugLogs.push(`extractName() - no valid name parts found, returning empty strings`);
-    mlog.debug(...debugLogs);
+    DEBUG_LOGS.push(NL + `extractName() - no valid name parts found, returning empty strings`);
     return { first: '', middle: '', last: '' }; 
 }
 
@@ -504,8 +496,7 @@ export function extractPhone(
     }
     const originalPhone = String(phone);
     // remove leading and trailing letters. remove commas, semicolons, colons, and slashes
-    phone = originalPhone.trim().replace(/^\s*[a-zA-Z]*|[a-zA-Z]\s*$|[,;:/]/g, ''); 
-    const debugLogs: any[] = [];
+    phone = originalPhone.trim().replace(/^\s*[a-zA-Z]*|[a-zA-Z]\s*$|[,;:/]*/g, ''); 
     for (let i = 0; i < phoneRegexList.length; i++) {
         const { re, groupFormat } = phoneRegexList[i];
         let matches =  phone.match(re);
@@ -513,17 +504,16 @@ export function extractPhone(
             continue;
         }
         let formattedPhones = matches.map(p => formatPhone(p, re, groupFormat));
-        debugLogs.push(
-            `extractPhone("${originalPhone}") - testing phoneRegexList[${i}] on "${phone}"`,
-            TAB + `matches: ${JSON.stringify(matches)}`,
+        DEBUG_LOGS.push(
+            NL+`extractPhone("${originalPhone}") - "${phone}" matched phoneRegexList[${i}]!`,
+            TAB + `        matches: ${JSON.stringify(matches)}`,
             TAB + `formattedPhones: ${JSON.stringify(formattedPhones)}`,
         )
         return formattedPhones;
     }
     if (phone) { // phone is non-empty and did not match any regex
-        debugLogs.push(`extractPhone() - no match found for "${phone}", returning empty string.`)
+        DEBUG_LOGS.push(NL+`extractPhone() - no match found for "${phone}", returning null.`)
     };
-    log.debug(...debugLogs);
     return null;
 
 }
@@ -592,7 +582,7 @@ export function stringEndsWithAnyOf(
     }
 
     if (!regex) {
-        log.warn('endsWithAnyOf() Invalid suffixes type. returning false.', 
+        mlog.warn('endsWithAnyOf() Invalid suffixes type. returning false.', 
             'Expected string, array of strings, or RegExpbut received:', typeof suffixes, suffixes);
         return false; // Invalid suffixes type
     }
@@ -635,7 +625,7 @@ export function stringStartsWithAnyOf(
     }
 
     if (!regex) {
-        log.warn(
+        mlog.warn(
             'startsWithAnyOf() Invalid prefixes type. returning false.', 
             TAB + 'Expected string, array of strings, or RegExp, but received:', typeof prefixes, 
             TAB + 'prefixes', prefixes
@@ -720,23 +710,33 @@ export function equivalentAlphanumericStrings(
         Math.floor(s1Alphabetical.length * (1 - tolerance)), 
         Math.floor(s2Alphabetical.length * (1 - tolerance)), 
     );
+    // DEBUG_LOGS.push(NL+`equivalentAlphanumericStrings() - maxLevenshteinDistance = ${maxLevenshteinDistance}`,
+    //     TAB + `levenshteinDistance("${s1}", "${s2}") = ${levenshteinDistance(s1, s2)}`,
+    //     TAB + `levenshteinDistance("${s1Alphabetical}", "${s2Alphabetical}") = ${levenshteinDistance(s1Alphabetical, s2Alphabetical)}`,
+    // );
     if (levenshteinDistance(s1, s2) <= maxLevenshteinDistance
         || levenshteinDistance(s1Alphabetical, s2Alphabetical) <= maxLevenshteinDistance
     ) { 
         return true;
     }
-    const s1IncludesTolerableS2 = (!isNaN(tolerance) &&
-        s1Alphabetical.length >= s2Alphabetical.length
+    const s1IncludesTolerableS2 = (s2.length > 0 && s2Alphabetical.length > 0
+        && s1Alphabetical.length >= s2Alphabetical.length
         && s2Alphabetical.length / s1Alphabetical.length >= tolerance 
         && s1Alphabetical.includes(s2Alphabetical)
     );
-    const s2IncludesTolerableS1 = (!isNaN(tolerance) &&
-        s2Alphabetical.length >= s1Alphabetical.length
+    const s2IncludesTolerableS1 = (s1.length > 0 && s1Alphabetical.length > 0
+        && s2Alphabetical.length >= s1Alphabetical.length
         && s1Alphabetical.length / s2Alphabetical.length >= tolerance
         && s2Alphabetical.includes(s1Alphabetical)
     );
+    // DEBUG_LOGS.push(
+    //     TAB + `s1IncludesTolerableS2 ? ${s1IncludesTolerableS2}`,
+    //     TAB + `s2IncludesTolerableS1 ? ${s2IncludesTolerableS1}`,
+    // );
     if (s1IncludesTolerableS2 || s2IncludesTolerableS1) { 
+        // DEBUG_LOGS.push(NL+` -> returning true`);
         return true;
     }
+    // DEBUG_LOGS.push(NL+` -> returning false`);
     return false;
 }

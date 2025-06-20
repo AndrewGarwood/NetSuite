@@ -13,11 +13,14 @@ import {
     isNonEmptyArray, isEmptyArray, isNullLike, hasNonTrivialKeys,
     BOOLEAN_TRUE_VALUES,
     BOOLEAN_FALSE_VALUES,
-    isBooleanFieldId
+    isBooleanFieldId,
+    isSubrecordValue,
+    areEquivalentObjects,
+    isFieldParseOptions, isValueMappingEntry
 } from "./utils/typeValidation";
 import { 
     getDelimiterFromFilePath, DelimiterCharacterEnum,
-    ValueMapping, ValueMappingEntry, isValueMappingEntry, 
+    ValueMapping, ValueMappingEntry, 
     cleanString, equivalentAlphanumericStrings as equivalentAlphanumeric,
     FieldDictionaryParseOptions,
     FieldParseOptions,
@@ -27,6 +30,7 @@ import {
     ParseResults,
     IntermediateParseResults,
     SublistLineParseOptions,
+    isValidCsv,
 } from "./utils/io";
 import csv from 'csv-parser';
 import fs from 'fs';
@@ -41,6 +45,7 @@ import {
  * - instead of parsing csv directly to type of `PostRecordOptions`, could instead parse to
  * record interfaces from src/utils/ns, then have a function that converts those
  * to `PostRecordOptions`
+ * @TODO allow one FieldParseOptions to generate multiple fieldId:FieldValue pairs for the FieldDictionary
  */
 
 /** use to set the field `"isinactive"` to false */
@@ -51,7 +56,7 @@ let rowIndex = 0;
 export async function parseRecords(
     filePath: string,
     parseOptions: ParseOptions
-): Promise<ParseResults>{
+): Promise<ParseResults> {
     if (!filePath || typeof filePath !== 'string' || !fs.existsSync(filePath)) {
         mlog.error(`ERROR parseRecords(): Invalid 'filePath' parameter:`,
             TAB+`expected param 'filePath' of type 'string'`,
@@ -99,6 +104,11 @@ export async function parseRecords(
                      * `if row` pertains to an existing record in `IntermediateParseResults` 
                      * (e.g. recordType=salesorder and have already processed one of its rows) 
                      * */
+                    DEBUG_LOGS.push(
+                        (DEBUG_LOGS.length > 0 ? NL : '')+`[START ROW] rowIndex: ${rowIndex}:`,
+                        TAB+`      recordType: '${recordType}', idColumn: ${keyColumn}, recordId: '${recordId}'`,
+                        TAB+`isExistingRecord ? ${recordId in intermediate[recordType]}`,
+                    );
                     let postOptions = (intermediate[recordType][recordId]  
                         ? intermediate[recordType][recordId] 
                         : {
@@ -108,12 +118,13 @@ export async function parseRecords(
                             sublists: {} as SublistDictionary,
                         }
                     ) as PostRecordOptions;
-                    
                     intermediate[recordType][recordId] = processRow(
                         row, postOptions, 
                         fieldOptions as FieldDictionaryParseOptions, 
                         sublistOptions as SublistDictionaryParseOptions
                     );
+                    mlog.debug(...DEBUG_LOGS, NL+`[END ROW] rowIndex: ${rowIndex}:`,);
+                    DEBUG_LOGS.length = 0; // clear debug logs for next row
                 }
             })
             .on('error', (error: Error) => {
@@ -188,13 +199,13 @@ function processFieldDictionaryParseOptions(
     for (const fieldId of Object.keys(fieldOptions)) {
         if (!fieldId || typeof fieldId !== 'string') { continue; }
         const valueOptions = fieldOptions[fieldId];
-        fields[fieldId] = (isSubrecordValue(valueOptions)
-            ? generateSetFieldSubrecordOptions(row, fields, 
-                fieldId, valueOptions as SubrecordParseOptions
-            ) as SubrecordValue
-            : parseFieldValue(row, 
+        fields[fieldId] = (isFieldParseOptions(valueOptions)
+            ? parseFieldValue(row, 
                 fieldId, valueOptions as FieldParseOptions
             ) as FieldValue
+            : generateSetFieldSubrecordOptions(row, fields, 
+                fieldId, valueOptions as SubrecordParseOptions
+            ) as SubrecordValue
         );
     }
     return fields;
@@ -238,13 +249,19 @@ function processSublistLineParseOptions(
         const newSublistLine: SublistLine = {};
         for (const sublistFieldId of Object.keys(lineOptions)) {
             const valueOptions = lineOptions[sublistFieldId];
-            newSublistLine[sublistFieldId] = (isSubrecordValue(valueOptions)
-                ? generateSetSublistSubrecordOptions(row, sublistId, 
-                    sublistFieldId, valueOptions as SubrecordParseOptions
-                ) as SubrecordValue 
-                : parseFieldValue(row, 
+            // mlog.info(`processSublistLineParseOptions()`,
+            //     TAB+`sublistId: '${sublistId}', sublistFieldId: '${sublistFieldId}'`,
+            //     TAB+`sublistLines.length: ${sublistLines.length}`,
+            //     TAB+`valueOptions.keys(): ${Object.keys(valueOptions)}`,
+            //     TAB+`'subrecordType' in valueOptions ? ${valueOptions && 'subrecordType' in valueOptions}`,
+            // );
+            newSublistLine[sublistFieldId] = (isFieldParseOptions(valueOptions)
+                ? parseFieldValue(row, 
                     sublistFieldId, valueOptions as FieldParseOptions
                 ) as FieldValue
+                : generateSetSublistSubrecordOptions(row, sublistId, 
+                    sublistFieldId, valueOptions as SubrecordParseOptions
+                ) as SubrecordValue
             );
         }
         if (!isDuplicateSublistLine(sublistLines, newSublistLine)) {
@@ -270,6 +287,11 @@ function generateSetSublistSubrecordOptions(
     if (!row || !parentSublistId || !parentFieldId || isNullLike(subrecordOptions)) {
         return {} as SetSublistSubrecordOptions;
     }
+    DEBUG_LOGS.push(
+        NL + `[START generateSetSublistSubrecordOptions()]`, 
+        TAB+`parentSublistId: '${parentSublistId}'`,
+        TAB+`  parentFieldId: '${parentFieldId}'`,
+    );
     const { subrecordType, fieldOptions, sublistOptions } = subrecordOptions;
     const result = {
         subrecordType, 
@@ -282,6 +304,7 @@ function generateSetSublistSubrecordOptions(
     if (sublistOptions && isNonEmptyArray(Object.keys(sublistOptions))) {
         result.sublists = processSublistDictionaryParseOptions(row, {}, sublistOptions);
     }
+    DEBUG_LOGS.push(NL + `[END generateSetSublistSubrecordOptions()]`,); 
     return result;
 }
 
@@ -304,10 +327,14 @@ function generateSetFieldSubrecordOptions(
         : { subrecordType, fieldId, fields: {}, sublists: {} } // create new subrecord options
     ) as SetFieldSubrecordOptions;
     if (fieldOptions && isNonEmptyArray(Object.keys(fieldOptions))) {
-        result.fields = processFieldDictionaryParseOptions(row, result.fields as FieldDictionary, fieldOptions);
+        result.fields = processFieldDictionaryParseOptions(row, 
+            result.fields as FieldDictionary, fieldOptions
+        );
     }
     if (sublistOptions && isNonEmptyArray(Object.keys(sublistOptions))) {
-        result.sublists = processSublistDictionaryParseOptions(row, result.sublists as SublistDictionary, sublistOptions);
+        result.sublists = processSublistDictionaryParseOptions(row, 
+            result.sublists as SublistDictionary, sublistOptions
+        );
     }
     return result;
 }
@@ -323,20 +350,36 @@ function parseFieldValue(
     fieldId: string,
     valueParseOptions: FieldParseOptions,
 ): FieldValue {
+    DEBUG_LOGS.push(
+        NL +`[START parseFieldValue()] - fieldId: '${fieldId}'`,
+    );
     if (!fieldId || typeof fieldId !== 'string' || isNullLike(valueParseOptions)) {
         return null;
     }
-    let value: FieldValue = null;
+    let value: FieldValue | undefined = undefined;
     const { defaultValue, colName, evaluator, args } = valueParseOptions;
+    // DEBUG_LOGS.push(
+    //     TAB+`defaultValue: '${defaultValue}'`,
+    //     TAB+`     colName: '${colName}'`,
+    //     TAB+`   evlauator: '${evaluator ? evaluator.name+'()': undefined}'`,
+    //     // TAB+` args.length:  ${args ? args.length : 0}`,
+    // );
     if (evaluator) {
         value = evaluator(row, ...(args || []));
+        DEBUG_LOGS.push(NL+` -> value from evaluator(row) = '${value}'`);
     } else if (colName) {
-        value = transformValue(String(row[colName]), colName, fieldId);
+        value = transformValue(
+            cleanString(row[colName]), colName, fieldId, 
+                isNonEmptyArray(args) ? args[0] as ValueMapping : undefined
+        );
+        DEBUG_LOGS.push(NL+` -> value from transformValue(row[colName]) = '${value}'`);
     }
-    if (defaultValue !== undefined && isNullLike(value)) {
+    if (defaultValue !== undefined && (value === undefined || value === '')) {
         value = defaultValue;
+        DEBUG_LOGS.push(NL+` -> value from defaultValue ='${value}'`);
     }   
-    return value;
+    DEBUG_LOGS.push(NL+`[END parseFieldValue()] - fieldId: '${fieldId}' -> value: '${value}'`);
+    return value as FieldValue;
 }
 
 /**
@@ -380,7 +423,7 @@ export function transformValue(
         // else return as string
         return trimmedValue;
     } catch (error) {
-        mlog.warn(`ERROR transformValue(): at row ${rowIndex} could not parse value: ${trimmedValue}`);
+        mlog.error(`ERROR transformValue(): at row ${rowIndex} could not parse value: ${trimmedValue}`);
         return trimmedValue;
     }
 }
@@ -399,94 +442,33 @@ export function isDuplicateSublistLine(
     if (!isNonEmptyArray(existingLines)) { // existingLines isEmptyArray === true, or it's undefined
         return false;
     }
-    const isDuplicateSublistLine = existingLines.some(existingLine => {
+    DEBUG_LOGS.push(
+        NL + `isDuplicateSublistLine() - checking for duplicate sublist line.`,
+    );
+    const isDuplicateSublistLine = existingLines.some((existingLine, sublistLineIndex) => {
         return Object.keys(newLine).every(fieldId => {
+            let areFieldsEqual = false;
             const valA = existingLine[fieldId];
             const valB = newLine[fieldId];
             if (isSubrecordValue(valA) && isSubrecordValue(valB)) {
-                return areEquivalentSubrecordValues(valA, valB);
+                areFieldsEqual = areEquivalentObjects(valA, valB);
+            } else {
+                areFieldsEqual = equivalentAlphanumeric(
+                    String(valA as FieldValue), String(valB as FieldValue)
+                );
             }
-            return equivalentAlphanumeric(String(valA), String(valB));
+            DEBUG_LOGS.push(
+                TAB + `sublistLineIndex: ${sublistLineIndex}, fieldId: '${fieldId}',`,
+                // TAB + `valA: '${valA}'`,
+                // TAB + `valB: '${valB}'`,
+                TAB + `areFieldsEqual: ${areFieldsEqual}`,
+            );
         });
     });
+    DEBUG_LOGS.push(
+        NL + ` -> return isDuplicateSublistLine === ${isDuplicateSublistLine}`,
+    );
     return isDuplicateSublistLine;
 }
-/**
- * Compares subrecord value objects by shallow equality of their keys and values 
- * */
-export function areEquivalentSubrecordValues(valA: SubrecordValue, valB: SubrecordValue): boolean {
-    if (!isSubrecordValue(valA) || !isSubrecordValue(valB)) {
-        return false;
-    }
-    const keysA = Object.keys(valA);
-    const keysB = Object.keys(valB);
-    if (keysA.length !== keysB.length) return false;
-    return keysA.every(key => 
-        equivalentAlphanumeric(
-            String((valA as Record<string, any>)[key]), 
-            String((valB as Record<string, any>)[key])
-        )
-    );
-}
 
-/**
- * @param value `any`
- * @returns **`isSubrecordValue`** `boolean`
- * - `true` if the `value` is an object with a `subrecordType` property,
- * - `false` otherwise.
- */
-export function isSubrecordValue(value: any): value is SubrecordValue {
-    return typeof value === 'object' && value !== null && 'subrecordType' in value;
-}
 
-/**
- * @param filePath `string`
- * @param delimiter `string` {@link DelimiterCharacterEnum}
- * @returns **`isValidCsv`** `boolean`
- * - `true` if the CSV file at `filePath` is valid (all rows have the same number of columns as the header),
- * - `false` `otherwise`. 
- */
-export function isValidCsv(
-    filePath: string, 
-    delimiter: DelimiterCharacterEnum | string,
-): boolean {
-    if (!filePath || !fs.existsSync(filePath)) {
-        mlog.error(`ERROR isValidCsv(): path does not exist: ${filePath}`);
-        return false;
-    }
-    if (!delimiter || delimiter.length === 0) {
-        mlog.error(`ERROR isValidCsv(): invalid delimiter: ${delimiter}`);
-        return false;
-    }   
-    const data = fs.readFileSync(filePath, 'utf8');
-    const lines = data.split('\n');
-    if (lines.length < 2) {
-        mlog.error(`ERROR isValidCsv(): file has less than 2 lines: ${filePath}`);
-        return false;
-    }
-    const header: string[] = lines[0].split(delimiter).map(col => col.trim());
-    if (header.length < 1) {
-        mlog.error(`ERROR isValidCsv(): no header found in file: ${filePath}`);
-        return false;
-    }
-    // Check if all rows have the same number of columns as the header
-    for (let i = 1; i < lines.length; i++) {
-        const rowValues: string[] = lines[i].split(delimiter).map(col => col.trim());
-        if (header.length !== rowValues.length 
-            && i !== lines.length-1 // allow for empty last row in files.
-        ) {
-            mlog.warn(`isValidCsv(): Invalid row found: header.length !== rowValues.length`,
-                TAB+`   header.length: ${header.length},`,
-                TAB+`rowValues.length: ${rowValues.length}`,
-                TAB+` -> Difference =  ${header.length - rowValues.length}`,
-                TAB+`   header: ${JSON.stringify(header)}`,
-                TAB+`rowValues: ${JSON.stringify(rowValues)}`,
-                TAB+` rowIndex: ${i},`,
-                TAB+` filePath: '${filePath}'`,
-                NL+`returning false...`
-            );
-            return false;
-        }
-    }
-    return true;
-}

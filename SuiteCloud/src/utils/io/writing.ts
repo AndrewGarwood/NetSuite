@@ -123,7 +123,8 @@ export function indentedStringify(
     jsonString = jsonString
         .split('\n')
         .map(line => NEW_LINE_TAB + '\t'.repeat(indent) + line)
-        .join('');
+        .join('')
+        .replace(/^\n\t. /, '').replace(/•/g, '');
     return jsonString;
 }
 

@@ -22,8 +22,9 @@ export type SubrecordValue = ({
     subrecordType?: string;
 } & {
     [subrecordFieldId: string]: FieldValue; 
-}) | SetFieldSubrecordOptions | SetSublistSubrecordOptions;
-
+}) | ((SetFieldSubrecordOptions | SetSublistSubrecordOptions) & {
+    [key: string]: any;
+});
 /**
  * @typedefn **`SublistDictionary`**
  */
