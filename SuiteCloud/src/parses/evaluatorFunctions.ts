@@ -5,7 +5,7 @@
 import { parseLogger as log, mainLogger as mlog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS 
 } from '../config';
-import { HUMAN_VENDORS_TRIMMED } from './vendor/vendorEvaluatorFunctions';
+import { HUMAN_VENDORS_TRIMMED } from './.archive/vendor/vendorEvaluatorFunctions';
 import { 
     FieldValue, 
     StateAbbreviationEnum as STATES, 
@@ -19,10 +19,10 @@ import {
     checkForOverride, isValidEmail,
     SALUTATION_REGEX, ATTN_SALUTATION_PREFIX_PATTERN, LAST_NAME_COMMA_FIRST_NAME_PATTERN,
     ValueMapping,
-    ColumnSliceOptions, StringReplaceOptions, equivalentAlphanumericStrings
+    ColumnSliceOptions, StringReplaceOptions, equivalentAlphanumericStrings as equivalentAlphanumeric
 } from "../utils/io";
 import { customerCompany } from './customer/customerEvaluatorFunctions';
-
+const suppressed_DEBUG_LOGS: any[] = [];
 export const ENTITY_VALUE_OVERRIDES: ValueMapping = {
 } 
 
@@ -71,23 +71,16 @@ export const externalId = (
 export const isPerson = (
     row: Record<string, any>, 
     entityIdColumn: string, 
-    companyColumn?: string
+    companyColumn: string='Company'
 ): boolean => {
     let entity = entityId(row, entityIdColumn);
     let company = (companyColumn 
         ? cleanString(row[companyColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
         : ''
     );
-    // DEBUG_LOGS.push(
-    //     NL+ `isPerson('${entity}') entityIdColumn = '${entityIdColumn}', companyColumn = '${companyColumn}'`, 
-    //     TAB + `HUMAN_VENDORS_TRIMMED.includes('${entity}') = ${HUMAN_VENDORS_TRIMMED.includes(entity)}`,
-    //     TAB + `COMPANY_KEYWORDS_PATTERN.test('${entity}')  = ${COMPANY_KEYWORDS_PATTERN.test(entity)}`,
-    //     TAB + `'${entity}' ends with company abbreviation  = ${stringEndsWithAnyOf(entity, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`,
-    //     TAB + `/[0-9@]+/.test('${entity}')                 = ${/[0-9@&]+/.test(entity)}`,
-    //     TAB + `Boolean('${company}')                       = ${Boolean(company)}`,
-    // );
     if (HUMAN_VENDORS_TRIMMED.includes(entity)) {
         // log.debug(...[...logArr, TAB + `-> return true`]);
+        DEBUG_LOGS.push(NL + `-> return true because entity '${entity}' is in HUMAN_VENDORS_TRIMMED`);
         return true;
     }
     if (COMPANY_KEYWORDS_PATTERN.test(entity) 
@@ -96,13 +89,26 @@ export const isPerson = (
         || entity.split(' ').length === 1
         || (company
             && !LAST_NAME_COMMA_FIRST_NAME_PATTERN.test(company)
-            && equivalentAlphanumericStrings(entity, company)
+            && equivalentAlphanumeric(entity, company)
         )
+        || (company && COMPANY_KEYWORDS_PATTERN.test(company))
     ) {
         // log.debug(...[...logArr, TAB + `-> return false`]);
         return false;
     }
-    // log.debug(...[...logArr, TAB + `Reached End of isPerson() -> return true`]);
+    DEBUG_LOGS.push(
+        NL+ `isPerson():`,
+        NL + `entityIdColumn = '${entityIdColumn}' -> entity = '${entity}'`,`companyColumn = '${companyColumn}'`, 
+        TAB + `HUMAN_VENDORS_TRIMMED.includes('${entity}') = ${HUMAN_VENDORS_TRIMMED.includes(entity)}`,
+        TAB + `COMPANY_KEYWORDS_PATTERN.test('${entity}')  = ${COMPANY_KEYWORDS_PATTERN.test(entity)}`,
+        TAB + `'${entity}' ends with company abbreviation  = ${stringEndsWithAnyOf(entity, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`,
+        TAB + `/[0-9@]+/.test('${entity}')                 = ${/[0-9@&]+/.test(entity)}`,
+        NL + `companyColumn = '${companyColumn}' -> company = '${company}'`,
+        TAB + `Boolean('${company}')                       = ${Boolean(company)}`,
+        TAB + `COMPANY_KEYWORDS_PATTERN.test('${company}') = ${company && COMPANY_KEYWORDS_PATTERN.test(company)}`, 
+
+    );
+    DEBUG_LOGS.push(TAB + `Reached End of isPerson() -> return true`);
     return true;
 }
 
@@ -120,29 +126,29 @@ export const field = (
     if (!row || !extractor || !columnOptions || columnOptions.length === 0) {
         return '';
     }
-    DEBUG_LOGS.push(NL + `[START evaluate.field()] - extractor: ${extractor.name}()`,
-        TAB+`columnOptions: ${JSON.stringify(columnOptions)}`
-    );
+    // DEBUG_LOGS.push(NL + `[START evaluate.field()] - extractor: ${extractor.name}()`,
+    //     TAB+`columnOptions: ${JSON.stringify(columnOptions)}`
+    // );
     let result = '';
     for (const colOption of columnOptions) {
         const col = (typeof colOption === 'string' 
             ? colOption : colOption.colName
         );
         let initialVal = cleanString(row[col]);
-        // DEBUG_LOGS.push(NL + `colOption: ${JSON.stringify(colOption)}`,
-        //     TAB+`col: '${col}', initialVal: '${initialVal}'`
-        // );
+        suppressed_DEBUG_LOGS.push(NL + `colOption: ${JSON.stringify(colOption)}`,
+            TAB+`col: '${col}', initialVal: '${initialVal}'`
+        );
         if (!initialVal) { continue; }
         const minIndex = (typeof colOption === 'object' && colOption.minIndex 
             ? colOption.minIndex : 0
         );
         const matchResults = extractor(initialVal);
-        // DEBUG_LOGS.push(NL + `matchResults after ${extractor.name}('${initialVal}'): ${JSON.stringify(matchResults)}`,
-        //     TAB + `matchResults.length: ${matchResults ? matchResults.length : undefined}`,
-        //     TAB + `matchResults[minIndex=${minIndex}]: '${matchResults ? matchResults[minIndex] : undefined}'`,        
-        // );
+        suppressed_DEBUG_LOGS.push(NL + `matchResults after ${extractor.name}('${initialVal}'): ${JSON.stringify(matchResults)}`,
+            TAB + `matchResults.length: ${matchResults ? matchResults.length : undefined}`,
+            TAB + `matchResults[minIndex=${minIndex}]: '${matchResults ? matchResults[minIndex] : undefined}'`,        
+        );
         if (!matchResults || matchResults.length <= minIndex || matchResults[minIndex] === null || matchResults[minIndex] === undefined) {
-            DEBUG_LOGS.push(NL + `continue to next column option because at least one of the following is true:`,
+            suppressed_DEBUG_LOGS.push(NL + `continue to next column option because at least one of the following is true:`,
                 TAB+`   !matchResults === ${!matchResults}`,
                 TAB+`|| matchResults.length <= minIndex === ${matchResults && matchResults.length <= minIndex}`,
                 TAB+`|| !matchResults[${minIndex}] === ${matchResults && !matchResults[minIndex]}`,
@@ -152,7 +158,7 @@ export const field = (
         result = (matchResults[minIndex] as string);
         break;
     }
-    DEBUG_LOGS.push(NL+`[END evaluate.field()] - extractor: ${extractor.name}(), RETURN result: '${result}'`,);
+    // DEBUG_LOGS.push(NL+`[END evaluate.field()] - extractor: ${extractor.name}(), RETURN result: '${result}'`,);
     return result
 }
 
@@ -196,7 +202,7 @@ export const salutation = (
     let salutationValue = cleanString(row[salutationColumn]);
     if (salutationValue) return salutationValue;
     if (!nameColumns) return '';
-    DEBUG_LOGS.push(
+    suppressed_DEBUG_LOGS.push(
         NL+`evaluate.salutation() cleanString(row['${salutationColumn}']) = '${salutationValue}'`,
     );
     for (const col of nameColumns) {
@@ -205,13 +211,13 @@ export const salutation = (
             STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, undefined, undefined, 
             [{searchValue: /^((attention|attn|atn):)?\s*/i, replaceValue: '' }]
         );
-        DEBUG_LOGS.push(
+        suppressed_DEBUG_LOGS.push(
             TAB + `col: '${col}', initialVal: '${initialVal}'`,
         );
         if (!initialVal) { continue; } 
         if (SALUTATION_REGEX.test(initialVal)) {
             salutationValue = initialVal.match(SALUTATION_REGEX)?.[0] || '';
-            DEBUG_LOGS.push(
+            suppressed_DEBUG_LOGS.push(
                 TAB + `SALUTATION_REGEX.test('${initialVal}') = true`,
                 TAB + `initialVal.match(SALUTATION_REGEX)?.[0] = '${initialVal.match(SALUTATION_REGEX)?.[0]}'`,
                 TAB + `-> RETURN salutationValue: '${salutationValue}'`
@@ -270,7 +276,7 @@ export const attention = (
         .trim()
     );
     result = (fullName.includes(entity)) ? '' : fullName;
-    log.debug(`End of evaluate.attention() -> result: '${result}'`,
+    suppressed_DEBUG_LOGS.push(NL+`End of evaluate.attention() -> result: '${result}'`,
         NL+`attention(entityIdColumn='${args.entityIdColumn}', salutationColumn='${args.salutationColumn}', nameColumns.length=${args.nameColumns?.length || 0})`,
         TAB + `    entity: '${entity}'`,
         TAB + `salutation: '${salutationValue}'`,
@@ -326,24 +332,24 @@ export const street = (
     );
     const lineOneIsRedundant: boolean = (
         (Boolean(attentionValue) && (streetLineOneValue.includes(attentionValue)
-            || equivalentAlphanumericStrings(streetLineOneValue, attentionValue)
+            || equivalentAlphanumeric(streetLineOneValue, attentionValue)
         )) 
         || 
         (Boolean(addresseeValue) && (streetLineOneValue.includes(addresseeValue)
-            || equivalentAlphanumericStrings(streetLineOneValue, addresseeValue)
+            || equivalentAlphanumeric(streetLineOneValue, addresseeValue)
         ))
     );
     if (streetLineNumber === 1 && lineOneIsRedundant) {
-        // DEBUG_LOGS.push(NL + `streetLineNumber === 1 && lineOneIsRedundant is true!`,
-        //     TAB + `street(streetLineNumber=${streetLineNumber}, streetLineOneColumn='${args.streetLineOneColumn}', streetLineTwoColumn='${args.streetLineTwoColumn}',`,
-        //     TAB + `entityIdColumn='${args.entityIdColumn}', salutationColumn='${args.salutationColumn}', nameColumns.length=${args.nameColumns?.length})`,
-        //     NL + `streetLineOneValue: '${streetLineOneValue}' is redundant...`,
-        //     TAB + `                      streetLineOneValue.includes(attentionValue) ? ${streetLineOneValue.includes(attentionValue)}`,
-        //     TAB + `equivalentAlphanumericStrings(streetLineOneValue, attentionValue) ? ${equivalentAlphanumericStrings(streetLineOneValue, attentionValue)}`,
-        //     TAB + `                      streetLineOneValue.includes(addresseeValue) ? ${streetLineOneValue.includes(addresseeValue)}`,
-        //     TAB + `equivalentAlphanumericStrings(streetLineOneValue, addresseeValue) ? ${equivalentAlphanumericStrings(streetLineOneValue, addresseeValue)}`,
-        //     NL + ` -> return streetLineTwoValue: '${streetLineTwoValue}'`
-        // );
+        DEBUG_LOGS.push(NL + `streetLineNumber === 1 && lineOneIsRedundant is true!`,
+            TAB + `street(streetLineNumber=${streetLineNumber}, streetLineOneColumn='${args.streetLineOneColumn}', streetLineTwoColumn='${args.streetLineTwoColumn}',`,
+            TAB + `entityIdColumn='${args.entityIdColumn}', salutationColumn='${args.salutationColumn}', nameColumns.length=${args.nameColumns?.length})`,
+            NL + `streetLineOneValue: '${streetLineOneValue}' is redundant...`,
+            TAB + `                      streetLineOneValue.includes(attentionValue) ? ${streetLineOneValue.includes(attentionValue)}`,
+            TAB + `equivalentAlphanumericStrings(streetLineOneValue, attentionValue) ? ${equivalentAlphanumeric(streetLineOneValue, attentionValue)}`,
+            TAB + `                      streetLineOneValue.includes(addresseeValue) ? ${streetLineOneValue.includes(addresseeValue)}`,
+            TAB + `equivalentAlphanumericStrings(streetLineOneValue, addresseeValue) ? ${equivalentAlphanumeric(streetLineOneValue, addresseeValue)}`,
+            NL + ` -> return streetLineTwoValue: '${streetLineTwoValue}'`
+        );
         return streetLineTwoValue;
     } else if (streetLineNumber === 1) {
         return streetLineOneValue;
@@ -408,14 +414,14 @@ export const firstName = (
         ? cleanString(row[firstNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
         : ''
     );
-    // DEBUG_LOGS.push(NL + `cleanString(row[firstNameColumn]): '${first}'`);
+    suppressed_DEBUG_LOGS.push(NL + `cleanString(row[firstNameColumn]): '${first}'`);
     if (!first || first.split(' ').length > 1) {
         first = name(row, 
             ...(firstNameColumn ? [firstNameColumn] : []) //if data entry error when someone put whole name in firstNameColumn,
                 .concat(nameColumns)
         ).first;
     }
-    // DEBUG_LOGS.push(NL + `first after evaluate nameColumns: '${first}'`);
+    suppressed_DEBUG_LOGS.push(NL + `first after evaluate nameColumns: '${first}'`);
     return first.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');
 }
 
@@ -431,7 +437,7 @@ export const middleName = (
     if (!middle || middle.split(' ').length > 1) {
         middle = name(row, ...nameColumns).middle;
     }
-    // DEBUG_LOGS.push(NL + `middle after evaluate nameColumns: '${middle}'`);
+    suppressed_DEBUG_LOGS.push(NL + `middle after evaluate nameColumns: '${middle}'`);
     return middle.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');
 }
 
@@ -448,7 +454,7 @@ export const lastName = (
     if (!last) {
         last = name(row, ...nameColumns).last;
     }
-    // DEBUG_LOGS.push(NL + `last after evaluate nameColumns: '${last}'`);
+    suppressed_DEBUG_LOGS.push(NL + `last after evaluate nameColumns: '${last}'`);
     return last.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');;
 }
 

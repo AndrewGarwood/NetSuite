@@ -11,18 +11,22 @@ import {
     checkForOverride,
     cleanString,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION,
-    ValueMapping, equivalentAlphanumericStrings
+    ValueMapping, equivalentAlphanumericStrings as equivalentAlphanumeric
 } from "../../utils/io";
 import { isPerson, firstName, middleName, lastName, entityId, ENTITY_VALUE_OVERRIDES } from "../evaluatorFunctions";
+import { CustomerColumnEnum as C } from "./customerConstants";
+
+
 
 export const customerIsPerson = (
     row: Record<string, any>, 
-    entityIdColumn: string
+    entityIdColumn: string,
+    companyColumn: string=C.COMPANY
 ): string => {
     if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return RADIO_FIELD_FALSE;
     }
-    return isPerson(row, entityIdColumn) ? RADIO_FIELD_TRUE : RADIO_FIELD_FALSE;
+    return isPerson(row, entityIdColumn, companyColumn) ? RADIO_FIELD_TRUE : RADIO_FIELD_FALSE;
 }
 
 /** calls {@link firstName}`(row, firstNameColumn, ...nameColumns)` from `evaluatorFunctions.ts` if customer is an individual human and not a company */
@@ -82,7 +86,7 @@ export const customerCategory = (
     if (!row || !categoryColumn || !categoryDict) {
         return '';
     }
-    let categoryValue = row[categoryColumn];
+    let categoryValue = row[categoryColumn] as string;
     if (!categoryValue || !categoryDict[categoryValue]) {
         return '';
     }
@@ -113,7 +117,7 @@ export const customerStatus = (
 export const customerCompany = (
     row: Record<string, any>,
     entityIdColumn: string,
-    companyNameColumn?: string,
+    companyNameColumn: string=C.COMPANY,
 ): string => {
     if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return '';
@@ -130,8 +134,7 @@ export const customerCompany = (
         ) as string
         : ''
     );   
-    if (companyName 
-        && companyName.toLowerCase().replace(/\W*/g, '') !== entity.toLowerCase().replace(/\W*/g, '')
+    if (companyName && equivalentAlphanumeric(companyName, entity)
         //  && COMPANY_KEYWORD_REGEX.test(companyName)
     ) {
         return companyName;

@@ -3,6 +3,9 @@
  * @description Types specific to NetSuite's internal API (copies, analogs, or extensions of NetSuite's `N/record` module types).
  */
 
+import { hasKeys, isPrimitiveValue } from "src/utils/typeValidation";
+import { SetFieldSubrecordOptions, SetSublistSubrecordOptions } from "./Requests";
+
 /**
  * @enum {string} **`LogTypeEnum`**
  * @readonly
@@ -128,3 +131,16 @@ export enum FieldInputTypeEnum {
     /** `Inline HTML` fields accept `strings`. Strings containing HTML tags are represented as HTML entities in UI. {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273155868.html#:~:text=The%20following%20code%20sample%20shows%20the%20syntax%20for%20INLINEHTML%20fields%20and%20what%20is%20returned.} */
     INLINE_HTML = 'inlinehtml',
 }
+
+/**
+ * either the subrecord itself or the options to set a subrecord
+ * @typedefn **`SubrecordValue`** 
+ * */
+export type SubrecordValue = ({
+    subrecordType?: string;
+} & {
+    [subrecordFieldId: string]: FieldValue; 
+}) | ((SetFieldSubrecordOptions | SetSublistSubrecordOptions) & {
+    [key: string]: any;
+});
+

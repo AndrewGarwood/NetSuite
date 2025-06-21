@@ -39,7 +39,7 @@ let server: Server | any | undefined;
 export const CLOSE_SERVER = (): void => {
     if (server) {
         server.close(() => {
-            infoLogs.push(NL + 'Server closed successfully.');
+            infoLogs.push((infoLogs.length > 0 ? NL : '') + 'Server closed successfully.');
         });
     } else {
         infoLogs.push(NL + 'Server is not running or already closed.');

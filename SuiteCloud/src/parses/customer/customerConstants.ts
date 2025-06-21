@@ -21,8 +21,8 @@ export const COMPLETE_FILE = `${CUSTOMER_DIR}/customer.tsv` as string;
 export const FIRST_PART_FILE = `${CUSTOMER_DIR}/customer_part1.tsv` as string;
 /** `${DATA_DIR}/customers/customer_part2.tsv` */
 export const SECOND_PART_FILE = `${CUSTOMER_DIR}/customer_part2.tsv` as string;
-/** `${DATA_DIR}/customers/customer_part2.tsv` */
-export const EDGE_CASES_FILE = `${CUSTOMER_DIR}/customer_part2.tsv` as string;
+/** `${DATA_DIR}/customers/edge_cases.tsv` */
+export const EDGE_CASES_FILE = `${CUSTOMER_DIR}/edge_cases.tsv` as string;
 /** 
  * maybe this is unnecessary... but I like enums 
  * @enum {string} **`CustomerColumnEnum`**

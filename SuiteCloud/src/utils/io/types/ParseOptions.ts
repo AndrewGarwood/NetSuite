@@ -1,5 +1,5 @@
 /**
- * @file src/utils/io/types/CsvParseOptions.ts
+ * @file src/utils/io/types/ParseOptions.ts
  */
 
 import { 
@@ -29,6 +29,12 @@ export type IntermediateParseResults = {
 };
 export type ParseResults = {
     [recordType: RecordTypeEnum | string]: PostRecordOptions[]
+};
+export type ValidatedParseResults = {
+    [recordType: string | RecordTypeEnum | EntityRecordTypeEnum]: {
+        valid: PostRecordOptions[], 
+        invalid: PostRecordOptions[]
+    }
 };
 
 /**
@@ -102,44 +108,6 @@ export type idSearchParseOptions = {
 }
 
 
-export type ParsePostProcessingOptions = {
-    recordType: RecordTypeEnum;
-    cloneOptions?: CloneOptions;
-    pruneFunc?: (options: PostRecordOptions) => PostRecordOptions | null;
-}
-
-/**
- * @typedefn **`CloneOptions`**
- * @property {RecordTypeEnum | EntityRecordTypeEnum | string} donorType - {@link RecordTypeEnum} - The type of the NetSuite record to clone from.
- * @property {RecordTypeEnum | EntityRecordTypeEnum | string} recipientType - {@link RecordTypeEnum} - The type of the NetSuite record to clone to.
- * @property {idPropertyEnum} idProperty - {@link idPropertyEnum} - The property from the donor's {@link FieldDictionary.valueFields} used to join the donor and recipient records.
- * @property {Array<string>} fieldIds - `Array<string>` - `fieldIds` to clone from the donor's {@link FieldDictionary}'s ({@link PostRecordOptions}`.fieldDict.valueFields` 
- * and {@link PostRecordOptions}`.fieldDict.subrecordFields`) to the recipient's {@link FieldDictionary}'s `valueFields` and `subrecordFields`.
- * @property {Array<string>} sublistIds - `Array<string>` - `sublistIds` to clone from the donor's {@link SublistDictionary}
- */
-export type CloneOptions = {
-    donorType: RecordTypeEnum | EntityRecordTypeEnum | string;
-    recipientType: RecordTypeEnum | EntityRecordTypeEnum | string;
-    idProperty: idPropertyEnum;
-    fieldIds?: string[];
-    sublistIds?: string[];
-}
-
-/**
- * @deprecated
- * @enum {string} **`FieldParentTypeEnum`**
- * @description Enum for the parent type of a subrecord. Used to determine if the subrecord is a body field or a sublist field.
- * @property {string} SUBLIST - The subrecord corresponds to a sublist field in its parent record.
- * @property {string} BODY - The subrecord corresponds to a body field in its parent record.
- */
-export enum FieldParentTypeEnum {
-    /**The subrecord corresponds to a sublist field in its parent record. */
-    SUBLIST = 'sublist',
-    /**The subrecord corresponds to a body field in its parent record. */
-    BODY = 'body',
-}
-
-
 /**
  * only set oldValue to newValue if the column name is in validColumns
  * @property {FieldValue} newValue - The new value to set for the column.
@@ -171,4 +139,3 @@ export type ColumnSliceOptions = {
  * - - a {@link ValueMappingEntry} -> override occurences of `key` only in specified columns (see {@link ValueMappingEntry.validColumns}) with {@link ValueMappingEntry.newValue}.
  */
 export type ValueMapping = Record<string, FieldValue | ValueMappingEntry>;
-

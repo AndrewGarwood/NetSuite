@@ -2,74 +2,70 @@
  * @file src/parses/pruneFunctions.ts
  */
 
-import { pruneLogger as plog, mainLogger as mlog, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
+import { pruneLogger as plog, mainLogger as mlog, INDENT_LOG_LINE as TAB, indentedStringify } from 'src/config/setupLog';
 import { 
     FieldDictionary,
     PostRecordOptions,
     SetFieldValueOptions,
+    SetSublistSubrecordOptions,
     SetSublistValueOptions,
     SublistLine,
+    SubrecordValue,
 } from "../utils/api/types";
-import { isNullLike, RADIO_FIELD_TRUE } from "../utils/typeValidation";
+import { hasKeys, isNullLike, RADIO_FIELD_FALSE, RADIO_FIELD_TRUE } from "../utils/typeValidation";
 
 
 
+const CONTACT_REQUIRED_FIELDS = ['firstname', 'lastname']
+const ADDRESS_REQUIRED_FIELDS = ['addr1']; // , 'country'
+const ENTITY_REQUIRED_FIELDS = ['entityid', 'isperson', 'companyname']
 /** 
- * `REQUIRED_FIELDS = ['entityid', 'companyname']` 
- * - if entity isperson, call {@link requireNameFields}
- * - call {@link pruneAddressBook}
+ * `ENTITY_REQUIRED_FIELDS = ['entityid', 'companyname']` 
+ * - `if` entity isperson, call {@link nameFieldsAreRequired}, 
+ * - `else` deletes any existing name fields from `options.fields`
+ * - `then` call {@link pruneAddressBook}
  * */
 export const entity = (
     options: PostRecordOptions,
 ): PostRecordOptions | null => {
     if (isNullLike(options) || !options.fields) {
-        plog.warn(`pruneEntity(): options is null or undefined, returning null`);
+        plog.warn(`pruneEntity(): options or options.fields is null or undefined, returning null`);
         return null;
     }
-    const REQUIRED_FIELDS = ['entityid', 'companyname']
-    try {
-        for (const requiredField of REQUIRED_FIELDS) {
-            if (!options.fields[requiredField]){
-                return null;
-            }
-            
-        }        
-        if (options.fields.isperson && options.fields.isperson === RADIO_FIELD_TRUE) {
-            options = requireNameFields(options) as PostRecordOptions;
-        } 
-        options = pruneAddressBook(options) as PostRecordOptions;
-        return options;
-    } catch (error) {
-        plog.error(`Error in pruneEntity('${options.recordType}'):`, error);
-        return options;
+    
+    if (!hasKeys(options.fields, ENTITY_REQUIRED_FIELDS)) { 
+        plog.warn(`pruneEntity(): options.fields does not have required fields.`,
+            TAB+`required: ${JSON.stringify(ENTITY_REQUIRED_FIELDS)}`,
+            TAB+`received: ${JSON.stringify(options.fields)}`
+        );
+        return null; 
     }
-}
-
-/** make sure options.fieldDict.valueFields has values for firstname and lastname. then call {@link pruneAddressBook} */
-export const requireNameFields = (
-    options: PostRecordOptions,
-): PostRecordOptions | null => {
-    if (isNullLike(options) || !options.fields) {
-        plog.warn(`requireNameFields(): options is null or undefined, returning null`);
+    const nameFieldsAreRequired = Boolean(options.fields.isperson 
+        && options.fields.isperson === RADIO_FIELD_TRUE
+    );  
+    if (nameFieldsAreRequired && !hasKeys(options.fields, CONTACT_REQUIRED_FIELDS)) {
+        plog.warn(`prune.entity(): options.fields does not have required fields.`,
+            TAB+`recordType: ${options.recordType}`,
+            TAB+`required: ${JSON.stringify(CONTACT_REQUIRED_FIELDS)}`,
+            TAB+`received: ${JSON.stringify(Object.keys(options.fields))}`
+        );
         return null;
-    }
-    const REQUIRED_CONTACT_FIELDS = ['firstname', 'lastname']
-    try {
-        for (const requiredField of REQUIRED_CONTACT_FIELDS) {
-            if (!options.fields || !options.fields[requiredField]) {
-                return null;
+    } else {
+        const nameFields = [...CONTACT_REQUIRED_FIELDS, 'middlename', 'salutation']
+        for (const nameFieldId of nameFields) {
+            if (nameFieldId in options.fields) {
+                delete options.fields[nameFieldId];
             }
         }
-        options = pruneAddressBook(options) as PostRecordOptions;
-        return options;
-    } catch (error) {
-        plog.error(`Error in pruneIfNoName():`, error);
-        return options;
     }
+    options = pruneAddressBook(options) as PostRecordOptions;
+    return options;
 }
+
 /**
- * @notimplemented need to update with new definition of FieldDictionary and SublistDictionary 
- * - prune the addressbook sublist of entity records. `REQUIRED_ADDRESS_FIELDS = ['addr1', 'country']` 
+ * @TODO abstract to pruneSublistFields and accept sublistId + requiredFieldIds as params
+ * - prune the addressbook sublist of entity records. 
+ * - `ADDRESS_REQUIRED_FIELDS = ['addr1']` 
  * */
 export const pruneAddressBook = (
     options: PostRecordOptions,
@@ -77,22 +73,17 @@ export const pruneAddressBook = (
     if (isNullLike(options) || !options.sublists) {
         return null;
     }
-    const REQUIRED_ADDRESS_FIELDS = ['addr1']; // , 'country'
     const linesToKeep: number[] = [];
     let addressBook = options.sublists.addressbook || [] as SublistLine[];
     for (let i = 0; i < addressBook.length; i++) {
         const sublistLine = addressBook[i];
-        if (!sublistLine || !sublistLine.fields) {
-            continue;
-        }
-        let hasRequiredFields = true;
-        for (const requiredField of REQUIRED_ADDRESS_FIELDS) {
-            if (!sublistLine[requiredField]) {
-                hasRequiredFields = false;
-                break;
-            }
-        }
-        if (!hasRequiredFields) {
+        const address = sublistLine.addressbookaddress as SetSublistSubrecordOptions;
+        if (!address.fields || !hasKeys(address.fields, ADDRESS_REQUIRED_FIELDS)) {
+            plog.warn(`pruneAddressBook(): sublist line ${i} does not have required fields.`,
+                TAB+`required: ${JSON.stringify(ADDRESS_REQUIRED_FIELDS)}`,
+                TAB+`received: ${JSON.stringify(Object.keys(sublistLine))}`,
+                TAB+`sublistLine: ${indentedStringify(sublistLine)}`
+            );
             continue;
         }
         linesToKeep.push(i);
@@ -110,23 +101,24 @@ export const pruneAddressBook = (
 };
 
 /**
- * calls {@link requireNameFields}, then {@link pruneAddressBook}
  * @param options 
  * @returns `options` with required fields for contact records, or `null` if required fields are missing
  */
 export const contact = (
     options: PostRecordOptions,
 ): PostRecordOptions | null => {
-    if (isNullLike(options)) {
-        plog.warn(`pruneContact(): options is null or undefined, returning null`);
+    if (isNullLike(options) || !options.fields) {
+        mlog.warn(`pruneContact(): options or options.fields is null or undefined, returning null`);
         return null;
     }
-    try {
-        options = requireNameFields(options) as PostRecordOptions;
-        return options === null 
-            ? null : pruneAddressBook(options) as PostRecordOptions;    
-    } catch (error) {
-        plog.error(`Error in pruneContact():`, error);
-        return options;
+    
+    if (!hasKeys(options.fields, CONTACT_REQUIRED_FIELDS)) {
+        mlog.warn(`requireNameFields(): options.fields does not have required fields`,
+            TAB+`required: ${JSON.stringify(CONTACT_REQUIRED_FIELDS)}`,
+            TAB+`received: ${JSON.stringify(Object.keys(options.fields))}`
+        );
+        return null;
     }
+    return pruneAddressBook(options) as PostRecordOptions;    
+
 }

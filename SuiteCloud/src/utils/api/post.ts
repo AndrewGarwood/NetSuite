@@ -54,8 +54,8 @@ export async function upsertRecordPayload(
                 continue;
             }
             responseDataArr.push(res.data as PostRecordResponse);
-            mlog.debug(`upsertRecordPayload() finished batch ${i+1} of ${batches.length}; results: `, 
-                indentedStringify(((res.data as PostRecordResponse).results as RecordResult[])
+            mlog.debug(`upsertRecordPayload() finished batch ${i+1} of ${batches.length}`,
+                TAB+`results:`, indentedStringify(((res.data as PostRecordResponse).results as RecordResult[])
                     .reduce((acc, postResult) => {
                         acc[postResult.recordType] = (acc[postResult.recordType] || 0) + 1;
                         return acc;
