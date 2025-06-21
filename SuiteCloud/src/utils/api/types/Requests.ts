@@ -4,7 +4,7 @@
  * General types used to interact with NetSuite's internal API.
  */
 
-import { FieldValue } from "./InternalApi";
+import { FieldValue, SubrecordValue } from "./InternalApi";
 import { NumericOperatorEnum, RecordOperatorEnum, RecordTypeEnum, SearchOperatorEnum, TextOperatorEnum } from "src/utils/ns";
 
 /**
@@ -14,17 +14,6 @@ export type FieldDictionary = {
     [fieldId: string]: FieldValue | SubrecordValue
 };
 
-/**
- * either the subrecord itself or the options to set a subrecord
- * @typedefn **`SubrecordValue`** 
- * */
-export type SubrecordValue = ({
-    subrecordType?: string;
-} & {
-    [subrecordFieldId: string]: FieldValue; 
-}) | ((SetFieldSubrecordOptions | SetSublistSubrecordOptions) & {
-    [key: string]: any;
-});
 /**
  * @typedefn **`SublistDictionary`**
  */

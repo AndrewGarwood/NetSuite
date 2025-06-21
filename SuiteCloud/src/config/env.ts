@@ -13,12 +13,6 @@ import { stdin as input, stdout as output } from 'node:process';
 import path from 'node:path';
 
 
-/** `./SuiteCloud/` = the directory where the node_modules folder lives*/
-export const NODE_HOME_DIR = process.cwd();
-/** = {@link NODE_HOME_DIR}`/src` = `SuiteCloud/src` = `process.cwd()/src`*/
-export const SRC_DIR = path.join(NODE_HOME_DIR, 'src') as string;
-/** = {@link SRC_DIR}`/server/tokens` */
-export const TOKEN_DIR = path.join(SRC_DIR, 'server', 'tokens') as string;
 
 export const BASE_ACCOUNT_ID = (process.env.ACCOUNT_ID || 'MISSING_ENV_VARIABLE-ACCOUNT_ID') as string;
 
@@ -127,6 +121,12 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
 }
 
 
+/** `./SuiteCloud/` = the directory where the node_modules folder lives*/
+export const NODE_HOME_DIR = process.cwd();
+/** = {@link NODE_HOME_DIR}`/src` = `SuiteCloud/src` = `process.cwd()/src`*/
+export const SRC_DIR = path.join(NODE_HOME_DIR, 'src') as string;
+/** = {@link SRC_DIR}`/server/tokens` */
+export const TOKEN_DIR = path.join(SRC_DIR, 'server', 'tokens') as string;
 export const USER = process.cwd().split(path.sep)[2];
 console.log(`USER = '${USER}'`);
 const ORGANIZATION = process.env.ORGANIZATION || 'MISSING_ENV_VAR-ORGANIZATION';
@@ -159,7 +159,7 @@ export const STOP_RUNNING = (exitCode: number=0, ...msg: any[]): void => {
     process.exit(exitCode);
 }
 /**
- * @description Pause execution for specified amount of milliseconds
+ * @description async func to pause execution for specified amount of milliseconds
  * - default message =  `'> Pausing for ${ms} milliseconds.'`
  * - `if` pass in null as second argument, no message will be logged 
  * @param {number} ms - The number of milliseconds to pause execution for.

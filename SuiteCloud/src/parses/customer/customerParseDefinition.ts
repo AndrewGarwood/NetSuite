@@ -5,13 +5,10 @@ import { mainLogger as mlog } from "../../config";
 import { 
     RecordTypeEnum,
     ContactRoleEnum,
-    SearchOperatorEnum,
     idPropertyEnum,
-    idSearchOptions,
-    CustomerCategoryEnum, 
     SB_TERM_DICTIONARY as TERM_DICT,
 } from "../../utils/api/types";
-import { CustomerStatusEnum, CustomerTaxItemEnum } from "../../utils/api/types";
+import { CustomerTaxItemEnum } from "../../utils/api/types";
 import { 
     ColumnSliceOptions,
     FieldDictionaryParseOptions,
@@ -19,7 +16,8 @@ import {
     RecordParseOptions,
     SublistDictionaryParseOptions,
     SublistLineParseOptions,
-    SubrecordParseOptions, 
+    SubrecordParseOptions, RecordPostProcessingOptions, CloneOptions,
+    ProcessParseResultsOptions,
 } from "../../utils/io";
 import { CustomerColumnEnum as C, CUSTOMER_CATEGORY_MAPPING as CATEGORY_DICT } from "./customerConstants";
 import * as evaluate from "../evaluatorFunctions";
@@ -118,8 +116,9 @@ const SHIPPING_STREET_ARGS: evaluate.StreetArguments = {
 }
 
 /**@TODO maybe allow addrphone values to be an altphone of the contact/customer */
-export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions = {
-    'entityid': { evaluator: evaluate.entityId, args: [C.ENTITY_ID] },
+export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions | {
+    [fieldId: string]: FieldParseOptions | SubrecordParseOptions;
+} = {
     'isinactive': { defaultValue: NOT_INACTIVE },
     'email': { evaluator: evaluate.email, args: [C.EMAIL, C.ALT_EMAIL] },
     'altemail': { evaluator: evaluate.email, 
@@ -133,8 +132,7 @@ export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions = {
         args: [C.HOME_PHONE, { colName: C.PHONE, minIndex: 3}] as Array<string | ColumnSliceOptions> 
     },
     'fax': { evaluator: evaluate.phone, args: [C.FAX, C.ALT_FAX] },
-    'salutation': { evaluator: evaluate.salutation, 
-        args: [C.SALUTATION, ...NAME_COLUMNS] },
+    'salutation': { evaluator: evaluate.salutation, args: [C.SALUTATION, ...NAME_COLUMNS] },
     'firstname': { evaluator: evaluate.firstName, args: [C.FIRST_NAME, ...NAME_COLUMNS] },
     'middlename': { evaluator: evaluate.middleName, args: [C.MIDDLE_NAME, ...NAME_COLUMNS] },
     'lastname': { evaluator: evaluate.lastName, args: [C.LAST_NAME, ...NAME_COLUMNS] },
@@ -172,28 +170,28 @@ const SHIPPING_ADDRESS_OPTIONS: SubrecordParseOptions = {
     } as FieldDictionaryParseOptions,
 };
 
-export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions = {
+export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions | {
+    [sublistId: string]: SublistLineParseOptions[];
+} = {
     addressbook: [
         { addressbookaddress: BILLING_ADDRESS_OPTIONS },
         { addressbookaddress: SHIPPING_ADDRESS_OPTIONS },  
     ] as SublistLineParseOptions[],
 };
-/**@TODO handle removal of name fields if isperson === 'F' in post processing */
+
 export const CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: C.ENTITY_ID,
     fieldOptions: {
-        'isperson': { evaluator: customerEval.customerIsPerson, args: [C.ENTITY_ID] },
+        'entityid': { evaluator: evaluate.entityId, args: [C.ENTITY_ID] },
+        'isperson': { evaluator: customerEval.customerIsPerson, args: [C.ENTITY_ID, C.COMPANY] },
         ...CONTACT_CUSTOMER_SHARED_FIELDS,
         'externalid': { evaluator: evaluate.externalId, args: [RecordTypeEnum.CUSTOMER, C.ENTITY_ID] },
         'altphone': { evaluator: evaluate.phone, 
-            args: [{ colName: C.PHONE, minIndex: 1}, C.ALT_PHONE, C.WORK_PHONE] as Array<string | ColumnSliceOptions> 
+            args: [{ colName: C.PHONE, minIndex: 1}, C.ALT_PHONE, C.WORK_PHONE, C.SHIP_TO_FOUR, C.SHIP_TO_FIVE] as Array<string | ColumnSliceOptions> 
         },
         'entitystatus': { evaluator: customerEval.customerStatus, args: [C.CATEGORY] },
         'category': { evaluator: customerEval.customerCategory, args: [C.CATEGORY, CATEGORY_DICT] },
         'companyname': { evaluator: customerEval.customerCompany, args: [C.ENTITY_ID, C.COMPANY] },
-        // 'firstname': { evaluator: customerEval.firstNameIfCustomerIsPerson, args: [C.ENTITY_ID, C.FIRST_NAME, ...NAME_COLUMNS] },
-        // 'middlename': { evaluator: customerEval.middleNameIfCustomerIsPerson, args: [C.ENTITY_ID, C.MIDDLE_NAME, ...NAME_COLUMNS] },
-        // 'lastname': { evaluator: customerEval.lastNameIfCustomerIsPerson, args: [C.ENTITY_ID, C.LAST_NAME, ...NAME_COLUMNS] },
         'accountnumber': { colName: C.ACCOUNT_NUMBER },
         'terms': { evaluator: evaluate.terms, args: [C.TERMS, TERM_DICT] },
         'taxable': {defaultValue: true },
@@ -204,22 +202,37 @@ export const CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
     sublistOptions: ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,
 };
 
-/**@TODO do not include {@link CONTACT_CUSTOMER_SHARED_FIELDS} in fieldOptions, instead handle value cloning in post processing */
+/**
+ * 
+*/
 export const CONTACT_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: C.ENTITY_ID,
     fieldOptions: {
-        ...CONTACT_CUSTOMER_SHARED_FIELDS,
+        'entityid': { evaluator: evaluate.entityId, args: [C.ENTITY_ID] },
         'externalid': { evaluator: evaluate.externalId, args: [RecordTypeEnum.CONTACT, C.ENTITY_ID] },
-        'officephone': { evaluator: evaluate.phone, args: [C.WORK_PHONE] },
-        // 'firstname': { evaluator: evaluate.firstName, args: [C.FIRST_NAME, ...NAME_COLUMNS] },
-        // 'middlename': { evaluator: evaluate.middleName, args: [C.MIDDLE_NAME, ...NAME_COLUMNS] },
-        // 'lastname': { evaluator: evaluate.lastName, args: [C.LAST_NAME, ...NAME_COLUMNS] },
+        'officephone': { evaluator: evaluate.phone, args: [C.WORK_PHONE, C.SHIP_TO_FOUR, C.SHIP_TO_FIVE] },
         'company': { evaluator: contactEval.contactCompany, args: [C.ENTITY_ID] },
         'contactrole': {defaultValue: ContactRoleEnum.PRIMARY_CONTACT },
-        
     } as FieldDictionaryParseOptions,
-    sublistOptions: ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS,
 }
 
+export const CLONE_CUSTOMER_FIELDS_TO_CONTACT_OPTIONS: CloneOptions = {
+    donorType: RecordTypeEnum.CUSTOMER,
+    recipientType: RecordTypeEnum.CONTACT,
+    idProp: idPropertyEnum.ENTITY_ID,
+    fieldIds: Object.keys(CONTACT_CUSTOMER_SHARED_FIELDS),
+    sublistIds: ['addressbook'],
+};
 
+export const CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS: ProcessParseResultsOptions | {
+    [recordType: string]: RecordPostProcessingOptions;
+} = {
+    [RecordTypeEnum.CUSTOMER]: {
+        pruneFunc: prune.entity
+    },
+    [RecordTypeEnum.CONTACT]: {
+        cloneOptions: CLONE_CUSTOMER_FIELDS_TO_CONTACT_OPTIONS,
+        pruneFunc: prune.contact
+    },
+}
 

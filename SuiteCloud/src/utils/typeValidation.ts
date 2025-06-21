@@ -1,10 +1,38 @@
 /**
  * @file src/utils/typeValidation.ts
  */
-import { FieldValue, SubrecordValue } from "src/utils/api/types";
+export * from "./api/types/typeGuards";
+export * from "./io/types/typeGuards";
+
+import { FieldValue, SubrecordValue, idSearchOptions, idPropertyEnum, PostRecordOptions } from "src/utils/api/types";
 import { mainLogger as mlog } from "src/config/setupLog";
 import { BOOLEAN_FIELD_ID_REGEX, EMAIL_REGEX, equivalentAlphanumericStrings as equivalentAlphanumeric } from "./io/regex";
 import { FieldParseOptions, ValueMappingEntry } from "./io";
+
+/**
+ * Represents the `boolean` value `true` for a radio field in NetSuite.
+ */
+export const RADIO_FIELD_TRUE = 'T';
+/**
+ * Represents the `boolean` value `false` for a radio field in NetSuite.
+ */
+export const RADIO_FIELD_FALSE = 'F';
+/**
+ * - `= typeof `{@link RADIO_FIELD_TRUE}` | typeof `{@link RADIO_FIELD_FALSE}`;` 
+ * @description
+ * Value representing the state of a radio field in NetSuite. (i.e. is the button filled in or not)
+ * - e.g. the Customer record's `'isperson'` field.
+ * */
+export type RadioFieldBoolean = typeof RADIO_FIELD_TRUE | typeof RADIO_FIELD_FALSE;   
+
+
+export const BOOLEAN_TRUE_VALUES = ['true', 'yes', 'y'];
+export const BOOLEAN_FALSE_VALUES = ['false', 'no', 'n'];
+export const BOOLEAN_FIELD_ID_LIST = [
+    'isinactive', 'isprivate', 'giveaccess', 'emailtransactions', 'faxtransactions', 
+    'is1099eligible', 'isdefaultbilling', 'isdefaultshipping', 'isprimary', 'isprimaryshipto', 
+    'isprimarybilling', 'isprimaryshipping'
+];
 
 /**
  * @param value the value to check
@@ -66,16 +94,21 @@ export function hasNonTrivialKeys(obj: any): obj is Record<string, any> | { [key
     });
     return hasKeyWithNonTrivialValue;
 }
-
 /**
- * @TODO add param that indicates whether all keys be in the object or not
  * @note maybe redundant with the syntax `key in obj` ? but able to check more than one
- * @param obj the object to check
- * @param keys the list of keys that obj must have
+ * @param obj `T extends Object` the object to check
+ * @param keys `Array<keyof T> | string[] | string` the list of keys that obj must have
+ * @param requireAll `boolean` defaults to `true` 
+ * - `if` `true`, all keys must be present in the object; 
+ * - `if` `false`, at least one key must be present
  * @returns {boolean} `true` if the object has all the keys, `false` otherwise
  * @throws {TypeError} if `keys` is not an array
  */
-export function hasKeys<T extends Object>(obj: T, keys: Array<keyof T>): boolean {
+export function hasKeys<T extends Object>(
+    obj: T, 
+    keys: Array<keyof T> | string[] | string, 
+    requireAll: boolean = true
+): boolean {
     if (!obj || typeof obj !== 'object') {
         return false;
     }
@@ -85,16 +118,20 @@ export function hasKeys<T extends Object>(obj: T, keys: Array<keyof T>): boolean
     if (!keys || isEmptyArray(keys)) {
         throw new TypeError('hasKeys() param `keys` must be an array with at least one key');
     }
-    if (keys.length === 0) {
-        return false; // No keys to check
-    }
+    if (keys.length === 0) return false;
+    let numKeysFound = 0;
     for (const key of keys) {
-        if (!Object.prototype.hasOwnProperty.call(obj, key)) {
-            // log.warn(`hasKeys() key "${String(key)}" not found in the object`);
-            return false; // Key not found in the object
+        if (key in obj) {
+            numKeysFound++;
+            if (!requireAll) {
+                return true; // If requireAll is false, we can return early if any key is found
+            }
+        } else if (requireAll) {
+            return false; 
+            // If requireAll is true and a key is not found, return false
         }
     }
-    return true; // All keys found in the object
+    return requireAll ? numKeysFound === keys.length : numKeysFound > 0; 
 }
 
 
@@ -130,53 +167,6 @@ export function areEquivalentObjects(
 }
 
 /**
- * - {@link SubrecordValue}
- * - {@link SetFieldSubrecordOptions}
- * - {@link SetSublistSubrecordOptions}
- * - {@link SubrecordParseOptions}
- * @param value `any`
- * @returns **`isSubrecordValue`** `boolean`
- * - `true` `if` `value` `isSubrecordParseOptions` or `isSetSubrecordOptions`,
- * - `false` `otherwise`.
- */
-export function isSubrecordValue(value: any): value is SubrecordValue {
-    if (!value || typeof value !== 'object') {
-        return false;
-    }
-    const isSubrecordParseOptions = Boolean('fieldOptions' in value 
-        && 'sublistOptions' in value
-    );
-    const isSetSubrecordOptions = Boolean('fieldId' in value
-        && ('fields' in value || 'sublists' in value)
-    );
-    return (value && typeof value === 'object' 
-        && 'subrecordType' in value 
-        && (isSubrecordParseOptions || isSetSubrecordOptions)
-    ); 
-}
-
-/**
- * @param value 
- * @returns **`isFieldValue`** `boolean`
- * - `true` if the `value` is a primitive value (string, number, boolean, null, undefined),
- * - `true` if the `value` is a Date object,
- * - `true` if the `value` is an array of primitive values,
- * - `false` otherwise.
- */
-export function isFieldValue(value: any): value is FieldValue {
-    if (isPrimitiveValue(value)) {
-        return true;
-    }
-    if (value instanceof Date) {
-        return true;
-    }
-    if (Array.isArray(value)) {
-        return value.every(item => isPrimitiveValue(item));
-    }
-    return false;
-}
-
-/**
  * @param value 
  * @returns 
  */
@@ -191,58 +181,6 @@ export function isPrimitiveValue(
     }
     return false;
 }
-
-/**
- * @param value 
- * @returns 
- */
-export function isFieldParseOptions(value: any): value is FieldParseOptions {
-    if (!value || typeof value !== 'object') {
-        return false;
-    }
-    if ('defaultValue' in value 
-        || 'colName' in value 
-        || 'evaluator' in value 
-        || 'args' in value
-    ) {
-        return true; // at least one of the properties is present
-    }
-    return false;
-}
-
-
-/**
- * @description Checks if the given value is a {@link ValueMappingEntry} = `{ newValue`: {@link FieldValue}, `validColumns`: `string | string[] }`.
- * @param value - The value to check.
- */
-export function isValueMappingEntry(value: any): value is ValueMappingEntry {
-    return typeof value === 'object' && 'newValue' in value && 'validColumns' in value;
-}
-
-/**
- * Represents the `boolean` value `true` for a radio field in NetSuite.
- */
-export const RADIO_FIELD_TRUE = 'T';
-/**
- * Represents the `boolean` value `false` for a radio field in NetSuite.
- */
-export const RADIO_FIELD_FALSE = 'F';
-/**
- * - `= typeof `{@link RADIO_FIELD_TRUE}` | typeof `{@link RADIO_FIELD_FALSE}`;` 
- * @description
- * Value representing the state of a radio field in NetSuite. (i.e. is the button filled in or not)
- * - e.g. the Customer record's `'isperson'` field.
- * */
-export type RadioFieldBoolean = typeof RADIO_FIELD_TRUE | typeof RADIO_FIELD_FALSE;   
-
-
-export const BOOLEAN_TRUE_VALUES = ['true', 'yes', 'y'];
-export const BOOLEAN_FALSE_VALUES = ['false', 'no', 'n'];
-export const BOOLEAN_FIELD_ID_LIST = [
-    'isinactive', 'isprivate', 'giveaccess', 'emailtransactions', 'faxtransactions', 
-    'is1099eligible', 'isdefaultbilling', 'isdefaultshipping', 'isprimary', 'isprimaryshipto', 
-    'isprimarybilling', 'isprimaryshipping'
-];
 
 /**
  * @param fieldId `string`
