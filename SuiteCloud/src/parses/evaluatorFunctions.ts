@@ -2,10 +2,10 @@
  * @file src/parses/evaluatorFunctions.ts
  */
 
-import { parseLogger as log, mainLogger as mlog, 
+import { parseLogger as plog, mainLogger as mlog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS 
 } from '../config';
-import { HUMAN_VENDORS_TRIMMED } from './.archive/vendor/vendorEvaluatorFunctions';
+import { HUMAN_VENDOR_LIST } from './vendor/vendorConstants';
 import { 
     FieldValue, 
     StateAbbreviationEnum as STATES, 
@@ -19,20 +19,29 @@ import {
     checkForOverride, isValidEmail,
     SALUTATION_REGEX, ATTN_SALUTATION_PREFIX_PATTERN, LAST_NAME_COMMA_FIRST_NAME_PATTERN,
     ValueMapping,
-    ColumnSliceOptions, StringReplaceOptions, equivalentAlphanumericStrings as equivalentAlphanumeric
+    ColumnSliceOptions, StringReplaceOptions, equivalentAlphanumericStrings as equivalentAlphanumeric,
+    stringContainsAnyOf
 } from "../utils/io";
-import { customerCompany } from './customer/customerEvaluatorFunctions';
-const suppressed_DEBUG_LOGS: any[] = [];
+
+const SUPPRESS: any[] = [];
 export const ENTITY_VALUE_OVERRIDES: ValueMapping = {
 } 
 
-
 /** 
+ * @param row `Record<string, any>` - the `row` of data
+ * @param entityIdColumn `string`
  * @returns **`entity`** = {@link checkForOverride}`(`{@link cleanString}`(row[entityIdColumn],...),...)`
  * */
-export const entityId = (row: Record<string, any>, entityIdColumn: string): string => {
-    let entity = cleanString(row[entityIdColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION) || '';
-    return checkForOverride(entity, entityIdColumn, ENTITY_VALUE_OVERRIDES) as string;
+export const entityId = (
+    row: Record<string, any>, 
+    entityIdColumn: string
+): string => {
+    let entity = cleanString(
+        row[entityIdColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION
+    ) || '';
+    return checkForOverride(
+        entity, entityIdColumn, ENTITY_VALUE_OVERRIDES
+    ) as string;
 }
 
 /**
@@ -53,8 +62,9 @@ export const externalId = (
 
 /**
  * @description
- * Check if the entity is a person or a company based on the `row` context data using the following assumptions/rules:
- * - `If` the `entityId` is in the {@link HUMAN_VENDORS_TRIMMED} list, it is a person.
+ * Check if the entity is a person or a company based on the `row` context data 
+ * using the following assumptions/rules:
+ * - `If` the `entityId` is in the {@link HUMAN_VENDOR_LIST} list, it is a person.
  * - `If` the `entityId` matches the {@link COMPANY_KEYWORDS_PATTERN} or ends with {@link COMPANY_ABBREVIATION_PATTERN}, consider it is a company.
  * - `If` `/[0-9@]+/.test(entityId)`, it is a company.
  * - `If` the `entityId` is a single word, it is a company.
@@ -65,8 +75,8 @@ export const externalId = (
  * @param entityIdColumn `string` - the column of the `row` to look for the entity ID in
  * @param companyColumn `string` - the column of the `row` to look for the company name in
  * @returns **`isPerson`** `boolean` 
- * - `true` if the entity is a person, 
- * - `false` `otherwise`
+ * - **`true`** `if` the entity is a person, 
+ * - **`false`** `otherwise`
  */
 export const isPerson = (
     row: Record<string, any>, 
@@ -78,14 +88,14 @@ export const isPerson = (
         ? cleanString(row[companyColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
         : ''
     );
-    if (HUMAN_VENDORS_TRIMMED.includes(entity)) {
+    if (HUMAN_VENDOR_LIST.includes(entity)) {
         // log.debug(...[...logArr, TAB + `-> return true`]);
-        DEBUG_LOGS.push(NL + `-> return true because entity '${entity}' is in HUMAN_VENDORS_TRIMMED`);
+        DEBUG_LOGS.push(NL + `-> return true because entity '${entity}' is in HUMAN_VENDOR_LIST`);
         return true;
     }
     if (COMPANY_KEYWORDS_PATTERN.test(entity) 
         || stringEndsWithAnyOf(entity, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE)
-        || /[0-9@]+/.test(entity) 
+        || stringContainsAnyOf(entity, /[0-9@]+/, RegExpFlagsEnum.GLOBAL)
         || entity.split(' ').length === 1
         || (company
             && !LAST_NAME_COMMA_FIRST_NAME_PATTERN.test(company)
@@ -96,10 +106,10 @@ export const isPerson = (
         // log.debug(...[...logArr, TAB + `-> return false`]);
         return false;
     }
-    DEBUG_LOGS.push(
+    SUPPRESS.push(
         NL+ `isPerson():`,
         NL + `entityIdColumn = '${entityIdColumn}' -> entity = '${entity}'`,`companyColumn = '${companyColumn}'`, 
-        TAB + `HUMAN_VENDORS_TRIMMED.includes('${entity}') = ${HUMAN_VENDORS_TRIMMED.includes(entity)}`,
+        TAB + `HUMAN_VENDOR_LIST.includes('${entity}') = ${HUMAN_VENDOR_LIST.includes(entity)}`,
         TAB + `COMPANY_KEYWORDS_PATTERN.test('${entity}')  = ${COMPANY_KEYWORDS_PATTERN.test(entity)}`,
         TAB + `'${entity}' ends with company abbreviation  = ${stringEndsWithAnyOf(entity, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`,
         TAB + `/[0-9@]+/.test('${entity}')                 = ${/[0-9@&]+/.test(entity)}`,
@@ -108,7 +118,7 @@ export const isPerson = (
         TAB + `COMPANY_KEYWORDS_PATTERN.test('${company}') = ${company && COMPANY_KEYWORDS_PATTERN.test(company)}`, 
 
     );
-    DEBUG_LOGS.push(TAB + `Reached End of isPerson() -> return true`);
+    SUPPRESS.push(TAB + `Reached End of isPerson() -> return true`);
     return true;
 }
 
@@ -126,16 +136,16 @@ export const field = (
     if (!row || !extractor || !columnOptions || columnOptions.length === 0) {
         return '';
     }
-    // DEBUG_LOGS.push(NL + `[START evaluate.field()] - extractor: ${extractor.name}()`,
-    //     TAB+`columnOptions: ${JSON.stringify(columnOptions)}`
-    // );
+    SUPPRESS.push(NL + `[START evaluate.field()] - extractor: ${extractor.name}()`,
+        TAB+`columnOptions: ${JSON.stringify(columnOptions)}`
+    );
     let result = '';
     for (const colOption of columnOptions) {
         const col = (typeof colOption === 'string' 
             ? colOption : colOption.colName
         );
         let initialVal = cleanString(row[col]);
-        suppressed_DEBUG_LOGS.push(NL + `colOption: ${JSON.stringify(colOption)}`,
+        SUPPRESS.push(NL + `colOption: ${JSON.stringify(colOption)}`,
             TAB+`col: '${col}', initialVal: '${initialVal}'`
         );
         if (!initialVal) { continue; }
@@ -143,12 +153,12 @@ export const field = (
             ? colOption.minIndex : 0
         );
         const matchResults = extractor(initialVal);
-        suppressed_DEBUG_LOGS.push(NL + `matchResults after ${extractor.name}('${initialVal}'): ${JSON.stringify(matchResults)}`,
+        SUPPRESS.push(NL + `matchResults after ${extractor.name}('${initialVal}'): ${JSON.stringify(matchResults)}`,
             TAB + `matchResults.length: ${matchResults ? matchResults.length : undefined}`,
             TAB + `matchResults[minIndex=${minIndex}]: '${matchResults ? matchResults[minIndex] : undefined}'`,        
         );
         if (!matchResults || matchResults.length <= minIndex || matchResults[minIndex] === null || matchResults[minIndex] === undefined) {
-            suppressed_DEBUG_LOGS.push(NL + `continue to next column option because at least one of the following is true:`,
+            SUPPRESS.push(NL + `continue to next column option because at least one of the following is true:`,
                 TAB+`   !matchResults === ${!matchResults}`,
                 TAB+`|| matchResults.length <= minIndex === ${matchResults && matchResults.length <= minIndex}`,
                 TAB+`|| !matchResults[${minIndex}] === ${matchResults && !matchResults[minIndex]}`,
@@ -158,7 +168,7 @@ export const field = (
         result = (matchResults[minIndex] as string);
         break;
     }
-    // DEBUG_LOGS.push(NL+`[END evaluate.field()] - extractor: ${extractor.name}(), RETURN result: '${result}'`,);
+    SUPPRESS.push(NL+`[END evaluate.field()] - extractor: ${extractor.name}(), RETURN result: '${result}'`,);
     return result
 }
 
@@ -186,11 +196,11 @@ export const email = (
     ...emailColumnOptions: Array<string | ColumnSliceOptions>
 ): string => {
     const emailValue: string = field(row, extractEmail, ...emailColumnOptions);
-    // mlog.info(NL+`evaluatorFunctions.email()`,
-    //     TAB+`emailValue: '${emailValue}'`,
-    //     TAB+`isValidEmail('${emailValue}') = ${isValidEmail(emailValue)}`,
-    //     TAB+`-> return '${emailValue}'`
-    // );
+    SUPPRESS.push(NL+`evaluatorFunctions.email()`,
+        TAB+`emailValue: '${emailValue}'`,
+        TAB+`isValidEmail('${emailValue}') = ${isValidEmail(emailValue)}`,
+        TAB+`-> return '${emailValue}'`
+    );
     return isValidEmail(emailValue) ? emailValue : '';
 }
 
@@ -202,7 +212,7 @@ export const salutation = (
     let salutationValue = cleanString(row[salutationColumn]);
     if (salutationValue) return salutationValue;
     if (!nameColumns) return '';
-    suppressed_DEBUG_LOGS.push(
+    SUPPRESS.push(
         NL+`evaluate.salutation() cleanString(row['${salutationColumn}']) = '${salutationValue}'`,
     );
     for (const col of nameColumns) {
@@ -211,13 +221,13 @@ export const salutation = (
             STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, undefined, undefined, 
             [{searchValue: /^((attention|attn|atn):)?\s*/i, replaceValue: '' }]
         );
-        suppressed_DEBUG_LOGS.push(
+        SUPPRESS.push(
             TAB + `col: '${col}', initialVal: '${initialVal}'`,
         );
         if (!initialVal) { continue; } 
         if (SALUTATION_REGEX.test(initialVal)) {
             salutationValue = initialVal.match(SALUTATION_REGEX)?.[0] || '';
-            suppressed_DEBUG_LOGS.push(
+            SUPPRESS.push(
                 TAB + `SALUTATION_REGEX.test('${initialVal}') = true`,
                 TAB + `initialVal.match(SALUTATION_REGEX)?.[0] = '${initialVal.match(SALUTATION_REGEX)?.[0]}'`,
                 TAB + `-> RETURN salutationValue: '${salutationValue}'`
@@ -256,7 +266,6 @@ export const attention = (
     if (!row || !args.entityIdColumn) {
         return '';
     }
-    let result = '';
     const entity = entityId(row, args.entityIdColumn);
     const salutationValue = (args.salutationColumn 
         ? salutation(row, args.salutationColumn, ...(args.nameColumns || []))
@@ -275,17 +284,49 @@ export const attention = (
         .replace(/^\s*\.\s*$/, '')
         .trim()
     );
-    result = (fullName.includes(entity)) ? '' : fullName;
-    suppressed_DEBUG_LOGS.push(NL+`End of evaluate.attention() -> result: '${result}'`,
-        NL+`attention(entityIdColumn='${args.entityIdColumn}', salutationColumn='${args.salutationColumn}', nameColumns.length=${args.nameColumns?.length || 0})`,
+    // const result = (fullName.includes(entity)) ? '' : fullName;
+    SUPPRESS.push(NL+`End of evaluate.attention()`,
+        // NL+`attention(entityIdColumn='${args.entityIdColumn}', salutationColumn='${args.salutationColumn}', nameColumns.length=${args.nameColumns?.length || 0})`,
         TAB + `    entity: '${entity}'`,
-        TAB + `salutation: '${salutationValue}'`,
+        // TAB + `salutation: '${salutationValue}'`,
         TAB + `  fullName: '${fullName}'`,
-        TAB + `fullName.includes(entity) ? ${fullName.includes(entity)}`,
-        TAB + `-> return result: '${result}'`
+        TAB + `fullName.includes(entity) ? ${Boolean(entity) && fullName.includes(entity)}`,
+        // TAB + `-> return result: '${result}'`
     );
-    return result;
+    return fullName;
+    // return result;
 }
+
+/**
+ * @param row `Record<string, any>`
+ * @param entityIdColumn `string`
+ * @param companyNameColumn `string`
+ * @returns **`addressee`** `string` - the name of the addressee based on the `row` data.
+ * - i.e. the entity/company's name
+ */
+export const addressee = (
+    row: Record<string, any>,
+    entityIdColumn: string,
+    companyNameColumn?: string
+): string => {
+    if (!row || !entityIdColumn) {
+        mlog.error(`addressee() called with invalid parameters.`,
+            TAB + `addressee() requires row, entityIdColumn, and companyNameColumn`,
+        );
+        return '';
+    }
+    let entity = entityId(row, entityIdColumn);
+    let companyName = (companyNameColumn 
+        ? checkForOverride(
+            cleanString(row[companyNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION), 
+            companyNameColumn, 
+            ENTITY_VALUE_OVERRIDES
+        ) as string
+        : ''
+    );
+    return companyName ? companyName : entity;   
+}
+
 export type StreetArguments = {
     streetLineOneColumn: string;
     streetLineTwoColumn: string;
@@ -309,13 +350,13 @@ export const street = (
     streetLineNumber: 1 | 2,
     args: StreetArguments
 ): string => {
-    const invalidParams = Boolean(!row || !args
+    const invalidStreetArguments = Boolean(!row || !args
         || ![1, 2].includes(streetLineNumber) 
         || !args.streetLineOneColumn 
         || !args.streetLineTwoColumn 
         || !args.entityIdColumn
     );
-    if (invalidParams) {
+    if (invalidStreetArguments) {
         mlog.error(`street() called with invalid parameters.`,
             TAB + `street() requries row, streetLineNumber, and`,
             TAB + `args object with defined args.streetLineOneColumn, args.streetLineTwoColumn, args.entityIdColumn`,
@@ -323,12 +364,14 @@ export const street = (
         return '';
     }        
     const attentionValue = attention(row, args);
-    const addresseeValue = args.addresseeFunction(row, args.entityIdColumn, args.companyNameColumn)
+    const addresseeValue = args.addresseeFunction(
+        row, args.entityIdColumn, args.companyNameColumn
+    );
     const streetLineOneValue = cleanString(row[args.streetLineOneColumn], 
-        undefined, undefined, undefined, [{searchValue: /^\s*(,|.)\s*$/, replaceValue: ''}]
+        undefined, undefined, undefined, [{searchValue: /^\s*(,|\.)+\s*$/, replaceValue: ''}]
     );
     const streetLineTwoValue = cleanString(row[args.streetLineTwoColumn], 
-        undefined, undefined, undefined, [{searchValue: /^\s*(,|.)\s*$/, replaceValue: ''}]
+        undefined, undefined, undefined, [{searchValue: /^\s*(,|\.)+\s*$/, replaceValue: ''}]
     );
     const lineOneIsRedundant: boolean = (
         (Boolean(attentionValue) && (streetLineOneValue.includes(attentionValue)
@@ -340,21 +383,21 @@ export const street = (
         ))
     );
     if (streetLineNumber === 1 && lineOneIsRedundant) {
-        DEBUG_LOGS.push(NL + `streetLineNumber === 1 && lineOneIsRedundant is true!`,
-            TAB + `street(streetLineNumber=${streetLineNumber}, streetLineOneColumn='${args.streetLineOneColumn}', streetLineTwoColumn='${args.streetLineTwoColumn}',`,
-            TAB + `entityIdColumn='${args.entityIdColumn}', salutationColumn='${args.salutationColumn}', nameColumns.length=${args.nameColumns?.length})`,
+        SUPPRESS.push(NL + `streetLineNumber === 1 && lineOneIsRedundant is true!`,
             NL + `streetLineOneValue: '${streetLineOneValue}' is redundant...`,
-            TAB + `                      streetLineOneValue.includes(attentionValue) ? ${streetLineOneValue.includes(attentionValue)}`,
-            TAB + `equivalentAlphanumericStrings(streetLineOneValue, attentionValue) ? ${equivalentAlphanumeric(streetLineOneValue, attentionValue)}`,
-            TAB + `                      streetLineOneValue.includes(addresseeValue) ? ${streetLineOneValue.includes(addresseeValue)}`,
-            TAB + `equivalentAlphanumericStrings(streetLineOneValue, addresseeValue) ? ${equivalentAlphanumeric(streetLineOneValue, addresseeValue)}`,
+            NL + `attentionValue: '${attentionValue}'`,
+            TAB + `               streetLineOneValue.includes(attentionValue) ? ${Boolean(attentionValue) && streetLineOneValue.includes(attentionValue)}`,
+            TAB + `equivalentAlphanumeric(streetLineOneValue, attentionValue) ? ${equivalentAlphanumeric(streetLineOneValue, attentionValue)}`,
+            NL + `addresseeValue: '${addresseeValue}'`,
+            TAB + `               streetLineOneValue.includes(addresseeValue) ? ${Boolean(addresseeValue) && streetLineOneValue.includes(addresseeValue)}`,
+            TAB + `equivalentAlphanumeric(streetLineOneValue, addresseeValue) ? ${equivalentAlphanumeric(streetLineOneValue, addresseeValue)}`,
             NL + ` -> return streetLineTwoValue: '${streetLineTwoValue}'`
         );
         return streetLineTwoValue;
     } else if (streetLineNumber === 1) {
         return streetLineOneValue;
     } else if (streetLineNumber === 2 && lineOneIsRedundant) {
-        return '';
+        return ''; // return empty string because already set value of addr1 to streetLineTwoValue
     } else if (streetLineNumber === 2) {
         return streetLineTwoValue;
     } else {
@@ -386,7 +429,7 @@ export const name = (
         }
         const {first, middle, last} = extractName(initialVal);
         if (first && last) { 
-            log.debug(`extractName('${initialVal}') from col='${col}'`,
+            plog.debug(`extractName('${initialVal}') from col='${col}'`,
                 TAB+`-> return { first='${first}', middle='${middle}', last='${last}' }`
             );
             return { first: first, middle: middle || '', last: last }; 
@@ -414,14 +457,14 @@ export const firstName = (
         ? cleanString(row[firstNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
         : ''
     );
-    suppressed_DEBUG_LOGS.push(NL + `cleanString(row[firstNameColumn]): '${first}'`);
+    SUPPRESS.push(NL + `cleanString(row[firstNameColumn]): '${first}'`);
     if (!first || first.split(' ').length > 1) {
         first = name(row, 
             ...(firstNameColumn ? [firstNameColumn] : []) //if data entry error when someone put whole name in firstNameColumn,
                 .concat(nameColumns)
         ).first;
     }
-    suppressed_DEBUG_LOGS.push(NL + `first after evaluate nameColumns: '${first}'`);
+    SUPPRESS.push(NL + `first after evaluate nameColumns: '${first}'`);
     return first.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');
 }
 
@@ -437,7 +480,7 @@ export const middleName = (
     if (!middle || middle.split(' ').length > 1) {
         middle = name(row, ...nameColumns).middle;
     }
-    suppressed_DEBUG_LOGS.push(NL + `middle after evaluate nameColumns: '${middle}'`);
+    SUPPRESS.push(NL + `middle after evaluate nameColumns: '${middle}'`);
     return middle.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');
 }
 
@@ -454,7 +497,7 @@ export const lastName = (
     if (!last) {
         last = name(row, ...nameColumns).last;
     }
-    suppressed_DEBUG_LOGS.push(NL + `last after evaluate nameColumns: '${last}'`);
+    SUPPRESS.push(NL + `last after evaluate nameColumns: '${last}'`);
     return last.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');;
 }
 
@@ -469,7 +512,7 @@ export const state = (
     } else if (Object.values(STATES).includes(state as STATES)) {
         return state;
     } else {
-        log.warn(`Invalid state: '${state}'`);
+        plog.warn(`Invalid state: '${state}'`);
         return '';
     }
 }
@@ -489,7 +532,7 @@ export const country = (
         return COUNTRIES.UNITED_STATES; 
         // Default to United States if state is valid but country is not
     } else {
-        log.warn(`Invalid country: '${country}' or state: '${state}'`);
+        plog.warn(`Invalid country: '${country}' or state: '${state}'`);
         return '';
     }
 }
@@ -500,10 +543,10 @@ export const terms = (
     termsDict: Record<string, Term> | undefined
 ): FieldValue => {
     if (!termsDict) {
-        log.error('evaluateVendorTerms: termDict is undefined. Cannot evaluate terms.');
+        plog.error('evaluateVendorTerms: termDict is undefined. Cannot evaluate terms.');
         return null;
     }
-        let termsRowValue = cleanString(row[termsColumn]);
+    let termsRowValue = cleanString(row[termsColumn]);
     if (termsRowValue && Object.keys(termsDict).includes(termsRowValue)) {
         return termsDict[termsRowValue].internalid as number;
     } else if (termsRowValue && Object.keys(termsDict).some((key) => termsDict[key].name === termsRowValue)) {
@@ -513,7 +556,7 @@ export const terms = (
     } else if (!termsRowValue){
         return null;
     }
-    log.warn(`Invalid terms: '${termsRowValue}'`);
+    plog.warn(`Invalid terms: '${termsRowValue}'`);
     return null;
 }
 
@@ -530,12 +573,12 @@ export const website = (
     websiteColumn: string,
     ...emailColumnOptions: Array<string | ColumnSliceOptions>
 ): FieldValue => {
-    let website = cleanString(row[websiteColumn]);
-    if (website) {
-        website = website
+    let websiteValue = cleanString(row[websiteColumn]);
+    if (websiteValue) {
+        websiteValue = websiteValue
             .replace(/^(http(s)?:\/\/)?(www\.)?/, '')
             .replace(/\/$/, '');
-        return `https://${website}`;
+        return `https://${websiteValue}`;
     } else { // see if email address is for the entity's website
         for (const colOption of emailColumnOptions) {
             let emailValue = email(row, colOption);
@@ -544,10 +587,10 @@ export const website = (
             ) {
                 continue; // skip common email domains
             }
-            website = emailValue.split('@')[1] // get the domain part of the email
+            websiteValue = emailValue.split('@')[1] // get the domain part of the email
                 .replace(/^(http(s)?:\/\/)?(www\.)?/, '')
                 .replace(/\/$/, '');
-            return `https://${website}`;
+            return `https://${websiteValue}`;
         }
     }
     return '';

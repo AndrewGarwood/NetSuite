@@ -84,7 +84,7 @@ export async function parseRecordCsv(
         );
         return {};
     }
-    mlog.info(`parseRecords() Starting parse...`,
+    mlog.info(`[START parseRecords()]`,
         TAB+`recordTypes: ${JSON.stringify(Object.keys(parseOptions))}`,
         TAB+`   filePath: '${filePath}'`,
     );           
@@ -112,8 +112,7 @@ export async function parseRecordCsv(
                      * (e.g. recordType=salesorder and have already processed one of its rows) 
                      * */
                     DEBUG_LOGS.push(
-                        NL+ `      recordType: '${recordType}', idColumn: '${keyColumn}', recordId: '${recordId}'`,
-                        TAB+`isExistingRecord ? ${recordId in intermediate[recordType]}`,
+                        NL+ `recordType: '${recordType}', idColumn: '${keyColumn}', recordId: '${recordId}' -> isExistingRecord ? ${recordId in intermediate[recordType]}`,
                     );
                     let postOptions = (intermediate[recordType][recordId]  
                         ? intermediate[recordType][recordId] 
@@ -130,7 +129,7 @@ export async function parseRecordCsv(
                         sublistOptions as SublistDictionaryParseOptions
                     );
                 }
-                mlog.debug(...DEBUG_LOGS, NL+`[END ROW] rowIndex: ${rowIndex}:`,);
+                // mlog.debug(...DEBUG_LOGS, NL+`[END ROW] rowIndex: ${rowIndex}:`,);
                 DEBUG_LOGS.length = 0; // clear debug logs for next row
                 rowIndex++;
             })
@@ -145,7 +144,7 @@ export async function parseRecordCsv(
                     acc[recordType] = results[recordType].length;
                     return acc;
                 }, {} as Record<string, number>);
-                mlog.info(`Finished processing CSV file.`,
+                mlog.info(`[END parseRecordCsv()]`,
                     TAB + `  recordTypes: ${JSON.stringify(Object.keys(parseOptions))}`,
                     TAB + `Last rowIndex: ${rowIndex}`,
                     TAB + `Parse Summary: ${indentedStringify(parseSummary)}`
