@@ -21,6 +21,8 @@ export const COMPLETE_FILE = `${CUSTOMER_DIR}/customer.tsv` as string;
 export const FIRST_PART_FILE = `${CUSTOMER_DIR}/customer_part1.tsv` as string;
 /** `${DATA_DIR}/customers/customer_part2.tsv` */
 export const SECOND_PART_FILE = `${CUSTOMER_DIR}/customer_part2.tsv` as string;
+/** `${DATA_DIR}/customers/customer_part3.tsv` */
+export const THIRD_PART_FILE = `${CUSTOMER_DIR}/customer_part3.tsv` as string;
 /** `${DATA_DIR}/customers/edge_cases.tsv` */
 export const EDGE_CASES_FILE = `${CUSTOMER_DIR}/edge_cases.tsv` as string;
 /** 

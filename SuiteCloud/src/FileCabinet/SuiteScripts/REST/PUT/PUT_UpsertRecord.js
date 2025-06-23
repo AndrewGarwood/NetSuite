@@ -1,16 +1,17 @@
 /**
  * @NApiVersion 2.1
  * @NScriptType Restlet
- * @NScriptName POST_UpsertRecord
+ * @NScriptName PUT_UpsertRecord
  * @PROD_ScriptId NOT_DEPLOYED
  * @PROD_DeployId NOT_DEPLOYED
- * @SB_ScriptId 174
+ * @SB_ScriptId 176
  * @SB_DeployId 1
  */
 
 /**
  * @consideration could use rec.submitFields() instead of rec.setValue() and rec.setSublistValue(), but initially 
  * went with the latter because I wanted granular logging and thought I could wrap each setValue in a try catch to check for errors.
+ * @consideration make an enum for subrecord fieldIds so don't have to use less robust isSubrecordValue()
  * @consideration make an enum for sublistIds (of non static sublists) {@link https://stoic.software/articles/types-of-sublists/#:~:text=Lastly%2C%20the-,Static%20List,-sublists%20are%20read} 
  */
 define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
@@ -27,7 +28,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
      * - = `{ postOptions: `{@link PostRecordOptions}` | Array<`{@link PostRecordOptions}`>, responseOptions: `{@link RecordResponseOptions}` }`
      * @returns {PostRecordResponse} **`response`** **{@link PostRecordResponse}** = `{ success: boolean, message: string, results?: `{@link RecordResult}`[], rejects?: `{@link PostRecordOptions}`[], error?: string, logArray: `{@link LogStatement}`[] }`
      */
-    const post = (reqBody) => {
+    const put = (reqBody) => {
         const { postOptions, responseOptions } = reqBody;
         if (!postOptions || !isNonEmptyArray(postOptions)) {
             writeLog(LogTypeEnum.ERROR, 'post() Invalid Request Parameter', 'non-empty postOptions is required');
@@ -44,15 +45,24 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         try {
             for (let i = 0; i < postOptions.length; i++) {
                 const options = postOptions[i];
-                const result = processPostRecordOptions(options, responseOptions);
-                if (!result) {
-                    writeLog(LogTypeEnum.ERROR,
-                        `post() Invalid PostRecordOptions at index ${i}:`,
-                    )
+                try {
+                    const result = processRecordOptions(options, responseOptions);
+                    if (!result) {
+                        writeLog(LogTypeEnum.ERROR,
+                            `post() Invalid PostRecordOptions at index ${i}:`,
+                        )
+                        rejects.push(options);
+                        continue;
+                    }
+                    results.push(result);
+                } catch (e) {
+                    writeLog(LogTypeEnum.ERROR, 
+                        `post() Error processing PostRecordOptions at index ${i}:`, 
+                        JSON.stringify(e)
+                    );
                     rejects.push(options);
                     continue;
                 }
-                results.push(result);
             }
             
             writeLog(LogTypeEnum.AUDIT, `End of POST_UpsertRecord:`, { 
@@ -91,7 +101,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
      * @param {RecordResponseOptions} [responseOptions]
      * @returns {RecordResult | null} **`result`** {@link RecordResult} = `{ internalid: number, recordType: string | RecordTypeEnum, fields?: `{@link FieldDictionary}`, sublists?: `{@link SublistDictionary}` }`
      */
-    function processPostRecordOptions(options, responseOptions) {
+    function processRecordOptions(options, responseOptions) {
         if (!options || typeof options !== 'object') {
             writeLog(LogTypeEnum.ERROR, 
                 `ERROR: processPostRecordOptions() Invalid Options:`, 
@@ -127,11 +137,16 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         let rec = undefined;
         isDynamic = typeof isDynamic !== 'boolean' ? NOT_DYNAMIC : isDynamic;
         const recId = searchForRecordById(recordType, idOptions, fields);
-        let isExistingRecord = typeof recId === 'number' && recId > 0;
+        const isExistingRecord = typeof recId === 'number' && recId > 0;
         if (isExistingRecord && fields && isNonEmptyArray(Object.keys(fields))) { 
             //remove idPropertyEnum values from keys of fields
             for (const idPropFieldId of Object.values(idPropertyEnum)) {
                 if (fields[idPropFieldId]) { 
+                    writeLog(LogTypeEnum.AUDIT,
+                        `processPostRecordOptions() removing idPropertyEnum field '${idPropFieldId}' from fields`,
+                        `because an existing record with internalid '${recId}' was found`,
+                        `fields['${idPropFieldId}'] = '${fields[idPropFieldId]}'`
+                    );
                     delete fields[idPropFieldId];
                 }
             }
@@ -156,7 +171,9 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         /**@type {RecordResult} {@link RecordResult} */
         const result = {
             recordType,
-            internalid: rec.save({ enableSourcing: true, ignoreMandatoryFields: true }), //isExistingRecord ? recId : rec.save({ enableSourcing: true, ignoreMandatoryFields: true }),
+            internalid: rec.save({ enableSourcing: true, ignoreMandatoryFields: true }), 
+            //(isExistingRecord ? recId : rec.save({ enableSourcing: true, ignoreMandatoryFields: true })), 
+            //rec.save({ enableSourcing: true, ignoreMandatoryFields: true }), //
         };
         if (responseOptions && responseOptions.responseFields) {
             result.fields = getResponseFields(rec, responseOptions.responseFields);
@@ -1651,5 +1668,5 @@ const RecordTypeEnum = {
     WORKPLACE: 'workplace',
     ZONE: 'zone'
 };
-    return { post };
+    return { put: put };
 });

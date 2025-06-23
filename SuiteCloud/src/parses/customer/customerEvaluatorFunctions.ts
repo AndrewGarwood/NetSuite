@@ -5,7 +5,7 @@ import {
     CustomerStatusEnum,
     FieldValue,
 } from "../../utils/api/types";
-import { parseLogger as log } from "../../config";
+import { parseLogger as log, DEBUG_LOGS } from "../../config";
 import { RADIO_FIELD_TRUE, RADIO_FIELD_FALSE } from "../../utils/typeValidation";
 import { 
     checkForOverride,
@@ -114,6 +114,12 @@ export const customerStatus = (
 }
 
 
+/**
+ * @param row 
+ * @param entityIdColumn 
+ * @param companyNameColumn 
+ * @returns
+ */
 export const customerCompany = (
     row: Record<string, any>,
     entityIdColumn: string,
@@ -123,9 +129,9 @@ export const customerCompany = (
         return '';
     }
     let entity = entityId(row, entityIdColumn);
-    if (!isPerson(row, entityIdColumn, companyNameColumn)) {
-        return entity;
-    }
+    // if (!isPerson(row, entityIdColumn, companyNameColumn)) {
+    //     return entity;
+    // }
     let companyName = (companyNameColumn 
         ? checkForOverride(
             cleanString(row[companyNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION), 
@@ -133,13 +139,12 @@ export const customerCompany = (
             ENTITY_VALUE_OVERRIDES
         ) as string
         : ''
-    );   
-    if (companyName && equivalentAlphanumeric(companyName, entity)
-        //  && COMPANY_KEYWORD_REGEX.test(companyName)
-    ) {
-        return companyName;
-    }
-    // log.debug(`Reached End of customerCompany() -> returning entityId: "${entity}"`); 
-    return entity;
+    );
+    return companyName ? companyName : entity;   
+    // if (companyName && equivalentAlphanumeric(companyName, entity)) {
+    //     return companyName;
+    // }
+    // // log.debug(`Reached End of customerCompany() -> returning entityId: "${entity}"`); 
+    // return entity;
     
 }

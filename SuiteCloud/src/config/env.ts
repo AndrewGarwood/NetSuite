@@ -1,18 +1,15 @@
 /**
- * @file env.ts
+ * @file src/config/env.ts
  * @description Environment variables for the SuiteCloud project.
  */
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
-dotenv.config();
-
-import { AccountEnvironmentEnum, SuiteScriptEnvironment, ScriptDictionary, ScriptDetails } from '../utils/ns/SuiteScriptEnvironment';
-
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
+
 import path from 'node:path';
-
-
+import { AccountEnvironmentEnum, SuiteScriptEnvironment, ScriptDictionary } from 'src/utils/ns';
+dotenv.config();
 
 export const BASE_ACCOUNT_ID = (process.env.ACCOUNT_ID || 'MISSING_ENV_VARIABLE-ACCOUNT_ID') as string;
 
@@ -35,30 +32,23 @@ export const REST_CLIENT_SECRET = (inProduction
     : (process.env.SB_REST_CLIENT_SECRET || 'MISSING_ENV_VARIABLE-REST_CLIENT_SECRET') as string
 );
 
-/** `https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/` 
- * @see {@link ACCOUNT_ID}*/
+/** `https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/` @see {@link ACCOUNT_ID}*/
 export const SUITETALK_URL=`https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/` as string;
 
-/** https://${ACCOUNT_ID}.app.netsuite.com/app/login/oauth2/authorize.nl 
- * @see {@link ACCOUNT_ID}*/
+/** `https://${ACCOUNT_ID}.app.netsuite.com/app/login/oauth2/authorize.nl` @see {@link ACCOUNT_ID}*/
 export const AUTH_URL = `https://${ACCOUNT_ID}.app.netsuite.com/app/login/oauth2/authorize.nl` as string;
 
-/** https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token 
- * @see {@link ACCOUNT_ID}*/
+/** `https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token` @see {@link ACCOUNT_ID}*/
 export const TOKEN_URL = `https://${ACCOUNT_ID}.suitetalk.api.netsuite.com/services/rest/auth/oauth2/v1/token` as string;
 
 /**
- * `https://${ACCOUNT_ID}.restlets.api.netsuite.com/app/site/hosting/restlet.nl` 
- * @see {@link ACCOUNT_ID} 
+ * `https://${ACCOUNT_ID}.restlets.api.netsuite.com/app/site/hosting/restlet.nl` @see {@link ACCOUNT_ID} 
  * @example specificRestletUrl = `${RESTLET_URL_STEM}?script=${scriptId}&deploy=${deployId}`
 */
 export const RESTLET_URL_STEM = `https://${ACCOUNT_ID}.restlets.api.netsuite.com/app/site/hosting/restlet.nl` as string;
 
 export const SERVER_PORT = (process.env.SERVER_PORT || '3000') as string;
-/**
- * @description `http://localhost:${SERVER_PORT}/callback` 
- * @example `http://localhost:3000/callback` 
- * */
+/**@description `http://localhost:${SERVER_PORT}/callback` @example `http://localhost:3000/callback` */
 export const REDIRECT_URI = (process.env.REST_REDIRECT_URI || `http://localhost:${SERVER_PORT}/callback`) as string;
 
 export const REST_APPLICATION_ID = (process.env.REST_APPLICATION_ID || 'MISSING_ENV_VARIABLE-REST_APPLICATION_ID') as string;
@@ -76,11 +66,15 @@ export const AUTHORIZATION_HEADER: string = [
     `nlauth_application_id=${REST_APPLICATION_ID}`
 ].join(', ');
 
+
+// export const SB_HITC_UPLOADER_TOKEN_ID = (process.env.HITC_UPLOADER_TOKEN_ID || 'MISSING_ENV_VARIABLE-HITC_UPLOADER_TOKEN_ID') as string;
+// export const SB_HITC_UPLOADER_TOKEN_SECRET = (process.env.HITC_UPLOADER_TOKEN_SECRET || 'MISSING_ENV_VARIABLE-HITC_UPLOADER_TOKEN_SECRET') as string;
+
 /** restlets //,rest_webservices,webservices,suiteanalytics,full,offline */
 export const SCOPE = 'restlets'; //,rest_webservices,webservices,suiteanalytics,full,offline';
 
 /**
- * @reference https://system.netsuite.com/app/help/helpcenter.nl?fid=section_158081944642.html 
+ * @reference https://9866738-sb1.app.netsuite.com/app/help/helpcenter.nl?fid=section_158081944642.html 
  * @description (from reference)
  * - The length of the state parameter must be between 22 and 1024 characters. 
  * - Valid characters are all printable ASCII characters.
@@ -108,25 +102,26 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
                 scriptId: 173,
                 deployId: 1,
             },
-            POST_UpsertRecord: {
-                scriptId: 174,
-                deployId: 1,
-            },
             GET_Record: {
                 scriptId: 175,
+                deployId: 1,
+            },
+            PUT_UpsertRecord: {
+                scriptId: 176,
                 deployId: 1,
             },
         } as ScriptDictionary,
     }
 }
 
-
 /** `./SuiteCloud/` = the directory where the node_modules folder lives*/
-export const NODE_HOME_DIR = process.cwd();
-/** = {@link NODE_HOME_DIR}`/src` = `SuiteCloud/src` = `process.cwd()/src`*/
+export const NODE_HOME_DIR = process.cwd() as string;
+/** = {@link NODE_HOME_DIR}`/src` = `process.cwd()/src`*/
 export const SRC_DIR = path.join(NODE_HOME_DIR, 'src') as string;
-/** = {@link SRC_DIR}`/server/tokens` */
+
+/** = "{@link SRC_DIR}`/server/tokens`" */
 export const TOKEN_DIR = path.join(SRC_DIR, 'server', 'tokens') as string;
+
 export const USER = process.cwd().split(path.sep)[2];
 console.log(`USER = '${USER}'`);
 const ORGANIZATION = process.env.ORGANIZATION || 'MISSING_ENV_VAR-ORGANIZATION';
@@ -134,12 +129,14 @@ const ORGANIZATION = process.env.ORGANIZATION || 'MISSING_ENV_VAR-ORGANIZATION';
 export const ONE_DRIVE_DIR = `C:/Users/${USER}/OneDrive - ${ORGANIZATION}` as string;
 /** `${`{@link ONE_DRIVE_DIR}`}/NetSuite/logs` (not part of git repo so no worry about file size) */
 export const CLOUD_LOG_DIR = path.join(ONE_DRIVE_DIR, 'NetSuite', 'logs') as string;
-/** = {@link NODE_HOME_DIR}`/../data` = `root/data` */
-export const DATA_DIR = path.join(NODE_HOME_DIR, '../data') as string;
-/** = {@link NODE_HOME_DIR}`/.output` = `/SuiteCloud/.output` */
-export const OUTPUT_DIR = path.join(NODE_HOME_DIR, '.output') as string;
-/**`/NetSuiteDev/SuiteCloud/.output/error_json` */
-export const ERROR_DIR = path.join(OUTPUT_DIR, 'error_json') as string;
+/** `/NetSuite/data` */
+export const DATA_DIR = path.join(NODE_HOME_DIR, '..', 'data') as string;
+// export const DATA_DIR = `C:/Users/${USER}/.dev/benev-dev-all/NetSuite/data`;
+
+/** `/NetSuite/SuiteCloud/.output` */
+export const OUTPUT_DIR = path.join(NODE_HOME_DIR,'.output') as string;
+/**`/NetSuite/SuiteCloud/.output/errors` */
+export const ERROR_DIR = path.join(OUTPUT_DIR, 'errors') as string;
 
 /** 
  * @example 
@@ -173,12 +170,14 @@ export const DELAY = async (ms: number, ...msg: any[]): Promise<void> => {
     if (msgArr[0] !== null) {console.log(...msgArr);}
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+
 const TAB = '\n\t';
 console.log(` > Loading env...`,
     TAB + `        USER: ${USER}`,
     TAB + `   inSandbox: ${inSandbox}`,
     TAB + `inProduction: ${inProduction}`
 );
+
 
 validatePath(
     NODE_HOME_DIR, SRC_DIR, TOKEN_DIR, ONE_DRIVE_DIR, CLOUD_LOG_DIR, 

@@ -42,5 +42,5 @@ export enum AxiosContentTypeEnum {
     JSON = 'application/json',
     PLAIN_TEXT = 'text/plain',
     XML = 'application/xml',
-    FORM_URLENCODED = 'application/x-www-form-urlencoded',
+    FORM_URL_ENCODED = 'application/x-www-form-urlencoded',
 }

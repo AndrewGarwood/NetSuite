@@ -9,23 +9,26 @@ import {
     ProcessParseResultsOptions, ParseOptions, ParseResults,
     getCurrentPacificTime
 } from "./utils/io";
-import { TOKEN_DIR, DATA_DIR, OUTPUT_DIR, STOP_RUNNING, CLOUD_LOG_DIR, 
+import { 
+    TOKEN_DIR, DATA_DIR, OUTPUT_DIR, STOP_RUNNING, CLOUD_LOG_DIR, 
     SCRIPT_ENVIRONMENT as SE, DELAY, 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, INFO_LOGS, DEBUG_LOGS, 
-    indentedStringify, DEFAULT_LOG_FILEPATH, clearLogFile,
+    indentedStringify, DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, clearLogFile,
     ERROR_LOG_FILEPATH,
     ERROR_DIR
 } from "./config";
 import { 
     EntityRecordTypeEnum, PostRecordOptions, PostRecordRequest, PostRecordResponse, RecordResult, idPropertyEnum,
     RecordResponseOptions, upsertRecordPayload, getRecordById, GetRecordResponse,
-    ScriptDictionary, SAMPLE_POST_CUSTOMER_OPTIONS as SAMPLE_CUSTOMER,
+    SAMPLE_POST_CUSTOMER_OPTIONS as SAMPLE_CUSTOMER,
     RecordTypeEnum,
     FieldDictionary,
     idSearchOptions,
     SearchOperatorEnum, 
 } from "./utils/api";
-import { CUSTOMER_PARSE_OPTIONS, CONTACT_PARSE_OPTIONS, CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS as POST_PROCESSING_OPTIONS } from "src/parses/customer/customerParseDefinition"
+import { CUSTOMER_PARSE_OPTIONS, CONTACT_PARSE_OPTIONS, 
+    CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS as POST_PROCESSING_OPTIONS 
+} from "src/parses/customer/customerParseDefinition"
 import * as customerFiles from './parses/customer/customerConstants';
 import { parseRecordCsv } from "./csvParser";
 import { processParseResults } from "./parseResultsProcessor";
@@ -45,23 +48,34 @@ const entityResponseOptions: RecordResponseOptions = {
 const TWO_SECONDS = 2000;
 
 async function main() {
-    clearLogFile(DEFAULT_LOG_FILEPATH, ERROR_LOG_FILEPATH);
-    mlog.info(`Start of main()`);
+    clearLogFile(DEFAULT_LOG_FILEPATH, ERROR_LOG_FILEPATH, PARSE_LOG_FILEPATH);
+
+    const csvFilePath = customerFiles.SMALL_SUBSET_FILE;
+    mlog.info(`Start of main() - csvFilePath: '${csvFilePath}'`);
+    await DELAY(TWO_SECONDS);
     const parseOptions: ParseOptions = {
         [RecordTypeEnum.CUSTOMER]: CUSTOMER_PARSE_OPTIONS,
         [RecordTypeEnum.CONTACT]: CONTACT_PARSE_OPTIONS
     };
     const parseResults: ParseResults = await parseRecordCsv(
-        customerFiles.SINGLE_COMPANY_FILE, parseOptions
+        csvFilePath, parseOptions
     );
     const validatedResults: ValidatedParseResults = processParseResults(
         parseResults, 
         POST_PROCESSING_OPTIONS as ProcessParseResultsOptions 
     );
-    write(validatedResults, path.join(OUTPUT_DIR, 'validatedResults.json'));
-    STOP_RUNNING(0);
+    const invalidOptions = Object.keys(validatedResults).reduce((acc, recordType) => {
+        const invalid = validatedResults[recordType].invalid;
+        if (invalid && invalid.length > 0) {
+            acc[recordType] = invalid;
+        }
+        return acc;
+    }, {} as Record<string, PostRecordOptions[]>);
+    await DELAY(TWO_SECONDS);
+    write(invalidOptions, path.join(OUTPUT_DIR, 'invalidOptions2.json'));
+    // STOP_RUNNING(0);
     const entityResponses: PostRecordResponse[] 
-        = await postEntities(validatedResults[RecordTypeEnum.CUSTOMER].valid);
+        = await putEntities(validatedResults[RecordTypeEnum.CUSTOMER].valid);
     await DELAY(TWO_SECONDS);
     const companyContacts: PostRecordOptions[] = matchContactsToEntityResponses(
         validatedResults[RecordTypeEnum.CONTACT].valid, 
@@ -69,7 +83,7 @@ async function main() {
     ).companyContacts;
 
     const contactResponses: PostRecordResponse[] 
-        = await postContacts(companyContacts);
+        = await putContacts(companyContacts);
     await DELAY(TWO_SECONDS);
     const entityUpdates: PostRecordOptions[] = generateEntityUpdates(
         EntityRecordTypeEnum.CUSTOMER,
@@ -77,10 +91,11 @@ async function main() {
     );
 
     const entityUpdateResponses: PostRecordResponse[] 
-        = await postEntities(entityUpdates);
-    write(entityUpdateResponses, 
-        path.join(OUTPUT_DIR, 'entityUpdateResponses.json')
-    );
+        = await putEntities(entityUpdates);
+    // write(entityUpdateResponses, 
+    //     path.join(OUTPUT_DIR, 'entityUpdateResponses.json')
+    // );
+    await DELAY(TWO_SECONDS);
     mlog.info(`End of main()`);
     STOP_RUNNING(0);
 }
@@ -105,7 +120,7 @@ export const CONTACT_RESPONSE_PROPS = ['entityid', 'company', 'firstname', 'last
  * @param responseOptions {@link RecordResponseOptions} - properties to return in the response.
  * @returns **`entityResponses`** `Promise<`{@link PostRecordResponse}`[]`
  */
-export async function postEntities(
+export async function putEntities(
     entities: PostRecordOptions[],
     responseOptions: RecordResponseOptions=entityResponseOptions
 ): Promise<PostRecordResponse[]> {
@@ -118,9 +133,9 @@ export async function postEntities(
             await upsertRecordPayload(entityRequest);
         return entityResponses;
     } catch (error) {
-        mlog.error(`postEntityRecords() Error posting entities and contacts.`);
+        mlog.error(`postEntities() Error posting entities and contacts.`);
         write({timestamp: getCurrentPacificTime(), caught: error as any}, 
-            ERROR_DIR, 'ERROR_postEntityRecords.json'
+            ERROR_DIR, 'ERROR_putEntities.json'
         );
     }
     return [];
@@ -131,7 +146,7 @@ export async function postEntities(
  * @param responseProps {@link RecordResponseOptions} - properties to return in the response.
  * @returns **`contactResponses`** `Promise<`{@link PostRecordResponse}`[]>`
  */
-export async function postContacts(
+export async function putContacts(
     contacts: PostRecordOptions[],
     responseOptions: RecordResponseOptions={responseFields: CONTACT_RESPONSE_PROPS}
 ): Promise<PostRecordResponse[]> {
@@ -144,12 +159,12 @@ export async function postContacts(
             await upsertRecordPayload(contactRequest);
         return contactResponses;
     } catch (error) {
-        mlog.error(`postEntityContacts() Error posting contacts.`);
+        mlog.error(`postContacts() Error posting contacts.`);
         write({timestamp: getCurrentPacificTime(), caught: error as any}, 
-            ERROR_DIR, 'ERROR_postEntityContacts.json'
+            ERROR_DIR, 'ERROR_putContacts.json'
         );
     }
-    mlog.warn(`postEntityContacts() returning empty array.`);
+    mlog.warn(`postContacts() returning empty array.`);
     return [] as PostRecordResponse[];
 }
 
@@ -157,14 +172,14 @@ export async function postContacts(
 /** 
  * @param entityType {@link EntityRecordTypeEnum} - type of the primary entity to update
  * @param contactResponses `Array<`{@link PostRecordResponse}`>` - responses from initial contact post.
- * @returns **`entityUpdates`** = `Array<`{@link PostRecordOptions}`>` - represents updates to set entity.contact to internalId of entity-company's corresponding contact 
+ * @returns **`entityUpdates`** = `Array<`{@link PostRecordOptions}`>` - updates to set `entity.contact` to `internalid` of entity-company's corresponding contact 
  * */
 export function generateEntityUpdates(
     entityType: EntityRecordTypeEnum,
     contactResponses: PostRecordResponse[]
 ): PostRecordOptions[] {
     const entityUpdates: PostRecordOptions[] = [];
-    const contactResults: RecordResult[] = getPostResults(contactResponses);    
+    const contactResults: RecordResult[] = getRecordResults(contactResponses);    
     for (let contactResult of contactResults) {
         entityUpdates.push({
             recordType: entityType,
@@ -192,7 +207,7 @@ export function generateEntityUpdates(
  * @param postResponses `Array<`{@link PostRecordResponse}`>`
  * @returns **`postResults`** = `Array<`{@link RecordResult}`>`
  */
-export function getPostResults(
+export function getRecordResults(
     postResponses: PostRecordResponse[]
 ): RecordResult[] {
     const postResults: RecordResult[] = [];
@@ -243,7 +258,7 @@ export function matchContactsToEntityResponses(
     companyContacts: PostRecordOptions[], 
     unmatchedContacts: PostRecordOptions[],
 } {
-    const entityResults: RecordResult[] = getPostResults(entityResponses);
+    const entityResults: RecordResult[] = getRecordResults(entityResponses);
     const companyContacts: PostRecordOptions[] = [];
     const unmatchedContacts: PostRecordOptions[] = [];
     for (let i = 0; i < contacts.length; i++) {
@@ -274,7 +289,7 @@ export function matchContactsToEntityResponses(
         if (!entityInternalId) {
             mlog.warn(
                 `entityInternalId is undefined for contact with company '${contactCompany}' at contacts[index=${i}].`, 
-                `Adding to unmatchedContacts.`
+                TAB+`Adding to unmatchedContacts.`
             );
             unmatchedContacts.push(contact);
             continue;

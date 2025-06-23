@@ -1,7 +1,7 @@
 /**
  * @file src/server/authServer.ts
  */
-import express, {Request, Response} from 'express';
+import express, { Request, Response } from 'express';
 import { Server } from 'node:http';
 import axios from 'axios'; //~\node_modules\@types\axios\index.d.ts
 import open from 'open';
@@ -16,7 +16,7 @@ import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from './types';
 import { writeObjectToJson as write, getCurrentPacificTime, readJsonFileAsObject as read, calculateDifferenceOfDateStrings, TimeUnitEnum, } from 'src/utils/io';
 import { mainLogger as mlog, errorLogger as elog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
 import path from 'node:path';
-import * as fs from 'fs';
+// import * as fs from 'fs';
 
 const infoLogs: any[] = []
 /** `src/server/tokens/STEP2_tokens.json` */
@@ -39,10 +39,11 @@ let server: Server | any | undefined;
 export const CLOSE_SERVER = (): void => {
     if (server) {
         server.close(() => {
-            infoLogs.push((infoLogs.length > 0 ? NL : '') + 'Server closed successfully.');
+            infoLogs.push((infoLogs.length > 0 ? NL : '') 
+            + 'CLOSE_SERVER() Server closed successfully.');
         });
     } else {
-        infoLogs.push(NL + 'Server is not running or already closed.');
+        infoLogs.push(NL + 'CLOSE_SERVER() Server is not running or already closed.');
     }
 }
 
@@ -95,7 +96,7 @@ export async function exchangeAuthCodeForTokens(
     try {
         const response = await axios.post(TOKEN_URL, params, {
             headers: { 
-                'Content-Type': AxiosContentTypeEnum.FORM_URLENCODED 
+                'Content-Type': AxiosContentTypeEnum.FORM_URL_ENCODED 
             },
             auth: { 
                 username: CLIENT_ID, 
@@ -125,7 +126,7 @@ export async function exchangeRefreshTokenForNewTokens(
     try {
         const response = await axios.post(TOKEN_URL, params.toString(), {
             headers: { 
-                'Content-Type': AxiosContentTypeEnum.FORM_URLENCODED 
+                'Content-Type': AxiosContentTypeEnum.FORM_URL_ENCODED 
             },
             auth: { 
                 username: CLIENT_ID, 
@@ -211,33 +212,32 @@ export async function getAccessToken(): Promise<string> {
     try {
         if ((!accessToken || accessTokenIsExpired) && refreshToken && !refreshTokenIsExpired) {
             infoLogs.push(
-                '(Access token is undefined or expired) AND (Refresh token is available and has not yet expired).',
+                (infoLogs.length > 0 ? NL : '')+'(Access token is invalid) AND (Refresh token is valid).',
                 TAB + '-> Initiating auth flow from exchangeRefreshTokenForNewTokens()...'
             );
             let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_IS_AVAILABLE) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
         } else if ((!accessToken || accessTokenIsExpired) && (!refreshToken || refreshTokenIsExpired)) {
             infoLogs.push(
-                '(Access token is undefined or expired) AND (Refresh token is undefined or expired).', 
+                (infoLogs.length > 0 ? NL : '')+'(Access token is invalid) AND (Refresh token is invalid).', 
                 TAB + '-> Initiating auth flow from the beginning...'
             );
             let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_IS_NOT_AVAILABLE) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
         } else {
-            infoLogs.push(`Access token is valid. Proceeding with REST call...`);
+            infoLogs.push((infoLogs.length > 0 ? NL : '')+`Access token is valid. Proceeding with REST call...`);
         }
         CLOSE_SERVER();
         mlog.info(...infoLogs);
         infoLogs.length = 0;
         return accessToken as string;
     } catch (error) {
-        mlog.error('Error in main.ts getAccessToken()', error);
+        mlog.error('Error in authServer.ts getAccessToken()', error);
         throw error;
     }
 }
 
 /**
- * 
  * @param filePath `string` - path to the local json file containing the {@link TokenResponse}, defaults to {@link STEP2_TOKENS_PATH} = `${OUTPUT_DIR}/STEP2_tokens.json`
  * @description Checks if the TokenResponse stored locally in a json file have expired by comparing the current time with the last updated time and the expiration time.
  * - `TokenResponse.expires_in`'s default value is 3600 seconds (1 hour) as per OAuth2.0 standard.
@@ -249,11 +249,11 @@ export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): bool
     try {
         const tokenResponse = read(filePath) as TokenResponse;
         if (!tokenResponse) {
-            mlog.error('tokenResponse is undefined. Cannot check expiration.');
+            mlog.error('localTokensHaveExpired() tokenResponse is undefined. Cannot check expiration.');
             return true;
         }
         if (!tokenResponse?.lastUpdated || !tokenResponse?.expires_in) {
-            mlog.error('lastUpdated or expires_in key in local json file is undefined. Cannot check expiration.');
+            mlog.error('localTokensHaveExpired() lastUpdated or expires_in key in local json file is undefined. Cannot check expiration.');
             return true;
         }
         const currentTime: string = getCurrentPacificTime();

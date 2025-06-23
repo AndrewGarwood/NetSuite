@@ -2,7 +2,7 @@
  * @file src/parses/vendor/vendorConstants.ts
  */
 import { DATA_DIR, validatePath, mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING } from "../../config";
-import { readJsonFileAsObject as read } from "../../utils/io";
+import { cleanString, readJsonFileAsObject as read, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION } from "../../utils/io";
 import { hasKeys } from "../../utils/typeValidation";
 import path from "node:path";
 
@@ -21,4 +21,6 @@ if (!hasKeys(jsonObject, ['humanVendors'])) {
     );
     STOP_RUNNING(1, 'Stopping execution due to missing or malformed data.')
 }
-export const HUMAN_VENDOR_LIST = jsonObject.humanVendors as string[];
+export const HUMAN_VENDOR_LIST = jsonObject.humanVendors.map(
+    (name: string) => cleanString(name, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
+);
