@@ -18,7 +18,7 @@ import {
     ERROR_DIR
 } from "./config";
 import { 
-    EntityRecordTypeEnum, PostRecordOptions, PostRecordRequest, PostRecordResponse, RecordResult, idPropertyEnum,
+    EntityRecordTypeEnum, RecordOptions, RecordRequest, RecordResponse, RecordResult, idPropertyEnum,
     RecordResponseOptions, upsertRecordPayload, getRecordById, GetRecordResponse,
     SAMPLE_POST_CUSTOMER_OPTIONS as SAMPLE_CUSTOMER,
     RecordTypeEnum,
@@ -70,27 +70,27 @@ async function main() {
             acc[recordType] = invalid;
         }
         return acc;
-    }, {} as Record<string, PostRecordOptions[]>);
+    }, {} as Record<string, RecordOptions[]>);
     await DELAY(TWO_SECONDS);
     write(invalidOptions, path.join(OUTPUT_DIR, 'invalidOptions2.json'));
     // STOP_RUNNING(0);
-    const entityResponses: PostRecordResponse[] 
+    const entityResponses: RecordResponse[] 
         = await putEntities(validatedResults[RecordTypeEnum.CUSTOMER].valid);
     await DELAY(TWO_SECONDS);
-    const companyContacts: PostRecordOptions[] = matchContactsToEntityResponses(
+    const companyContacts: RecordOptions[] = matchContactsToEntityResponses(
         validatedResults[RecordTypeEnum.CONTACT].valid, 
         entityResponses
     ).companyContacts;
 
-    const contactResponses: PostRecordResponse[] 
+    const contactResponses: RecordResponse[] 
         = await putContacts(companyContacts);
     await DELAY(TWO_SECONDS);
-    const entityUpdates: PostRecordOptions[] = generateEntityUpdates(
+    const entityUpdates: RecordOptions[] = generateEntityUpdates(
         EntityRecordTypeEnum.CUSTOMER,
         contactResponses
     );
 
-    const entityUpdateResponses: PostRecordResponse[] 
+    const entityUpdateResponses: RecordResponse[] 
         = await putEntities(entityUpdates);
     // write(entityUpdateResponses, 
     //     path.join(OUTPUT_DIR, 'entityUpdateResponses.json')
@@ -116,20 +116,20 @@ export const ENTITY_RESPONSE_PROPS = ['entityid', 'isperson', 'companyname', 'em
 export const CONTACT_RESPONSE_PROPS = ['entityid', 'company', 'firstname', 'lastname', 'email'];
 /**
  * @description Post entities and their contacts to NetSuite
- * @param entities `Array<`{@link PostRecordOptions}`>`
+ * @param entities `Array<`{@link RecordOptions}`>`
  * @param responseOptions {@link RecordResponseOptions} - properties to return in the response.
- * @returns **`entityResponses`** `Promise<`{@link PostRecordResponse}`[]`
+ * @returns **`entityResponses`** `Promise<`{@link RecordResponse}`[]`
  */
 export async function putEntities(
-    entities: PostRecordOptions[],
+    entities: RecordOptions[],
     responseOptions: RecordResponseOptions=entityResponseOptions
-): Promise<PostRecordResponse[]> {
+): Promise<RecordResponse[]> {
     try {
-        const entityRequest: PostRecordRequest = {
+        const entityRequest: RecordRequest = {
             postOptions: entities,
             responseOptions
         };
-        const entityResponses: PostRecordResponse[] = 
+        const entityResponses: RecordResponse[] = 
             await upsertRecordPayload(entityRequest);
         return entityResponses;
     } catch (error) {
@@ -142,20 +142,20 @@ export async function putEntities(
 }
 
 /**
- * @param contacts `Array<`{@link PostRecordOptions}`>` - should be {@link matchContactsToEntityResponses}'s return value, `companyContacts`
+ * @param contacts `Array<`{@link RecordOptions}`>` - should be {@link matchContactsToEntityResponses}'s return value, `companyContacts`
  * @param responseProps {@link RecordResponseOptions} - properties to return in the response.
- * @returns **`contactResponses`** `Promise<`{@link PostRecordResponse}`[]>`
+ * @returns **`contactResponses`** `Promise<`{@link RecordResponse}`[]>`
  */
 export async function putContacts(
-    contacts: PostRecordOptions[],
+    contacts: RecordOptions[],
     responseOptions: RecordResponseOptions={responseFields: CONTACT_RESPONSE_PROPS}
-): Promise<PostRecordResponse[]> {
+): Promise<RecordResponse[]> {
     try {
-        const contactRequest: PostRecordRequest = {
+        const contactRequest: RecordRequest = {
             postOptions: contacts,
             responseOptions
         };
-        const contactResponses: PostRecordResponse[] = 
+        const contactResponses: RecordResponse[] = 
             await upsertRecordPayload(contactRequest);
         return contactResponses;
     } catch (error) {
@@ -165,20 +165,20 @@ export async function putContacts(
         );
     }
     mlog.warn(`postContacts() returning empty array.`);
-    return [] as PostRecordResponse[];
+    return [] as RecordResponse[];
 }
 
 
 /** 
  * @param entityType {@link EntityRecordTypeEnum} - type of the primary entity to update
- * @param contactResponses `Array<`{@link PostRecordResponse}`>` - responses from initial contact post.
- * @returns **`entityUpdates`** = `Array<`{@link PostRecordOptions}`>` - updates to set `entity.contact` to `internalid` of entity-company's corresponding contact 
+ * @param contactResponses `Array<`{@link RecordResponse}`>` - responses from initial contact post.
+ * @returns **`entityUpdates`** = `Array<`{@link RecordOptions}`>` - updates to set `entity.contact` to `internalid` of entity-company's corresponding contact 
  * */
 export function generateEntityUpdates(
     entityType: EntityRecordTypeEnum,
-    contactResponses: PostRecordResponse[]
-): PostRecordOptions[] {
-    const entityUpdates: PostRecordOptions[] = [];
+    contactResponses: RecordResponse[]
+): RecordOptions[] {
+    const entityUpdates: RecordOptions[] = [];
     const contactResults: RecordResult[] = getRecordResults(contactResponses);    
     for (let contactResult of contactResults) {
         entityUpdates.push({
@@ -198,17 +198,17 @@ export function generateEntityUpdates(
             fields: {
                 contact: contactResult?.internalid 
             } as FieldDictionary,
-        } as PostRecordOptions);
+        } as RecordOptions);
     }
     return entityUpdates;
 }
 
 /**
- * @param postResponses `Array<`{@link PostRecordResponse}`>`
+ * @param postResponses `Array<`{@link RecordResponse}`>`
  * @returns **`postResults`** = `Array<`{@link RecordResult}`>`
  */
 export function getRecordResults(
-    postResponses: PostRecordResponse[]
+    postResponses: RecordResponse[]
 ): RecordResult[] {
     const postResults: RecordResult[] = [];
     for (let entityResponse of postResponses) {
@@ -226,13 +226,13 @@ export function getRecordResults(
 }
 
 /**
- * @param entities `Array<`{@link PostRecordOptions}`>`
+ * @param entities `Array<`{@link RecordOptions}`>`
  * @returns **`numCompanyEntities`** - `number`
  */
-export function countCompanyEntities(entities: PostRecordOptions[]): number {
+export function countCompanyEntities(entities: RecordOptions[]): number {
     let numCompanyEntities = 0;
     for (let i = 0; i < entities.length; i++) {
-        const entity: PostRecordOptions = entities[i];
+        const entity: RecordOptions = entities[i];
         
         const isPerson: RadioFieldBoolean = entity?.fields?.isperson as RadioFieldBoolean;
         if (isPerson === RADIO_FIELD_TRUE) {
@@ -245,24 +245,24 @@ export function countCompanyEntities(entities: PostRecordOptions[]): number {
 
 /**
  * @description match `internalid`s of entity post results to contacts
- * @param contacts `Array<`{@link PostRecordOptions}`>`
- * @param entityResponses `Array<`{@link PostRecordResponse}`>`
- * @returns `{ companyContacts: Array<`{@link PostRecordOptions}`>, unmatchedContacts: Array<`{@link PostRecordOptions}`> }`
+ * @param contacts `Array<`{@link RecordOptions}`>`
+ * @param entityResponses `Array<`{@link RecordResponse}`>`
+ * @returns `{ companyContacts: Array<`{@link RecordOptions}`>, unmatchedContacts: Array<`{@link RecordOptions}`> }`
  * - **`companyContacts`**: - contacts corresponding to an entity in netsuite where `entity.isperson === 'F'` (i.e. a company) -> need to make a contact record.
  * - **`unmatchedContacts`**: - contacts corresponding to an entity in netsuite where `entity.isperson === 'T'` (i.e. a person) -> no need to make a contact record.
  */
 export function matchContactsToEntityResponses(
-    contacts: PostRecordOptions[], 
-    entityResponses: PostRecordResponse[]
+    contacts: RecordOptions[], 
+    entityResponses: RecordResponse[]
 ): {
-    companyContacts: PostRecordOptions[], 
-    unmatchedContacts: PostRecordOptions[],
+    companyContacts: RecordOptions[], 
+    unmatchedContacts: RecordOptions[],
 } {
     const entityResults: RecordResult[] = getRecordResults(entityResponses);
-    const companyContacts: PostRecordOptions[] = [];
-    const unmatchedContacts: PostRecordOptions[] = [];
+    const companyContacts: RecordOptions[] = [];
+    const unmatchedContacts: RecordOptions[] = [];
     for (let i = 0; i < contacts.length; i++) {
-        const contact: PostRecordOptions = contacts[i];
+        const contact: RecordOptions = contacts[i];
         if (!contact || !contact.fields) {
             mlog.warn(`contact is undefined or has no fields at contacts[index=${i}]. Continuing...`);
             continue;
@@ -317,11 +317,11 @@ async function test_getRecordById() {
 }
 
 async function test_upsertRecordPayload() {
-    const payload: PostRecordRequest = {
-        postOptions: [SAMPLE_CUSTOMER] as PostRecordOptions[],
+    const payload: RecordRequest = {
+        postOptions: [SAMPLE_CUSTOMER] as RecordOptions[],
         responseOptions: entityResponseOptions,
     };
-    const responses = await upsertRecordPayload(payload) as PostRecordResponse[];
+    const responses = await upsertRecordPayload(payload) as RecordResponse[];
     mlog.debug(`End of testUpsertRecordPayload()`);
     write(responses, path.join(OUTPUT_DIR, 'test_upsertRecordPayload_Response.json'));
 }

@@ -39,19 +39,6 @@ export type SublistLine = {
     lineIdProp?: string;
 }
 
-/** Type: **`SubrecordDictionary`** {@link SubrecordDictionary} */
-/**
- * - each key in SubrecordDictionary is the fieldId (`body` or `sublist`) of a field that holds a subrecord object
- * - distinguish between body subrecords and sublist subrecords by checking if the mapped object has property `'sublistId'`
- * - - i.e. `mappedObject = SubrecordDictionary[fieldId]; `
- * - - `if 'sublistId' in mappedObject.keys()`, `then` it's a `sublist` subrecord and vice versa
- * - {@link SetFieldSubrecordOptions} for body subrecords
- * - {@link SetSublistSubrecordOptions} for sublist subrecords
- * @typedefn **`SubrecordDictionary`**
- */
-export type SubrecordDictionary = {
-    [fieldId: string]: SetFieldSubrecordOptions | SetSublistSubrecordOptions;
-};
 
 /**
  * @typedefn **`SetFieldSubrecordOptions`**
@@ -139,3 +126,18 @@ export enum idPropertyEnum {
     ENTITY_ID = 'entityid',
     ITEM_ID = 'itemid'
 }
+
+/** Type: **`SubrecordDictionary`** {@link SubrecordDictionary} */
+/**
+ * @deprecated
+ * - each key in SubrecordDictionary is the fieldId (`body` or `sublist`) of a field that holds a subrecord object
+ * - distinguish between body subrecords and sublist subrecords by checking if the mapped object has property `'sublistId'`
+ * - - i.e. `mappedObject = SubrecordDictionary[fieldId]; `
+ * - - `if 'sublistId' in mappedObject.keys()`, `then` it's a `sublist` subrecord and vice versa
+ * - {@link SetFieldSubrecordOptions} for body subrecords
+ * - {@link SetSublistSubrecordOptions} for sublist subrecords
+ * @typedefn **`SubrecordDictionary`**
+ */
+export type SubrecordDictionary = {
+    [fieldId: string]: SetFieldSubrecordOptions | SetSublistSubrecordOptions;
+};

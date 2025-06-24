@@ -40,10 +40,10 @@ export const CLOSE_SERVER = (): void => {
     if (server) {
         server.close(() => {
             infoLogs.push((infoLogs.length > 0 ? NL : '') 
-            + 'CLOSE_SERVER() Server closed successfully.');
+            + '[CLOSE_SERVER()] Server closed successfully.');
         });
     } else {
-        infoLogs.push(NL + 'CLOSE_SERVER() Server is not running or already closed.');
+        infoLogs.push(NL + '[CLOSE_SERVER()] Server is not running or already closed.');
     }
 }
 
@@ -62,7 +62,7 @@ export async function getAuthCode(): Promise<string> {
                 resolve(authCode);
             } else {
                 res.send('Authorization code not received. Please try again.');
-                mlog.error('Error in authServer.ts getAuthCode(): Authorization code not received');
+                mlog.error('[Error in authServer.ts getAuthCode()]: Authorization code not received');
                 reject(new Error('Authorization code not received'));
             }
         });
@@ -76,7 +76,7 @@ export async function getAuthCode(): Promise<string> {
                 state: require('crypto').randomBytes(32).toString('hex') as string,
             }).toString();
             open(authLink).catch((err) => {    
-                mlog.error('Error in authServer.ts getAuthCode() when opening authURL:', err);
+                mlog.error('[Error in authServer.ts getAuthCode()] when opening authURL:', err);
                 reject(err);
             });
         });
@@ -104,12 +104,12 @@ export async function exchangeAuthCodeForTokens(
             },
         });
         if (!response || !response.data) {
-            mlog.error('Error in authServer.ts exchangeAuthCodeForTokens(): No response data received');
+            mlog.error('[Error in authServer.ts exchangeAuthCodeForTokens()]: No response data received');
             throw new Error('No response data received after axios.post(...) in authServer.ts exchangeAuthCodeForTokens()');
         }
         return response.data as TokenResponse;
     } catch (error) {
-        mlog.error('Error in authServer.ts exchangeAuthCodeForTokens():', error);
+        mlog.error('[Error in authServer.ts exchangeAuthCodeForTokens()]:', error);
         throw new Error('Failed to exchange authorization code for token');
     }
 }
@@ -135,7 +135,7 @@ export async function exchangeRefreshTokenForNewTokens(
         });
         return response.data as TokenResponse;
     } catch (error) {
-        mlog.error('Error in authServer.ts exchangeRefreshTokenForNewTokens():', error);
+        mlog.error('[Error in authServer.ts exchangeRefreshTokenForNewTokens()]:', error);
         throw new Error('Failed to refresh access token');
     }
 }
@@ -158,10 +158,6 @@ export async function initiateAuthFlow(
     initiateToRefresh: boolean=false, 
     pathToOriginalTokens: string=STEP2_TOKENS_PATH,
 ): Promise<TokenResponse> {
-    // if (initiateToRefresh || !fs.existsSync(pathToOriginalTokens)) {
-    //     elog.error(`initiateAuthFlow(initiateToRefresh=true) - File does not exist: ${pathToOriginalTokens}`,);
-    //     throw new Error(`File does not exist: ${pathToOriginalTokens}. Please run the authorization flow first, initiateAuthFlow(false)`);
-    // }
     if (!initiateToRefresh) {
         // Step 1: Get the authorization code
         const authCode = await getAuthCode();
@@ -174,12 +170,12 @@ export async function initiateAuthFlow(
     } else { // Step 3: Refresh the token
         const tokenResponse = read(pathToOriginalTokens) as TokenResponse;
         if (!tokenResponse) {
-            mlog.error('Error: authServer.initiateAuthFlow(true, _) TokenResponse not found.', 
+            mlog.error('[Error: authServer.initiateAuthFlow(true, _)] TokenResponse not found.', 
             TAB + 'Please run the authorization flow first, initiateAuthFlow(false)');
             throw new Error('initiateAuthFlow(initiateToRefresh=true) TokenResponse not found. Please run the authorization flow first, initiateAuthFlow(false)');
         }
         if (!tokenResponse.refresh_token) {
-            mlog.error('Error: authServer.initiateAuthFlow(true, _) refresh_token not found in TokenResponse.', 
+            mlog.error('[Error: authServer.initiateAuthFlow(true, _)] refresh_token not found in TokenResponse.', 
             TAB + 'Please run the authorization flow first, initiateAuthFlow(false)');
             throw new Error('initiateAuthFlow(initiateToRefresh=true) refresh_token not found in TokenResponse. Please run the authorization flow first, initiateAuthFlow(false)');
         }
@@ -212,27 +208,27 @@ export async function getAccessToken(): Promise<string> {
     try {
         if ((!accessToken || accessTokenIsExpired) && refreshToken && !refreshTokenIsExpired) {
             infoLogs.push(
-                (infoLogs.length > 0 ? NL : '')+'(Access token is invalid) AND (Refresh token is valid).',
+                (infoLogs.length > 0 ? NL : '')+'[getAccessToken()] (Access token is invalid) AND (Refresh token is valid).',
                 TAB + '-> Initiating auth flow from exchangeRefreshTokenForNewTokens()...'
             );
             let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_IS_AVAILABLE) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
         } else if ((!accessToken || accessTokenIsExpired) && (!refreshToken || refreshTokenIsExpired)) {
             infoLogs.push(
-                (infoLogs.length > 0 ? NL : '')+'(Access token is invalid) AND (Refresh token is invalid).', 
+                (infoLogs.length > 0 ? NL : '')+'[getAccessToken()] (Access token is invalid) AND (Refresh token is invalid).', 
                 TAB + '-> Initiating auth flow from the beginning...'
             );
             let tokenRes: TokenResponse = await initiateAuthFlow(REFRESH_TOKEN_IS_NOT_AVAILABLE) as TokenResponse;
             accessToken = tokenRes?.access_token || '';
         } else {
-            infoLogs.push((infoLogs.length > 0 ? NL : '')+`Access token is valid. Proceeding with REST call...`);
+            infoLogs.push((infoLogs.length > 0 ? NL : '')+`[getAccessToken()] Access token is valid. Proceeding with REST call...`);
         }
         CLOSE_SERVER();
         mlog.info(...infoLogs);
         infoLogs.length = 0;
         return accessToken as string;
     } catch (error) {
-        mlog.error('Error in authServer.ts getAccessToken()', error);
+        mlog.error('[Error in authServer.ts getAccessToken()]', error);
         throw error;
     }
 }
@@ -249,11 +245,11 @@ export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): bool
     try {
         const tokenResponse = read(filePath) as TokenResponse;
         if (!tokenResponse) {
-            mlog.error('localTokensHaveExpired() tokenResponse is undefined. Cannot check expiration.');
+            mlog.error('[localTokensHaveExpired()] tokenResponse is undefined. Cannot check expiration.');
             return true;
         }
         if (!tokenResponse?.lastUpdated || !tokenResponse?.expires_in) {
-            mlog.error('localTokensHaveExpired() lastUpdated or expires_in key in local json file is undefined. Cannot check expiration.');
+            mlog.error('[localTokensHaveExpired()] lastUpdated or expires_in key in local json file is undefined. Cannot check expiration.');
             return true;
         }
         const currentTime: string = getCurrentPacificTime();
@@ -264,7 +260,7 @@ export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): bool
         ) as number;
         const haveExpired = (msDiff != 0 && msDiff >= tokenLifespan * 1000 - FIVE_MINUTES);
         if (haveExpired) {
-            infoLogs.push((infoLogs.length > 0 ? NL : '')+`localTokensHaveExpired(): token has reached or exceeded 5 minute buffer`,
+            infoLogs.push((infoLogs.length > 0 ? NL : '')+`[localTokensHaveExpired()]: token has reached or exceeded 5 minute buffer`,
                 TAB + `  tokenPath: ${filePath}.`,
                 TAB + `lastUpdated: ${lastUpdatedTime}`, 
                 TAB + `currentTime: ${currentTime}`
@@ -272,7 +268,7 @@ export function localTokensHaveExpired(filePath: string=STEP2_TOKENS_PATH): bool
         }
         return haveExpired;
     } catch (error) {
-        mlog.error('Error in localTokensHaveExpired(), return default (true):', error);
+        mlog.error('[localTokensHaveExpired()] Error -> return default (true):', error);
         return true;
     } 
 }
@@ -292,7 +288,7 @@ function generateAxiosParams(
     redirectUri: string=REDIRECT_URI
 ): URLSearchParams {
     if (code && refreshToken) {
-        throw new Error('Both code and refreshToken cannot be provided at the same time. Please provide only one.');
+        throw new Error('[generateAxiosParams()] Both code and refreshToken cannot be provided at the same time. Please provide only one.');
     }
     const params = new URLSearchParams({redirect_uri: redirectUri});
     if (code) {

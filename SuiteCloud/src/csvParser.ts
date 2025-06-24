@@ -37,7 +37,7 @@ import fs from 'fs';
 import { 
     FieldValue, FieldDictionary, SublistDictionary, SublistLine, 
     SubrecordValue, SetFieldSubrecordOptions, SetSublistSubrecordOptions, 
-    PostRecordOptions, RecordTypeEnum, isFieldValue, isSubrecordValue
+    RecordOptions, RecordTypeEnum, isFieldValue, isSubrecordValue
 } from "./utils/api";
 
 /**
@@ -122,7 +122,7 @@ export async function parseRecordCsv(
                             fields: {} as FieldDictionary,
                             sublists: {} as SublistDictionary,
                         }
-                    ) as PostRecordOptions;
+                    ) as RecordOptions;
                     intermediate[recordType][recordId] = processRow(row,
                         postOptions, 
                         fieldOptions as FieldDictionaryParseOptions, 
@@ -159,17 +159,17 @@ export async function parseRecordCsv(
  * then most recent value will be assigned to field. 
  * - for sublists, make a new {@link SublistLine} if all key-value pairs not equal?
  * @param row `Record<string, any>` - the current row
- * @param postOptions {@link PostRecordOptions}
+ * @param postOptions {@link RecordOptions}
  * @param fieldOptions {@link FieldDictionaryParseOptions}
  * @param sublistOptions {@link SublistDictionaryParseOptions}
- * @returns **`postOptions`** — {@link PostRecordOptions}
+ * @returns **`postOptions`** — {@link RecordOptions}
  */
 function processRow(
     row: Record<string, any>,
-    postOptions: PostRecordOptions,
+    postOptions: RecordOptions,
     fieldOptions: FieldDictionaryParseOptions,
     sublistOptions: SublistDictionaryParseOptions,
-): PostRecordOptions {
+): RecordOptions {
     if (!row || !postOptions) {
         return postOptions;
     }

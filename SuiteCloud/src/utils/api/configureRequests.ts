@@ -8,7 +8,7 @@ import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT
 import { createUrlWithParams } from "./url";
 import { getAccessToken, AxiosCallEnum, AxiosContentTypeEnum } from "src/server";
 import { 
-    PostRecordRequest, PostRecordResponse, PostRecordOptions, RecordResponseOptions,
+    RecordRequest, RecordResponse, RecordOptions, RecordResponseOptions,
     RecordResult, DeleteRecordByTypeRequest, 
 } from "./types";
 import { ScriptDictionary } from "../ns";

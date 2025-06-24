@@ -4,7 +4,7 @@
 export * from "./api/types/typeGuards";
 export * from "./io/types/typeGuards";
 
-import { FieldValue, SubrecordValue, idSearchOptions, idPropertyEnum, PostRecordOptions } from "src/utils/api/types";
+import { FieldValue, SubrecordValue, idSearchOptions, idPropertyEnum, RecordOptions } from "src/utils/api/types";
 import { mainLogger as mlog } from "src/config/setupLog";
 import { BOOLEAN_FIELD_ID_REGEX, EMAIL_REGEX, equivalentAlphanumericStrings as equivalentAlphanumeric } from "./io/regex";
 import { FieldParseOptions, ValueMappingEntry } from "./io";
