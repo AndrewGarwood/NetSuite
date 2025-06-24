@@ -5,7 +5,7 @@
 import { pruneLogger as plog, mainLogger as mlog, INDENT_LOG_LINE as TAB, indentedStringify } from 'src/config/setupLog';
 import { 
     FieldDictionary,
-    PostRecordOptions,
+    RecordOptions,
     SetFieldValueOptions,
     SetSublistSubrecordOptions,
     SetSublistValueOptions,
@@ -26,8 +26,8 @@ const ENTITY_REQUIRED_FIELDS = ['entityid', 'isperson', 'companyname']
  * - `then` call {@link pruneAddressBook}
  * */
 export const entity = (
-    options: PostRecordOptions,
-): PostRecordOptions | null => {
+    options: RecordOptions,
+): RecordOptions | null => {
     if (isNullLike(options) || !options.fields) {
         plog.warn(`pruneEntity(): options or options.fields is null or undefined, returning null`);
         return null;
@@ -58,7 +58,7 @@ export const entity = (
             }
         }
     }
-    options = pruneAddressBook(options) as PostRecordOptions;
+    options = pruneAddressBook(options) as RecordOptions;
     return options;
 }
 
@@ -68,8 +68,8 @@ export const entity = (
  * - `ADDRESS_REQUIRED_FIELDS = ['addr1']` 
  * */
 export const pruneAddressBook = (
-    options: PostRecordOptions,
-): PostRecordOptions | null => {
+    options: RecordOptions,
+): RecordOptions | null => {
     if (isNullLike(options) || !options.sublists) {
         return null;
     }
@@ -105,8 +105,8 @@ export const pruneAddressBook = (
  * @returns `options` with required fields for contact records, or `null` if required fields are missing
  */
 export const contact = (
-    options: PostRecordOptions,
-): PostRecordOptions | null => {
+    options: RecordOptions,
+): RecordOptions | null => {
     if (isNullLike(options) || !options.fields) {
         mlog.warn(`pruneContact(): options or options.fields is null or undefined, returning null`);
         return null;
@@ -119,6 +119,6 @@ export const contact = (
         );
         return null;
     }
-    return pruneAddressBook(options) as PostRecordOptions;    
+    return pruneAddressBook(options) as RecordOptions;    
 
 }

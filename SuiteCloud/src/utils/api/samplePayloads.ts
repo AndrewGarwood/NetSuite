@@ -6,7 +6,7 @@
 import { CountryAbbreviationEnum, StateAbbreviationEnum, RecordTypeEnum } from "../ns";
 import { RADIO_FIELD_FALSE } from "../typeValidation";
 import { SetSublistSubrecordOptions, FieldDictionary, SetFieldValueOptions, 
-    PostRecordOptions, SetSublistValueOptions, SublistDictionary, SublistLine } from "./types";
+    RecordOptions, SetSublistValueOptions, SublistDictionary, SublistLine } from "./types";
 
 const NOT_INACTIVE = false; // const IS_INACTIVE = true;
 const NOT_DYNAMIC = false;
@@ -43,7 +43,7 @@ const SUZZALLO_ADDRESS_SUBRECORD_OPTIONS: SetSublistSubrecordOptions = {
     } as FieldDictionary,
 };
 
-export const UW_LIBRARIES_POST_VENDOR_OPTIONS: PostRecordOptions = {
+export const UW_LIBRARIES_POST_VENDOR_OPTIONS: RecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
     isDynamic: NOT_DYNAMIC,
     fields: {
@@ -82,7 +82,7 @@ const MISSION_VIEJO_LIBRARY_ADDRESS_SUBRECORD_OPTIONS: SetSublistSubrecordOption
     } as FieldDictionary,
 };
 
-export const MISSION_VIEJO_LIBRARY_POST_VENDOR_OPTIONS: PostRecordOptions = {
+export const MISSION_VIEJO_LIBRARY_POST_VENDOR_OPTIONS: RecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
     isDynamic: NOT_DYNAMIC,
     fields: {
@@ -101,7 +101,7 @@ export const MISSION_VIEJO_LIBRARY_POST_VENDOR_OPTIONS: PostRecordOptions = {
     } as SublistDictionary,
 };
 
-export const SAMPLE_POST_CUSTOMER_OPTIONS: PostRecordOptions = {
+export const SAMPLE_POST_CUSTOMER_OPTIONS: RecordOptions = {
     recordType: RecordTypeEnum.CUSTOMER,
     isDynamic: NOT_DYNAMIC,
     fields: {

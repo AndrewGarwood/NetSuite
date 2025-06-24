@@ -6,7 +6,7 @@ import {
     RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum, NumericOperatorEnum, 
     RecordTypeEnum, EntityRecordTypeEnum 
 } from "../../ns";
-import { FieldValue, PostRecordOptions, idPropertyEnum } from '../../api/types';
+import { FieldValue, RecordOptions, idPropertyEnum } from '../../api/types';
 
 export type ParseOptions = {
     [recordType: RecordTypeEnum | string]: RecordParseOptions | {
@@ -24,16 +24,16 @@ export type RecordParseOptions = {
 
 export type IntermediateParseResults = {
     [recordType: RecordTypeEnum | string]: {
-        [recordId: string]: PostRecordOptions
+        [recordId: string]: RecordOptions
     }
 };
 export type ParseResults = {
-    [recordType: RecordTypeEnum | string]: PostRecordOptions[]
+    [recordType: RecordTypeEnum | string]: RecordOptions[]
 };
 export type ValidatedParseResults = {
     [recordType: string | RecordTypeEnum | EntityRecordTypeEnum]: {
-        valid: PostRecordOptions[], 
-        invalid: PostRecordOptions[]
+        valid: RecordOptions[], 
+        invalid: RecordOptions[]
     }
 };
 

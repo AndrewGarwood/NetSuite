@@ -8,7 +8,7 @@ import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT
 import { createUrlWithParams } from "./url";
 import { getAccessToken, AxiosContentTypeEnum } from "../../server";
 import { 
-    PostRecordRequest, PostRecordResponse, PostRecordOptions, RecordResponseOptions,
+    RecordRequest, RecordResponse, RecordOptions, RecordResponseOptions,
     RecordResult,
 } from "./types";
 import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "./configureRequests";

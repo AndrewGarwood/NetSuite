@@ -22,7 +22,7 @@ import {
 import { 
     FieldValue, FieldDictionary, SublistDictionary, SublistLine, 
     SubrecordValue, SetFieldSubrecordOptions, SetSublistSubrecordOptions, 
-    PostRecordOptions, RecordTypeEnum,
+    RecordOptions, RecordTypeEnum,
     EntityRecordTypeEnum, 
 } from "./utils/api";
 import { 
@@ -40,7 +40,7 @@ import { cloneDeep } from "lodash";
  * @param options {@link ProcessParseResultsOptions} 
  * - = `{ [recordType: string]: `{@link RecordPostProcessingOptions}` }`
  * @returns **`results`** {@link ValidatedParseResults} 
- * - = `{ [recordType: string]: {valid:` {@link PostRecordOptions}`[]; invalid: PostRecordOptions[]; } }`
+ * - = `{ [recordType: string]: {valid:` {@link RecordOptions}`[]; invalid: PostRecordOptions[]; } }`
  */
 export function processParseResults(
     initialResults: ParseResults,
@@ -124,14 +124,14 @@ export function processParseResults(
  * @param recordType 
  * @param index 
  * @param cloneOptions 
- * @returns **`recipientOptions`** {@link PostRecordOptions}
+ * @returns **`recipientOptions`** {@link RecordOptions}
  */
 function processCloneOptions(
     parseResults: ParseResults,
     recordType: RecordTypeEnum | EntityRecordTypeEnum | string,
     index: number,
     cloneOptions: CloneOptions
-): PostRecordOptions {
+): RecordOptions {
     const recipientOptions = parseResults[recordType][index];
     if (!isPostRecordOptions(recipientOptions)) {
         mlog.error(`processCloneOptions() Invalid recipientOptions at index ${index} for recordType '${recordType}':`,
@@ -158,7 +158,7 @@ function processCloneOptions(
         );
         return recipientOptions;
     }
-    const donorOptions = parseResults[donorType].find((donor: PostRecordOptions) => {
+    const donorOptions = parseResults[donorType].find((donor: RecordOptions) => {
         return (getRecordId(donor, idProp) === recipientId);
     });
     if (!donorOptions) {
@@ -201,11 +201,11 @@ function processCloneOptions(
             recipientOptions.sublists[sublistId] = cloneDeep(donorOptions.sublists[sublistId]);
         }
     }
-    return recipientOptions as PostRecordOptions;
+    return recipientOptions as RecordOptions;
 }
 
 function getRecordId(
-    postOptions: PostRecordOptions, 
+    postOptions: RecordOptions, 
     idProp: string
 ): string | undefined {
     if (postOptions.idOptions) {

@@ -8,7 +8,7 @@ import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT
 import { createUrlWithParams } from "./url";
 import { getAccessToken, AxiosContentTypeEnum } from "../../server";
 import { 
-    PostRecordRequest, PostRecordResponse, PostRecordOptions, RecordResponseOptions,
+    RecordRequest, RecordResponse, RecordOptions, RecordResponseOptions,
     RecordResult,
 } from "./types";
 import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "./configureRequests";
@@ -20,16 +20,16 @@ const UPSERT_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.PUT_UpsertRecord.deployId as num
  * enforces max number of 100 records per post call (see {@link BATCH_SIZE}) 
  * - e.g. if `payload.postOptions.length` > BATCH_SIZE_100,
  * then split into multiple payloads of at most 100 records each
- * @param payload {@link PostRecordRequest}
+ * @param payload {@link RecordRequest}
  * @param scriptId `number`
  * @param deployId `number`
- * @returns **`responses`** — `Promise<`{@link PostRecordResponse}`[]>`
+ * @returns **`responses`** — `Promise<`{@link RecordResponse}`[]>`
  */
 export async function upsertRecordPayload(
-    payload: PostRecordRequest,
+    payload: RecordRequest,
     scriptId: number=UPSERT_RECORD_SCRIPT_ID, 
     deployId: number=UPSERT_RECORD_DEPLOY_ID,
-): Promise<PostRecordResponse[]> {
+): Promise<RecordResponse[]> {
     if (!payload || Object.keys(payload).length === 0) {
         mlog.error(`upsertRecordPayload() 'payload' parameter is undefined or empty. Cannot call RESTlet. Exiting...`);
         STOP_RUNNING(1);
@@ -38,9 +38,9 @@ export async function upsertRecordPayload(
     const upsertRecordArray = (Array.isArray(postOptions) 
         ? postOptions : [postOptions]
     );
-    const responseDataArr: PostRecordResponse[] = [];
+    const responseDataArr: RecordResponse[] = [];
     // normalize payload size
-    const batches: PostRecordOptions[][] = partitionArrayBySize(
+    const batches: RecordOptions[][] = partitionArrayBySize(
         upsertRecordArray, BATCH_SIZE
     );
     for (let i = 0; i < batches.length; i++) {
@@ -51,14 +51,14 @@ export async function upsertRecordPayload(
                 accessToken, scriptId, deployId, { 
                     postOptions: batch, 
                     responseOptions: responseOptions, 
-                } as PostRecordRequest,
+                } as RecordRequest,
             );
             await DELAY(TWO_SECONDS, null);
             if (!res || !res.data) {
                 mlog.warn(`upsertRecordPayload() batchIndex=${i} res.data is undefined. Skipping...`);
                 continue;
             }
-            const resData = res.data as PostRecordResponse;
+            const resData = res.data as RecordResponse;
             responseDataArr.push(resData);
             const summary = (resData.results as RecordResult[])
                 .reduce((acc, postResult) => {

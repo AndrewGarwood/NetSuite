@@ -4,7 +4,7 @@
 
 import { hasKeys } from "src/utils/typeValidation";
 import { FieldParseOptions, ValueMappingEntry, CloneOptions } from ".";
-import { PostRecordOptions } from "src/utils/api";
+import { RecordOptions } from "src/utils/api";
 
 /**
  * @param value `any`
@@ -29,10 +29,10 @@ export function isValueMappingEntry(value: any): value is ValueMappingEntry {
 /**
  * @param value `any`
  * @returns **`isPostRecordOptions`** `boolean`
- * - `true` if the `value` is a valid {@link PostRecordOptions} object,
+ * - `true` if the `value` is a valid {@link RecordOptions} object,
  * - `false` `otherwise`.
  */
-export function isPostRecordOptions(value: any): value is PostRecordOptions {
+export function isPostRecordOptions(value: any): value is RecordOptions {
     return (value && typeof value === 'object' 
         && hasKeys(value, 'recordType') 
         && hasKeys(value, ['fields', 'sublists'], false)
