@@ -14,8 +14,6 @@ import {
 } from "./config";
 import {
     isNonEmptyArray, isEmptyArray, isNullLike, hasNonTrivialKeys,
-    BOOLEAN_TRUE_VALUES,
-    BOOLEAN_FALSE_VALUES,
     areEquivalentObjects,
     hasKeys
 } from "./utils/typeValidation";
@@ -28,7 +26,7 @@ import {
 import { 
     cleanString, equivalentAlphanumericStrings as equivalentAlphanumeric,
     ParseResults, RecordPostProcessingOptions, CloneOptions,
-    isPostRecordOptions, isCloneOptions,
+    isRecordOptions, isCloneOptions,
     ValidatedParseResults,
     ProcessParseResultsOptions
 } from "./utils/io";
@@ -40,7 +38,7 @@ import { cloneDeep } from "lodash";
  * @param options {@link ProcessParseResultsOptions} 
  * - = `{ [recordType: string]: `{@link RecordPostProcessingOptions}` }`
  * @returns **`results`** {@link ValidatedParseResults} 
- * - = `{ [recordType: string]: {valid:` {@link RecordOptions}`[]; invalid: PostRecordOptions[]; } }`
+ * - = `{ [recordType: string]: {valid:` {@link RecordOptions}`[]; invalid: RecordOptions[]; } }`
  */
 export function processParseResults(
     initialResults: ParseResults,
@@ -59,12 +57,12 @@ export function processParseResults(
             || typeof recordType !== 'string' 
             || !isNonEmptyArray(initialResults[recordType])
             || initialResults[recordType].some(
-                element => !isPostRecordOptions(element)
+                element => !isRecordOptions(element)
             )
         );
         if (isInvalidParseResultsEntry) {
             mlog.error(`processParseResults() Invalid argument: 'initialResults'`,
-                TAB+`expected: 'initialResults' (ParseResults) to have keys as record type strings and values as non-empty array of PostRecordOptions.`,
+                TAB+`expected: 'initialResults' (ParseResults) to have keys as record type strings and values as non-empty array of RecordOptions.`,
                 TAB+`received: ${typeof recordType} = '${recordType}' with value: ${indentedStringify(initialResults[recordType])}`,
                 TAB+`returning empty results...`
             );
@@ -120,10 +118,10 @@ export function processParseResults(
 }
 
 /**
- * @param parseResults 
- * @param recordType 
- * @param index 
- * @param cloneOptions 
+ * @param parseResults {@link ParseResults}
+ * @param recordType {@link RecordTypeEnum} | {@link EntityRecordTypeEnum} | `string` - the recipient record type
+ * @param index `number` - index of the recipient {@link RecordOptions} in `parseResults[recordType]`
+ * @param cloneOptions {@link CloneOptions}
  * @returns **`recipientOptions`** {@link RecordOptions}
  */
 function processCloneOptions(
@@ -133,9 +131,9 @@ function processCloneOptions(
     cloneOptions: CloneOptions
 ): RecordOptions {
     const recipientOptions = parseResults[recordType][index];
-    if (!isPostRecordOptions(recipientOptions)) {
+    if (!isRecordOptions(recipientOptions)) {
         mlog.error(`processCloneOptions() Invalid recipientOptions at index ${index} for recordType '${recordType}':`,
-            TAB+`expected: PostRecordOptions object, received: ${typeof recipientOptions} = '${indentedStringify(recipientOptions)}'`,
+            TAB+`expected: RecordOptions object, received: ${typeof recipientOptions} = '${indentedStringify(recipientOptions)}'`,
             TAB+`Returning postOptions unchanged.`
         );
         return recipientOptions;
@@ -204,6 +202,11 @@ function processCloneOptions(
     return recipientOptions as RecordOptions;
 }
 
+/**
+ * @param postOptions {@link RecordOptions} - the record options to get the id from
+ * @param idProp `string` - the property to search for the id, see {@link idPropertyEnum}
+ * @returns `string | undefined` - the id value if found, `undefined` otherwise
+ */
 function getRecordId(
     postOptions: RecordOptions, 
     idProp: string

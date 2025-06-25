@@ -24,7 +24,7 @@ export interface CustomerBase {
     entityid: string;
     entitystatus: CustomerStatusEnum;
     isperson?: RadioFieldBoolean;
-    category?: CustomerCategoryEnum;
+    category?: RecordRef;
     taxable?: boolean;
     taxitem?: string;
     email?: string;
@@ -49,7 +49,7 @@ export interface Customer extends CustomerBase {
 }
 
 /**
- * @interface CustomerSublists
+ * @interface **`CustomerSublists`**
  * @reference {@link https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/customer.html#:~:text=your%20Web%20site.-,Sublists,-addressbook%20%2D%20Address}
  * */
 export interface CustomerSublists {
@@ -67,12 +67,7 @@ export interface CustomerSublists {
     contactroles?: never[];
 }
 
-/**
- * @enum {number} **`CustomerCategoryEnum`** 
- */
-export enum CustomerCategoryEnum {
-    CATEGORY_A = 1,
-}
+
 
 /**
  * @enum {number} **`CustomerStatusEnum`**
@@ -105,9 +100,9 @@ export enum CustomerStatusEnum {
 /**
  * @enum {number} **`CustomerTaxItemEnum`**
  * @property {number} NOT_TAXABLE - `-7`
- * @property {number} YOUR_TAX_ITEM - `1`
+ * @property {number} YOUR_TAX_ITEM - `105`
  */
 export enum CustomerTaxItemEnum {
     NOT_TAXABLE = -7,
-    YOUR_TAX_ITEM = 1,
+    YOUR_TAX_ITEM = 105,
 }

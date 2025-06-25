@@ -18,7 +18,7 @@
         }
     },
     "include": [
-        "src/server/authServer.ts", 
+        "src/server/AuthManager.ts", 
         "src/main.ts", 
     ],
     "exclude": ["node_modules", "src/FileCabinet/SuiteScripts/**/*.js", "src/FileCabinet/SuiteScripts/**/*.js", "src/FileCabinet/SuiteScripts/REST/*.js"]

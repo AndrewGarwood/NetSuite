@@ -2,11 +2,10 @@
  * @file src/utils/ns/Enums.ts
  */
 export { 
-    CustomerCategoryEnum, VendorCategoryEnum, CustomerStatusEnum, 
+    VendorCategoryEnum, CustomerStatusEnum, 
     CustomerTaxItemEnum, ContactRoleEnum, SubrecordTypeEnum, 
     EntityRecordTypeEnum, NetSuiteRecordTypeEnum, RecordTypeEnum, 
-    LeadSourceEnum, LeadStatusEnum 
-} from './record';
+    LeadSourceEnum, LeadStatusEnum } from './record';
 export { AccountEnvironmentEnum, ScriptTypeEnum } from './SuiteScriptEnvironment';
 export { 
     FilterOperatorEnum, SearchSortEnum, DateOperatorEnum, TextOperatorEnum, 
@@ -14,8 +13,6 @@ export {
     MultiSelectOperatorEnum
 } from './search'
 export { NetSuiteFileTypeEnum, NetSuiteFileEncodingEnum } from './File';
-
-
 /**
  * @enum {string} **`UnitsTypeEnum`**
  * @description Enum for unit types in NetSuite. (defined by account user)

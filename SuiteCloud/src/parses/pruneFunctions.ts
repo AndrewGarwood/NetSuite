@@ -113,7 +113,7 @@ export const contact = (
     }
     
     if (!hasKeys(options.fields, CONTACT_REQUIRED_FIELDS)) {
-        mlog.warn(`requireNameFields(): options.fields does not have required fields`,
+        plog.warn(`contact(): options.fields does not have required fields`,
             TAB+`required: ${JSON.stringify(CONTACT_REQUIRED_FIELDS)}`,
             TAB+`received: ${JSON.stringify(Object.keys(options.fields))}`
         );

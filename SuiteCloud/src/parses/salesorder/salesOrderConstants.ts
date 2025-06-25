@@ -44,14 +44,8 @@ export enum SalesOrderColumnEnum {
     TRAN_DATE = 'Date',
     SHIP_DATE = 'Ship Date',
     OTHER_REF_NUM = 'P. O. #',
-    ENTITY = 'Source Name', // use as customer/contact entityid
-}
-
-/** 
- * @enum {string} **`CustomerColumnEnum`**
- * */
-export enum SalesOrderCustomerColumnEnum {
-    ENTITY_ID = 'Source Name',
+    /**use as customer/contact entityid */
+    ENTITY_ID = 'Source Name', // 
     PRIMARY_CONTACT = 'Name Contact',
     PHONE = 'Name Phone #',
     FAX = 'Name Fax #',

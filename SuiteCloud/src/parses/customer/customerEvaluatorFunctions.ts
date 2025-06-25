@@ -26,10 +26,16 @@ export const customerIsPerson = (
     if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return RADIO_FIELD_FALSE;
     }
-    return isPerson(row, entityIdColumn, companyColumn) ? RADIO_FIELD_TRUE : RADIO_FIELD_FALSE;
+    return (isPerson(row, entityIdColumn, companyColumn) 
+        ? RADIO_FIELD_TRUE 
+        : RADIO_FIELD_FALSE
+    );
 }
 
-/** calls {@link firstName}`(row, firstNameColumn, ...nameColumns)` from `evaluatorFunctions.ts` if customer is an individual human and not a company */
+/** 
+ * calls {@link firstName}`(row, firstNameColumn, ...nameColumns)` 
+ * from `evaluatorFunctions.ts` if customer is an individual human and not a company 
+ * */
 export const firstNameIfCustomerIsPerson = (
     row: Record<string, any>,
     entityIdColumn: string,
@@ -115,10 +121,10 @@ export const customerStatus = (
 
 
 /**
- * @param row 
- * @param entityIdColumn 
- * @param companyNameColumn 
- * @returns
+ * @param row `Record<string, any>`
+ * @param entityIdColumn `string`
+ * @param companyNameColumn `string`
+ * @returns `string` - the company name of the customer, or the entityId if no company name is provided.
  */
 export const customerCompany = (
     row: Record<string, any>,

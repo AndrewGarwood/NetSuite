@@ -189,13 +189,13 @@ const COMPANY_KEYWORD_LIST: string[] = [
 /** 
  * @TODO divide COMPANY_KEYWORDS_PATTERN into multiple regexes then compose
  * could instead make a {@link COMPANY_KEYWORD_LIST} then join with `|` and use `new RegExp()` to create a regex from the list
- * - `re` = `/\b(?:company|corp|inc|co\.?,? ltd\.?|ltd|\.?l\.?lc|plc . . .)\b/ `
+ * - `re` = `/\b(?:company|corp|inc|co\.?,? ltd\.?|ltd|\.?l\.?lc|plc . . .)\b/` `i`
  * */
 export const COMPANY_KEYWORDS_PATTERN: RegExp = 
-/\b(?:compan(y|ies)|[+@&]+|corporation|corporate|(drop)?box|corp|inc|co\.|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|plc|llp|(un)?limited|nys|oc|mc|pr|local|group|consulting|consultant(s)?|vcc|bcp|center|(in)?pack(aging|age)?|electric|chemical|Exhibit(s)?|business|Factory|employee|print(s|ing)?|Pharmaceutical(s)?|vistaprint|associates|association|account(s)?|art(s)?|AMZ|independent|beauty|beautiful(ly)?|meditech|medaesthetic|partners|Acupuncture|Affiliate(s)?|telecom|maps|cosmetic(s)?|connections|practice|computer|service(s)?|skincare|skin|face|facial|body|artisan(s)?|Alchemy|advanced|surgical|surgery|surgeons|administrators|laser|practice|scientific|science|health|healthcare|medical|med|med( |i)?spa|spa|perfect|surgeons|(med)?(a)?esthetic(s|a)?|salon|lounge|studio|wellness|courier|capital|financ(e|ing)|collector|dept(\.)?|HVAC|insurance|ins|surety|freight|fine art|solution(s)?|trad(e|ing)|renewal|department|inst\.|institute|instant|university|college|America(n)?|US(A)?|global|digital|virtual|orange|coast(al)?|tree|franchise|orthopedic(s)?|academy|advertising|travel|technologies|flash|international|tech|clinic(s|al)?|Exterminator|Nightclub|management|foundation|aid|product(ions|ion|s)?|industr(y|ies|ial)|biomed|bio|bio-chem|lubian|technology|technical|special(ist(s)?|ities)?|support|innovat(e|ive|ion(s)?)|county|united|state(s)?|the|one|of|for|by|and|on|or|at|it|the|about|plan|legal|valley|republic|recruit(ing)?|media|southern|office|post office|clean(er|ers)|transport|law|contract|high|food|meal|therapy|therapeutic(s)?|dental|laboratory|instrument|southwest|ingredient(s)?|commerce|city|Laboratories|lab|logistics|newport|radio|video|photo(graphy)?|korea|communication(s)|derm(atology|atologist(s)?)|new|express|goods|mission|depot|treasur(e|er|y)|revenue|biolab|Orders|staff(ing|ed)?|investors|envelope|refresh|Anti|AgingMajestic|motors|museum|event|Kaiser|pacific|visa|platinum|level|Rejuvenation|bespoke|Cardio|speed|pro|tax|firm|DC|square|store|weight|group|Buy|balance(d)?|buckhead|market(s)?|Bulk|perks|GPT|Boutique|supplement(s)?|vitamin(s)?|plus|sales|salesforce|precision|fitness|image|premier|Fulfillment|final|elite|elase|sculpt(ing)?|botox|south|Hills|symposium|wifi|online|worldwide|tv|derm([a-z]+)|wine|rent(al(s)?)?|mail|plumber(s)?|Sociedade|card|\.com)\b/i;
+/\b(?:compan(y|ies)|[+@&]+|corporation|corporate|(drop)?box|corp|inc|co\.|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|plc|llp|(un)?limited|nys|oc|mc|pr|local|group|consulting|consultant(s)?|vcc|bcp|center|(in)?pack(aging|age)?|electric|chemical|Exhibit(s)?|business|Factory|employee|print(s|ing)?|Pharmaceutical(s)?|vistaprint|associates|association|account(s)?|art(s)?|AMZ|independent|beauty|beautiful(ly)?|meditech|medaesthetic|partners|Acupuncture|Affiliate(s)?|telecom|maps|cosmetic(s)?|connections|practice|computer|service(s)?|skincare|skin|face|facial|body|artisan(s)?|Alchemy|plastic|advanced|surgical|surgery|surgeons|administrators|laser|practice|scientific|science|health|healthcare|medical|med|med( |i)?spa|spa|perfect|surgeons|(med)?(a)?esthetic(s|a)?|salon|lounge|studio|wellness|courier|capital|financ(e|ing)|collector|dept(\.)?|HVAC|insurance|ins|surety|freight|fine art|solution(s)?|trad(e|ing)|renewal|department|inst\.|institute|instant|university|college|America(n)?|US(A)?|global|digital|virtual|orange|coast(al)?|tree|franchise|orthopedic(s)?|academy|advertising|travel|technologies|flash|international|tech|clinic(s|al)?|Exterminator|Nightclub|management|foundation|aid|product(ions|ion|s)?|industr(y|ies|ial)|biomed|bio|bio-chem|lubian|technology|technical|special(ist(s)?|ities)?|support|innovat(e|ive|ion(s)?)|county|united|state(s)?|the|one|of|for|by|and|on|or|at|it|the|about|plan|legal|valley|republic|recruit(ing)?|media|southern|office|post office|clean(er|ers)|transport|law|contract|high|food|meal|therapy|therapeutic(s)?|dental|laboratory|instrument|southwest|ingredient(s)?|commerce|city|Laboratories|lab|logistics|newport|radio|video|photo(graphy)?|korea|communication(s)|derm(atology|atologist(s)?)|new|express|goods|mission|depot|treasur(e|er|y)|revenue|biolab|Orders|staff(ing|ed)?|investors|envelope|refresh|Anti|AgingMajestic|motors|museum|event|Kaiser|pacific|visa|platinum|level|Rejuvenation|bespoke|Cardio|speed|pro|tax|firm|DC|square|store|weight|group|Buy|balance(d)?|buckhead|market(s)?|Bulk|perks|GPT|Boutique|supplement(s)?|vitamin(s)?|plus|sales|salesforce|precision|fitness|image|premier|Fulfillment|final|elite|elase|sculpt(ing)?|botox|south|Hills|symposium|wifi|online|worldwide|tv|derm([a-z]+)|wine|rent(al(s)?)?|mail|plumber(s)?|Sociedade|card|\.com)\b/i;
 /** - `re` =  `/\b(?:corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc)\.?\s*$/i` */
 export const COMPANY_ABBREVIATION_PATTERN: RegExp =
-/\b(?:corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc|llp)\.?\s*$/i;
+/\b(?:corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc|llp|s\.c)\.?\s*$/i;
 
 /** 
  * @param {string} s - `string` - the string to check
@@ -213,7 +213,7 @@ export function doesNotEndWithKnownAbbreviation(s: string): boolean {
     );
 }
 
-/** strip leading `.` and trailing `.` if satisfy stripRightCondition: {@link doesNotEndWithKnownAbbreviation} */
+/** strip leading `.` and (trailing `.` if satisfy stripRightCondition: {@link doesNotEndWithKnownAbbreviation}) */
 export const STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION: StringStripOptions = {
     char: '.',
     escape: true,
@@ -232,8 +232,6 @@ export const UNCONDITIONAL_STRIP_DOT_OPTIONS: StringStripOptions = {
     rightArgs: undefined
 }
 
-/** `re` = `/(^(is|give|send|fax|email)[a-z0-9]{2,}$)/` */
-export const BOOLEAN_FIELD_ID_REGEX = new RegExp(/(^(is|give|send|fax|email)[a-z0-9]{2,}$)/)
 
 /** `re` = `/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/` */
 export const EMAIL_REGEX = new RegExp(
@@ -286,10 +284,10 @@ export const MIDDLE_INITIAL_REGEX = new RegExp(
     RegExpFlagsEnum.IGNORE_CASE
 );
 /** 
- * `re` = `/(,? ?(MSPA|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|MSN-RN|R\.?N|N\.?P|CRNA|FAAD|FNP|P.?A.?C|PA-C|PA|DMD|NMD|MD|M\.D|DO|L\.?E\.?|CMA|O.?M|Frcs|FRCS|FACS|FAC)\.?,?){asterisk}/g`  
+ * `re` = `/(,? ?(MSPA|APRN|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|MSN-RN|R\.?N|N\.?P|CRNA|FAAD|FNP|P.?A.?C|PA-C|PA|DMD|NMD|MD|M\.D|DO|L\.?E\.?|CMA|CANS|O.?M|Frcs|FRCS|FACS|FAC)\.?,?){asterisk}/g`  
  * */
 export const JOB_TITLE_SUFFIX_PATTERN = new RegExp(
-    /(,? ?(MSPA|APRN|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|MSN-RN|R\.?N|N\.?P|CRNA|FAAD|FNP|P.?A.?C|PA-C|PA|DMD|NMD|MD|M\.D|DO|L\.?E\.?|CMA|O.?M|Frcs|FRCS|FACS|FAC)\.?,?)*/, 
+    /(,? ?(MSPA|APRN|ARNP|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|MSN|MSN-RN|R\.?N|N\.?P|CRNA|FAAD|FNP|P.?A.?C|PA-C|PA|DMD|NMD|MD|M\.D|DO|L\.?E\.?|CMA|CANS|O.?M|Frcs|FRCS|FACS|FAC)\.?,?)*/, 
     RegExpFlagsEnum.GLOBAL
 ); 
 
@@ -313,13 +311,11 @@ export const REMOVE_JOB_TITLE_SUFFIX: StringReplaceOptions = [
 /**
  * - {@link REMOVE_ATTN_SALUTATION_PREFIX}
  * - {@link REMOVE_JOB_TITLE_SUFFIX}
- * - replace double spaces with a single space
  * - remove trailing comma
  */
 export const CLEAN_NAME_REPLACE_OPTIONS: StringReplaceOptions = [
     ...REMOVE_ATTN_SALUTATION_PREFIX,
     ...REMOVE_JOB_TITLE_SUFFIX,
-    { searchValue: /\s+/g, replaceValue: ' ' }, // replace multiple spaces with a single space
     { searchValue: /,$/g, replaceValue: '' }, // remove trailing comma
 ]
 

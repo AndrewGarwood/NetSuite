@@ -11,7 +11,8 @@
 /**
  * @consideration could use rec.submitFields() instead of rec.setValue() and rec.setSublistValue(), but initially 
  * went with the latter because I wanted granular logging and thought I could wrap each setValue in a try catch to check for errors.
- * @consideration make an enum for subrecord fieldIds so don't have to use less robust isSubrecordValue()
+ * @consideration make an enum for subrecord fieldIds so don't have to use less robust {@link isSubrecord}`()`
+ * - see {@link SubrecordFieldEnum}
  * @consideration make an enum for sublistIds (of non static sublists) {@link https://stoic.software/articles/types-of-sublists/#:~:text=Lastly%2C%20the-,Static%20List,-sublists%20are%20read} 
  */
 define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
@@ -24,24 +25,24 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
 
     
     /**
-     * @param {PostRecordRequest} reqBody **{@link PostRecordRequest}**
-     * - = `{ postOptions: `{@link PostRecordOptions}` | Array<`{@link PostRecordOptions}`>, responseOptions: `{@link RecordResponseOptions}` }`
-     * @returns {PostRecordResponse} **`response`** **{@link PostRecordResponse}** = `{ success: boolean, message: string, results?: `{@link RecordResult}`[], rejects?: `{@link PostRecordOptions}`[], error?: string, logArray: `{@link LogStatement}`[] }`
+     * @param {RecordRequest} reqBody **{@link RecordRequest}**
+     * - = `{ postOptions: `{@link RecordOptions}` | Array<`{@link RecordOptions}`>, responseOptions: `{@link RecordResponseOptions}` }`
+     * @returns {RecordResponse} **`response`** **{@link RecordResponse}** = `{ success: boolean, message: string, results?: `{@link RecordResult}`[], rejects?: `{@link RecordOptions}`[], error?: string, logArray: `{@link LogStatement}`[] }`
      */
     const put = (reqBody) => {
         const { postOptions, responseOptions } = reqBody;
         if (!postOptions || !isNonEmptyArray(postOptions)) {
-            writeLog(LogTypeEnum.ERROR, 'post() Invalid Request Parameter', 'non-empty postOptions is required');
-            return { status: false, message: 'post() Invalid Request Parameter', error: 'non-empty postOptions is required', logArray };
+            writeLog(LogTypeEnum.ERROR, 'put() Invalid Request Parameter', 'non-empty postOptions is required');
+            return { status: false, message: 'put() Invalid Request Parameter', error: 'non-empty postOptions is required', logArray };
         }
         if (!Array.isArray(postOptions)) {
             postOptions = [postOptions];
         }
         /**@type {RecordResult[]} */
         const results = [];
-        /**@type {PostRecordOptions[]} */
+        /**@type {RecordOptions[]} */
         const rejects = [];
-        writeLog(LogTypeEnum.AUDIT, `post() received valid postOptions of length: ${postOptions.length}`);
+        writeLog(LogTypeEnum.AUDIT, `put() received valid postOptions of length: ${postOptions.length}`);
         try {
             for (let i = 0; i < postOptions.length; i++) {
                 const options = postOptions[i];
@@ -49,7 +50,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     const result = processRecordOptions(options, responseOptions);
                     if (!result) {
                         writeLog(LogTypeEnum.ERROR,
-                            `post() Invalid PostRecordOptions at index ${i}:`,
+                            `put() Invalid RecordOptions at index ${i}:`,
                         )
                         rejects.push(options);
                         continue;
@@ -57,7 +58,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     results.push(result);
                 } catch (e) {
                     writeLog(LogTypeEnum.ERROR, 
-                        `post() Error processing PostRecordOptions at index ${i}:`, 
+                        `put() Error processing RecordOptions at index ${i}:`, 
                         JSON.stringify(e)
                     );
                     rejects.push(options);
@@ -65,29 +66,29 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 }
             }
             
-            writeLog(LogTypeEnum.AUDIT, `End of POST_UpsertRecord:`, { 
+            writeLog(LogTypeEnum.AUDIT, `End of PUT_UpsertRecord:`, { 
                 numRecordsProcessed: results.length,
                 numRejects: rejects.length,
                 numErrorLogs: logArray.filter(log => log.type === LogTypeEnum.ERROR).length,
             });
-            /**@type {PostRecordResponse} */
+            /**@type {RecordResponse} */
             return {
                 status: 200,
-                message: `POST_UpsertRecord completed, processed ${results.length} record(s)`,
+                message: `PUT_UpsertRecord completed, processed ${results.length} record(s)`,
                 results: results,
                 rejects: rejects,
                 logArray: logArray,
             };
         } catch (e) {
-            writeLog(LogTypeEnum.ERROR, `Error in POST_UpsertRecord:`, { 
+            writeLog(LogTypeEnum.ERROR, `Error in PUT_UpsertRecord:`, { 
                 numRecordsProcessed: results.length,
                 numRejects: rejects.length,
                 numErrorLogs: logArray.filter(log => log.type === LogTypeEnum.ERROR).length,
             }, JSON.stringify(e));
-            /**@type {PostRecordResponse} */
+            /**@type {RecordResponse} */
             return {
                 status: 500,
-                message: 'Error in POST_UpsertRecord: upsert failed after processing ' + results.length + ` records.`,
+                message: 'Error in PUT_UpsertRecord: upsert failed after processing ' + results.length + ` records.`,
                 error: String(e),
                 logArray: logArray,
                 results: results,
@@ -97,15 +98,15 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     }
 
     /**
-     * @param {PostRecordOptions} options 
+     * @param {RecordOptions} options 
      * @param {RecordResponseOptions} [responseOptions]
      * @returns {RecordResult | null} **`result`** {@link RecordResult} = `{ internalid: number, recordType: string | RecordTypeEnum, fields?: `{@link FieldDictionary}`, sublists?: `{@link SublistDictionary}` }`
      */
     function processRecordOptions(options, responseOptions) {
         if (!options || typeof options !== 'object') {
             writeLog(LogTypeEnum.ERROR, 
-                `ERROR: processPostRecordOptions() Invalid Options:`, 
-                `options must be an object of type PostRecordOptions`,
+                `ERROR: processRecordOptions() Invalid Options:`, 
+                `options must be an object of type RecordOptions`,
                 `= { recordType: RecordTypeEnum, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
             );
             return null;
@@ -114,7 +115,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         recordType = validateRecordType(recordType);
         if (!recordType) {
             writeLog(LogTypeEnum.ERROR,
-                `ERROR: processPostRecordOptions() Invalid Options:`,
+                `ERROR: processRecordOptions() Invalid Options:`,
                 `options is Missing 'recordType' property`,
                 `= { recordType: RecordTypeEnum, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
             );
@@ -126,9 +127,9 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         );
         if (missingFieldsAndSublists) {
             writeLog(LogTypeEnum.ERROR, 
-                `ERROR: processPostRecordOptions() Invalid Options`,
+                `ERROR: processRecordOptions() Invalid Options`,
                 `options is Missing 'fields' and 'sublists' property (must have at least one)`, 
-                `options must be an object of type PostRecordOptions`,
+                `options must be an object of type RecordOptions`,
                 `= { recordType: RecordTypeEnum, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
             );
             return null;
@@ -139,14 +140,9 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         const recId = searchForRecordById(recordType, idOptions, fields);
         const isExistingRecord = typeof recId === 'number' && recId > 0;
         if (isExistingRecord && fields && isNonEmptyArray(Object.keys(fields))) { 
-            //remove idPropertyEnum values from keys of fields
+            //remove idPropertyEnum values from keys of fields to avoid DUP_ENTITY error.
             for (const idPropFieldId of Object.values(idPropertyEnum)) {
                 if (fields[idPropFieldId]) { 
-                    writeLog(LogTypeEnum.AUDIT,
-                        `processPostRecordOptions() removing idPropertyEnum field '${idPropFieldId}' from fields`,
-                        `because an existing record with internalid '${recId}' was found`,
-                        `fields['${idPropFieldId}'] = '${fields[idPropFieldId]}'`
-                    );
                     delete fields[idPropFieldId];
                 }
             }
@@ -156,8 +152,8 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             );
         } else {
             writeLog(LogTypeEnum.DEBUG, 
-                `processPostRecordOptions() creating new '${recordType}' record`, 
-                `processPostRecordOptions() No existing '${recordType}' record found.`,
+                `processRecordOptions() creating new '${recordType}' record`, 
+                `processRecordOptions() No existing '${recordType}' record found.`,
                 `-> Creating new '${recordType}' record...`
             );
             rec = record.create({type: recordType, isDynamic });
@@ -440,7 +436,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 let lineIndices = [];
                 const wantToEditExistingLine = (
                     typeof line !== 'number' 
-                    && lineIdProp !== undefined 
+                    && typeof lineIdProp === 'string' 
                     && sublistLine[lineIdProp] !== undefined
                 );
                 if (typeof line === 'number') { 
@@ -452,6 +448,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                         sublistLine[lineIdProp], 
                         lineIdProp || idPropertyEnum.INTERNAL_ID
                     ));
+                    delete sublistLine.lineIdProp; // remove key 'lineIdProp' as it's only used to identify the line(s) to edit
                 } else if (typeof line !== 'number') {
                     lineIndices.push(i); 
                 }
@@ -533,9 +530,10 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     }
 
     /**
+     * @TODO maybe add validation step with {@link SubrecordFieldEnum}
      * @param {object} rec 
-     * @param {RecordTypeEnum} parentRecordType 
-     * @param {SetFieldSubrecordOptions} subrecordOptions 
+     * @param {RecordTypeEnum} parentRecordType {@link RecordTypeEnum}
+     * @param {SetFieldSubrecordOptions} subrecordOptions {@link SetFieldSubrecordOptions}
      * @returns {object} **`rec`**
      */
     function processFieldSubrecordOptions(rec, parentRecordType, subrecordOptions) {
@@ -673,40 +671,35 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
 /*---------------------------- [ Helper Functions ] ----------------------------*/
 
 /**
- * @TODO decide if this is necessary abstraction or if should just use `Array.isArray() and arr.length > 0` everywhere
  * @param {any} arr 
- * @returns {boolean} **`true`** `if` `arr` is an array and has at least one element, **`false`** `otherwise`.
+ * @returns {arr is Array<any> & { length: number }} **`true`** `if` `arr` is an array and has at least one element, **`false`** `otherwise`.
  */
 function isNonEmptyArray(arr) {
     return Array.isArray(arr) && arr.length > 0;
 }
+/**
+ * @param {any} arr 
+ * @returns {arr is Array<any> & { length: 0 }} **`true`** `if` `arr` is an array is empty, **`false`** `otherwise`.
+ */
 function isEmptyArray(arr) { return Array.isArray(arr) && arr.length === 0; }
 
 /**
  * @description Check if an object has any non-empty keys (not undefined, null, or empty string). 
  * - passing in an array will return `false`.
  * @param {object} obj - The `object` to check.
- * @returns {boolean} **`true`** if the object has any non-empty keys, **`false`** `otherwise`.
+ * @returns {obj is Record<string, any> | { [key: string]: any } |{ [key: string]: FieldValue }} **`true`** if the object has any non-empty keys, **`false`** `otherwise`.
  */
 function hasNonTrivialKeys(obj) {
-    if (!obj || typeof obj !== 'object' || isEmptyArray(Object.keys(obj))) {
+    if (typeof obj !== 'object' || !obj || Array.isArray(obj)) {
         return false;
     }
-    for (const key in obj) { // return true if any key is non-empty
-        let value = obj[key];
-        let valueIsNonTrivial = (obj.hasOwnProperty(key)
-            && value !== undefined
-            && value !== null
-            && (value !== ''
-                || isNonEmptyArray(value)
-                || (typeof value === 'object' && isNonEmptyArray(Object.entries(value)))
-            )
+    const hasKeyWithNonTrivialValue = Object.values(obj).some(value => {
+        return value !== undefined && value !== null &&
+            (value !== '' || isNonEmptyArray(value) 
+            || (isNonEmptyArray(Object.entries(value)))
         );
-        if (valueIsNonTrivial) {
-            return true;
-        }
-    }
-    return false;
+    });
+    return hasKeyWithNonTrivialValue;
 }
 /**
  * @enum {string} **`LogTypeEnum`**
@@ -727,7 +720,7 @@ const LogTypeEnum = {
     /** = `'emergency'` */
     EMERGENCY: 'emergency',
 };
-/**max number of times allowed to call `log.debug(title, details)` per `post()` call */
+/**max number of times allowed to call `log.debug(title, details)` per `put()` call */
 const MAX_LOGS_PER_LEVEL = 500;
 /**@type {{[logType: LogTypeEnum]: {count: number, limit: number}}} */
 const logDict = {
@@ -797,11 +790,11 @@ function getCurrentPacificTime() {
     return new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
 }
 /**
- * @consideration make an enum for subrecord types
- * assumes that the input value is a subrecord object if it is an object and not an array and not a Date object
+ * @consideration make an enum for subrecord fieldIds... see {@link SubrecordFieldEnum}
+ * @description assumes that the input value is a subrecord object if it is an object and not an array and not a Date object
  * - {@link SetFieldSubrecordOptions} or {@link SetSublistSubrecordOptions}
  * @param {any | SubrecordValue} value 
- * @returns **`isSubrecord`** `boolean` = **`true`** `if` `value` is a subrecord object, **`false`** `otherwise`.
+ * @returns {value is SubrecordValue} **`isSubrecord`** `boolean` = **`true`** `if` `value` is a subrecord object, **`false`** `otherwise`.
  */
 function isSubrecord(value) {
     const isNonEmptyObject = Boolean(value 
@@ -906,24 +899,29 @@ const NOT_DYNAMIC = false;
  * @enum {string} **`SubrecordFieldEnum`**
  */
 const SubrecordFieldEnum = {
-    ADDRESS: 'addressbookaddress'
+    /**from the `'addressbook'` `sublist` on Relationship records */
+    ADDRESS_BOOK_ADDRESS: 'addressbookaddress',
+    /**from the `'billaddress'` body `field` on Transaction records */
+    BILL_ADDRESS: 'billaddress',
+    /**from the `'shipaddress'` body `field` on Transaction records */
+    SHIP_ADDRESS: 'shipaddress',
 }
 
-/**Type: PostRecordRequest {@link PostRecordRequest} */
+/**Type: RecordRequest {@link RecordRequest} */
 /**
- * @typedef {Object} PostRecordRequest
- * @property {PostRecordOptions | Array<PostRecordOptions>} postOptions = {@link PostRecordOptions} | `Array<`{@link PostRecordOptions}`>`
- * - {@link PostRecordOptions} = `{ recordType: `{@link RecordTypeEnum}`, isDynamic?: boolean, idOptions?: `{@link idSearchOptions}`[], fields?: `{@link FieldDictionary}`, sublists?: `{@link SublistDictionary}` }`
+ * @typedef {Object} RecordRequest
+ * @property {RecordOptions | Array<RecordOptions>} postOptions = {@link RecordOptions} | `Array<`{@link RecordOptions}`>`
+ * - {@link RecordOptions} = `{ recordType: `{@link RecordTypeEnum}`, isDynamic?: boolean, idOptions?: `{@link idSearchOptions}`[], fields?: `{@link FieldDictionary}`, sublists?: `{@link SublistDictionary}` }`
  * @property {RecordResponseOptions} [responseOptions] = {@link RecordResponseOptions} = `{ responseFields: string | string[], responseSublists: Record<string, string | string[]> }`
  */
 
-/**Type: PostRecordResponse {@link PostRecordResponse} */
+/**Type: RecordResponse {@link RecordResponse} */
 /**
- * @typedef {Object} PostRecordResponse
+ * @typedef {Object} RecordResponse
  * @property {string | number} status - Indicates status of the request.
  * @property {string} message - A message indicating the result of the request.
  * @property {RecordResult[]} [results] - an `Array<`{@link RecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully upserted.
- * @property {PostRecordOptions[]} [rejects] - an `Array<`{@link PostRecordOptions}`>` containing the record options that were not successfully upserted.
+ * @property {RecordOptions[]} [rejects] - an `Array<`{@link RecordOptions}`>` containing the record options that were not successfully upserted.
  * @property {string} [error] - An error message if the request was not successful.
  * @property {LogStatement[]} logArray - an `Array<`{@link LogStatement}`>` generated during the request processing.
  */
@@ -937,7 +935,7 @@ const SubrecordFieldEnum = {
 
 /**
  * = `{ recordType: RecordTypeEnum, isDynamic?: boolean, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
- * @typedef {Object} PostRecordOptions
+ * @typedef {Object} RecordOptions
  * @property {RecordTypeEnum} recordType - The record type to post, see {@link RecordTypeEnum}
  * @property {boolean} [isDynamic=false] - Indicates if the record should be created/loaded in dynamic mode. (defaults to {@link NOT_DYNAMIC} = `false`)
  * @property {idSearchOptions[]} [idOptions] options to search for an existing record to upsert 
@@ -974,7 +972,7 @@ const SubrecordFieldEnum = {
 /** Type: **`SublistDictionary`** {@link SublistDictionary} */
 /**
  * sublistIds mapped to an `Array<`{@link SublistLine}`>` = `{ [sublistFieldId: string]: `{@link FieldValue}`; line?: number; internalid?: number; }[]`
- * - {@link SublistLine}'s `sublistFieldId`s specified in the {@link BatchPostRecordRequest.responseSublists} request property.
+ * - {@link SublistLine}'s `sublistFieldId`s specified in the {@link BatchRecordRequest.responseSublists} request property.
  * @typedef {{
  * [sublistId: string]: Array<SublistLine | {[sublistFieldId: string]: FieldValue | SubrecordValue}>
  * }} SublistDictionary

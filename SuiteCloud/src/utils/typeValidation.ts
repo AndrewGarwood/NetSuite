@@ -6,33 +6,8 @@ export * from "./io/types/typeGuards";
 
 import { FieldValue, SubrecordValue, idSearchOptions, idPropertyEnum, RecordOptions } from "src/utils/api/types";
 import { mainLogger as mlog } from "src/config/setupLog";
-import { BOOLEAN_FIELD_ID_REGEX, EMAIL_REGEX, equivalentAlphanumericStrings as equivalentAlphanumeric } from "./io/regex";
+import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "./io/regex";
 import { FieldParseOptions, ValueMappingEntry } from "./io";
-
-/**
- * Represents the `boolean` value `true` for a radio field in NetSuite.
- */
-export const RADIO_FIELD_TRUE = 'T';
-/**
- * Represents the `boolean` value `false` for a radio field in NetSuite.
- */
-export const RADIO_FIELD_FALSE = 'F';
-/**
- * - `= typeof `{@link RADIO_FIELD_TRUE}` | typeof `{@link RADIO_FIELD_FALSE}`;` 
- * @description
- * Value representing the state of a radio field in NetSuite. (i.e. is the button filled in or not)
- * - e.g. the Customer record's `'isperson'` field.
- * */
-export type RadioFieldBoolean = typeof RADIO_FIELD_TRUE | typeof RADIO_FIELD_FALSE;   
-
-
-export const BOOLEAN_TRUE_VALUES = ['true', 'yes', 'y'];
-export const BOOLEAN_FALSE_VALUES = ['false', 'no', 'n'];
-export const BOOLEAN_FIELD_ID_LIST = [
-    'isinactive', 'isprivate', 'giveaccess', 'emailtransactions', 'faxtransactions', 
-    'is1099eligible', 'isdefaultbilling', 'isdefaultshipping', 'isprimary', 'isprimaryshipto', 
-    'isprimarybilling', 'isprimaryshipping'
-];
 
 /**
  * @param value the value to check
@@ -51,7 +26,13 @@ export function isNullLike(value: any): value is null | undefined | '' | [] | Re
     if (typeof value === 'object' && isEmptyArray(Object.keys(value))) {
         return true;
     }
-    if (typeof value === 'string' && (value.trim() === '' || value.toLowerCase() === 'undefined' || value.toLowerCase() === 'null') ) {
+    const isNullLikeString = (typeof value === 'string' 
+        && (value.trim() === '' 
+            || value.toLowerCase() === 'undefined' 
+            || value.toLowerCase() === 'null'
+        )
+    ); 
+    if (isNullLikeString) {
         return true;
     }
     return false;
@@ -78,11 +59,16 @@ export function isEmptyArray(arr: any): arr is Array<any> & { length: 0 } {
 /**
  * @TODO add param that indicates whether all values be nontrivial or not
  * @description Check if an object has at least 1 key with value that is non-empty (not `undefined`, `null`, or empty string). 
- * - passing in an array will return `false`.
+ * @note **passing in an array will return `false`.**
  * @param obj - The object to check.
  * @returns **`true`** if the object has any non-empty keys, **`false`** otherwise.
  */
-export function hasNonTrivialKeys(obj: any): obj is Record<string, any> | { [key: string]: any } |{ [key: string]: FieldValue } {
+export function hasNonTrivialKeys(
+    obj: any
+): obj is Record<string, any> 
+| { [key: string]: any } 
+| { [key: string]: FieldValue } 
+{
     if (typeof obj !== 'object' || !obj || Array.isArray(obj)) {
         return false;
     }
@@ -102,7 +88,6 @@ export function hasNonTrivialKeys(obj: any): obj is Record<string, any> | { [key
  * - `if` `true`, all keys must be present in the object; 
  * - `if` `false`, at least one key must be present
  * @returns {boolean} `true` if the object has all the keys, `false` otherwise
- * @throws {TypeError} if `keys` is not an array
  */
 export function hasKeys<T extends Object>(
     obj: T, 
@@ -116,7 +101,7 @@ export function hasKeys<T extends Object>(
         keys = [keys] as Array<keyof T>; // Convert string (assumed to be single key) to array of keys
     }
     if (!keys || isEmptyArray(keys)) {
-        throw new TypeError('hasKeys() param `keys` must be an array with at least one key');
+        throw new Error('[hasKeys()] no keys provided: param `keys` must be an array with at least one key');
     }
     if (keys.length === 0) return false;
     let numKeysFound = 0;
@@ -166,10 +151,6 @@ export function areEquivalentObjects(
     });
 }
 
-/**
- * @param value 
- * @returns 
- */
 export function isPrimitiveValue(
     value: any
 ): value is string | number | boolean | null | undefined {
@@ -189,3 +170,31 @@ export function isPrimitiveValue(
 export const isBooleanFieldId = (fieldId: string): boolean => {
     return BOOLEAN_FIELD_ID_LIST.includes(fieldId) || BOOLEAN_FIELD_ID_REGEX.test(fieldId);
 }
+
+/**
+ * Represents the `boolean` value `true` for a radio field in NetSuite.
+ */
+export const RADIO_FIELD_TRUE = 'T';
+/**
+ * Represents the `boolean` value `false` for a radio field in NetSuite.
+ */
+export const RADIO_FIELD_FALSE = 'F';
+/**
+ * - `= typeof `{@link RADIO_FIELD_TRUE}` | typeof `{@link RADIO_FIELD_FALSE}`;` 
+ * @description
+ * Value representing the state of a radio field in NetSuite. (i.e. is the button filled in or not)
+ * - e.g. the Customer record's `'isperson'` field.
+ * */
+export type RadioFieldBoolean = typeof RADIO_FIELD_TRUE | typeof RADIO_FIELD_FALSE;   
+
+
+/** `re` = `/(^(is|give|send|fax|email)[a-z0-9]{2,}$)/` */
+export const BOOLEAN_FIELD_ID_REGEX = new RegExp(/(^(is|give|send|fax|email)[a-z0-9]{2,}$)/)
+export const BOOLEAN_TRUE_VALUES = ['true', 'yes', 'y'];
+export const BOOLEAN_FALSE_VALUES = ['false', 'no', 'n'];
+export const BOOLEAN_FIELD_ID_LIST = [
+    'isinactive', 'isprivate', 'giveaccess', 'emailtransactions', 'faxtransactions', 
+    'is1099eligible', 'isdefaultbilling', 'isdefaultshipping', 'isprimary', 'isprimaryshipto', 
+    'isprimarybilling', 'isprimaryshipping'
+];
+

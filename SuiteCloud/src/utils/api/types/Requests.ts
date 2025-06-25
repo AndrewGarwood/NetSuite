@@ -1,11 +1,14 @@
 /**
  * @file src/utils/api/types/Requests.ts
- * @description types that can be used across multiple request types (e.g. `GET`, `POST`, `DELETE`).
+ * @description types that can be used across multiple request types (e.g. `GET`, `PUT`, `DELETE`).
  * General types used to interact with NetSuite's internal API.
  */
 
 import { FieldValue, SubrecordValue } from "./InternalApi";
-import { NumericOperatorEnum, RecordOperatorEnum, RecordTypeEnum, SearchOperatorEnum, TextOperatorEnum } from "src/utils/ns";
+import { 
+    NumericOperatorEnum, RecordOperatorEnum, 
+    RecordTypeEnum, SearchOperatorEnum, TextOperatorEnum 
+} from "src/utils/ns";
 
 /**
  * @typedefn **`FieldDictionary`**
@@ -38,7 +41,6 @@ export type SublistLine = {
     /**`string` - the `'sublistFieldId'` of the list entry with defined value at `SublistLine[sublistFieldId]` that you want to use to search for existing lines */
     lineIdProp?: string;
 }
-
 
 /**
  * @typedefn **`SetFieldSubrecordOptions`**
@@ -74,7 +76,7 @@ export type SetSublistSubrecordOptions = {
 
 
 /**
- * @typedefn **`PostResponseOptions`**
+ * @typedefn **`RecordResponseOptions`**
  * @property {string | string[]} [responseFields] - `fieldId(s)` of the main record to return in the response.
  * @property {Record<string, string | string[]>} [responseSublists] `sublistId(s)` mapped to `sublistFieldId(s)` to return in the response.
  */
