@@ -171,8 +171,16 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions |
     [sublistId: string]: SublistLineParseOptions[];
 } = {
     addressbook: [
-        { addressbookaddress: BILLING_ADDRESS_OPTIONS },
-        { addressbookaddress: SHIPPING_ADDRESS_OPTIONS },  
+        { 
+            lineIdProp: 'label', 
+            label: { evaluator: evaluate.street, args: [1, BILLING_STREET_ARGS] },
+            addressbookaddress: BILLING_ADDRESS_OPTIONS, 
+        },
+        { 
+            lineIdProp: 'label', 
+            label: { evaluator: evaluate.street, args: [1, SHIPPING_STREET_ARGS] },
+            addressbookaddress: SHIPPING_ADDRESS_OPTIONS, 
+        },  
     ] as SublistLineParseOptions[],
 };
 /**@TODO handle removal of name fields if isperson === 'F' in post processing */
@@ -201,7 +209,7 @@ export const CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
 
 /**
  * 
-*/
+ * */
 export const CONTACT_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: C.ENTITY_ID,
     fieldOptions: {
@@ -211,8 +219,12 @@ export const CONTACT_PARSE_OPTIONS: RecordParseOptions = {
         company: { evaluator: customerEval.customerCompany, args: [C.ENTITY_ID, C.COMPANY] },
         contactrole: {defaultValue: ContactRoleEnum.PRIMARY_CONTACT },
     } as FieldDictionaryParseOptions,
-}
-
+};
+/** 
+ * from parsed customer RecordOptions, 
+ * clone {@link CONTACT_CUSTOMER_SHARED_FIELDS} 
+ * and the `'addressbook'` sublist 
+ * to the contact RecordOptions with matching `'entityid'` */
 export const CLONE_CUSTOMER_FIELDS_TO_CONTACT_OPTIONS: CloneOptions = {
     donorType: RecordTypeEnum.CUSTOMER,
     recipientType: RecordTypeEnum.CONTACT,
@@ -231,5 +243,5 @@ export const CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS: ProcessParseResultsOption
         cloneOptions: CLONE_CUSTOMER_FIELDS_TO_CONTACT_OPTIONS,
         pruneFunc: prune.contact
     },
-}
+};
 

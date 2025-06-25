@@ -10,7 +10,7 @@ import { getCurrentPacificTime } from '../../utils/io/dateTime';
  * @property {string} access_token - The access token.
  * @property {string} refresh_token - The refresh token.
  * @property {number} expires_in - The expiration time of the access token in seconds.
- * @property {string} [lastUpdated] - TThe last updated time of the token (optional). manually added by setting TokenResponse.lastUpdated = {@link getCurrentPacificTime}() at the time of the response.
+ * @property {string} [lastUpdated] - The last updated time of the token (optional). manually added by setting TokenResponse.lastUpdated = {@link getCurrentPacificTime}() at the time of the response.
  * - maybe change to just use `Date().getTime()`
  * @property {string} [token_type] - The type of the token (e.g., "Bearer").
  * @property {string} [scope] - The scope of the access token (optional).

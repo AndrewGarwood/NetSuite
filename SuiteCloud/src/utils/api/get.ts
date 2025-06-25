@@ -6,13 +6,13 @@ import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify } 
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "./url";
-import { getAccessToken, AxiosContentTypeEnum } from "../../server";
+import { AxiosContentTypeEnum } from "../../server";
 import { 
     GetRecordRequest, GetRecordResponse, idSearchOptions, idPropertyEnum, 
     RecordResponseOptions, RecordOperatorEnum, RecordTypeEnum, EntityRecordTypeEnum,
     SearchOperatorEnum
 } from "./types";
-import { NOT_DYNAMIC, SB_REST_SCRIPTS } from "./configureRequests";
+import { getAccessToken, NOT_DYNAMIC, SB_REST_SCRIPTS } from "./configureRequests";
 
 
 const GET_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.GET_Record.scriptId as number;
@@ -33,10 +33,10 @@ export async function getRecordById(
     idProp: idPropertyEnum = idPropertyEnum.INTERNAL_ID,
     responseOptions: RecordResponseOptions = {} as RecordResponseOptions
 ): Promise<GetRecordResponse> {
-    mlog.debug(`Start of get.ts getRecordById()`);
+    mlog.debug(`[Start getRecordById()]`);
     if (!recordType || !recordId) {
-        mlog.error('get.ts getRecordById() recordType or idValue is undefined. Cannot call RESTlet.');
-        throw new Error('get.ts getRecordById() recordType or idValue is undefined. Cannot call RESTlet.');
+        mlog.error('[get.ts getRecordById()] recordType or idValue is undefined. Cannot call RESTlet.');
+        throw new Error('[get.ts getRecordById()] recordType or idValue is undefined. Cannot call RESTlet.');
     }
     const idValue = (idProp === idPropertyEnum.INTERNAL_ID 
         ? Number(recordId) 
@@ -63,7 +63,7 @@ export async function getRecordById(
         );
         return response.data as GetRecordResponse;
     } catch (error) {
-        mlog.error('Error in get.ts getRecordById():', error);
+        mlog.error('[Error in get.ts getRecordById()]:', error);
         write({error: error}, ERROR_DIR, 'ERROR_getRecordById.json');
         throw new Error('Failed to call RESTlet with request params: ' + JSON.stringify(request, null, 4));
     }
@@ -83,16 +83,16 @@ export async function GET(
     params: Record<string, any>,
 ): Promise<any> {
     if (!params) {
-        mlog.error('get.ts GET() params is undefined. Cannot call RESTlet.');
-        throw new Error('get.ts GET() params is undefined. Cannot call RESTlet.');
+        mlog.error('[get.ts GET()] params is undefined. Cannot call RESTlet.');
+        throw new Error('[get.ts GET()] params is undefined. Cannot call RESTlet.');
     }
     if (!scriptId || !deployId) {
-        mlog.error('get.ts GET() scriptId or deployId is undefined. Cannot call RESTlet.');
-        throw new Error('get.ts GET() scriptId or deployId is undefined. Cannot call RESTlet.');
+        mlog.error('[get.ts GET()] scriptId or deployId is undefined. Cannot call RESTlet.');
+        throw new Error('[get.ts GET()] scriptId or deployId is undefined. Cannot call RESTlet.');
     }
     if (!accessToken) {
-        mlog.error('get.ts GET() getAccessToken() is undefined. Cannot call RESTlet.');
-        throw new Error('get.ts GET() getAccessToken() is undefined. Cannot call RESTlet.');
+        mlog.error('[get.ts GET()] getAccessToken() is undefined. Cannot call RESTlet.');
+        throw new Error('[get.ts GET()] getAccessToken() is undefined. Cannot call RESTlet.');
     }
     const restletUrl = createUrlWithParams(RESTLET_URL_STEM, {
         script: scriptId,
@@ -108,7 +108,7 @@ export async function GET(
         });
         return response;
     } catch (error) {
-        mlog.error('Error in get.ts GET():', error);
+        mlog.error('[Error in get.ts GET()]:', error);
         write({error: error}, ERROR_DIR, 'ERROR_GET.json');
         throw new Error('Failed to call RESTlet with params');
     }

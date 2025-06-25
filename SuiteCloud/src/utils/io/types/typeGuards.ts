@@ -28,11 +28,11 @@ export function isValueMappingEntry(value: any): value is ValueMappingEntry {
 
 /**
  * @param value `any`
- * @returns **`isPostRecordOptions`** `boolean`
+ * @returns **`isRecordOptions`** `boolean`
  * - `true` if the `value` is a valid {@link RecordOptions} object,
  * - `false` `otherwise`.
  */
-export function isPostRecordOptions(value: any): value is RecordOptions {
+export function isRecordOptions(value: any): value is RecordOptions {
     return (value && typeof value === 'object' 
         && hasKeys(value, 'recordType') 
         && hasKeys(value, ['fields', 'sublists'], false)

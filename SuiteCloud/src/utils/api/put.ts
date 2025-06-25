@@ -6,12 +6,12 @@ import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify } 
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "./url";
-import { getAccessToken, AxiosContentTypeEnum } from "../../server";
+import { AxiosContentTypeEnum } from "../../server";
 import { 
     RecordRequest, RecordResponse, RecordOptions, RecordResponseOptions,
     RecordResult,
 } from "./types";
-import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "./configureRequests";
+import { getAccessToken, BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "./configureRequests";
 
 
 const UPSERT_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.PUT_UpsertRecord.scriptId as number;
@@ -31,7 +31,9 @@ export async function upsertRecordPayload(
     deployId: number=UPSERT_RECORD_DEPLOY_ID,
 ): Promise<RecordResponse[]> {
     if (!payload || Object.keys(payload).length === 0) {
-        mlog.error(`upsertRecordPayload() 'payload' parameter is undefined or empty. Cannot call RESTlet. Exiting...`);
+        mlog.error(`[upsertRecordPayload()] Invalid parameters`,
+            TAB+`param 'payload'  is undefined or empty. Cannot call RESTlet. Exiting...`
+        );
         STOP_RUNNING(1);
     }
     const { postOptions, responseOptions } = payload;
@@ -39,7 +41,6 @@ export async function upsertRecordPayload(
         ? postOptions : [postOptions]
     );
     const responseDataArr: RecordResponse[] = [];
-    // normalize payload size
     const batches: RecordOptions[][] = partitionArrayBySize(
         upsertRecordArray, BATCH_SIZE
     );
@@ -55,7 +56,7 @@ export async function upsertRecordPayload(
             );
             await DELAY(TWO_SECONDS, null);
             if (!res || !res.data) {
-                mlog.warn(`upsertRecordPayload() batchIndex=${i} res.data is undefined. Skipping...`);
+                mlog.warn(`[upsertRecordPayload()] batchIndex=${i} res.data is undefined. Skipping...`);
                 continue;
             }
             const resData = res.data as RecordResponse;
@@ -64,16 +65,19 @@ export async function upsertRecordPayload(
                 .reduce((acc, postResult) => {
                     acc[postResult.recordType] = (acc[postResult.recordType] || 0) + 1;
                     return acc;
-                }, {} as Record<string, number>
+                }, {} as Record<string, any>
             );
+            summary.numSuccess = (resData?.results?.length || 0);
+            summary.numFailed = (resData?.rejects?.length || 0);
+            summary.batchSize = batch.length;
+            // summary.successRatio = (resData?.results?.length || 0) / batch.length;
             mlog.debug(
-                `upsertRecordPayload() finished batch ${i+1} of ${batches.length};`,
-                `numResults/numRequested = (${resData?.results?.length || 0}/${batch.length})`,
+                `[upsertRecordPayload()] finished batch ${i+1} of ${batches.length};`,
                 TAB+`summary:`, indentedStringify(summary)
             );
             continue;
         } catch (error) {
-            mlog.error(`Error in put.ts upsertRecordPayload().upsertRecordArray.PUT(batchIndex=${i}):`);
+            mlog.error(`Error in put.ts [upsertRecordPayload()].upsertRecordArray.PUT(batchIndex=${i}):`);
             write({timestamp: getCurrentPacificTime(), caught: error}, ERROR_DIR, `ERROR_upsertRecordPayload_batch_${i}.json`);
             continue;
         }
@@ -82,9 +86,9 @@ export async function upsertRecordPayload(
 }
 
 /**
- * @param accessToken `string`
- * @param scriptId `number` - the script ID of the RESTlet to call
- * @param deployId `number` - the deploy ID of the RESTlet to call
+ * @param accessToken `string` - see {@link getAccessToken}
+ * @param scriptId `number`
+ * @param deployId `number`
  * @param payload `Record<string, any> | any` - the payload to send to the RESTlet
  * @param contentType {@link AxiosContentTypeEnum}`.JSON | AxiosContentTypeEnum.PLAIN_TEXT`. default = {@link AxiosContentTypeEnum.JSON},
  * @returns **`response`** - `Promise<any>` - the response from the RESTlet
@@ -97,16 +101,16 @@ export async function PUT(
     contentType: AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN_TEXT = AxiosContentTypeEnum.JSON,
 ): Promise<any> {
     if (!scriptId || !deployId) {
-        mlog.error('put.ts PUT().scriptId or deployId is undefined. Cannot call RESTlet.');
-        throw new Error('put.ts PUT().scriptId or deployId is undefined. Cannot call RESTlet.');
+        mlog.error('[put.ts PUT()] scriptId or deployId is undefined. Cannot call RESTlet.');
+        throw new Error('[put.ts PUT()] scriptId or deployId is undefined. Cannot call RESTlet.');
     }
     if (!accessToken) {
-        mlog.error('put.ts PUT().accessToken is undefined. Cannot call RESTlet.');
-        throw new Error('put.ts PUT().accessToken is undefined. Cannot call RESTlet.');
+        mlog.error('[put.ts PUT()] accessToken is undefined. Cannot call RESTlet.');
+        throw new Error('[put.ts PUT()] accessToken is undefined. Cannot call RESTlet.');
     }
     if (!payload) {
-        mlog.error('put.ts PUT().payload is undefined. Cannot call RESTlet.');
-        throw new Error('put.ts PUT().payload is undefined. Cannot call RESTlet.');
+        mlog.error('[put.ts PUT()] payload is undefined. Cannot call RESTlet.');
+        throw new Error('[put.ts PUT()] payload is undefined. Cannot call RESTlet.');
     }
     /** = `'${`{@link RESTLET_URL_STEM}`}?script=${scriptId}&deploy=${deployId}'` */
     const restletUrl = createUrlWithParams(RESTLET_URL_STEM, {

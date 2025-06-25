@@ -1,11 +1,19 @@
 /**
  * @file src/csvParser.ts
+ * @consideration maybe try to enacpsulate parse output into a class that evaluator functions can use...
+ * - so that they can reference fields that have already been parsed to prevent repeat function calls...
+ * - and other global variables like rowIndex and csvFilePath 
+ * @consideration
+ * - instead of parsing csv directly to type of `RecordOptions`, could instead parse to
+ * record interfaces from src/utils/ns, then have a function that converts those
+ * to `RecordOptions`
+ * @TODO allow one FieldParseOptions to generate multiple fieldId:FieldValue pairs for the FieldDictionary
  */
 import { 
     mainLogger as mlog, 
     parseLogger as plog, 
     INDENT_LOG_LINE as TAB, 
-    NEW_LINE as NL, DEBUG_LOGS, INFO_LOGS,
+    NEW_LINE as NL, DEBUG_LOGS as DEBUG, INFO_LOGS as INFO,
     indentedStringify,
     STOP_RUNNING
 } from "./config";
@@ -39,14 +47,6 @@ import {
     SubrecordValue, SetFieldSubrecordOptions, SetSublistSubrecordOptions, 
     RecordOptions, RecordTypeEnum, isFieldValue, isSubrecordValue
 } from "./utils/api";
-
-/**
- * @consideration
- * - instead of parsing csv directly to type of `PostRecordOptions`, could instead parse to
- * record interfaces from src/utils/ns, then have a function that converts those
- * to `PostRecordOptions`
- * @TODO allow one FieldParseOptions to generate multiple fieldId:FieldValue pairs for the FieldDictionary
- */
 
 /** use to set the field `"isinactive"` to false */
 const NOT_DYNAMIC = false;
@@ -84,7 +84,7 @@ export async function parseRecordCsv(
         );
         return {};
     }
-    mlog.info(`[START parseRecords()]`,
+    INFO.push(`[START parseRecordCsv()]`,
         TAB+`recordTypes: ${JSON.stringify(Object.keys(parseOptions))}`,
         TAB+`   filePath: '${filePath}'`,
     );           
@@ -99,8 +99,8 @@ export async function parseRecordCsv(
         fs.createReadStream(filePath)
             .pipe(csv({ separator: delimiter}))
             .on('data', (row: Record<string, any>) => {
-                DEBUG_LOGS.push(
-                    (DEBUG_LOGS.length > 0 ? NL : '')+`[START ROW] rowIndex: ${rowIndex}:`,
+                DEBUG.push(
+                    (DEBUG.length > 0 ? NL : '')+`[START ROW] rowIndex: ${rowIndex}:`,
                 );
                 for (const recordType of Object.keys(parseOptions)) {
                     const { 
@@ -111,7 +111,7 @@ export async function parseRecordCsv(
                      * `if row` pertains to an existing record in `IntermediateParseResults` 
                      * (e.g. recordType=salesorder and have already processed one of its rows) 
                      * */
-                    DEBUG_LOGS.push(
+                    DEBUG.push(
                         NL+ `recordType: '${recordType}', idColumn: '${keyColumn}', recordId: '${recordId}' -> isExistingRecord ? ${recordId in intermediate[recordType]}`,
                     );
                     let postOptions = (intermediate[recordType][recordId]  
@@ -129,8 +129,8 @@ export async function parseRecordCsv(
                         sublistOptions as SublistDictionaryParseOptions
                     );
                 }
-                // mlog.debug(...DEBUG_LOGS, NL+`[END ROW] rowIndex: ${rowIndex}:`,);
-                DEBUG_LOGS.length = 0; // clear debug logs for next row
+                // mlog.debug(...DEBUG, NL+`[END ROW] rowIndex: ${rowIndex}:`,);
+                DEBUG.length = 0;
                 rowIndex++;
             })
             .on('error', (error: Error) => {
@@ -144,11 +144,13 @@ export async function parseRecordCsv(
                     acc[recordType] = results[recordType].length;
                     return acc;
                 }, {} as Record<string, number>);
-                mlog.info(`[END parseRecordCsv()]`,
+                INFO.push(NL+`[END parseRecordCsv()]`,
                     TAB + `  recordTypes: ${JSON.stringify(Object.keys(parseOptions))}`,
                     TAB + `Last rowIndex: ${rowIndex}`,
                     TAB + `Parse Summary: ${indentedStringify(parseSummary)}`
                 );
+                mlog.info(...INFO);
+                INFO.length = 0;
                 resolve(results)
             });
     });
@@ -228,14 +230,14 @@ function processSublistDictionaryParseOptions(
     sublists: SublistDictionary,
     sublistOptions: SublistDictionaryParseOptions,
 ): SublistDictionary {
-    // DEBUG_LOGS.push(
+    // DEBUG.push(
     //     NL + `[START processSublistDictionaryParseOptions()]`,
     //     TAB+`Object.keys(sublistOptions): ${JSON.stringify(Object.keys(sublistOptions))}`,
     // );
     if (!row || !sublistOptions || isEmptyArray(Object.keys(sublistOptions))) {
         return sublists;
     }
-    // DEBUG_LOGS.push(
+    // DEBUG.push(
     //     NL+`sublists BEFORE processSublistLineParseOptions(): ${indentedStringify(sublists)}`
     // );
     for (const [sublistId, lineOptionsArray] of Object.entries(sublistOptions)) {
@@ -246,7 +248,7 @@ function processSublistDictionaryParseOptions(
             row, sublistId, sublistLines, lineOptionsArray as SublistLineParseOptions[]
         );
     }
-    // DEBUG_LOGS.push(
+    // DEBUG.push(
     //     NL+`sublists AFTER processSublistLineParseOptions(): ${indentedStringify(sublists)}`,
     //     NL + `[END processSublistDictionaryParseOptions()]`
     // );
@@ -264,6 +266,16 @@ function processSublistLineParseOptions(
     }
     for (const lineOptions of lineOptionsArray) {
         const newSublistLine: SublistLine = {};
+        if (lineOptions.lineIdProp) {
+            // mlog.debug(`lineOptions.lineIdProp is truthy`,
+            //     TAB+`sublistId: '${sublistId}'`,
+            //     // TAB+`lineOptions: ${JSON.stringify(lineOptions)}`,
+            //     TAB+`lineOptions.lineIdProp: '${lineOptions.lineIdProp}'`,
+            // );
+            // STOP_RUNNING(); 
+            newSublistLine.lineIdProp = lineOptions.lineIdProp; 
+            delete lineOptions.lineIdProp;
+        }
         for (const sublistFieldId of Object.keys(lineOptions)) {
             const valueOptions = lineOptions[sublistFieldId];
             // mlog.info(`processSublistLineParseOptions()`,
@@ -312,7 +324,7 @@ function generateSetSublistSubrecordOptions(
     if (!row || !parentSublistId || !parentFieldId || isNullLike(subrecordOptions)) {
         return {} as SetSublistSubrecordOptions;
     }
-    // DEBUG_LOGS.push(
+    // DEBUG.push(
     //     NL + `[START generateSetSublistSubrecordOptions()]`, 
     //     TAB+`parentSublistId: '${parentSublistId}'`,
     //     TAB+`  parentFieldId: '${parentFieldId}'`,
@@ -329,7 +341,7 @@ function generateSetSublistSubrecordOptions(
     if (sublistOptions && isNonEmptyArray(Object.keys(sublistOptions))) {
         result.sublists = processSublistDictionaryParseOptions(row, {}, sublistOptions);
     }
-    // DEBUG_LOGS.push(NL + `[END generateSetSublistSubrecordOptions()]`,); 
+    // DEBUG.push(NL + `[END generateSetSublistSubrecordOptions()]`,); 
     return result;
 }
 
@@ -375,7 +387,7 @@ function parseFieldValue(
     fieldId: string,
     valueParseOptions: FieldParseOptions,
 ): FieldValue {
-    // DEBUG_LOGS.push(
+    // DEBUG.push(
     //     NL +`[START parseFieldValue()] - fieldId: '${fieldId}'`,
     // );
     if (!fieldId || typeof fieldId !== 'string' || isNullLike(valueParseOptions)) {
@@ -383,7 +395,7 @@ function parseFieldValue(
     }
     let value: FieldValue | undefined = undefined;
     const { defaultValue, colName, evaluator, args } = valueParseOptions;
-    // DEBUG_LOGS.push(
+    // DEBUG.push(
     //     TAB+`defaultValue: '${defaultValue}'`,
     //     TAB+`     colName: '${colName}'`,
     //     TAB+`   evlauator: '${evaluator ? evaluator.name+'()': undefined}'`,
@@ -391,19 +403,19 @@ function parseFieldValue(
     // );
     if (evaluator) {
         value = evaluator(row, ...(args || []));
-        // DEBUG_LOGS.push(NL+` -> value from evaluator(row) = '${value}'`);
+        // DEBUG.push(NL+` -> value from evaluator(row) = '${value}'`);
     } else if (colName) {
         value = transformValue(
             cleanString(row[colName]), colName, fieldId, 
                 isNonEmptyArray(args) ? args[0] as ValueMapping : undefined
         );
-        // DEBUG_LOGS.push(NL+` -> value from transformValue(row[colName]) = '${value}'`);
+        // DEBUG.push(NL+` -> value from transformValue(row[colName]) = '${value}'`);
     }
     if (defaultValue !== undefined && (value === undefined || value === '')) {
         value = defaultValue;
-        // DEBUG_LOGS.push(NL+` -> value from defaultValue ='${value}'`);
+        // DEBUG.push(NL+` -> value from defaultValue ='${value}'`);
     }   
-    // DEBUG_LOGS.push(NL+`[END parseFieldValue()] - fieldId: '${fieldId}' -> value: '${value}'`);
+    // DEBUG.push(NL+`[END parseFieldValue()] - fieldId: '${fieldId}' -> value: '${value}'`);
     return value as FieldValue;
 }
 
@@ -467,10 +479,31 @@ export function isDuplicateSublistLine(
     if (!isNonEmptyArray(existingLines)) { // existingLines isEmptyArray === true, or it's undefined
         return false;
     }
-    // DEBUG_LOGS.push(
-    //     NL + `isDuplicateSublistLine() - checking for duplicate sublist line.`,
-    // );
+    DEBUG.push(
+        NL + `isDuplicateSublistLine() - checking for duplicate sublist line.`,
+    );
     const isDuplicateSublistLine = existingLines.some((existingLine, sublistLineIndex) => {
+        const canCompareUsingLineIdProp = Boolean(
+            existingLine.lineIdProp && newLine.lineIdProp
+            && typeof existingLine.lineIdProp === 'string' 
+            && typeof newLine.lineIdProp === 'string'  
+            && Boolean(newLine[newLine.lineIdProp])
+            && typeof newLine[newLine.lineIdProp] === 'string' 
+            && typeof existingLine[existingLine.lineIdProp] === 'string'
+            && existingLine.lineIdProp === newLine.lineIdProp
+        );
+        if (canCompareUsingLineIdProp) {
+            DEBUG.push(NL + `canCompareUsingLineIdProp === true`,
+                TAB + `              existingLine.lineIdProp: '${existingLine.lineIdProp}'`,
+                TAB + `                   newLine.lineIdProp: '${newLine.lineIdProp}'`,
+                TAB + `existingLine[existingLine.lineIdProp]: '${existingLine[existingLine.lineIdProp as string]}'`,
+                TAB + `          newLine[newLine.lineIdProp]: '${newLine[newLine.lineIdProp as string]}'`,
+            );
+            let idProp = existingLine.lineIdProp as string;
+            return equivalentAlphanumeric(
+                existingLine[idProp] as string, newLine[idProp] as string
+            );
+        } 
         return Object.keys(newLine).every(fieldId => {
             const valA = existingLine[fieldId];
             const valB = newLine[fieldId];
@@ -480,7 +513,7 @@ export function isDuplicateSublistLine(
                 )
                 : areEquivalentObjects(valA as SubrecordValue, valB as SubrecordValue)
             );
-            // DEBUG_LOGS.push(
+            // DEBUG.push(
             //     TAB + `sublistLineIndex: ${sublistLineIndex}, fieldId: '${fieldId}',`,
             //     TAB + `valA: '${valA}'`,
             //     TAB + `valB: '${valB}'`,
@@ -489,7 +522,7 @@ export function isDuplicateSublistLine(
             return areFieldsEqual;
         });
     });
-    // DEBUG_LOGS.push(
+    // DEBUG.push(
     //     NL + ` -> return isDuplicateSublistLine === ${isDuplicateSublistLine}`,
     // );
     return isDuplicateSublistLine;

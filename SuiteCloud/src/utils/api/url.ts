@@ -4,7 +4,6 @@
 
 import { REDIRECT_URI } from "src/config/env";
 import { GrantTypeEnum } from "src/server/types";
-import { exchangeAuthCodeForTokens, exchangeRefreshTokenForNewTokens } from "src/server/authServer";
 
 
 export type SearchParamValue = string | number | boolean;
@@ -45,7 +44,8 @@ export function createUrlWithParams(
         } else if (typeof value === "object") {
             url.searchParams.append(key, JSON.stringify(value));
         } else {
-            throw new Error(`createUrlWithParams() Value for key '${key}'`);// must be a primitives or an array of primitives.`);
+            throw new Error(`createUrlWithParams() Value for key '${key}'`);
+            // must be a primitives or an array of primitives.`);
         }
     }
     return url;
@@ -53,15 +53,16 @@ export function createUrlWithParams(
 
 
 /**
- * @param code - The authorization code received from the OAuth callback. is defined when this function is called in {@link exchangeAuthCodeForTokens}`(authCode)` 
+ * @deprecated
+ * @param code - The authorization code received from the OAuth callback.
  * - code !== undefined -> grant_type=authorization_code
- * @param refreshToken - The refresh token received from the initial token response. is defined when this function is called in {@link exchangeRefreshTokenForNewTokens}`(refreshToken)` 
+ * @param refreshToken - The refresh token received from the initial token response.
  * - refreshToken !== undefined -> grant_type=refresh_token
  * @param redirectUri - The redirect URI used in the OAuth flow. Default is {@link REDIRECT_URI}.
  * @returns {URLSearchParams} params, see {@link URLSearchParams}
  * @reference {@link https://nodejs.org/api/url.html#class-urlsearchparams}
  */
-export function generateAxiosParams(
+function generateAxiosParams(
     code?: string, 
     refreshToken?: string, 
     redirectUri: string=REDIRECT_URI

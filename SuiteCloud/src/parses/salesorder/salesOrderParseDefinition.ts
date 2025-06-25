@@ -6,8 +6,7 @@ import {
     ContactRoleEnum,
     SearchOperatorEnum,
     idPropertyEnum,
-    idSearchOptions,
-    CustomerCategoryEnum, 
+    idSearchOptions, 
     SB_TERM_DICTIONARY as TERM_DICT,
 } from "../../utils/api/types";
 import { CustomerStatusEnum, CustomerTaxItemEnum } from "../../utils/api/types";
@@ -22,8 +21,7 @@ import {
 } from "../../utils/io";
 import * as evaluate from "../evaluatorFunctions";
 import * as customerEval from "../customer/customerEvaluatorFunctions";
-import * as contactEval from "../contact/contactEvaluatorFunctions";
-import { SalesOrderCustomerColumnEnum as SO_C, SalesOrderColumnEnum as SO } from "./salesOrderConstants";
+import { SalesOrderColumnEnum as SO } from "./salesOrderConstants";
 /** use to set the field `"isinactive"` to false */
 const NOT_INACTIVE = false;
 /**
@@ -31,22 +29,22 @@ const NOT_INACTIVE = false;
  * then look for name to extract from these columns
  * */
 export const NAME_COLUMNS = [
-    SO.ENTITY, SO_C.PRIMARY_CONTACT, SO_C.STREET_ONE, SO_C.STREET_TWO, 
-    SO_C.SHIP_TO_STREET_ONE, SO_C.SHIP_TO_STREET_TWO,
+    SO.ENTITY_ID, SO.PRIMARY_CONTACT, SO.STREET_ONE, SO.STREET_TWO, 
+    SO.SHIP_TO_STREET_ONE, SO.SHIP_TO_STREET_TWO,
 ]
 /** Look for {@link evaluate.attention} names in these columns for the billing address */
 export const BILLING_NAME_COLUMNS = [
-    SO_C.STREET_ONE, SO_C.STREET_TWO, SO_C.PRIMARY_CONTACT,  SO_C.ENTITY_ID
+    SO.STREET_ONE, SO.STREET_TWO, SO.PRIMARY_CONTACT,  SO.ENTITY_ID
 ]
 
 /** Look for {@link evaluate.attention} names in these columns for the shipping address */
 export const SHIPPING_NAME_COLUMNS = [
-    SO_C.SHIP_TO_STREET_ONE, SO_C.SHIP_TO_STREET_TWO, 
-    SO_C.PRIMARY_CONTACT, SO_C.ENTITY_ID
+    SO.SHIP_TO_STREET_ONE, SO.SHIP_TO_STREET_TWO, 
+    SO.PRIMARY_CONTACT, SO.ENTITY_ID
 ];
 
 const BILLING_ATTENTION_ARGS: evaluate.AttentionArguments = {
-    entityIdColumn: SO_C.ENTITY_ID, 
+    entityIdColumn: SO.ENTITY_ID, 
     salutationColumn: undefined,
     firstNameColumn: undefined,
     middleNameColumn: undefined,
@@ -55,7 +53,7 @@ const BILLING_ATTENTION_ARGS: evaluate.AttentionArguments = {
 }
 
 const SHIPPING_ATTENTION_ARGS: evaluate.AttentionArguments = {
-    entityIdColumn: SO_C.ENTITY_ID, 
+    entityIdColumn: SO.ENTITY_ID, 
     salutationColumn: undefined,
     firstNameColumn: undefined,
     middleNameColumn: undefined,
@@ -64,16 +62,16 @@ const SHIPPING_ATTENTION_ARGS: evaluate.AttentionArguments = {
 }
 
 const BILLING_STREET_ARGS: evaluate.StreetArguments = {
-    streetLineOneColumn: SO_C.STREET_ONE, 
-    streetLineTwoColumn: SO_C.STREET_TWO,
+    streetLineOneColumn: SO.STREET_ONE, 
+    streetLineTwoColumn: SO.STREET_TWO,
     companyNameColumn: undefined,
     addresseeFunction: customerEval.customerCompany, 
     ...BILLING_ATTENTION_ARGS
 }
 
 const SHIPPING_STREET_ARGS: evaluate.StreetArguments = {
-    streetLineOneColumn: SO_C.SHIP_TO_STREET_ONE,
-    streetLineTwoColumn: SO_C.SHIP_TO_STREET_TWO,
+    streetLineOneColumn: SO.SHIP_TO_STREET_ONE,
+    streetLineTwoColumn: SO.SHIP_TO_STREET_TWO,
     companyNameColumn: undefined,
     addresseeFunction: customerEval.customerCompany,
     ...SHIPPING_ATTENTION_ARGS
@@ -81,39 +79,47 @@ const SHIPPING_STREET_ARGS: evaluate.StreetArguments = {
 
 
 export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions = {
-    'entityid': { evaluator: evaluate.entityId, args: [SO_C.ENTITY_ID] },
+    'entityid': { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
     'isinactive': { defaultValue: NOT_INACTIVE },
-    'email': { evaluator: evaluate.email, args: [SO_C.EMAIL] },
-    'phone': { evaluator: evaluate.phone, args: [SO_C.PHONE] },
-    'fax': { evaluator: evaluate.phone, args: [SO_C.FAX] },
+    'email': { evaluator: evaluate.email, args: [SO.EMAIL] },
+    'phone': { evaluator: evaluate.phone, args: [SO.PHONE] },
+    'fax': { evaluator: evaluate.phone, args: [SO.FAX] },
 }
 
+/** 
+ * (body subrecord) 
+ * - fieldId: `'billaddress'` 
+ * */
 const BILLING_ADDRESS_OPTIONS: SubrecordParseOptions = {
     subrecordType: 'address',
     fieldOptions:{
-        'country': { evaluator: evaluate.country, args: [SO_C.COUNTRY, SO_C.STATE] },
-        'addressee': { evaluator: customerEval.customerCompany, args: [SO_C.ENTITY_ID] },
+        'country': { evaluator: evaluate.country, args: [SO.COUNTRY, SO.STATE] },
+        'addressee': { evaluator: customerEval.customerCompany, args: [SO.ENTITY_ID] },
         'attention': { evaluator: evaluate.attention, args: [BILLING_ATTENTION_ARGS] },
         'addr1': { evaluator: evaluate.street, args: [1, BILLING_STREET_ARGS] },
         'addr2': { evaluator: evaluate.street, args: [2, BILLING_STREET_ARGS] },
-        'city': { colName: SO_C.CITY },
-        'state': { evaluator: evaluate.state, args: [SO_C.STATE]},
-        'zip': { colName: SO_C.ZIP },
-        // 'addrphone': { evaluator: evaluate.phone, args: BILLING_PHONE_COLUMNS },
+        'city': { colName: SO.CITY },
+        'state': { evaluator: evaluate.state, args: [SO.STATE]},
+        'zip': { colName: SO.ZIP },
+        'addrphone': { evaluator: evaluate.phone, args: [SO.PHONE] },
     } as FieldDictionaryParseOptions,
 };
 
+/** 
+ * (body subrecord) 
+ * - fieldId: `'shipaddress'` 
+ * */
 const SHIPPING_ADDRESS_OPTIONS: SubrecordParseOptions = {
     subrecordType: 'address',
     fieldOptions: { 
-        'country': { evaluator: evaluate.country, args: [SO_C.SHIP_TO_COUNTRY, SO_C.SHIP_TO_STATE]},
-        'addressee': { evaluator: customerEval.customerCompany, args: [SO_C.ENTITY_ID] },
+        'country': { evaluator: evaluate.country, args: [SO.SHIP_TO_COUNTRY, SO.SHIP_TO_STATE]},
+        'addressee': { evaluator: customerEval.customerCompany, args: [SO.ENTITY_ID] },
         'attention': { evaluator: evaluate.attention, args: [SHIPPING_ATTENTION_ARGS] },
         'addr1': { evaluator: evaluate.street, args: [1, SHIPPING_STREET_ARGS] },
         'addr2': { evaluator: evaluate.street, args: [2, SHIPPING_STREET_ARGS] },
-        'city': { colName: SO_C.SHIP_TO_CITY },
-        'state': { evaluator: evaluate.state, args: [SO_C.SHIP_TO_STATE]},
-        'zip': { colName: SO_C.SHIP_TO_ZIP },
-        // 'addrphone': { evaluator: evaluate.phone, args: SHIPPING_PHONE_COLUMNS },
+        'city': { colName: SO.SHIP_TO_CITY },
+        'state': { evaluator: evaluate.state, args: [SO.SHIP_TO_STATE]},
+        'zip': { colName: SO.SHIP_TO_ZIP },
+        'addrphone': { evaluator: evaluate.phone, args: [SO.PHONE] },
     } as FieldDictionaryParseOptions,
 };

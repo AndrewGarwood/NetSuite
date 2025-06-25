@@ -5,7 +5,7 @@
 import { parseLogger as plog, mainLogger as mlog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS 
 } from '../config';
-import { HUMAN_VENDOR_LIST } from './vendor/vendorConstants';
+import { HUMAN_VENDORS_TRIMMED } from './vendor/vendorConstants';
 import { 
     FieldValue, 
     StateAbbreviationEnum as STATES, 
@@ -18,11 +18,13 @@ import {
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, COMPANY_KEYWORDS_PATTERN, COMPANY_ABBREVIATION_PATTERN,
     checkForOverride, isValidEmail,
     SALUTATION_REGEX, ATTN_SALUTATION_PREFIX_PATTERN, LAST_NAME_COMMA_FIRST_NAME_PATTERN,
-    ValueMapping,
+    ValueMapping, REMOVE_ATTN_SALUTATION_PREFIX,
     ColumnSliceOptions, StringReplaceOptions, equivalentAlphanumericStrings as equivalentAlphanumeric,
     stringContainsAnyOf
 } from "../utils/io";
 
+/**@TODO maybe find way allow evaluator functions to reference fields that have already been parsed to prevent repeat function calls... */
+/**temporarily put logs here instead of commenting out log statements */
 const SUPPRESS: any[] = [];
 export const ENTITY_VALUE_OVERRIDES: ValueMapping = {
 } 
@@ -38,7 +40,7 @@ export const entityId = (
 ): string => {
     let entity = cleanString(
         row[entityIdColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION
-    ) || '';
+    );
     return checkForOverride(
         entity, entityIdColumn, ENTITY_VALUE_OVERRIDES
     ) as string;
@@ -64,7 +66,7 @@ export const externalId = (
  * @description
  * Check if the entity is a person or a company based on the `row` context data 
  * using the following assumptions/rules:
- * - `If` the `entityId` is in the {@link HUMAN_VENDOR_LIST} list, it is a person.
+ * - `If` the `entityId` is in the {@link HUMAN_VENDORS_TRIMMED} list, it is a person.
  * - `If` the `entityId` matches the {@link COMPANY_KEYWORDS_PATTERN} or ends with {@link COMPANY_ABBREVIATION_PATTERN}, consider it is a company.
  * - `If` `/[0-9@]+/.test(entityId)`, it is a company.
  * - `If` the `entityId` is a single word, it is a company.
@@ -88,9 +90,9 @@ export const isPerson = (
         ? cleanString(row[companyColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
         : ''
     );
-    if (HUMAN_VENDOR_LIST.includes(entity)) {
+    if (HUMAN_VENDORS_TRIMMED.includes(entity)) {
         // log.debug(...[...logArr, TAB + `-> return true`]);
-        DEBUG_LOGS.push(NL + `-> return true because entity '${entity}' is in HUMAN_VENDOR_LIST`);
+        DEBUG_LOGS.push(NL + `-> return true because entity '${entity}' is in HUMAN_VENDORS_TRIMMED`);
         return true;
     }
     if (COMPANY_KEYWORDS_PATTERN.test(entity) 
@@ -109,7 +111,7 @@ export const isPerson = (
     SUPPRESS.push(
         NL+ `isPerson():`,
         NL + `entityIdColumn = '${entityIdColumn}' -> entity = '${entity}'`,`companyColumn = '${companyColumn}'`, 
-        TAB + `HUMAN_VENDOR_LIST.includes('${entity}') = ${HUMAN_VENDOR_LIST.includes(entity)}`,
+        TAB + `HUMAN_VENDORS_TRIMMED.includes('${entity}') = ${HUMAN_VENDORS_TRIMMED.includes(entity)}`,
         TAB + `COMPANY_KEYWORDS_PATTERN.test('${entity}')  = ${COMPANY_KEYWORDS_PATTERN.test(entity)}`,
         TAB + `'${entity}' ends with company abbreviation  = ${stringEndsWithAnyOf(entity, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`,
         TAB + `/[0-9@]+/.test('${entity}')                 = ${/[0-9@&]+/.test(entity)}`,

@@ -32,83 +32,95 @@ import { CUSTOMER_PARSE_OPTIONS, CONTACT_PARSE_OPTIONS,
 import * as customerFiles from './parses/customer/customerConstants';
 import { parseRecordCsv } from "./csvParser";
 import { processParseResults } from "./parseResultsProcessor";
-import { RadioFieldBoolean, RADIO_FIELD_TRUE } from './utils/typeValidation';
+import { RadioFieldBoolean, RADIO_FIELD_TRUE, isNonEmptyArray } from './utils/typeValidation';
 
 /** 
  * {@link RecordResponseOptions}
- * - `responseFields: ['entityid', 'companyname', 'email']` 
+ * - `responseFields: ['entityid', 'isperson', 'companyname', 'email'];` 
  * - `responseSublists: { 'addressbook': [...] }` 
  * */
-const entityResponseOptions: RecordResponseOptions = {
-    responseFields: ['entityid', 'companyname', 'email'],
+const ENTITY_RESPONSE_OPTIONS: RecordResponseOptions = {
+    responseFields: ['entityid', 'isperson', 'companyname', 'email'],
     responseSublists: { 'addressbook': [
-        'addressid', 'label', 'defaultbilling', 'defaultshipping', // 'addressbookaddress'
+        'addressid', 'label', 'defaultbilling', 'defaultshipping', 'addressbookaddress'
     ] }
 };
 const TWO_SECONDS = 2000;
-
+const allData = [
+    customerFiles.FIRST_PART_FILE, 
+    customerFiles.SECOND_PART_FILE, 
+    customerFiles.THIRD_PART_FILE
+];
 async function main() {
     clearLogFile(DEFAULT_LOG_FILEPATH, ERROR_LOG_FILEPATH, PARSE_LOG_FILEPATH);
+    const entityType = RecordTypeEnum.CUSTOMER;
+    const filePaths = 
+        [customerFiles.SINGLE_COMPANY_FILE];
+        // allData; 
+    mlog.info(`[START main()]`);
+    await DELAY(TWO_SECONDS);
+    for (let i = 0; i < filePaths.length; i++) {
+        const csvFilePath = filePaths[i];
+        let fileName = path.basename(csvFilePath);
+        const parseOptions: ParseOptions = {
+            [entityType]: CUSTOMER_PARSE_OPTIONS,
+            [RecordTypeEnum.CONTACT]: CONTACT_PARSE_OPTIONS
+        };
+        const parseResults: ParseResults = await parseRecordCsv(
+            csvFilePath, parseOptions
+        );
+        // write(parseResults, 
+        //     path.join(OUTPUT_DIR, `${fileName}_parseResults.json`)
+        // );
+        const validatedResults: ValidatedParseResults = processParseResults(
+            parseResults, 
+            POST_PROCESSING_OPTIONS as ProcessParseResultsOptions 
+        );
+        const invalidOptions = Object.keys(validatedResults).reduce((acc, recordType) => {
+            const invalid = validatedResults[recordType].invalid;
+            if (isNonEmptyArray(invalid)) {
+                acc[recordType] = invalid;
+            }
+            return acc;
+        }, {} as Record<string, RecordOptions[]>);
+        write(validatedResults[entityType].valid, 
+            path.join(OUTPUT_DIR, `${fileName}_validOptions.json`)
+        );
+        write(invalidOptions, 
+            path.join(CLOUD_LOG_DIR, `${fileName}_invalidOptions.json`)
+        );
+        // STOP_RUNNING(0);
+        // await DELAY(TWO_SECONDS);
+        const entityResponses: RecordResponse[] 
+            = await putEntities(validatedResults[entityType].valid);
+        // write(entityResponses, 
+        //     path.join(OUTPUT_DIR, `${fileName}_entityResponses.json`)
+        // );
+        await DELAY(TWO_SECONDS);
+        const companyContacts: RecordOptions[] = matchContactsToEntityResponses(
+            validatedResults[RecordTypeEnum.CONTACT].valid, 
+            entityResponses
+        ).companyContacts;
 
-    const csvFilePath = customerFiles.SMALL_SUBSET_FILE;
-    mlog.info(`Start of main() - csvFilePath: '${csvFilePath}'`);
-    await DELAY(TWO_SECONDS);
-    const parseOptions: ParseOptions = {
-        [RecordTypeEnum.CUSTOMER]: CUSTOMER_PARSE_OPTIONS,
-        [RecordTypeEnum.CONTACT]: CONTACT_PARSE_OPTIONS
-    };
-    const parseResults: ParseResults = await parseRecordCsv(
-        csvFilePath, parseOptions
-    );
-    const validatedResults: ValidatedParseResults = processParseResults(
-        parseResults, 
-        POST_PROCESSING_OPTIONS as ProcessParseResultsOptions 
-    );
-    const invalidOptions = Object.keys(validatedResults).reduce((acc, recordType) => {
-        const invalid = validatedResults[recordType].invalid;
-        if (invalid && invalid.length > 0) {
-            acc[recordType] = invalid;
-        }
-        return acc;
-    }, {} as Record<string, RecordOptions[]>);
-    await DELAY(TWO_SECONDS);
-    write(invalidOptions, path.join(OUTPUT_DIR, 'invalidOptions2.json'));
-    // STOP_RUNNING(0);
-    const entityResponses: RecordResponse[] 
-        = await putEntities(validatedResults[RecordTypeEnum.CUSTOMER].valid);
-    await DELAY(TWO_SECONDS);
-    const companyContacts: RecordOptions[] = matchContactsToEntityResponses(
-        validatedResults[RecordTypeEnum.CONTACT].valid, 
-        entityResponses
-    ).companyContacts;
+        const contactResponses: RecordResponse[] 
+            = await putContacts(companyContacts);
+        await DELAY(TWO_SECONDS);
+        const entityUpdates: RecordOptions[] = generateEntityUpdates(
+            EntityRecordTypeEnum.CUSTOMER,
+            contactResponses
+        );
 
-    const contactResponses: RecordResponse[] 
-        = await putContacts(companyContacts);
-    await DELAY(TWO_SECONDS);
-    const entityUpdates: RecordOptions[] = generateEntityUpdates(
-        EntityRecordTypeEnum.CUSTOMER,
-        contactResponses
-    );
-
-    const entityUpdateResponses: RecordResponse[] 
-        = await putEntities(entityUpdates);
-    // write(entityUpdateResponses, 
-    //     path.join(OUTPUT_DIR, 'entityUpdateResponses.json')
-    // );
-    await DELAY(TWO_SECONDS);
-    mlog.info(`End of main()`);
+        const entityUpdateResponses: RecordResponse[] 
+            = await putEntities(entityUpdates);
+        await DELAY(TWO_SECONDS);
+    }
+    mlog.info(`[END main()]`);
     STOP_RUNNING(0);
 }
 main().catch(error => {
     mlog.error('Error executing main() function', Object.keys(error));
     STOP_RUNNING(1);
 });
-/**
- * - next goal: read a salesorder tsv -> parse customers, contacts, addresses
- * - post entities and customers
- * - get customer internalids and use as RecordRef when making salesorder
- * - - in salesorder shipgroup sublist, figure out how to select address from available addresses.
- */
 
 /** = `['entityid', 'companyname', 'isperson', 'email']` */
 export const ENTITY_RESPONSE_PROPS = ['entityid', 'isperson', 'companyname', 'email'];
@@ -122,7 +134,7 @@ export const CONTACT_RESPONSE_PROPS = ['entityid', 'company', 'firstname', 'last
  */
 export async function putEntities(
     entities: RecordOptions[],
-    responseOptions: RecordResponseOptions=entityResponseOptions
+    responseOptions: RecordResponseOptions=ENTITY_RESPONSE_OPTIONS
 ): Promise<RecordResponse[]> {
     try {
         const entityRequest: RecordRequest = {
@@ -133,9 +145,9 @@ export async function putEntities(
             await upsertRecordPayload(entityRequest);
         return entityResponses;
     } catch (error) {
-        mlog.error(`postEntities() Error posting entities and contacts.`);
+        mlog.error(`putEntities() Error putting entities.`);
         write({timestamp: getCurrentPacificTime(), caught: error as any}, 
-            ERROR_DIR, 'ERROR_putEntities.json'
+            ERROR_DIR, 'ERROR_puttEntities.json'
         );
     }
     return [];
@@ -159,12 +171,11 @@ export async function putContacts(
             await upsertRecordPayload(contactRequest);
         return contactResponses;
     } catch (error) {
-        mlog.error(`postContacts() Error posting contacts.`);
+        mlog.error(`putContacts() Error putting contacts.`);
         write({timestamp: getCurrentPacificTime(), caught: error as any}, 
             ERROR_DIR, 'ERROR_putContacts.json'
         );
     }
-    mlog.warn(`postContacts() returning empty array.`);
     return [] as RecordResponse[];
 }
 
@@ -181,22 +192,26 @@ export function generateEntityUpdates(
     const entityUpdates: RecordOptions[] = [];
     const contactResults: RecordResult[] = getRecordResults(contactResponses);    
     for (let contactResult of contactResults) {
+        if (!contactResult || !contactResult.fields) {
+            mlog.warn(`[generateEntityUpdates()] contactResult or contactResult.fields is undefined. Continuing...`);
+            continue;
+        }
         entityUpdates.push({
             recordType: entityType,
             idOptions: [
                 { 
                     idProp: idPropertyEnum.INTERNAL_ID, 
                     searchOperator: SearchOperatorEnum.RECORD.ANY_OF, 
-                    idValue: contactResult?.fields?.company // = ${entityType}'s internalid
+                    idValue: contactResult.fields.company // = ${entityType}'s internalid
                 },
                 { 
                     idProp: idPropertyEnum.ENTITY_ID, 
                     searchOperator: SearchOperatorEnum.TEXT.IS, 
-                    idValue: contactResult?.fields?.entityid
+                    idValue: contactResult.fields.entityid
                 } 
             ] as idSearchOptions[],
             fields: {
-                contact: contactResult?.internalid 
+                contact: contactResult.internalid 
             } as FieldDictionary,
         } as RecordOptions);
     }
@@ -205,24 +220,20 @@ export function generateEntityUpdates(
 
 /**
  * @param postResponses `Array<`{@link RecordResponse}`>`
- * @returns **`postResults`** = `Array<`{@link RecordResult}`>`
+ * @returns **`recordResults`** = `Array<`{@link RecordResult}`>`
  */
 export function getRecordResults(
     postResponses: RecordResponse[]
 ): RecordResult[] {
-    const postResults: RecordResult[] = [];
+    const recordResults: RecordResult[] = [];
     for (let entityResponse of postResponses) {
         if (!entityResponse || !entityResponse.results) {
-            mlog.error(`entityResponse or entityResponse.results is undefined. Continuing...`);
+            mlog.error(`[getRecordResults()] entityResponse or entityResponse.results is undefined. Continuing...`);
             continue;
         }
-        postResults.push(...entityResponse.results as RecordResult[]);
+        recordResults.push(...entityResponse.results as RecordResult[]);
     }
-    if (postResults.length === 0) {
-        mlog.warn(`No entityResults found. Returning empty array.`);
-        return [];
-    }
-    return postResults;
+    return recordResults;
 }
 
 /**
@@ -237,7 +248,7 @@ export function countCompanyEntities(entities: RecordOptions[]): number {
         const isPerson: RadioFieldBoolean = entity?.fields?.isperson as RadioFieldBoolean;
         if (isPerson === RADIO_FIELD_TRUE) {
             continue;
-        } // else, this entity: {PostRecordOptions} is a company
+        } // else, this (entity: RecordOptions) is a company
         numCompanyEntities++;
     }
     return numCompanyEntities;
@@ -280,21 +291,25 @@ export function matchContactsToEntityResponses(
          * - `therefore` extract the `entityid` value to compare in lookup 
          * by using indexOf(' ')+1 and slice() to get the part after the first space.
          * */
-        const entityInternalId = entityResults.find(entityResult => {
+        const entityMatch = entityResults.find(entityResult => {
             let entityId = String(entityResult?.fields?.entityid) || '';
             return entityId.slice(entityId.indexOf(' ')+1) === contactCompany
                 || entityResult?.fields?.companyname === contactCompany
-        }
-        )?.internalid;
-        if (!entityInternalId) {
-            mlog.warn(
-                `entityInternalId is undefined for contact with company '${contactCompany}' at contacts[index=${i}].`, 
-                TAB+`Adding to unmatchedContacts.`
-            );
+        });
+        // either no entity match found, 
+        // or entity is a person and thus a contact record cannot be made for it.
+        if (!entityMatch || !entityMatch.internalid 
+            || (entityMatch.fields && entityMatch.fields.isperson === RADIO_FIELD_TRUE)
+        ) {
+            mlog.debug(`matchContactsToEntityResponses() - no entity match found for contact`,
+                TAB+`  no entityMatch ? ${!entityMatch}`,
+                TAB+`   no internalid ? ${entityMatch && !entityMatch.internalid}`,
+                TAB+`isperson === 'T' ? ${entityMatch && entityMatch.fields && entityMatch.fields.isperson === RADIO_FIELD_TRUE}`,
+            ); 
             unmatchedContacts.push(contact);
             continue;
         }
-        contact.fields.company = entityInternalId;
+        contact.fields.company = entityMatch.internalid;
         companyContacts.push(contact);
     }
     return {
@@ -310,7 +325,7 @@ async function test_getRecordById() {
     const id = 41810;
     // mlog.debug(`recordInternalId: ${id}`);
     const response = await getRecordById(
-        recordType, id, undefined, entityResponseOptions
+        recordType, id, undefined, ENTITY_RESPONSE_OPTIONS
     ) as GetRecordResponse;
     write(response, path.join(OUTPUT_DIR, 'test_getRecordById_Response.json'));
     mlog.debug(`End of test_getRecordById()`);
@@ -319,7 +334,7 @@ async function test_getRecordById() {
 async function test_upsertRecordPayload() {
     const payload: RecordRequest = {
         postOptions: [SAMPLE_CUSTOMER] as RecordOptions[],
-        responseOptions: entityResponseOptions,
+        responseOptions: ENTITY_RESPONSE_OPTIONS,
     };
     const responses = await upsertRecordPayload(payload) as RecordResponse[];
     mlog.debug(`End of testUpsertRecordPayload()`);

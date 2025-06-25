@@ -46,6 +46,9 @@ export type FieldDictionaryParseOptions = {
 
 /**
  * @typedefn **`SublistDictionaryParseOptions`**
+ * - dictionary mapping sublistIds to `Array<`{@link SublistLineParseOptions}`>`
+ * - {@link SublistLineParseOptions} = 
+ * - `{ [sublistFieldId: string]: `{@link FieldParseOptions} | {@link SubrecordParseOptions}` } & { lineIdProp?: string }`
  */
 export type SublistDictionaryParseOptions = {
     [sublistId: string] : Array<SublistLineParseOptions>;
@@ -54,9 +57,14 @@ export type SublistDictionaryParseOptions = {
 
 /**
  * @typedefn **`SublistLineParseOptions`**
+ * @property {string} [lineIdProp] `string` - `optional` the `'internalid'` of the sublist field used to identify existing sublist lines for editing.
+ * - e.g. for the addressbook sublist, can define values for the sublistFieldId 'label', then set 'label' as the `lineIdProp`. 
  */
 export type SublistLineParseOptions = { 
     [sublistFieldId: string]: FieldParseOptions | SubrecordParseOptions
+} & { 
+    /**`string` - the `'internalid'` of the sublist field used to identify existing sublist lines for editing. */
+    lineIdProp?: string 
 }
 /*
  * @property {string} sublistLineKeyColumn - If there is a column name that uniquely identifies a sublist line,
@@ -68,22 +76,27 @@ export type SublistLineParseOptions = {
 /**
  * `evaluator` and `colName` are mutually exclusive.
  * @typedefn **`FieldValueParseOptions`**
- * @property {FieldValue} [defaultValue] - The default value to set if `row[colName]` or `evaluator(row)` is `undefined`.
+ * @property {FieldValue} [defaultValue] - The default value to use if `row[colName]` or `evaluator(row)` is `undefined`.
  * @property {string} [colName] - The column name in the CSV file containing the value for the body field.
- * @property {function} [evaluator] - A function that takes a `row` object and returns the value for the `fieldId`. This is used when the value is not in the CSV file or is determined by the contents/context of the `row`.
+ * @property {function} [evaluator] - A function that takes a `row` object and returns the value for the `fieldId`. 
+ * - This is used when the value is not in the CSV file or is determined by the contents/context of the `row`.
  * @property {Array<any>} [args] - An optional array of arguments to pass to the `evaluator` function.
  */
-export type FieldParseOptions =  {
-    defaultValue?: FieldValue; 
+export type FieldParseOptions = {
+    /**The default value to use if `row[colName]` or `evaluator(row,...)` is `undefined` */
+    defaultValue?: FieldValue;
+} & ({
+    /**The column name in the CSV file containing the value for the `field`. */
     colName?: string; 
     evaluator?: never; 
     args?: never; 
 } | { 
-    defaultValue?: FieldValue; 
     colName?: never; 
+    /**`function` that takes a `row` object (and arbitrary `args`) and returns the value for the `field`. */
     evaluator?: (row: Record<string, any>, ...args: any[]) => FieldValue; 
+    /**`optional` `array` of arguments to pass to the `evaluator` function. */
     args?: any[]; 
-};
+});
 
 /**
  * @typedefn **`FieldSubrecordParseOptions`**

@@ -6,14 +6,16 @@ import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify } 
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "./url";
-import { getAccessToken, AxiosCallEnum, AxiosContentTypeEnum } from "../../server";
+import { AxiosCallEnum, AxiosContentTypeEnum } from "../../server";
 import { 
     DeleteRecordByTypeRequest, DeleteExcludeOptions, DeleteRecordByTypeResponse,
 } from "./types";
-import { SB_REST_SCRIPTS } from "./configureRequests";
+import { getAccessToken, SB_REST_SCRIPTS } from "./configureRequests";
 
-const DELETE_RECORD_BY_TYPE_SCRIPT_ID = SB_REST_SCRIPTS.DELETE_DeleteRecordByType.scriptId as number;
-const DELETE_RECORD_BY_TYPE_DEPLOY_ID = SB_REST_SCRIPTS.DELETE_DeleteRecordByType.deployId as number;
+const DELETE_RECORD_BY_TYPE_SCRIPT_ID = 
+    SB_REST_SCRIPTS.DELETE_DeleteRecordByType.scriptId as number;
+const DELETE_RECORD_BY_TYPE_DEPLOY_ID = 
+    SB_REST_SCRIPTS.DELETE_DeleteRecordByType.deployId as number;
 
 /**
  * @param accessToken `string`
