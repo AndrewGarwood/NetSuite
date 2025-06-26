@@ -1,6 +1,7 @@
 /**
  * @file src/parseResultsProcessor.ts
  * @description handle post processing options of csvParser ParseResults.
+ * @TODO add another post processing options object.. something like "ComputeOptions" for fields whose values can only be determined after parse is complete.
  */
 
 import { 
@@ -25,13 +26,24 @@ import {
 } from "./utils/api";
 import { 
     cleanString, equivalentAlphanumericStrings as equivalentAlphanumeric,
-    ParseResults, RecordPostProcessingOptions, CloneOptions,
-    isRecordOptions, isCloneOptions,
+    ParseResults, RecordPostProcessingOptions, CloneOptions, ComposeOptions,
+    isRecordOptions, isCloneOptions, isComposeOptions,
     ValidatedParseResults,
-    ProcessParseResultsOptions
+    ProcessParseResultsOptions,
+    PostProcessingOperationEnum as OperationEnum
 } from "./utils/io";
 import { cloneDeep } from "lodash";
 
+
+
+/**
+ * Default operation order if none is specified
+ */
+const DEFAULT_OPERATION_ORDER: OperationEnum[] = [
+    OperationEnum.CLONE,
+    OperationEnum.COMPOSE,
+    OperationEnum.PRUNE
+];
 
 /**
  * @param initialResults {@link ParseResults}
@@ -51,6 +63,7 @@ export function processParseResults(
         )
         return {};
     }
+    // Initialize results structure
     const results: ValidatedParseResults = {};
     for (const recordType of Object.keys(initialResults)) {
         const isInvalidParseResultsEntry = (!recordType 
@@ -69,43 +82,76 @@ export function processParseResults(
             return {};
         }
         results[recordType] = { valid: [], invalid: [] };
-    };
-    for (const recordType of Object.keys(options)) { // cloning first
-        const { cloneOptions } = options[recordType] as RecordPostProcessingOptions;
+    }
+
+    // Process each record type according to its operation order
+    for (const recordType of Object.keys(options)) {
         if (!recordType || typeof recordType !== 'string' || !hasKeys(initialResults, recordType)) {
             mlog.error(`processParseResults() Invalid ProcessParseResultsOptions.recordType:`,
-                TAB+`expected: 'recordType' (string) to be a valid record type key in parseResults.`,
+                TAB+`expected: 'recordType' (string) to be a valid record type key in initialResults.`,
                 TAB+`received: ${typeof recordType} = '${recordType}'`,
-                TAB+`needed key in parseResults keys: ${JSON.stringify(Object.keys(initialResults))}`,
+                TAB+`needed key in initialResults keys: ${JSON.stringify(Object.keys(initialResults))}`,
                 TAB+`continuing to next processOptions...`,
             );
             continue;
         }
-        if (isCloneOptions(cloneOptions)) {
-            for (let i = 0; i < initialResults[recordType].length; i++) {
-                initialResults[recordType][i] = processCloneOptions(
-                    initialResults, recordType, i, cloneOptions
-                );
-            }
+        const processes = options[recordType] as RecordPostProcessingOptions;
+        const operationOrder = processes.operationOrder || DEFAULT_OPERATION_ORDER;
+        const orderIsInvalid = Boolean(operationOrder.length !== 3 
+            || Array.from(new Set(operationOrder)).length !== 3 
+            || operationOrder.some(op => !Object.values(OperationEnum).includes(op))
+        );
+        if (orderIsInvalid) {
+            mlog.error(`[processParseResults()] Invalid operationOrder. Expected exactly 3 operations`,
+                TAB+`Expected permutation of ${JSON.stringify(Object.values(OperationEnum))}.`,
+                TAB+`Received: ${JSON.stringify(operationOrder)}`,
+            );
+            throw new Error(`[processParseResults()] Invalid operationOrder. Expected exactly 3 operations`,);
         }
-    }
-    
-    for (const recordType of Object.keys(options)) { // pruning second
-        const { pruneFunc } = options[recordType] as RecordPostProcessingOptions;
-        if (pruneFunc && typeof pruneFunc === 'function') {
-            for (const postOptions of initialResults[recordType]) {
-                let pruneResult = pruneFunc(postOptions);
-                if (!pruneResult) {
-                    results[recordType].invalid.push(postOptions);
-                    continue;
-                }
-                results[recordType].valid.push(postOptions);
+        for (const operation of operationOrder) {
+            switch (operation) {
+                case OperationEnum.CLONE:
+                    if (!isCloneOptions(processes.cloneOptions)) { break; }
+                    for (let i = 0; i < initialResults[recordType].length; i++) {
+                        initialResults[recordType][i] = processCloneOptions(
+                            initialResults, recordType, i, processes.cloneOptions
+                        );
+                    }
+                    break;
+                case OperationEnum.COMPOSE:
+                    if (!isComposeOptions(processes.composeOptions)) { break; }
+                    for (let i = 0; i < initialResults[recordType].length; i++) {
+                        initialResults[recordType][i] = processComposeOptions(
+                            initialResults[recordType][i], processes.composeOptions
+                        );
+                    }
+                    break;
+                case OperationEnum.PRUNE:
+                    if (!processes.pruneFunc || typeof processes.pruneFunc !== 'function') {
+                        // If no prune function, all records are considered valid 
+                        results[recordType].valid.push(...initialResults[recordType]);
+                        break;
+                    }
+                    for (const record of initialResults[recordType]) {
+                        const pruneResult = processes.pruneFunc(record);
+                        if (!pruneResult) {
+                            results[recordType].invalid.push(record);
+                            continue;
+                        }
+                        results[recordType].valid.push(pruneResult);
+                    }
+                    break;
+                default:
+                    mlog.warn(`[processParseResults()] WARNING: Invalid operation:`,
+                        TAB+ `received unknown operation '${operation}' for recordType: ${recordType}`
+                    );
+                    break;
             }
         }
     }
     const summary: Record<string, any> = Object.keys(results).reduce((acc, recordType) => {
         acc[recordType] = {
-            initialCount: initialResults[recordType].length,    
+            initialCount: initialResults[recordType] ? initialResults[recordType].length : 0,    
             validCount: results[recordType].valid.length,
             pruneCount: results[recordType].invalid.length,
         };
@@ -118,6 +164,7 @@ export function processParseResults(
 }
 
 /**
+ * @TODO maybe modify so that can clone values from self to other fields on own record
  * @param parseResults {@link ParseResults}
  * @param recordType {@link RecordTypeEnum} | {@link EntityRecordTypeEnum} | `string` - the recipient record type
  * @param index `number` - index of the recipient {@link RecordOptions} in `parseResults[recordType]`
@@ -142,7 +189,7 @@ function processCloneOptions(
         donorType, recipientType, idProp, fieldIds, sublistIds 
     } = cloneOptions;
     if (!idProp || !donorType || !recipientType || recordType !== recipientType
-        || !hasKeys(parseResults,[donorType, recipientType])
+        || !hasKeys(parseResults, [donorType, recipientType])
         || (!isNonEmptyArray(fieldIds) && !isNonEmptyArray(sublistIds))
     ) {
         mlog.error(`processCloneOptions() Invalid CloneOptions - returning postOptions unchanged:`,);
@@ -169,7 +216,7 @@ function processCloneOptions(
     }
     if (isNonEmptyArray(fieldIds) && hasNonTrivialKeys(donorOptions.fields)) {
         if (!recipientOptions.fields) {
-            recipientOptions.fields = {};
+            recipientOptions.fields = {} as FieldDictionary;
         }
         for (const fieldId of fieldIds) {
             if (!(fieldId in donorOptions.fields)) {
@@ -203,6 +250,72 @@ function processCloneOptions(
 }
 
 /**
+ * @param record {@link RecordOptions} - the record options to compose additional fields/sublists for
+ * @param composeOptions {@link ComposeOptions} - options for composing fields and sublists
+ * @returns **`recordOptions`** {@link RecordOptions} - the modified record options
+ */
+function processComposeOptions(
+    record: RecordOptions,
+    composeOptions: ComposeOptions
+): RecordOptions {
+    if (!isRecordOptions(record)) {
+        mlog.error(`[processComposeOptions()] Invalid RecordOptions:`,
+            TAB+`expected: RecordOptions object, received: ${typeof record} = '${indentedStringify(record)}'`,
+            TAB+`Returning record unchanged.`
+        );
+        return record;
+    }
+    if (composeOptions.fields && hasNonTrivialKeys(composeOptions.fields)) {
+        if (!record.fields) {
+            record.fields = {};
+        }
+        
+        for (const [fieldId, fieldConfig] of Object.entries(composeOptions.fields)) {
+            try {
+                if (fieldConfig.composer && typeof fieldConfig.composer === 'function') {
+                    const composedValue = fieldConfig.composer(record);
+                    record.fields[fieldId] = composedValue;
+                }
+            } catch (error) {
+                mlog.error(`[processComposeOptions()] Error composing field '${fieldId}':`,
+                    TAB+`Error: ${error}`,
+                    TAB+`Skipping field composition...`
+                );
+            }
+        }
+    }
+
+    // Compose sublists
+    if (composeOptions.sublists && hasNonTrivialKeys(composeOptions.sublists)) {
+        if (!record.sublists) {
+            record.sublists = {} as SublistDictionary;
+        }
+        for (const [sublistId, sublistConfig] of Object.entries(composeOptions.sublists)) {
+            if (!record.sublists[sublistId] || isEmptyArray(record.sublists[sublistId])) {
+                record.sublists[sublistId] = [{} as SublistLine];
+            }
+            // compose fields for each line
+            for (let i = 0; i < record.sublists[sublistId].length; i++) {
+                for (const [sublistFieldId, fieldConfig] of Object.entries(sublistConfig)) {
+                    try {
+                        if (fieldConfig.composer && typeof fieldConfig.composer === 'function') {
+                            const composedValue = fieldConfig.composer(record);
+                            record.sublists[sublistId][i][sublistFieldId] = composedValue;
+                        }
+                    } catch (error) {
+                        mlog.error(`[processComposeOptions()] Error composing sublist field '${sublistId}.${sublistFieldId}':`,
+                            TAB+`Error: ${error}`,
+                            TAB+`Skipping sublist field composition...`
+                        );
+                    }
+                }
+            }
+        }
+    }
+    return record;
+}
+
+/**
  * @param postOptions {@link RecordOptions} - the record options to get the id from
  * @param idProp `string` - the property to search for the id, see {@link idPropertyEnum}
  * @returns `string | undefined` - the id value if found, `undefined` otherwise
@@ -213,7 +326,8 @@ function getRecordId(
 ): string | undefined {
     if (postOptions.idOptions) {
         const idOption = postOptions.idOptions.find(idOption => 
-            idOption.idProp === idProp);
+            idOption.idProp === idProp
+        );
         return idOption ? idOption.idValue as string: undefined;
     } else if (postOptions.fields && hasKeys(postOptions.fields, idProp)) {
         return postOptions.fields[idProp] as string;
