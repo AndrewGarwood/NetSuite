@@ -21,6 +21,7 @@ import {
 } from "../../utils/io";
 import * as evaluate from "../evaluatorFunctions";
 import * as customerEval from "../customer/customerEvaluatorFunctions";
+import * as soEval from "./salesOrderEvaluatorFunctions";
 import { SalesOrderColumnEnum as SO } from "./salesOrderConstants";
 /** use to set the field `"isinactive"` to false */
 const NOT_INACTIVE = false;
@@ -78,13 +79,13 @@ const SHIPPING_STREET_ARGS: evaluate.StreetArguments = {
 }
 
 
-export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions = {
-    'entityid': { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
-    'isinactive': { defaultValue: NOT_INACTIVE },
-    'email': { evaluator: evaluate.email, args: [SO.EMAIL] },
-    'phone': { evaluator: evaluate.phone, args: [SO.PHONE] },
-    'fax': { evaluator: evaluate.phone, args: [SO.FAX] },
-}
+// export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions = {
+//     entityid: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
+//     isinactive: { defaultValue: NOT_INACTIVE },
+//     email: { evaluator: evaluate.email, args: [SO.EMAIL] },
+//     phone: { evaluator: evaluate.phone, args: [SO.PHONE] },
+//     fax: { evaluator: evaluate.phone, args: [SO.FAX] },
+// }
 
 /** 
  * (body subrecord) 
@@ -92,16 +93,15 @@ export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions = {
  * */
 const BILLING_ADDRESS_OPTIONS: SubrecordParseOptions = {
     subrecordType: 'address',
-    fieldOptions:{
-        'country': { evaluator: evaluate.country, args: [SO.COUNTRY, SO.STATE] },
-        'addressee': { evaluator: customerEval.customerCompany, args: [SO.ENTITY_ID] },
-        'attention': { evaluator: evaluate.attention, args: [BILLING_ATTENTION_ARGS] },
-        'addr1': { evaluator: evaluate.street, args: [1, BILLING_STREET_ARGS] },
-        'addr2': { evaluator: evaluate.street, args: [2, BILLING_STREET_ARGS] },
-        'city': { colName: SO.CITY },
-        'state': { evaluator: evaluate.state, args: [SO.STATE]},
-        'zip': { colName: SO.ZIP },
-        'addrphone': { evaluator: evaluate.phone, args: [SO.PHONE] },
+    fieldOptions: {
+        country: { evaluator: evaluate.country, args: [SO.COUNTRY, SO.STATE] },
+        addressee: { evaluator: customerEval.customerCompany, args: [SO.ENTITY_ID] },
+        attention: { evaluator: evaluate.attention, args: [BILLING_ATTENTION_ARGS] },
+        addr1: { evaluator: evaluate.street, args: [1, BILLING_STREET_ARGS] },
+        addr2: { evaluator: evaluate.street, args: [2, BILLING_STREET_ARGS] },
+        city: { colName: SO.CITY },
+        state: { evaluator: evaluate.state, args: [SO.STATE]},
+        zip: { colName: SO.ZIP },
     } as FieldDictionaryParseOptions,
 };
 
@@ -112,14 +112,52 @@ const BILLING_ADDRESS_OPTIONS: SubrecordParseOptions = {
 const SHIPPING_ADDRESS_OPTIONS: SubrecordParseOptions = {
     subrecordType: 'address',
     fieldOptions: { 
-        'country': { evaluator: evaluate.country, args: [SO.SHIP_TO_COUNTRY, SO.SHIP_TO_STATE]},
-        'addressee': { evaluator: customerEval.customerCompany, args: [SO.ENTITY_ID] },
-        'attention': { evaluator: evaluate.attention, args: [SHIPPING_ATTENTION_ARGS] },
-        'addr1': { evaluator: evaluate.street, args: [1, SHIPPING_STREET_ARGS] },
-        'addr2': { evaluator: evaluate.street, args: [2, SHIPPING_STREET_ARGS] },
-        'city': { colName: SO.SHIP_TO_CITY },
-        'state': { evaluator: evaluate.state, args: [SO.SHIP_TO_STATE]},
-        'zip': { colName: SO.SHIP_TO_ZIP },
-        'addrphone': { evaluator: evaluate.phone, args: [SO.PHONE] },
+        country: { evaluator: evaluate.country, args: [SO.SHIP_TO_COUNTRY, SO.SHIP_TO_STATE]},
+        addressee: { evaluator: customerEval.customerCompany, args: [SO.ENTITY_ID] },
+        attention: { evaluator: evaluate.attention, args: [SHIPPING_ATTENTION_ARGS] },
+        addr1: { evaluator: evaluate.street, args: [1, SHIPPING_STREET_ARGS] },
+        addr2: { evaluator: evaluate.street, args: [2, SHIPPING_STREET_ARGS] },
+        city: { colName: SO.SHIP_TO_CITY },
+        state: { evaluator: evaluate.state, args: [SO.SHIP_TO_STATE]},
+        zip: { colName: SO.SHIP_TO_ZIP },
     } as FieldDictionaryParseOptions,
 };
+//        addrphone: { evaluator: evaluate.phone, args: [SO.PHONE] },
+
+const LINE_ITEM_SUBLIST_OPTIONS: SublistDictionaryParseOptions = {
+    item: [{
+        item: { evaluator: () => {return "not implemented"}, args: [SO.ITEM] },
+        quantity: { colName: SO.QUANTITY },
+        rate: { colName: SO.RATE },
+        amount: { colName: SO.AMOUNT },
+    }] as SublistLineParseOptions[],
+};
+
+/** use then remove these entries in post processing */
+export const INTERMEDIATE_ENTRIES: FieldDictionaryParseOptions = {
+    transactiontype: { colName: SO.TRAN_TYPE }, 
+
+}
+
+export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
+    keyColumn: SO.TRAN_ID,
+    fieldOptions: {
+        ...INTERMEDIATE_ENTRIES,
+        entity: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
+        checknumber: { colName: SO.CHECK_NUMBER },
+        trandate: { colName: SO.TRAN_DATE },
+        saleseffectivedate: { colName: SO.TRAN_DATE },
+        shipdate: { colName: SO.SHIP_DATE },
+        billaddress: BILLING_ADDRESS_OPTIONS,
+        shipaddress: SHIPPING_ADDRESS_OPTIONS,
+    },
+    sublistOptions: {
+        ...LINE_ITEM_SUBLIST_OPTIONS,
+    }
+}
+
+/*
+post processing:
+class: evaluate salesorder.class based on all line items in the order...?
+remove fields.transactiontype
+*/

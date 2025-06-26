@@ -1,18 +1,45 @@
-import { EntityRecordTypeEnum, idPropertyEnum, RecordOptions, RecordTypeEnum } from "src/utils/api";
+/**
+ * @file src/utils/io/types/PostProcessing.ts
+ */
+import { 
+    EntityRecordTypeEnum, FieldValue, idPropertyEnum, RecordOptions, 
+    RecordTypeEnum 
+} from "src/utils/api";
+
+/**
+ * Defines the order of operations for post-processing
+ * @enum {string} **`PostProcessingOperationEnum`**
+ * @property {string} CLONE - Represents the clone operation. (see {@link CloneOptions})
+ * @property {string} COMPOSE - Represents the compose operation. (see {@link ComposeOptions})
+ * @property {string} PRUNE - Represents the prune operation, which is a user-defined function 
+ * that modifies or removes records from the results.
+ */
+export enum PostProcessingOperationEnum {
+    CLONE = 'clone',
+    COMPOSE = 'compose',
+    PRUNE = 'prune'
+}
 
 /**
  * @TODO maybe add something like a "RecordReferenceOptions" so that if the 
  * `ParseRecordOptions` object has a field that requires a record reference, 
- * call the api to get it from NetSuite with a corresponding `idSearchOptions` object
+ * call the GET_Record endpoint to get it from NetSuite with a corresponding `idSearchOptions` object
  * - {@link ParseResults}
  * @typedefn **`RecordPostProcessingOptions`**
  * @property {CloneOptions} [cloneOptions] - {@link CloneOptions} - Options for cloning records.
+ * @property {ComposeOptions} [composeOptions] - {@link ComposeOptions} - Options for composing additional fields or sublists for the record based on the ParseResults.
  * @property {function} [pruneFunc] - A function that takes a {@link RecordOptions} object and returns a modified version of it or `null` to remove the record from the results.
+ * @property {PostProcessingOperationEnum[]} [operationOrder] - Array defining the order of operations to perform. Defaults to [CLONE, COMPOSE, PRUNE].
  */
 export type RecordPostProcessingOptions = {
     cloneOptions?: CloneOptions;
+    composeOptions?: ComposeOptions;
     pruneFunc?: (options: RecordOptions) => RecordOptions | null;
+    operationOrder?: PostProcessingOperationEnum[];
 }
+
+
+
 export type ProcessParseResultsOptions = {
     [recordType: string]: RecordPostProcessingOptions;
 }
@@ -32,3 +59,26 @@ export type CloneOptions = {
     fieldIds?: string[];
     sublistIds?: string[];
 }
+
+
+/**
+ * Used to add key value pairs to the `fields` and `sublists` of a {@link RecordOptions} 
+ * object in post processing.
+ * @typedefn **`ComposeOptions`**
+ * @property {RecordTypeEnum | EntityRecordTypeEnum | string} recordType - {@link RecordTypeEnum}
+ */
+export type ComposeOptions = {
+    recordType: RecordTypeEnum | EntityRecordTypeEnum | string,
+    fields?: {
+        [fieldId: string]: {
+            composer: (options: RecordOptions) => FieldValue;
+        };
+    },
+    sublists?: {
+        [sublistId: string]: {
+            [sublistFieldId: string]: {
+                composer: (options: RecordOptions) => FieldValue;
+            };
+        };
+    }
+};

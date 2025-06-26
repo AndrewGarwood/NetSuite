@@ -42,7 +42,7 @@ import { RadioFieldBoolean, RADIO_FIELD_TRUE, isNonEmptyArray } from './utils/ty
 const ENTITY_RESPONSE_OPTIONS: RecordResponseOptions = {
     responseFields: ['entityid', 'isperson', 'companyname', 'email'],
     responseSublists: { 'addressbook': [
-        'addressid', 'label', 'defaultbilling', 'defaultshipping', 'addressbookaddress'
+        'addressid', 'label', 'defaultbilling', 'defaultshipping', // 'addressbookaddress'
     ] }
 };
 const TWO_SECONDS = 2000;
@@ -55,8 +55,8 @@ async function main() {
     clearLogFile(DEFAULT_LOG_FILEPATH, ERROR_LOG_FILEPATH, PARSE_LOG_FILEPATH);
     const entityType = RecordTypeEnum.CUSTOMER;
     const filePaths = 
-        [customerFiles.SINGLE_COMPANY_FILE];
-        // allData; 
+        // [customerFiles.SMALL_SUBSET_FILE];
+        allData; 
     mlog.info(`[START main()]`);
     await DELAY(TWO_SECONDS);
     for (let i = 0; i < filePaths.length; i++) {
@@ -83,9 +83,9 @@ async function main() {
             }
             return acc;
         }, {} as Record<string, RecordOptions[]>);
-        write(validatedResults[entityType].valid, 
-            path.join(OUTPUT_DIR, `${fileName}_validOptions.json`)
-        );
+        // write(validatedResults[entityType].valid, 
+        //     path.join(CLOUD_LOG_DIR, `${fileName}_validOptions.json`)
+        // );
         write(invalidOptions, 
             path.join(CLOUD_LOG_DIR, `${fileName}_invalidOptions.json`)
         );
@@ -301,7 +301,7 @@ export function matchContactsToEntityResponses(
         if (!entityMatch || !entityMatch.internalid 
             || (entityMatch.fields && entityMatch.fields.isperson === RADIO_FIELD_TRUE)
         ) {
-            mlog.debug(`matchContactsToEntityResponses() - no entity match found for contact`,
+            mlog.debug(`matchContactsToEntityResponses() - no entity match for contactCompany: '${contactCompany}'`,
                 TAB+`  no entityMatch ? ${!entityMatch}`,
                 TAB+`   no internalid ? ${entityMatch && !entityMatch.internalid}`,
                 TAB+`isperson === 'T' ? ${entityMatch && entityMatch.fields && entityMatch.fields.isperson === RADIO_FIELD_TRUE}`,
