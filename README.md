@@ -5,8 +5,7 @@
 
 
 ### My current approach is as follows:
-0. Determine desired objective. For example, if I need to upload a substantial amount of data, I can create records through POST requests 
-1. Write API endpoints so I can make requests to them with paylaods (e.g. [PUT_UpsertRecord.js][upsert_file] for creating/updating records)
+1. Write API endpoints (e.g. [PUT_UpsertRecord.js][upsert_file] for creating/updating records)
 2. I wanted to use TypeScript in VSCode, so I set up an Oauth2.0 flow to communicate with these endpoints (see [AuthManager.ts][oauth_file])
 3. In my use case, the goal is to read data from csv files and store them into [payloads][sample_payloads_file]
 4. Determine proper mapping by using aforementioned [Record Browser][record_browser] and write [ParseOptions][parse_options_file] objects.
