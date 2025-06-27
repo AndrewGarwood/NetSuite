@@ -10,13 +10,10 @@
 2. I wanted to use TypeScript in VSCode, so I set up an Oauth2.0 flow to communicate with these endpoints (see [AuthManager.ts][oauth_file])
 3. In my use case, the goal is to read data from csv files and store them into [payloads][sample_payloads_file]
 4. Determine proper mapping by using aforementioned [Record Browser][record_browser] and write [ParseOptions][parse_options_file] objects.
-5. Then use [ParseOptions][parse_options_file] as a parameter of 
-6. Use authorization tokens generated from authorization flow to make API calls. (e.g. [put.ts][put_file])
-7. Write more features/improvements and refactor as work continues. @TODO JWT tokens
-
-#### Guides I found helpful for using SuiteScript: 
-- [NetSuite RESTlet Creation - SuiteScript 2.0 with OAuth 2 - YouTube][oauth_video]
-- [The SuiteScript Developer's Guide on NetSuite Subrecords - NetSuite Insights][subrecord_guide]
+5. Then use [ParseOptions][parse_options_file] as a parameter of parseRecordsCsv() in [csvParser.ts][parser_file]
+6. Then do some post-processing in [parseResultsProcessor.ts][post_process_file]
+7. Use tokens from authorization flow to make API calls. (e.g. [put.ts][put_file])
+8. Write more features/improvements and refactor as work continues. @TODO JWT tokens
 
 ## Links
 -----
@@ -28,9 +25,9 @@
 [parse_options_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/io/types/ParseOptions.ts
 [upsert_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/FileCabinet/SuiteScripts/REST/PUT/PUT_UpsertRecord.js
 [ouath_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/server/AuthManager.ts
+[parser_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/csvParser.ts
+[post_process_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parseResultsProcessor.ts
 [sample_payloads_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/samplePayloads.ts
 [put_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/put.ts
-[oauth_video]: https://www.youtube.com/watch?v=MAOMQp5dh0U
-[subrecord_guide]: https://netsuite.smash-ict.com/suitescript-developers-guide-on-netsuite-subrecords-part-1/
 [new_put_options_image]: ./images/New_PostRecordOptions.png
 [old_put_options_image]: ./images/Old_PostRecordOptions.png
