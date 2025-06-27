@@ -37,6 +37,8 @@ import { cloneDeep } from "lodash";
 
 
 /**
+ * = `[OperationEnum.CLONE, OperationEnum.COMPOSE, OperationEnum.PRUNE]`
+ * @description
  * Default operation order if none is specified
  */
 const DEFAULT_OPERATION_ORDER: OperationEnum[] = [
@@ -46,6 +48,9 @@ const DEFAULT_OPERATION_ORDER: OperationEnum[] = [
 ];
 
 /**
+ * @TODO maybe change shape of 'options' param to not map recordType to RecordPostProcessingOptions 
+ * because some records' cloneOptions might depend on another's (e.g. trying to clone a field that has been pruned)
+ * ... maybe make a dependency graph or something...
  * @param initialResults {@link ParseResults}
  * @param options {@link ProcessParseResultsOptions} 
  * - = `{ [recordType: string]: `{@link RecordPostProcessingOptions}` }`
@@ -214,6 +219,9 @@ function processCloneOptions(
         );
         return recipientOptions;
     }
+    // mlog.debug(`[processCloneOptions()] - found donor for recipient`,
+    //     TAB+`recipient number of fields before cloning: ${recipientOptions.fields ? Object.keys(recipientOptions.fields).length : 0}`,
+    // );
     if (isNonEmptyArray(fieldIds) && hasNonTrivialKeys(donorOptions.fields)) {
         if (!recipientOptions.fields) {
             recipientOptions.fields = {} as FieldDictionary;
@@ -223,13 +231,18 @@ function processCloneOptions(
                 plog.warn(`processCloneOptions() Field '${fieldId}' not found in donor record:`,
                     TAB+`  donorType: '${donorType}', recipientType: '${recipientType}', idProp: '${idProp}'`,
                     TAB+`recipientId: '${recipientId}'`,
+                    // TAB+`donorOptions.fields: ${indentedStringify(donorOptions.fields)}`,
                     TAB+`Skipping field....`
                 );
-                continue;
+                // STOP_RUNNING(1);
             }
             recipientOptions.fields[fieldId] = cloneDeep(donorOptions.fields[fieldId]);
         }
     }
+    // mlog.debug(`[processCloneOptions()] - cloned fields from donor to recipient`,
+    //     TAB+`recipient number of fields after cloning: ${recipientOptions.fields ? Object.keys(recipientOptions.fields).length : 0}`,
+    // );
+    // STOP_RUNNING(1);
     if (isNonEmptyArray(sublistIds) && hasNonTrivialKeys(donorOptions.sublists)) {
         for (const sublistId of sublistIds) {
             if (!recipientOptions.sublists) {
@@ -284,8 +297,11 @@ function processComposeOptions(
             }
         }
     }
-
-    // Compose sublists
+    if (composeOptions.idOptions 
+        && typeof composeOptions.idOptions.composer === 'function'
+    ) {
+        record.idOptions = composeOptions.idOptions.composer(record);
+    }
     if (composeOptions.sublists && hasNonTrivialKeys(composeOptions.sublists)) {
         if (!record.sublists) {
             record.sublists = {} as SublistDictionary;

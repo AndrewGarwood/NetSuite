@@ -16,6 +16,16 @@ import {
 import { isPerson, firstName, middleName, lastName, entityId } from "../evaluatorFunctions";
 import { SalesOrderColumnEnum as C } from "./salesOrderConstants";
 
-export const externalId = (row: Record<string, any>, ...idColumns: string[]): string => {
+export const externalId = (
+    row: Record<string, any>, 
+    ...idColumns: string[]
+): string => {
     return '';
+}
+
+export const itemSku = (
+    row: Record<string, any>,
+    itemColumn: string = C.ITEM
+): string => {
+    return 'not implemented';
 }

@@ -34,7 +34,13 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
                 'ERROR: GET_Record.get() Invalid request parameters', 
                 `reqParams is empty or undefined`
             );
-            return {}; // as `GetRecordResponse`
+            return {
+                status: 400,
+                message: 'Bad Request',
+                error: 'Invalid request parameters: reqParams is empty or undefined',
+                logArray: logArray,
+                records: []
+            }; // as `GetRecordResponse`
         }
         let { isDynamic, recordType} = reqParams;
         /**@type {idSearchOptions[]} */
@@ -48,15 +54,35 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
                 'ERROR: GET_Record.get() Invalid reqParams.recordType',
                 `recordType must be a valid RecordTypeEnum string, received: '${reqParams.recordType}'`
             );
-            return {}; // as `GetRecordResponse`
+            return {
+                status: 400,
+                message: 'Bad Request',
+                error: `Invalid request parameters: reqParams.recordType. recordType must be a valid RecordTypeEnum string, received: '${reqParams.recordType}'`,
+                logArray: logArray,
+                records: []
+            }; // as `GetRecordResponse`
         }
-        if (!idOptions || isEmptyArray(idOptions)) {
-            writeLog(LogTypeEnum.ERROR,
-                'ERROR: GET_Record.get() Invalid idOptions',
-                `idOptions must be a non-empty array of idSearchOptions,`
-            );
-            return {}; // as `GetRecordResponse`
-        }
+        if (idOptions && isNonEmptyArray(idOptions)) { 
+            return getById(recordType, idOptions, responseOptions);
+        } else if (!idOptions || isEmptyArray(idOptions)) {
+            return getAll(recordType, responseOptions);
+        } // else 
+        return {
+            status: 400,
+            message: 'Bad Request',
+            error: `Invalid request parameters: reqParams.idOptions; received: '${reqParams.idOptions}'`,
+            logArray: logArray,
+            records: []
+        }; // as `GetRecordResponse`
+    };
+
+    /**
+     * @param {RecordTypeEnum | string} recordType 
+     * @param {idSearchOptions[]} idOptions 
+     * @param {RecordResponseOptions} responseOptions 
+     * @returns {GetRecordResponse}
+     */
+    function getById(recordType, idOptions, responseOptions) {
         /**@type {GetRecordResponse} {@link GetRecordResponse} */
         const response = {}
         /**@type {object | undefined} */
@@ -64,7 +90,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
         const recId = searchForRecordById(recordType, idOptions);
         if (isNaN(recId) || recId === null) {
             writeLog(LogTypeEnum.AUDIT,
-                'GET_Record.get() No record found',
+                'GET_Record.getById() No record found',
                 `No record found for recordType '${recordType}' with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`
             );
             response.status = 404;
@@ -75,29 +101,47 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
         }
         response.status = 200;
         response.message = `Found '${recordType}' record with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`;
-        response.record = {
+        response.records = [{
             internalid: recId, 
             recordType, 
             fields: {}, 
             sublists: {}
-        };
+        }];
         rec = record.load({type: recordType, id: recId, isDynamic });
         writeLog(LogTypeEnum.DEBUG, 
             `Loading Existing ${recordType} record with internalid: '${recId}'`, 
         );
         if (responseOptions && responseOptions.responseFields) {
-            response.record.fields = getResponseFields(rec, responseOptions.responseFields);
+            response.records[0].fields = getResponseFields(rec, responseOptions.responseFields);
         }
         if (responseOptions && responseOptions.responseSublists) {
-            response.record.sublists = getResponseSublists(rec, responseOptions.responseSublists);
+            response.records[0].sublists = getResponseSublists(rec, responseOptions.responseSublists);
         }
         response.logArray = logArray;
         writeLog(LogTypeEnum.AUDIT, 
-            `GET_Record.get() Successfully retrieved record`, 
+            `GET_Record.getById() Successfully retrieved record`, 
             `recordType: '${recordType}', internalid: '${recId}'`,
         );
         return response;
-    };
+    }
+
+    /**
+     * @param {RecordTypeEnum | string} recordType 
+     * @param {RecordResponseOptions} responseOptions 
+     * @returns {GetRecordResponse}
+     */
+    function getAll(recordType, responseOptions) {
+        const records = [];
+        /**@type {GetRecordResponse} {@link GetRecordResponse} */
+        const response = {
+            status: 500,
+            message: 'Internal Server Error',
+            error: `getAll() not yet implemented`,
+            logArray: logArray,
+            records: records
+        }
+        return response;
+    }
     
     /**
      * @param {object} rec 
@@ -241,7 +285,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
         if (!Array.isArray(idOptions) || isEmptyArray(idOptions)) { 
             return null;
         }
-        let recordId = null;
+        let recordInternalId = null;
         for (let i = 0; i < idOptions.length; i++) {
             const { idProp, searchOperator, idValue } = idOptions[i];
             if (!idProp || !searchOperator || !idValue) {
@@ -282,9 +326,9 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
                     writeLog(LogTypeEnum.ERROR,
                         'WARNING: searchForRecordById() Multiple records found.',
                         `${resultRange.length} '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
-                        `tentatively storing id of first record found,'${recordId}' then continuing to next idOptions element`
+                        `tentatively storing id of first record found,'${recordInternalId}' then continuing to next idOptions element`
                     );
-                    recordId = resultRange[0].id;
+                    recordInternalId = resultRange[0].id;
                     continue;
                 } else if (resultRange.length === 1) {
                     writeLog(LogTypeEnum.DEBUG,
@@ -302,7 +346,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
                 continue;
             }
         }
-        return recordId ? Number(recordId) : null; // null if no record found
+        return recordInternalId ? Number(recordInternalId) : null; // null if no record found
     }
 /*---------------------------- [ Helper Functions ] ----------------------------*/
 /**
@@ -407,14 +451,19 @@ function validateRecordType(recordType) {
     return null;
 }
 /**
- * @TODO decide if this is necessary abstraction or if should just use `Array.isArray() and arr.length > 0` everywhere
  * @param {any} arr 
- * @returns {boolean} **`true`** `if` `arr` is an array and has at least one element, **`false`** `otherwise`.
+ * @returns {arr is Array<any> & { length: number }} `arr is Array<any> & { length: number }`
+ * - **`true`** `if` `arr` is an array and has at least one element, 
+ * - **`false`** `otherwise`.
  */
-function isNonEmptyArray(arr) {
-    return Array.isArray(arr) && arr.length > 0;
-}
-function isEmptyArray(arr) { return Array.isArray(arr) && arr.length === 0; }
+function isNonEmptyArray(arr) {return Array.isArray(arr) && arr.length > 0; }
+/**
+ * @param {any} val 
+ * @returns {arr is Array<any> & { length: 0 }} `arr is Array<any> & { length: 0 }` 
+ * - **`true`** `if` `arr` is an array and has length = `0` (no elements), 
+ * - **`false`** `otherwise`.
+ */
+function isEmptyArray(val) { return Array.isArray(val) && val.length === 0; }
 /*------------------------ [ Types, Enums, Constants ] ------------------------*/
 /** create/load a record in standard mode by setting `isDynamic` = `false` = `NOT_DYNAMIC`*/
 const NOT_DYNAMIC = false;
@@ -437,7 +486,7 @@ const NOT_DYNAMIC = false;
  * message: string;
  * error?: string;
  * logArray: LogStatement[];
- * record?: RecordResult; 
+ * records: RecordResult[]; 
  * }} GetRecordResponse
  */
 

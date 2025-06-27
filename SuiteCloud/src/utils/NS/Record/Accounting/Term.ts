@@ -17,6 +17,7 @@ export interface TermBase {
     preferred?: boolean;
 }
 
+
 export const SB_TERM_DICTIONARY: Record<string, TermBase> = {
     "Net 15": {
         name: "Net 15",
@@ -98,5 +99,9 @@ export const SB_TERM_DICTIONARY: Record<string, TermBase> = {
     "P.P .- Co Check": {
         name: "Prepay-Payment - Company Check",
         internalid: 109,
+    },
+    "Net 45": {
+        name: "Net 45",
+        internalid: 110,
     },
 }

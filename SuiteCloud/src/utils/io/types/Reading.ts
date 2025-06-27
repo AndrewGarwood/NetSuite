@@ -1,7 +1,7 @@
 /**
  * @file src/utils/io/Reading.ts
  */
-import { stripCharFromString, toTitleCase } from "../regex"
+import { applyStripOptions, toTitleCase } from "../regex"
 import { parseExcelForOneToMany } from "../reading"
 
 
@@ -26,6 +26,15 @@ export type ParseOneToManyOptions = {
     valueCaseOptions?: StringCaseOptions,
     keyPadOptions?: StringPadOptions,
     valuePadOptions?: StringPadOptions
+}
+/**
+ * @typedefn **`CleanStringOptions`**
+ */
+export type CleanStringOptions = {
+    strip?: StringStripOptions,
+    case?: StringCaseOptions,
+    pad?: StringPadOptions,
+    replace?: StringReplaceOptions
 }
 
 /**
@@ -56,7 +65,7 @@ export type StringPadOptions = {
 
 /**
  * @typedefn **`StringStripOptions`**
- * @property {string} char - the character to strip from the string with {@link stripCharFromString}
+ * @property {string} char - the character to strip from the string with {@link applyStripOptions}
  * @property {boolean} [escape] - `true` if the character should be escaped
  * @property {function} [stripLeftCondition] - a function that takes a string and returns `true` if the character should be stripped from the left side of the string
  * @property {any[]} [leftArgs] - arguments to pass to the `stripLeftCondition` function

@@ -29,7 +29,7 @@ const timestampTemplate = `(${dateTemplate} ${timeTemplate})`;
 
 const logNameTemplate = "[{{name}}]"; //"[{{nameWithDelimiterPrefix}}{{name}}{{nameWithDelimiterSuffix}}]";
 const logLevelTemplate = "{{logLevelName}}:";
-const fileInfoTemplate = "{{filePathWithLine}}";//"{{fileName}}:{{fileLine}}";
+const fileInfoTemplate = "{{filePathWithLine}}:{{fileColumn}} {{method}}";//"{{fileName}}:{{fileLine}}";
 /** 
  * use as value for {@link ISettingsParam.prettyLogTemplate} 
  * @description template string for log messages = {@link timestampTemplate} + {@link logNameTemplate} + {@link logLevelTemplate} + {@link fileInfoTemplate} + `\n\t{{logObjMeta}}`
@@ -115,13 +115,18 @@ const PARSE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
 /** `type: "pretty", name: "mainLogger"` */
 export const mainLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
 mainLogger.attachTransport((logObj: ILogObj) => {
-    appendFileSync(DEFAULT_LOG_FILEPATH, JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
+    appendFileSync(
+        DEFAULT_LOG_FILEPATH, 
+        JSON.stringify(modifyLogObj(logObj), null, 4) + "\n", 
+        { encoding: "utf-8" }
+    );
 });
+
 
 /** `type: "pretty", name: "errorLogger"` */
 export const errorLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
 errorLogger.attachTransport((logObj: ILogObj) => { //logObj: ILogObj & ILogObjMeta
-    appendFileSync(ERROR_LOG_FILEPATH, JSON.stringify(logObj) + "\n", { encoding: "utf-8" });
+    appendFileSync(ERROR_LOG_FILEPATH, JSON.stringify(modifyLogObj(logObj)) + "\n", { encoding: "utf-8" });
 });
 
 /** `type: "hidden", name: "parseLogger"` */
@@ -132,24 +137,25 @@ export const parseLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
 
 /** `type: "hidden", name: "pruneLogger"` */
 export const pruneLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
-// pruneLogger.attachTransport((logObj: ILogObj) => {
-//     appendFileSync(path.join(CLOUD_LOG_DIR, 'PRUNE_LOG.txt'), JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
-// });
+/** `type: "hidden", name: "authLogger"` */
+export const authLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
 
 
-/**
- * Clears the content of the specified log file(s).
- * @param filePaths - The path(s) to the log file(s) to clear.
- */
-export function clearLogFile(...filePaths: string[]): void {
-    for (const filePath of filePaths) {
-        if (!filePath || !existsSync(filePath)) {
-            mainLogger.warn(`clearLogFile() Log file does not exist: ${filePath}`);
-            continue;
-        }
-        writeFileSync(filePath, '', { encoding: 'utf-8' });
-    }
+function modifyLogObj(logObj: ILogObj): ILogObj {
+    const meta = logObj['_meta'] as IMeta;
+    const { logLevelName, date, path } = meta;
+    const timestamp = date ? date.toLocaleString() : '';
+    const pathString = `${path?.filePathWithLine}:${path?.fileColumn} ${path?.method ? path.method + '()' : ''}`;
+    delete logObj['_meta'];
+    let compositeInfo = '';
+    if (logLevelName) compositeInfo += `[${logLevelName}] `;
+    if (timestamp) compositeInfo += `(${timestamp}) `;
+    if (pathString) compositeInfo += `${pathString}`;
+    logObj['-1'] = compositeInfo.trim();
+    return logObj;
 }
+
+
 export const INFO_LOGS: any[] = []
 export const DEBUG_LOGS: any[] = [];
-export { indentedStringify } from '../utils/io'
+export { indentedStringify, trimFile, clearFile } from '../utils/io'

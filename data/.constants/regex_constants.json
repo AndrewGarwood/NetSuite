@@ -1,0 +1,20 @@
+{
+    "COMPANY_KEYWORD_LIST":[
+        "company",
+        "corp",
+        "inc",
+        "co\\.",
+        "co\\.?,? ltd\\.?",
+        "limited",
+        "ltd",
+        "gmbh",
+        "plc",
+        "ag",
+        "sarl",
+        "pvt",
+        "llc"
+    ],
+    "JOB_TITLE_SUFFIX_LIST":[
+        "MD"
+    ]
+}

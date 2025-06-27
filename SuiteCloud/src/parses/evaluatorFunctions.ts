@@ -12,6 +12,7 @@ import {
     CountryAbbreviationEnum as COUNTRIES, 
     TermBase as Term,
     RecordTypeEnum,
+    SB_TERM_DICTIONARY as TERM_DICT,
 } from "../utils/api/types";
 import { 
     extractPhone, cleanString, extractEmail, extractName, stringEndsWithAnyOf, RegExpFlagsEnum,
@@ -419,11 +420,7 @@ export const street = (
 export const name = (
     row: Record<string, any>, 
     ...nameColumns: string[]
-): {
-    first: string;
-    middle: string;
-    last: string;
-} => {
+): { first: string; middle: string; last: string; } => {
     for (const col of nameColumns) {
         let initialVal = cleanString(row[col], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION);
         if (!initialVal) {
@@ -539,27 +536,33 @@ export const country = (
     }
 }
 
+/**
+ * @param row 
+ * @param termsColumn 
+ * @param termsDict 
+ * @returns 
+ */
 export const terms = (
     row: Record<string, any>,
     termsColumn: string,
-    termsDict: Record<string, Term> | undefined
+    termsDict: Record<string, Term>=TERM_DICT
 ): FieldValue => {
-    if (!termsDict) {
-        plog.error('evaluateVendorTerms: termDict is undefined. Cannot evaluate terms.');
+    if (!row || !termsColumn || !termsDict) {
+        mlog.error('[evaluateVendorTerms()]: Invalid params. Cannot evaluate terms.');
         return null;
     }
     let termsRowValue = cleanString(row[termsColumn]);
     if (termsRowValue && Object.keys(termsDict).includes(termsRowValue)) {
         return termsDict[termsRowValue].internalid as number;
-    } else if (termsRowValue && Object.keys(termsDict).some((key) => termsDict[key].name === termsRowValue)) {
-        let key = Object.keys(termsDict)
-            .find((key) => termsDict[key].name === termsRowValue);
-        return key ? termsDict[key].internalid as number: null;
-    } else if (!termsRowValue){
+    } 
+    let key = Object.keys(termsDict).find(
+        (key) => termsDict[key].name === termsRowValue
+    );
+    if (!key) {
+        plog.warn(`Invalid terms: '${termsRowValue}'`);
         return null;
     }
-    plog.warn(`Invalid terms: '${termsRowValue}'`);
-    return null;
+    return termsDict[key].internalid as number;
 }
 
 

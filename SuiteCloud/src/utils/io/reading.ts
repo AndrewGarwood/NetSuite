@@ -4,7 +4,7 @@
 import fs from 'fs';
 import xlsx from 'xlsx';
 import { ParseOneToManyOptions } from './types/Reading';
-import { stripCharFromString, cleanString, UNCONDITIONAL_STRIP_DOT_OPTIONS } from './regex';
+import { applyStripOptions, cleanString, UNCONDITIONAL_STRIP_DOT_OPTIONS } from './regex';
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
 import { DelimiterCharacterEnum, ValueMapping, DelimitedFileTypeEnum } from './types';
 import { FieldValue } from '../api/types/InternalApi';
@@ -294,7 +294,7 @@ export function validateFileExtension(filePath: string, expectedExtension: strin
     if (filePath && filePath.endsWith(`.${expectedExtension}`)) {
         isValid = true;
     } else {
-        validatedFilePath = `${filePath}.${stripCharFromString(expectedExtension, UNCONDITIONAL_STRIP_DOT_OPTIONS)}`;
+        validatedFilePath = `${filePath}.${applyStripOptions(expectedExtension, UNCONDITIONAL_STRIP_DOT_OPTIONS)}`;
     }
     return { isValid, validatedFilePath };
 }

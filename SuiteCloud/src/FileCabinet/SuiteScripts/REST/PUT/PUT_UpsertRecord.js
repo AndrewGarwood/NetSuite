@@ -134,34 +134,38 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             );
             return null;
         }
+        const deletions = [];
         /**@type {object | undefined} */
         let rec = undefined;
         isDynamic = typeof isDynamic !== 'boolean' ? NOT_DYNAMIC : isDynamic;
         const recId = searchForRecordById(recordType, idOptions, fields);
         const isExistingRecord = typeof recId === 'number' && recId > 0;
         if (isExistingRecord && fields && isNonEmptyArray(Object.keys(fields))) { 
-            //remove idPropertyEnum values from keys of fields to avoid DUP_ENTITY error.
+            // remove idPropertyEnum values from keys of fields to avoid DUP_ENTITY error.
             for (const idPropFieldId of Object.values(idPropertyEnum)) {
                 if (fields[idPropFieldId]) { 
+                    deletions.push({idProp: idPropFieldId, value: fields[idPropFieldId]});
                     delete fields[idPropFieldId];
                 }
             }
             rec = record.load({type: recordType, id: recId, isDynamic });
-            writeLog(LogTypeEnum.DEBUG, 
-                `Loading Existing ${recordType} record with internalid: '${recId}'`, 
+            writeLog(LogTypeEnum.AUDIT, 
+                `Loading Existing ${recordType} record with internalid: '${recId}'`,
+                `id fields deleted from fields: ${JSON.stringify(deletions)}`,
+                `remaining fields: ${JSON.stringify(fields)}`, 
             );
         } else {
-            writeLog(LogTypeEnum.DEBUG, 
+            writeLog(LogTypeEnum.AUDIT, 
                 `processRecordOptions() creating new '${recordType}' record`, 
                 `processRecordOptions() No existing '${recordType}' record found.`,
-                `-> Creating new '${recordType}' record...`
+                `-> Try Creating new '${recordType}' record...`
             );
             rec = record.create({type: recordType, isDynamic });
         }
-        if (fields && isNonEmptyArray(Object.keys(fields))) {
+        if (isNonEmptyArray(Object.keys(fields))) {
             rec = processFieldDictionary(rec, recordType, fields);
         }
-        if (sublists && isNonEmptyArray(Object.keys(sublists))) {
+        if (isNonEmptyArray(Object.keys(sublists))) {
             rec = processSublistDictionary(rec, recordType, sublists);
         }
         /**@type {RecordResult} {@link RecordResult} */
@@ -222,7 +226,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
          * idOptions is invalid and fields does not have any idPropertyEnum values in its keys
          * -> unable to search for existing record -> return null
          * */
-        if (!Array.isArray(idOptions) || isEmptyArray(idOptions)) { 
+        if (!isNonEmptyArray(idOptions)) { 
             return null;
         }
         let recordId = null;
