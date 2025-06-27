@@ -143,7 +143,9 @@ export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: SO.TRAN_ID,
     fieldOptions: {
         ...INTERMEDIATE_ENTRIES,
+        externalid: { evaluator: soEval.externalId, args: [SO.TRAN_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER]},
         entity: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
+        terms: { evaluator: evaluate.terms, args: [SO.TERMS] },
         checknumber: { colName: SO.CHECK_NUMBER },
         trandate: { colName: SO.TRAN_DATE },
         saleseffectivedate: { colName: SO.TRAN_DATE },
@@ -158,6 +160,7 @@ export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
 
 /*
 post processing:
-class: evaluate salesorder.class based on all line items in the order...?
-remove fields.transactiontype
+- couponcode
+- class: evaluate salesorder.class based on all line items in the order...?
+- remove fields.transactiontype
 */

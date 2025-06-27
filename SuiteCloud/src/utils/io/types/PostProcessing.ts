@@ -2,7 +2,7 @@
  * @file src/utils/io/types/PostProcessing.ts
  */
 import { 
-    EntityRecordTypeEnum, FieldValue, idPropertyEnum, RecordOptions, 
+    EntityRecordTypeEnum, FieldValue, idPropertyEnum, idSearchOptions, RecordOptions, 
     RecordTypeEnum 
 } from "src/utils/api";
 
@@ -69,6 +69,7 @@ export type CloneOptions = {
  */
 export type ComposeOptions = {
     recordType: RecordTypeEnum | EntityRecordTypeEnum | string,
+    idOptions?: { composer: (options: RecordOptions) => idSearchOptions[] },
     fields?: {
         [fieldId: string]: {
             composer: (options: RecordOptions) => FieldValue;
@@ -82,3 +83,11 @@ export type ComposeOptions = {
         };
     }
 };
+
+export type FieldCompositionDictionary = {
+    [fieldId: string]: {
+        composer: CompositionFunction | ((options: RecordOptions) => FieldValue);
+    };
+};
+
+export type CompositionFunction = (options: RecordOptions) => any;

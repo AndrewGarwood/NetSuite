@@ -86,6 +86,18 @@ export const pruneAddressBook = (
             );
             continue;
         }
+        const attentionIsRedundant = Boolean(address.fields 
+            && hasKeys(address.fields, ['addressee', 'attention'])
+            && address.fields.addressee === address.fields.attention
+        );
+        if (attentionIsRedundant) {
+            plog.info(`pruneAddressBook(): sublist line ${i} has redundant attention field, setting it to empty string.`,
+                TAB+`addressee: ${address.fields.addressee}`,
+                TAB+`attention: ${address.fields.attention}`
+            );
+            address.fields.attention = '';
+            addressBook[i].addressbookaddress = address;
+        }
         linesToKeep.push(i);
     }
     let prunedAddressBook: SublistLine[] = [];
@@ -113,7 +125,7 @@ export const contact = (
     }
     
     if (!hasKeys(options.fields, CONTACT_REQUIRED_FIELDS)) {
-        plog.warn(`contact(): options.fields does not have required fields`,
+        mlog.warn(`contact(): options.fields does not have required fields`,
             TAB+`required: ${JSON.stringify(CONTACT_REQUIRED_FIELDS)}`,
             TAB+`received: ${JSON.stringify(Object.keys(options.fields))}`
         );

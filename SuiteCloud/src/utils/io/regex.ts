@@ -1,21 +1,41 @@
 /**
  * @file src/utils/io/regex.ts
  */
-import { DEBUG_LOGS, 
+import { DATA_DIR, validatePath, DEBUG_LOGS, 
     parseLogger as log, 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL 
-} from 'src/config/setupLog';
+} from 'src/config';
+import { readJsonFileAsObject as read } from './reading';
 import { StringCaseOptions, StringPadOptions, StringStripOptions, StringReplaceParams, StringReplaceOptions } from "./types/Reading";
-import { isNonEmptyArray } from '../typeValidation';
+import { hasKeys, isNonEmptyArray } from '../typeValidation';
 import { distance as levenshteinDistance } from 'fastest-levenshtein';
+import path from 'path';
 
+const filePath = path.join(DATA_DIR, '.constants', 'regex_constants.json');
+validatePath(filePath);
+const REGEX_CONSTANTS = read(filePath) as Record<string, any>;
+if (!REGEX_CONSTANTS 
+    || !hasKeys(REGEX_CONSTANTS, ['COMPANY_KEYWORD_LIST', 'JOB_TITLE_SUFFIX_LIST'])
+) {
+    throw new Error(`[regex.ts] Invalid REGEX_CONSTANTS file at '${filePath}'.`
+        +`Expected to have 'COMPANY_KEYWORD_LIST' key.`
+    );
+}
+const COMPANY_KEYWORD_LIST: string[] = REGEX_CONSTANTS.COMPANY_KEYWORD_LIST || [];
+const JOB_TITLE_SUFFIX_LIST: string[] = REGEX_CONSTANTS.JOB_TITLE_SUFFIX_LIST || [];
+if (!isNonEmptyArray(COMPANY_KEYWORD_LIST)) {
+    throw new Error(`[regex.ts] Invalid COMPANY_KEYWORD_LIST in REGEX_CONSTANTS file at '${filePath}'.`);
+}
+if (!isNonEmptyArray(JOB_TITLE_SUFFIX_LIST)) {
+    throw new Error(`[regex.ts] Invalid JOB_TITLE_SUFFIX_LIST in REGEX_CONSTANTS file at '${filePath}'.`);
+}
 
 /**
  * @description
  * - converts to string and trims, then: 
  * - applies options in this order: `StringReplaceOptions`, `StringStripOptions`, `StringCaseOptions`, `StringPadOptions`
  * - Removes leading+trailing spaces, extra spaces, commas, and dots from a string (e.g. `'..'` becomes `'.'`)
- * - optionally applies 4 option params with: {@link String.replace}, {@link stripCharFromString}, {@link handleCaseOptions}, and {@link handlePadOptions}.
+ * - optionally applies 4 option params with: {@link String.replace}, {@link applyStripOptions}, {@link applyCaseOptions}, and {@link applyPadOptions}.
  * @param s - the `string` to clean
  * @param stripOptions — {@link StringStripOptions}
  * - `optional` strip options to apply to the string
@@ -47,18 +67,17 @@ export function cleanString(
         }
     }
     if (stripOptions) {
-        s = stripCharFromString(s, stripOptions);
+        s = applyStripOptions(s, stripOptions);
     }
     if (caseOptions) {
-        s = handleCaseOptions(s, caseOptions);
+        s = applyCaseOptions(s, caseOptions);
     }   
     if (padOptions && padOptions.padLength) {
-        s = handlePadOptions(s, padOptions);
+        s = applyPadOptions(s, padOptions);
     }
     return s.trim().replace(/,$/g, '');
 }
 /**
- * 
  * @param s `string` - the string to convert to title case
  * @returns **`s`** `string` - the string in title case 
  * (i.e. first letter of each word, determined by the `\b` boundary metacharacter, is capitalized)
@@ -77,7 +96,7 @@ export function toTitleCase(s: string): string {
  * - applies the first case option that is `true` and ignores the rest
  * @returns **`s`** - the string with case options applied
  */
-export function handleCaseOptions(
+export function applyCaseOptions(
     s: string, 
     caseOptions: StringCaseOptions = { toUpper: false, toLower: false, toTitle: false }
 ): string {
@@ -101,7 +120,7 @@ export function handleCaseOptions(
  * @returns **`s`** - the string with padding options applied
  * @note `if` `s.length >= padLength`, no padding is applied
  */
-export function handlePadOptions(
+export function applyPadOptions(
     s: string,
     padOptions: StringPadOptions = { padLength: 24, padChar: ' ', padLeft: false, padRight: false }
 ): string {
@@ -122,7 +141,6 @@ export function handlePadOptions(
     return s;
 }
 
-// TODO maybe rename this to handleStripOptions
 /**
  * @param {string} s `string`
  * @param {StringStripOptions} stripOptions — {@link StringStripOptions} 
@@ -134,7 +152,7 @@ export function handlePadOptions(
  * @param {boolean} stripOptions.escape escape special regex characters in `char` with `char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')`
  * @returns `string` - the string with leading and trailing characters removed
  */
-export function stripCharFromString(
+export function applyStripOptions(
     s: string, 
     stripOptions: StringStripOptions
 ): string {
@@ -182,18 +200,13 @@ export enum RegExpFlagsEnum {
     STICKY = 'y'
 }
 
-const COMPANY_KEYWORD_LIST: string[] = [
-    'company',
-];
-
 /** 
- * @TODO divide COMPANY_KEYWORDS_PATTERN into multiple regexes then compose
- * could instead make a {@link COMPANY_KEYWORD_LIST} then join with `|` and use `new RegExp()` to create a regex from the list
  * - `re` = `/\b(?:company|corp|inc|co\.?,? ltd\.?|ltd|\.?l\.?lc|plc . . .)\b/` `i`
  * */
-export const COMPANY_KEYWORDS_PATTERN: RegExp = 
-/\b(?:compan(y|ies)|[+@&]+|corporation|corporate|(drop)?box|corp|inc|co\.|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|plc|llp|(un)?limited|nys|oc|mc|pr|local|group|consulting|consultant(s)?|vcc|bcp|center|(in)?pack(aging|age)?|electric|chemical|Exhibit(s)?|business|Factory|employee|print(s|ing)?|Pharmaceutical(s)?|vistaprint|associates|association|account(s)?|art(s)?|AMZ|independent|beauty|beautiful(ly)?|meditech|medaesthetic|partners|Acupuncture|Affiliate(s)?|telecom|maps|cosmetic(s)?|connections|practice|computer|service(s)?|skincare|skin|face|facial|body|artisan(s)?|Alchemy|plastic|advanced|surgical|surgery|surgeons|administrators|laser|practice|scientific|science|health|healthcare|medical|med|med( |i)?spa|spa|perfect|surgeons|(med)?(a)?esthetic(s|a)?|salon|lounge|studio|wellness|courier|capital|financ(e|ing)|collector|dept(\.)?|HVAC|insurance|ins|surety|freight|fine art|solution(s)?|trad(e|ing)|renewal|department|inst\.|institute|instant|university|college|America(n)?|US(A)?|global|digital|virtual|orange|coast(al)?|tree|franchise|orthopedic(s)?|academy|advertising|travel|technologies|flash|international|tech|clinic(s|al)?|Exterminator|Nightclub|management|foundation|aid|product(ions|ion|s)?|industr(y|ies|ial)|biomed|bio|bio-chem|lubian|technology|technical|special(ist(s)?|ities)?|support|innovat(e|ive|ion(s)?)|county|united|state(s)?|the|one|of|for|by|and|on|or|at|it|the|about|plan|legal|valley|republic|recruit(ing)?|media|southern|office|post office|clean(er|ers)|transport|law|contract|high|food|meal|therapy|therapeutic(s)?|dental|laboratory|instrument|southwest|ingredient(s)?|commerce|city|Laboratories|lab|logistics|newport|radio|video|photo(graphy)?|korea|communication(s)|derm(atology|atologist(s)?)|new|express|goods|mission|depot|treasur(e|er|y)|revenue|biolab|Orders|staff(ing|ed)?|investors|envelope|refresh|Anti|AgingMajestic|motors|museum|event|Kaiser|pacific|visa|platinum|level|Rejuvenation|bespoke|Cardio|speed|pro|tax|firm|DC|square|store|weight|group|Buy|balance(d)?|buckhead|market(s)?|Bulk|perks|GPT|Boutique|supplement(s)?|vitamin(s)?|plus|sales|salesforce|precision|fitness|image|premier|Fulfillment|final|elite|elase|sculpt(ing)?|botox|south|Hills|symposium|wifi|online|worldwide|tv|derm([a-z]+)|wine|rent(al(s)?)?|mail|plumber(s)?|Sociedade|card|\.com)\b/i;
-/** - `re` =  `/\b(?:corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc)\.?\s*$/i` */
+export const COMPANY_KEYWORDS_PATTERN = new RegExp(
+    `\\b(?:` + COMPANY_KEYWORD_LIST.join('|') + `)\\b`, RegExpFlagsEnum.IGNORE_CASE
+)
+
 export const COMPANY_ABBREVIATION_PATTERN: RegExp =
 /\b(?:corp|inc|co\.?,? ltd\.?|ltd|(p\.)?l\.?l\.?c|p\.?c|plc|llp|s\.c)\.?\s*$/i;
 
@@ -283,13 +296,14 @@ export const MIDDLE_INITIAL_REGEX = new RegExp(
     /^[A-Z]{1}\.?$/, 
     RegExpFlagsEnum.IGNORE_CASE
 );
+
 /** 
  * `re` = `/(,? ?(MSPA|APRN|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|MSN-RN|R\.?N|N\.?P|CRNA|FAAD|FNP|P.?A.?C|PA-C|PA|DMD|NMD|MD|M\.D|DO|L\.?E\.?|CMA|CANS|O.?M|Frcs|FRCS|FACS|FAC)\.?,?){asterisk}/g`  
  * */
 export const JOB_TITLE_SUFFIX_PATTERN = new RegExp(
-    /(,? ?(MSPA|APRN|ARNP|BSN|FNP-C|LME|DDS|DOO|Ph\.?D\.|MSN|MSN-RN|R\.?N|N\.?P|CRNA|FAAD|FNP|P.?A.?C|PA-C|PA|DMD|NMD|MD|M\.D|DO|L\.?E\.?|CMA|CANS|O.?M|Frcs|FRCS|FACS|FAC)\.?,?)*/, 
-    RegExpFlagsEnum.GLOBAL
-); 
+    `(,? ?(` + JOB_TITLE_SUFFIX_LIST.join('|') + `)\.?,?)*`,
+);
+
 
 /** `re` = `/((([A-Z]\.){1})*|([A-Z]{1,4}(\.|-)?)){asterisk}/` */
 export const CREDENTIAL_PATTERN = /((([A-Z]\.){1})*|([A-Z]{1,4}(\.|-)?))*/;

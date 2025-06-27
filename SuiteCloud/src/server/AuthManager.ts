@@ -21,7 +21,7 @@ import {
     readJsonFileAsObject as read, 
     getCurrentPacificTime 
 } from '../utils/io';
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from '../config/setupLog';
+import { mainLogger as mlog, authLogger as alog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from '../config/setupLog';
 
 // ============================================================================
 // TYPES
@@ -296,7 +296,7 @@ class AuthManager {
         let lastError: Error | null = null;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                mlog.debug(`[AuthManager.retryOperation()] ${operationName} attempt ${attempt}/${maxRetries}`);
+                alog.debug(`[AuthManager.retryOperation()] ${operationName} attempt ${attempt}/${maxRetries}`);
                 const result = await operation();
                 // Reset error count on success
                 if (this.tokenMetadata) {
@@ -314,7 +314,7 @@ class AuthManager {
                 if (attempt < maxRetries) {
                     // Exponential backoff
                     const delayMs = this.options.retryDelayMs * Math.pow(2, attempt - 1); 
-                    mlog.debug(`[AuthManager.retryOperation()] Retrying ${operationName} in ${delayMs}ms...`);
+                    alog.debug(`[AuthManager.retryOperation()] Retrying ${operationName} in ${delayMs}ms...`);
                     await this.delay(delayMs);
                 }
             }
@@ -567,7 +567,7 @@ class AuthManager {
 
     public async getAccessToken(): Promise<string> {
         if (this.state !== AuthState.IDLE && this.options.enableQueueing) {
-            mlog.debug('[AuthManager.getAccessToken()] Token acquisition in progress, queueing request...');   
+            alog.debug('[AuthManager.getAccessToken()] Token acquisition in progress, queueing request...');   
             return new Promise<string>((resolve, reject) => {
                 const request: PendingRequest = {
                     resolve,
@@ -592,7 +592,7 @@ class AuthManager {
         try {
             const current = this.getCurrentValidToken();
             if (current) {
-                mlog.debug(`[AuthManager.getAccessToken()] Using valid '${current.source}' token`);
+                alog.debug(`[AuthManager.getAccessToken()] Using valid '${current.source}' token`);
                 this.lastTokenResponse = current.token;
                 this.resolvePendingRequests(current.token.access_token);
                 return current.token.access_token;

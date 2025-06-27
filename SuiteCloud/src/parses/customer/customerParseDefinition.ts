@@ -7,6 +7,8 @@ import {
     ContactRoleEnum,
     idPropertyEnum,
     SB_TERM_DICTIONARY as TERM_DICT,
+    RecordOptions,
+    idSearchOptions, SearchOperatorEnum
 } from "../../utils/api/types";
 import { CustomerTaxItemEnum } from "../../utils/api/types";
 import { 
@@ -17,7 +19,7 @@ import {
     SublistDictionaryParseOptions,
     SublistLineParseOptions,
     SubrecordParseOptions, RecordPostProcessingOptions, CloneOptions,
-    ProcessParseResultsOptions,
+    ProcessParseResultsOptions, ComposeOptions,
 } from "../../utils/io";
 import { CustomerColumnEnum as C, CUSTOMER_CATEGORY_MAPPING as CATEGORY_DICT } from "./customerConstants";
 import * as evaluate from "../evaluatorFunctions";
@@ -187,7 +189,7 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions |
 export const CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: C.ENTITY_ID,
     fieldOptions: {
-        entityid: { evaluator: evaluate.entityId, args: [C.ENTITY_ID] },
+        entityid: { evaluator: evaluate.entityId, args: [C.ENTITY_ID] }, // customerEval.customerCompany, args: [C.ENTITY_ID, C.COMPANY] },
         isperson: { evaluator: customerEval.customerIsPerson, args: [C.ENTITY_ID, C.COMPANY] },
         ...CONTACT_CUSTOMER_SHARED_FIELDS,
         externalid: { evaluator: evaluate.externalId, args: [RecordTypeEnum.CUSTOMER, C.ENTITY_ID] },
@@ -233,15 +235,64 @@ export const CLONE_CUSTOMER_FIELDS_TO_CONTACT_OPTIONS: CloneOptions = {
     sublistIds: ['addressbook'],
 };
 
+
+
+const CUSTOMER_COMPOSE_OPTIONS: ComposeOptions = {
+    recordType: RecordTypeEnum.CUSTOMER,
+    idOptions: { 
+        composer: (options: RecordOptions) => {
+            const fields = options.fields;
+            if (!fields) {return []; }
+            const idOptions: idSearchOptions[] = options.idOptions 
+                ? options.idOptions : [];
+            idOptions.push(
+                { 
+                    idProp: idPropertyEnum.ENTITY_ID, 
+                    searchOperator: SearchOperatorEnum.TEXT.IS, 
+                    idValue: fields.companyname as string
+                },
+                { 
+                    idProp: idPropertyEnum.ENTITY_ID, 
+                    searchOperator: SearchOperatorEnum.TEXT.IS, 
+                    idValue: fields.entityid as string  
+                },
+                {
+                    idProp: idPropertyEnum.EXTERNAL_ID, 
+                    searchOperator: SearchOperatorEnum.TEXT.IS, 
+                    idValue: fields.externalid as string  
+                },
+                {
+                    idProp: idPropertyEnum.EXTERNAL_ID, 
+                    searchOperator: SearchOperatorEnum.TEXT.IS, 
+                    idValue: `${fields.companyname}<${RecordTypeEnum.CUSTOMER}>`
+                },
+            );
+            
+            if (
+                typeof fields.firstname === 'string' 
+                && typeof fields.lastname === 'string'
+                && fields.firstname && fields.lastname
+                && fields.entityid !== `${fields.firstname} ${fields.lastname}`
+            ) {
+                idOptions.push({
+                    idProp: idPropertyEnum.EXTERNAL_ID, 
+                    searchOperator: SearchOperatorEnum.TEXT.IS, 
+                    idValue: `${fields.firstname} ${fields.lastname}<${RecordTypeEnum.CUSTOMER}>`
+                });
+            }
+            return idOptions;
+        }
+    }
+}
 export const CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS: ProcessParseResultsOptions | {
     [recordType: string]: RecordPostProcessingOptions;
 } = {
-    [RecordTypeEnum.CUSTOMER]: {
-        pruneFunc: prune.entity
-    },
     [RecordTypeEnum.CONTACT]: {
         cloneOptions: CLONE_CUSTOMER_FIELDS_TO_CONTACT_OPTIONS,
         pruneFunc: prune.contact
     },
+    [RecordTypeEnum.CUSTOMER]: {
+        composeOptions: CUSTOMER_COMPOSE_OPTIONS,
+        pruneFunc: prune.entity
+    },
 };
-

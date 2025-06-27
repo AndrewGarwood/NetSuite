@@ -2,13 +2,14 @@
  * @file src/utils/io/writing.ts
  */
 import fs from 'fs';
-import { mainLogger as log, INDENT_LOG_LINE as NEW_LINE_TAB } from 'src/config/setupLog';
+import { mainLogger as mlog, INDENT_LOG_LINE as NEW_LINE_TAB } from 'src/config/setupLog';
 import { OUTPUT_DIR } from '../../config/env';
 import { getCurrentPacificTime } from './dateTime';
 import { validateFileExtension } from './reading';
 import { DelimitedFileTypeEnum, DelimiterCharacterEnum } from './types/Csv';
 import { hasKeys } from '../typeValidation';
 import path from 'node:path';
+import { existsSync, writeFileSync } from 'node:fs';
 
 
 
@@ -22,25 +23,25 @@ export type WriteJsonOptions = {
 
 /**
  * Output JSON data to a file with `fs.writeFileSync` or `fs.appendFileSync`.
- * @param {WriteJsonOptions} options {@link WriteJsonOptions}
- * @param {Record<string, any> | string} options.data `Record<string, any> | string` - JSON data to write to file.
+ * @param options {@link WriteJsonOptions}
+ * @param options.data `Record<string, any> | string` - JSON data to write to file.
  * - If `data` is a string, it will be parsed to JSON. If `data` is an object, it will be converted to JSON.
- * @param {string} options.filePath `string` - the complete path or the path to the directory where the file will be saved. If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
- * @param {string} [options.fileName] `string` - `optional`, 'name.ext', default=`''` If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
- * @param {number} [options.indent] `number` - `optional`, default=`4`
- * @param {boolean} [options.enableOverwrite] `boolean` - `optional`, default=`true` If `enableOverwrite` is `true`, the file will be overwritten. If `false`, the `data` will be appended to the file.
+ * @param options.filePath `string` - the complete path or the path to the directory where the file will be saved. If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
+ * @param options.fileName `string` - `optional`, 'name.ext', default=`''` If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
+ * @param options.indent `number` - `optional`, default=`4`
+ * @param options.enableOverwrite `boolean` - `optional`, default=`true` If `enableOverwrite` is `true`, the file will be overwritten. If `false`, the `data` will be appended to the file.
  * @returns {void}
  */
 export function writeObjectToJson(options: WriteJsonOptions): void
 
 /**
  * Output JSON data to a file with `fs.writeFileSync` or `fs.appendFileSync`.
- * @param {Record<string, any> | string} data `Record<string, any> | string` - JSON data to write to file
+ * @param data `Record<string, any> | string` - JSON data to write to file
  * - If `data` is a string, it will be parsed to JSON. If `data` is an object, it will be converted to JSON.
- * @param {string} filePath `string` - the complete path or the path to the directory where the file will be saved. If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
- * @param {string} fileName `string` - `optional`, 'name.ext', default=`''` If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
- * @param {number} indent `number` - `optional`, default=`4`
- * @param {boolean} enableOverwrite `boolean` - `optional`, default=`true` If `enableOverwrite` is `true`, the file will be overwritten. If `false`, the `data` will be appended to the file.
+ * @param filePath `string` - the complete path or the path to the directory where the file will be saved. If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
+ * @param fileName `string` - `optional`, 'name.ext', default=`''` If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
+ * @param indent `number` - `optional`, default=`4`
+ * @param enableOverwrite `boolean` - `optional`, default=`true` If `enableOverwrite` is `true`, the file will be overwritten. If `false`, the `data` will be appended to the file.
  * @returns {void}
  */
 export function writeObjectToJson(
@@ -60,7 +61,7 @@ export function writeObjectToJson(
     enableOverwrite: boolean=true
 ): void {
     if (!arg1) {
-        log.error('No data to write to JSON file');
+        mlog.error('No data to write to JSON file');
         return;
     }
     let data: Record<string, any> | string | undefined = arg1;
@@ -68,7 +69,7 @@ export function writeObjectToJson(
         try {
             data = JSON.parse(arg1) as Record<string, any>;
         } catch (e) {
-            log.error('Error parsing string to JSON', e);
+            mlog.error('Error parsing string to JSON', e);
             return;
         }
     }
@@ -86,7 +87,7 @@ export function writeObjectToJson(
         (fileName ? path.join(filePath || '', fileName): filePath || ''), 'json'
     );
     if (!validationResults.isValid) {
-        log.error('Invalid file path or name', validationResults);
+        mlog.error('Invalid file path or name', validationResults);
         return;
     }
     const outputPath = validationResults.validatedFilePath;
@@ -98,7 +99,7 @@ export function writeObjectToJson(
             fs.appendFileSync(outputPath, jsonData, { flag: 'a' });
         };
     } catch (e) {
-        log.error('Error writing to JSON file', e);
+        mlog.error('Error writing to JSON file', e);
         throw e;
     }
 
@@ -131,14 +132,14 @@ export function indentedStringify(
 /**
  * @deprecated
  * Output JSON data to the console
- * @param {Record<string, any>} data `Record<string, any>`
- * @param {number} spaces `number` - `optional`, default=`4` 
+ * @param data `Record<string, any>`
+ * @param spaces `number` - `optional`, default=`4` 
  */
 export function printJson(data:Record<string, any>, spaces: number=4) {
     try {
         console.log(JSON.stringify(data, null, spaces));
     } catch (e) {
-        log.error(e);
+        mlog.error(e);
     }
 }
 
@@ -169,15 +170,15 @@ export type ConsoleGroup = {
 
 /**
  * @deprecated
- * @param {ConsoleGroup} consoleGroup {@link ConsoleGroup}
- * @param {string} consoleGroup.label `string`
- * @param {Array<string> | string} consoleGroup.details `string[]` - log each string in arr on new line
- * @param {boolean} consoleGroup.collapse `boolean` - `optional`, default=`false`
- * @param {number} consoleGroup.numTabs `number` - `optional`, default=`1`
- * @param {boolean} consoleGroup.printToConsole `boolean` - `optional`, default=`true`
- * @param {boolean} consoleGroup.printToFile `boolean` - `optional`, default=`true`
- * @param {string} consoleGroup.filePath `string` - `${OUTPUT_DIR}/logs/DEFAULT_LOG.txt`
- * @param {boolean} consoleGroup.enableOverwrite `boolean` - `optional`, default=`false`
+ * @param consoleGroup {@link ConsoleGroup}
+ * @param consoleGroup.label `string`
+ * @param consoleGroup.details `string[]` - log each string in arr on new line
+ * @param consoleGroup.collapse `boolean` - `optional`, default=`false`
+ * @param consoleGroup.numTabs `number` - `optional`, default=`1`
+ * @param consoleGroup.printToConsole `boolean` - `optional`, default=`true`
+ * @param consoleGroup.printToFile `boolean` - `optional`, default=`true`
+ * @param consoleGroup.filePath `string` - `${OUTPUT_DIR}/logs/DEFAULT_LOG.txt`
+ * @param consoleGroup.enableOverwrite `boolean` - `optional`, default=`false`
  * @returns {void}
  * @description Print a console group with the given label and log statements. Optionally print to file.
  */
@@ -212,7 +213,7 @@ export function printConsoleGroup({
                 '\n' + labelOffset + label + '\n' + bodyOffset + details.join('\n' + bodyOffset), 
                 (err) => {
                     if (err) {
-                        log.error('Error writing to file', err);
+                        mlog.error('Error writing to file', err);
                     }
                 }
             );
@@ -222,7 +223,7 @@ export function printConsoleGroup({
                 '\n' + labelOffset + label + '\n' + bodyOffset + details.join('\n' + bodyOffset), 
                 (err) => {
                     if (err) {
-                        log.error('Error appending to file', err);
+                        mlog.error('Error appending to file', err);
                     }
                 }
             );
@@ -232,11 +233,11 @@ export function printConsoleGroup({
 
 
 /**
- * @param {Record<string, Array<string>>} listData `Record<string, Array<string>>` map col names to col values
- * @param {string} fileName string
- * @param {string} filePath string
- * @param {string} delimiter string - optional, default=`','`
- * @param {string} delimiterColumn string - optional, default=`''`
+ * @param listData `Record<string, Array<string>>` map col names to col values
+ * @param fileName string
+ * @param filePath string
+ * @param delimiter string - optional, default=`','`
+ * @param delimiterColumn string - optional, default=`''`
  */
 export function writeListsToCsv(
     listData: Record<string, Array<string>>,
@@ -269,9 +270,53 @@ export function writeListsToCsv(
     
     fs.writeFile(outputAddress, csvContent, (err) => {
         if (err) {
-            log.error('Error writing to CSV file', err);
+            mlog.error('Error writing to CSV file', err);
             return;
         } 
-        console.log(`CSV file has been saved to ${outputAddress}`);
+        mlog.info(`CSV file has been saved to ${outputAddress}`);
     });
+}
+
+/**
+ * @TODO consider if should allow other file extensions
+ * Trims a text file to keep only the last 10MB of data if it exceeds 10MB.
+ * @param filePaths arbitrary number of text file paths to trim
+ */
+export function trimFile(max: number=5, ...filePaths: string[]): void {
+    const MAX_BYTES = max * 1024 * 1024;
+    for (const filePath of filePaths) {
+        if (!filePath || !fs.existsSync(filePath) 
+            || !filePath.toLowerCase().endsWith('.txt')) {
+            mlog.error(`File does not exist or is not text: ${filePath}`);
+            continue;
+        }
+        try {
+            const stats = fs.statSync(filePath);
+            if (stats.size <= MAX_BYTES) return;
+            const fd = fs.openSync(filePath, 'r+');
+            const buffer = Buffer.alloc(MAX_BYTES);
+            fs.readSync(fd, buffer, 0, MAX_BYTES, stats.size - MAX_BYTES);
+            fs.ftruncateSync(fd, 0);
+            fs.writeSync(fd, buffer, 0, MAX_BYTES, 0);
+            fs.closeSync(fd);
+            mlog.info(`Trimmed file to last ${max}MB: ${filePath}`);
+        } catch (e) {
+            mlog.error('Error trimming file to last 10MB', e);
+            throw e;
+        }
+    }
+}
+
+/**
+ * Clears the content of the specified log file(s).
+ * @param filePaths - The path(s) to the log file(s) to clear.
+ */
+export function clearFile(...filePaths: string[]): void {
+    for (const filePath of filePaths) {
+        if (!filePath || !existsSync(filePath)) {
+            mlog.warn(`clearFile() Log file does not exist: ${filePath}`);
+            continue;
+        }
+        writeFileSync(filePath, '', { encoding: 'utf-8' });
+    }
 }

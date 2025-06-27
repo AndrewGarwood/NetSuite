@@ -8,6 +8,7 @@ import { DATA_DIR } from "../../config";
 export const SALES_ORDER_DIR = `${DATA_DIR}/salesorders` as string;
 /*
 Trans #	Type	Date	Num	Source Name	Name Address	Name Street1	Name Street2	Name City	Name State	Name Zip	Name Contact	Name Phone #	Name Fax #	Name E-Mail	Name Account #	Memo	P. O. #	Name	Ship Date	Deliv Date	Item	Account	Class	Rep	Billing Status	Qty	Sales Price	Amount	S. O. #	Lot Number	Paid Date	Ship To City	Ship To Address 1	Ship To Address 2	Ship To State	Ship Zip	Check #
+317505	Invoice	10/24/2024	24-30376	Aloha Aesthetics	Stacey Idica 673 Silver Bluff Road Aiken, SC 29803	Stacey Idica	673 Silver Bluff Road	Aiken	SC	29803		941-276-7001		stacey.bullfinch@gmail.com		Miracu Thread Forte Fix 10 units  (18GX100mm)	15979	Aloha Aesthetics	10/24/2024		Miracu:3FX18101802GA (Miracu Thread Forte Fix 10 units  (18GX100mm))	PDO Thread	Benev:Domestic	CE		5	374.00	1870.00	334854	2026/04/29-X81441G		Aiken	Aloha Aesthetics	Attn: Stacey Idica	SC	29803	
 
 */
 const SALES_ORDER_CSV_COLUMNS = [
@@ -15,7 +16,7 @@ const SALES_ORDER_CSV_COLUMNS = [
     'Type', 
     'Date', 
     
-    'Source Name', 'Name',
+    'Source Name', 'Terms',
     
     'Name Address', 
     'Name Street1', 
@@ -51,7 +52,9 @@ export enum SalesOrderColumnEnum {
     START_DATE = 'Date',
     SHIP_DATE = 'Ship Date',
     END_DATE = 'Due Date',
-    OTHER_REF_NUM = 'P. O. #',
+    PO_NUMBER = 'P. O. #',
+    INVOICE_NUMBER = 'Num',
+    TERMS = 'Terms',
     ITEM = 'Item',
     QUANTITY = 'Qty',
     RATE = 'Sales Price',
