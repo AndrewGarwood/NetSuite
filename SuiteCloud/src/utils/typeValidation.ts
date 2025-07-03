@@ -3,10 +3,11 @@
  */
 export * from "./api/types/typeGuards";
 export * from "./io/types/typeGuards";
+export { isValidCsv } from "./io/reading";
 
 import { FieldValue, SubrecordValue, idSearchOptions, idPropertyEnum, RecordOptions } from "src/utils/api/types";
 import { mainLogger as mlog } from "src/config/setupLog";
-import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "./io/regex";
+import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "./io/regex/index";
 import { FieldParseOptions, ValueMappingEntry } from "./io";
 
 /**
@@ -36,6 +37,19 @@ export function isNullLike(value: any): value is null | undefined | '' | [] | Re
         return true;
     }
     return false;
+}
+/**
+ * 
+ * @param values `any[]`
+ * @returns `values.some(v => `{@link isNullLike}`(v))`
+ * - **`true`** `if` any of the values are null, undefined, empty object (no keys), empty array, or empty string
+ * - **`false`** `otherwise`.
+ */
+export function anyNull(...values: any[]): boolean {
+    if (values === null || values === undefined) {
+        return true;
+    }
+    return values.some(v => isNullLike(v));
 }
 
 /**
@@ -87,12 +101,18 @@ export function hasNonTrivialKeys(
  * @param requireAll `boolean` defaults to `true` 
  * - `if` `true`, all keys must be present in the object; 
  * - `if` `false`, at least one key must be present
- * @returns {boolean} `true` if the object has all the keys, `false` otherwise
+ * @param restrictKeys `boolean` defaults to `false`
+ * - `if` `true`, only the keys provided in the `keys` param are allowed in the object;
+ * - `if` `false`, the object can keys not included in the `keys` param.
+ * @returns **`hasKeys`** `boolean` 
+ * - **`true`** `if` the object has the required key(s), 
+ * - **`false`** otherwise
  */
 export function hasKeys<T extends Object>(
     obj: T, 
     keys: Array<keyof T> | string[] | string, 
-    requireAll: boolean = true
+    requireAll: boolean = true,
+    restrictKeys: boolean = false
 ): boolean {
     if (!obj || typeof obj !== 'object') {
         return false;
@@ -114,6 +134,14 @@ export function hasKeys<T extends Object>(
         } else if (requireAll) {
             return false; 
             // If requireAll is true and a key is not found, return false
+        } 
+    }
+    if (restrictKeys) {
+        // If restrictKeys is true, check that no other keys are present in the object
+        const objKeys = Object.keys(obj);
+        const extraKeys = objKeys.filter(k => !keys.includes(k as keyof T & string));
+        if (extraKeys.length > 0) {
+            return false; // Found keys not in the allowed list
         }
     }
     return requireAll ? numKeysFound === keys.length : numKeysFound > 0; 
@@ -149,6 +177,11 @@ export function areEquivalentObjects(
         }
         return equivalentAlphanumeric(valA, valB);
     });
+}
+
+export function isNumericString(value: any): boolean {
+    if (typeof value !== 'string') return false;
+    return !isNaN(Number(value.trim()));
 }
 
 export function isPrimitiveValue(

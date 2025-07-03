@@ -1,5 +1,5 @@
 /**
- * @file src/parses/customer/customerConstants.ts
+ * @file src/parse_configurations/customer/customerConstants.ts
  */
 import path from "node:path";
 import { DATA_DIR } from "src/config/env";

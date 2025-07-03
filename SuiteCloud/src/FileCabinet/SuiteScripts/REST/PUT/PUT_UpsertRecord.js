@@ -204,22 +204,25 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         if (fields && (!idOptions || isEmptyArray(idOptions))) {
             /**@type {idSearchOptions[]} */
             idOptions = [];
-            for (const idPropFieldId of Object.values(idPropertyEnum)) {
-                if (fields[idPropFieldId]) {
-                    const idValue = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
-                        ? Number(fields[idPropFieldId]) 
-                        : String(fields[idPropFieldId])
-                    );
-                    const searchOperator = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
-                        ? SearchOperatorEnum.RECORD.ANY_OF 
-                        : SearchOperatorEnum.TEXT.IS
-                    );
-                    idOptions.push({
-                        idProp: idPropFieldId,
-                        searchOperator: searchOperator,
-                        idValue: idValue
-                    });
-                }
+        }
+        const remainingIdFields = Object.values(idPropertyEnum).filter(
+            idPropFieldId => !idOptions.some(option => option.idProp === idPropFieldId)
+        );
+        for (const idPropFieldId of remainingIdFields) {
+            if (fields[idPropFieldId]) {
+                const idValue = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
+                    ? Number(fields[idPropFieldId]) 
+                    : String(fields[idPropFieldId])
+                );
+                const searchOperator = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
+                    ? SearchOperatorEnum.RECORD.ANY_OF 
+                    : SearchOperatorEnum.TEXT.IS
+                );
+                idOptions.push({
+                    idProp: idPropFieldId,
+                    searchOperator: searchOperator,
+                    idValue: idValue
+                });
             }
         }
         /** 
@@ -305,7 +308,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             writeLog(LogTypeEnum.ERROR, 
                 `ERROR: upsertFieldValue() Invalid Parameters:`,
                 `rec, recordType, fieldId, and value are required parameters`,
-                `received { recordType: ${recordType}, fieldId: ${fieldId}, value: ${value} }`,
+                `received { recordType: '${recordType}', fieldId: '${fieldId}', value: '${value}' }`,
             );
             return rec;
         }

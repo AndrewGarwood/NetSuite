@@ -1,21 +1,21 @@
 /**
- * @file src/parses/customer/customerEvaluatorFunctions.ts
+ * @file src/parse_configurations/customer/customerEvaluatorFunctions.ts
  */
 import { 
     CustomerStatusEnum,
     FieldValue,
 } from "../../utils/api/types";
-import { parseLogger as log, DEBUG_LOGS } from "../../config";
-import { RADIO_FIELD_TRUE, RADIO_FIELD_FALSE } from "../../utils/typeValidation";
-import { 
-    checkForOverride,
-    cleanString,
+import { mainLogger as mlog, parseLogger as plog, DEBUG_LOGS as DEBUG, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config";
+import { RADIO_FIELD_TRUE, RADIO_FIELD_FALSE, anyNull } from "../../utils/typeValidation";
+import {
+    clean,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION,
-    ValueMapping, equivalentAlphanumericStrings as equivalentAlphanumeric
-} from "../../utils/io";
+    equivalentAlphanumericStrings as equivalentAlphanumeric
+} from "../../utils/io/regex/index";
 import { isPerson, firstName, middleName, lastName, entityId, ENTITY_VALUE_OVERRIDES } from "../evaluatorFunctions";
 import { CustomerColumnEnum as C } from "./customerConstants";
-
+import { ValueMapping, checkForOverride } from "src/utils/io";
+import { SUPPRESS } from "../evaluators/common";
 
 
 export const customerIsPerson = (
@@ -23,6 +23,14 @@ export const customerIsPerson = (
     entityIdColumn: string,
     companyColumn: string=C.COMPANY
 ): string => {
+    SUPPRESS.push(NL+`customerIsPerson() anyNull check`,
+        TAB+`anyNull(row, entityIdColumn, row[entityIdColumn]) = ${anyNull(row, entityIdColumn, row[entityIdColumn])}`,
+        TAB+`  row.keys().length:  ${Object.keys(row).length}`,
+        TAB+`     entityIdColumn: '${entityIdColumn}'`,
+        TAB+`      companyColumn: '${companyColumn}'`,
+        TAB+`row[entityIdColumn]: '${row[entityIdColumn]}'`,
+        TAB+` row[companyColumn]: '${row[companyColumn]}'`,
+    )
     if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return RADIO_FIELD_FALSE;
     }
@@ -102,7 +110,7 @@ export const customerCategory = (
 /**
  * Error: "You have entered an Invalid Field Value 7 for the following field: entitystatus"
  * -> not possible to set a customer record to qualified; instead make a 'lead' record, 
- * just returning CLOSED_WON for now. 
+ * just returning empty string (not setting value) for now. 
  * */
 export const customerStatus = (
     row: Record<string, any>,
@@ -116,7 +124,7 @@ export const customerStatus = (
     // if (!categoryValue) {
     //     return CustomerStatusEnum.QUALIFIED; 
     // }
-    return CustomerStatusEnum.CLOSED_WON;
+    return ''; //CustomerStatusEnum.CLOSED_WON;
 }
 
 
@@ -124,7 +132,9 @@ export const customerStatus = (
  * @param row `Record<string, any>`
  * @param entityIdColumn `string`
  * @param companyNameColumn `string`
- * @returns `string` - the company name of the customer, or the entityId if no company name is provided.
+ * @returns **`companyName`** `string` 
+ * - the name of the customer's company, 
+ * - or the `entityId` if no company name is provided.
  */
 export const customerCompany = (
     row: Record<string, any>,
@@ -140,7 +150,7 @@ export const customerCompany = (
     // }
     let companyName = (companyNameColumn 
         ? checkForOverride(
-            cleanString(row[companyNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION), 
+            clean(row[companyNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION), 
             companyNameColumn, 
             ENTITY_VALUE_OVERRIDES
         ) as string

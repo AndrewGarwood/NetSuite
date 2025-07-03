@@ -1,5 +1,6 @@
 /**
- * @file src/parses/salesorder/salesOrderParseDefinition.ts
+ * @file src/parse_configurations/salesorder/salesOrderParseDefinition.ts
+ * @TODO re-export data bc need "Item Description" column...
  */
 import { 
     RecordTypeEnum,
@@ -8,16 +9,20 @@ import {
     idPropertyEnum,
     idSearchOptions, 
     SB_TERM_DICTIONARY as TERM_DICT,
+    SublistLine,
 } from "../../utils/api/types";
 import { CustomerStatusEnum, CustomerTaxItemEnum } from "../../utils/api/types";
 import { 
+    CleanStringOptions, 
     ColumnSliceOptions,
     FieldDictionaryParseOptions,
     FieldParseOptions,
     RecordParseOptions,
     SublistDictionaryParseOptions,
     SublistLineParseOptions,
-    SubrecordParseOptions, 
+    SubrecordParseOptions, RecordPostProcessingOptions, CloneOptions,
+    ProcessParseResultsOptions, ComposeOptions,
+    SublistLineIdOptions,
 } from "../../utils/io";
 import * as evaluate from "../evaluatorFunctions";
 import * as customerEval from "../customer/customerEvaluatorFunctions";
@@ -78,15 +83,6 @@ const SHIPPING_STREET_ARGS: evaluate.StreetArguments = {
     ...SHIPPING_ATTENTION_ARGS
 }
 
-
-// export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions = {
-//     entityid: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
-//     isinactive: { defaultValue: NOT_INACTIVE },
-//     email: { evaluator: evaluate.email, args: [SO.EMAIL] },
-//     phone: { evaluator: evaluate.phone, args: [SO.PHONE] },
-//     fax: { evaluator: evaluate.phone, args: [SO.FAX] },
-// }
-
 /** 
  * (body subrecord) 
  * - fieldId: `'billaddress'` 
@@ -124,12 +120,24 @@ const SHIPPING_ADDRESS_OPTIONS: SubrecordParseOptions = {
 };
 //        addrphone: { evaluator: evaluate.phone, args: [SO.PHONE] },
 
+const lineItemIdEvaluator = (sublistLine: SublistLine, ...args: string[]): string => {
+    let idString = `{`+ [
+        `item:${sublistLine.item}`,
+        `quantity:${sublistLine.quantity}`,
+        `rate:${sublistLine.rate}`,
+        `amount:${sublistLine.amount}`
+    ].join(',') + `}`;
+    return idString;
+}
+
 const LINE_ITEM_SUBLIST_OPTIONS: SublistDictionaryParseOptions = {
     item: [{
-        item: { evaluator: () => {return "not implemented"}, args: [SO.ITEM] },
+        lineIdOptions: {lineIdEvaluator: lineItemIdEvaluator},
+        item: { evaluator: soEval.itemSku, args: [SO.ITEM] },
         quantity: { colName: SO.QUANTITY },
         rate: { colName: SO.RATE },
         amount: { colName: SO.AMOUNT },
+        description: { colName: SO.ITEM_DESCRIPTION },
     }] as SublistLineParseOptions[],
 };
 
@@ -139,13 +147,28 @@ export const INTERMEDIATE_ENTRIES: FieldDictionaryParseOptions = {
 
 }
 
+/**
+ * - `'S. O. #'` -> `'SO'`
+ * - `'P. O. #'` -> `'PO'`
+ * - `'Num'` -> `'INVOICE'`
+ */
+const cleanKeyOptions: CleanStringOptions = {
+    replace: [
+        {searchValue: /(\.| |#)*/g, replaceValue: ''}, 
+        {searchValue: /Num/g, replaceValue: 'INVOICE'}
+    ],
+}
+
+/**@TODO decide what to assign to the `otherrefnum` property */
 export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: SO.TRAN_ID,
     fieldOptions: {
-        ...INTERMEDIATE_ENTRIES,
-        externalid: { evaluator: soEval.externalId, args: [SO.TRAN_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER]},
+        // ...INTERMEDIATE_ENTRIES,
+        externalid: { evaluator: soEval.externalId, 
+            args: [cleanKeyOptions, SO.TRAN_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER]
+        },
         entity: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
-        terms: { evaluator: evaluate.terms, args: [SO.TERMS] },
+        terms: { evaluator: evaluate.terms, args: [SO.TERMS, TERM_DICT] },
         checknumber: { colName: SO.CHECK_NUMBER },
         trandate: { colName: SO.TRAN_DATE },
         saleseffectivedate: { colName: SO.TRAN_DATE },
@@ -157,10 +180,3 @@ export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
         ...LINE_ITEM_SUBLIST_OPTIONS,
     }
 }
-
-/*
-post processing:
-- couponcode
-- class: evaluate salesorder.class based on all line items in the order...?
-- remove fields.transactiontype
-*/

@@ -1,5 +1,5 @@
 /**
- * @file src/parses/customer/customerParseDefinition.ts
+ * @file src/parse_configurations/customer/customerParseDefinition.ts
  */
 import { mainLogger as mlog } from "../../config";
 import { 
@@ -20,6 +20,7 @@ import {
     SublistLineParseOptions,
     SubrecordParseOptions, RecordPostProcessingOptions, CloneOptions,
     ProcessParseResultsOptions, ComposeOptions,
+    SublistLineIdOptions,
 } from "../../utils/io";
 import { CustomerColumnEnum as C, CUSTOMER_CATEGORY_MAPPING as CATEGORY_DICT } from "./customerConstants";
 import * as evaluate from "../evaluatorFunctions";
@@ -41,10 +42,13 @@ export const SHIPPING_PHONE_COLUMNS = [
  * then look for name to extract from these columns
  * */
 export const NAME_COLUMNS = [
-    C.PRIMARY_CONTACT, C.SECONDARY_CONTACT, C.ENTITY_ID, 
+    C.PRIMARY_CONTACT, 
+    C.ENTITY_ID, 
     C.STREET_ONE, C.STREET_TWO, 
-    C.SHIP_TO_STREET_ONE, C.SHIP_TO_STREET_TWO,
-    C.BILL_TO_ONE, C.SHIP_TO_ONE, C.BILL_TO_TWO, C.SHIP_TO_TWO,
+    C.BILL_TO_ONE, C.BILL_TO_TWO,
+    C.SHIP_TO_STREET_ONE, C.SHIP_TO_STREET_TWO, 
+    C.SHIP_TO_ONE, C.SHIP_TO_TWO, 
+    C.SECONDARY_CONTACT,
 ]
 /** Look for {@link evaluate.attention} names in these columns for the billing address */
 export const BILLING_NAME_COLUMNS = [
@@ -114,10 +118,14 @@ const SHIPPING_STREET_ARGS: evaluate.StreetArguments = {
     ...SHIPPING_ATTENTION_ARGS
 }
 
-/**@TODO maybe allow addrphone values to be an altphone of the contact/customer */
+/**
+ * fields belonging to both record types, or customer fields 
+ * that are used in post processing for the contact's RecordOptions 
+ * */
 export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions | {
     [fieldId: string]: FieldParseOptions | SubrecordParseOptions;
 } = {
+    isperson: { evaluator: customerEval.customerIsPerson, args: [C.ENTITY_ID, C.COMPANY] },
     isinactive: { defaultValue: NOT_INACTIVE },
     email: { evaluator: evaluate.email, args: [C.EMAIL, C.ALT_EMAIL] },
     altemail: { evaluator: evaluate.email, 
@@ -135,7 +143,7 @@ export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions | {
     firstname: { evaluator: evaluate.firstName, args: [C.FIRST_NAME, ...NAME_COLUMNS] },
     middlename: { evaluator: evaluate.middleName, args: [C.MIDDLE_NAME, ...NAME_COLUMNS] },
     lastname: { evaluator: evaluate.lastName, args: [C.LAST_NAME, ...NAME_COLUMNS] },
-    title: { colName: C.TITLE},
+    title: { evaluator: evaluate.jobTitleSuffix, args: [C.TITLE, ...NAME_COLUMNS] },
     comments: { colName: C.COMMENTS },
 }
 
@@ -174,12 +182,12 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions |
 } = {
     addressbook: [
         { 
-            lineIdProp: 'label', 
+            lineIdOptions: {lineIdProp: 'label'} as SublistLineIdOptions, 
             label: { evaluator: evaluate.street, args: [1, BILLING_STREET_ARGS] },
             addressbookaddress: BILLING_ADDRESS_OPTIONS, 
         },
         { 
-            lineIdProp: 'label', 
+            lineIdOptions: {lineIdProp: 'label'} as SublistLineIdOptions, 
             label: { evaluator: evaluate.street, args: [1, SHIPPING_STREET_ARGS] },
             addressbookaddress: SHIPPING_ADDRESS_OPTIONS, 
         },  
@@ -190,9 +198,8 @@ export const CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: C.ENTITY_ID,
     fieldOptions: {
         entityid: { evaluator: evaluate.entityId, args: [C.ENTITY_ID] }, // customerEval.customerCompany, args: [C.ENTITY_ID, C.COMPANY] },
-        isperson: { evaluator: customerEval.customerIsPerson, args: [C.ENTITY_ID, C.COMPANY] },
         ...CONTACT_CUSTOMER_SHARED_FIELDS,
-        externalid: { evaluator: evaluate.externalId, args: [RecordTypeEnum.CUSTOMER, C.ENTITY_ID] },
+        externalid: { evaluator: evaluate.entityExternalId, args: [RecordTypeEnum.CUSTOMER, C.ENTITY_ID] },
         altphone: { evaluator: evaluate.phone, 
             args: [{ colName: C.PHONE, minIndex: 1}, C.ALT_PHONE, C.WORK_PHONE, C.SHIP_TO_FOUR, C.SHIP_TO_FIVE] as Array<string | ColumnSliceOptions> 
         },
@@ -216,11 +223,11 @@ export const CONTACT_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: C.ENTITY_ID,
     fieldOptions: {
         entityid: { evaluator: evaluate.entityId, args: [C.ENTITY_ID] },
-        externalid: { evaluator: evaluate.externalId, args: [RecordTypeEnum.CONTACT, C.ENTITY_ID] },
+        externalid: { evaluator: evaluate.entityExternalId, args: [RecordTypeEnum.CONTACT, C.ENTITY_ID] },
         officephone: { evaluator: evaluate.phone, args: [C.WORK_PHONE, C.SHIP_TO_FOUR, C.SHIP_TO_FIVE] },
         company: { evaluator: customerEval.customerCompany, args: [C.ENTITY_ID, C.COMPANY] },
         contactrole: {defaultValue: ContactRoleEnum.PRIMARY_CONTACT },
-    } as FieldDictionaryParseOptions,
+    } as FieldDictionaryParseOptions | ({[fieldId: string]: FieldParseOptions | SubrecordParseOptions;}),
 };
 /** 
  * from parsed customer RecordOptions, 

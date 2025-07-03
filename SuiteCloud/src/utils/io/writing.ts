@@ -279,7 +279,8 @@ export function writeListsToCsv(
 
 /**
  * @TODO consider if should allow other file extensions
- * Trims a text file to keep only the last 10MB of data if it exceeds 10MB.
+ * @description Trims a text file to keep only the last 10MB of data if it exceeds 10MB.
+ * @param max - Maximum size in MB to keep in the file, default is `5` -> 5MB.
  * @param filePaths arbitrary number of text file paths to trim
  */
 export function trimFile(max: number=5, ...filePaths: string[]): void {

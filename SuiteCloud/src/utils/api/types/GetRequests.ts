@@ -5,13 +5,11 @@ import { idPropertyEnum, idSearchOptions, LogStatement, RecordResponseOptions, R
 
 /**
  * @typedefn **`GetRecordRequest`**
- * @property {boolean} [isDynamic=false] - Indicates if the record should be loaded in dynamic mode. Defaults to `false`.
  * @property {string | RecordTypeEnum} recordType - The record type to get, see {@link RecordTypeEnum}.
- * @property {idSearchOptions} [idOptions] {@link idSearchOptions}
+ * @property {idSearchOptions[]} [idOptions] {@link idSearchOptions}`[]`
  * @property {RecordResponseOptions} [responseOptions] {@link RecordResponseOptions} = `{ responseFields?: string | string[], responseSublists?: Record<string, string | string[]> }`
  */
 export type GetRecordRequest = {
-    isDynamic?: boolean;
     recordType: string | RecordTypeEnum;
     idOptions: idSearchOptions[];
     responseOptions?: RecordResponseOptions;

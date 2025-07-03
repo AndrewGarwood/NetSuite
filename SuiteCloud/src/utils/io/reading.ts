@@ -2,33 +2,35 @@
  * @file src/utils/io/reading.ts
  */
 import fs from 'fs';
+import csv from 'csv-parser';
 import xlsx from 'xlsx';
-import { ParseOneToManyOptions } from './types/Reading';
-import { applyStripOptions, cleanString, UNCONDITIONAL_STRIP_DOT_OPTIONS } from './regex';
+import { StringCaseOptions, StringPadOptions, StringReplaceOptions, StringStripOptions } from './regex/index';
+import { ParseOneToManyOptions,} from './types/Reading';
+import { applyStripOptions, clean, UNCONDITIONAL_STRIP_DOT_OPTIONS } from './regex/index'
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
 import { DelimiterCharacterEnum, ValueMapping, DelimitedFileTypeEnum } from './types';
 import { FieldValue } from '../api/types/InternalApi';
-import { isValueMappingEntry } from '../typeValidation';
+import { isNonEmptyArray, isValueMappingEntry, anyNull } from '../typeValidation';
+import { EntityRecordTypeEnum, RecordTypeEnum } from '../api';
 
 
 /**
  * @param filePath `string`
  * @param delimiter `string` {@link DelimiterCharacterEnum}
  * @returns **`isValidCsv`** `boolean`
- * - `true` if the CSV file at `filePath` is valid (all rows have the same number of columns as the header),
- * - `false` `otherwise`. 
+ * - **`true`** `if` the CSV file at `filePath` is valid (all rows have the same number of columns as the header),
+ * - **`false`** `otherwise`. 
  */
 export function isValidCsv(
     filePath: string, 
-    delimiter: DelimiterCharacterEnum | string,
+    delimiter?: DelimiterCharacterEnum | string,
 ): boolean {
     if (!filePath || !fs.existsSync(filePath)) {
         mlog.error(`ERROR isValidCsv(): path does not exist: ${filePath}`);
         return false;
     }
     if (!delimiter || delimiter.length === 0) {
-        mlog.error(`ERROR isValidCsv(): invalid delimiter: ${delimiter}`);
-        return false;
+        delimiter = getDelimiterFromFilePath(filePath);
     }   
     const data = fs.readFileSync(filePath, 'utf8');
     const lines = data.split('\n');
@@ -62,7 +64,6 @@ export function isValidCsv(
     }
     return true;
 }
-
 /**
  * @param filePath `string`
  * @param sheetName `string`
@@ -97,13 +98,13 @@ export function parseExcelForOneToMany(
         const jsonData: any[] = xlsx.utils.sheet_to_json(sheet);
         const dict: Record<string, Array<string>> = {};
         jsonData.forEach(row => {
-            let key: string = cleanString(
+            let key: string = clean(
                 String(row[keyColumn]), 
                 keyStripOptions, 
                 keyCaseOptions, 
                 keyPadOptions
             ).trim().replace(/\.$/, '');
-            let val: string = cleanString(
+            let val: string = clean(
                 String(row[valueColumn]),
                 valueStripOptions, 
                 valueCaseOptions, 
@@ -160,13 +161,13 @@ export function parseCsvForOneToMany(
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].split(delimiter).map(col => col.trim());
             if (line.length > 1) {
-                let key = cleanString(
+                let key = clean(
                     line[keyIndex],
                     keyStripOptions, 
                     keyCaseOptions, 
                     keyPadOptions
                 );
-                let val = cleanString(
+                let val = clean(
                     line[valueIndex],
                     valueStripOptions,
                     valueCaseOptions, 
@@ -186,6 +187,86 @@ export function parseCsvForOneToMany(
             TAB+'Given File Path:', '"' + filePath + '"');
         return {} as Record<string, Array<string>>;
     }
+}
+
+
+/**
+ * Determines the proper delimiter based on file type or extension
+ * @param filePath `string` Path to the file
+ * @param fileType Explicit file type or `'auto'` for detection
+ * @returns **`delimiter`** `{`{@link DelimiterCharacterEnum}` | string}` The delimiter character
+ * @throws an error if the file extension is unsupported
+ */
+export function getDelimiterFromFilePath(
+    filePath: string, 
+    fileType?: DelimitedFileTypeEnum
+): DelimiterCharacterEnum | string {
+    if (fileType && fileType === DelimitedFileTypeEnum.CSV) return DelimiterCharacterEnum.COMMA;
+    if (fileType && fileType === DelimitedFileTypeEnum.TSV) return DelimiterCharacterEnum.TAB;
+    
+    // Auto-detect based on file extension
+    const extension = filePath.split('.').pop()?.toLowerCase();
+    if (extension === DelimitedFileTypeEnum.CSV) {
+        return DelimiterCharacterEnum.COMMA;
+    } else if (extension === DelimitedFileTypeEnum.TSV) {
+        return DelimiterCharacterEnum.TAB;
+    } else {
+        throw new Error(`Unsupported file extension: ${extension}`);
+    }
+}
+
+/**
+ * @param filePath `string`
+ * @returns **`jsonData`** — `Array<string>`
+ */
+export function readFileLinesIntoArray(filePath: string): Array<string> {
+    const result: string[] = [];
+    try {
+        const data = fs.readFileSync(filePath, 'utf8');
+        const lines = data.split('\n');
+        for (const line of lines) {
+            if (line.trim()) {
+                result.push(line.trim());
+            }
+        }
+    } catch (err) {
+        mlog.error('Error reading the file:', err);
+    }
+    return result;
+}
+
+/**
+ * @param filePath `string`
+ * @returns **`jsonData`** — `Record<string, any> | null` - JSON data as an object or null if an error occurs
+ */
+export function readJsonFileAsObject(filePath: string): Record<string, any> | null {
+    filePath = validateFileExtension(filePath, 'json').validatedFilePath;
+    try {
+        const data = fs.readFileSync(filePath, 'utf8');
+        const jsonData = JSON.parse(data);
+        return jsonData;
+    } catch (err) {
+        mlog.error('Error reading or parsing the JSON file:', err, 
+            TAB+'Given File Path:', '"' + filePath + '"');
+        return null;
+    }
+}
+
+
+/**
+ * @param filePath `string`
+ * @param expectedExtension `string`
+ * @returns **`result`** = `{ isValid`: `boolean`, `validatedFilePath`: `string }`
+ */
+export function validateFileExtension(filePath: string, expectedExtension: string): {isValid: boolean, validatedFilePath: string} {
+    let isValid = false;
+    let validatedFilePath = filePath;
+    if (filePath && filePath.endsWith(`.${expectedExtension}`)) {
+        isValid = true;
+    } else {
+        validatedFilePath = `${filePath}.${applyStripOptions(expectedExtension, UNCONDITIONAL_STRIP_DOT_OPTIONS)}`;
+    }
+    return { isValid, validatedFilePath };
 }
 
 /**
@@ -220,83 +301,23 @@ export function checkForOverride(
     return originalValue;
 }
 
-/**
- * Determines the proper delimiter based on file type or extension
- * @param filePath Path to the file
- * @param fileType Explicit file type or `'auto'` for detection
- * @returns `extension` `{`{@link DelimiterCharacterEnum}` | string}` The delimiter character
- */
-export function getDelimiterFromFilePath(
-    filePath: string, 
-    fileType?: DelimitedFileTypeEnum
-): DelimiterCharacterEnum | string {
-    if (fileType && fileType === DelimitedFileTypeEnum.CSV) return DelimiterCharacterEnum.COMMA;
-    if (fileType && fileType === DelimitedFileTypeEnum.TSV) return DelimiterCharacterEnum.TAB;
-    
-    // Auto-detect based on file extension
-    const extension = filePath.split('.').pop()?.toLowerCase();
-    if (extension === DelimitedFileTypeEnum.CSV) {
-        return DelimiterCharacterEnum.COMMA;
-    } else if (extension === DelimitedFileTypeEnum.TSV) {
-        return DelimiterCharacterEnum.TAB;
-    } else {
-        throw new Error(`Unsupported file extension: ${extension}`);
+
+
+export async function getCsvRows(
+    filePath: string
+): Promise<Array<Record<string, any>>> {
+    const delimiter = getDelimiterFromFilePath(filePath);
+    if (!delimiter || !isValidCsv(filePath, delimiter)) {
+        return []
     }
+    const rows: Array<Record<string, any>> = []; 
+    return new Promise((resolve, reject) => {
+        fs.createReadStream(filePath)
+            .pipe(csv({ separator: delimiter }))
+            .on('data', async (row: Record<string, any>) => {
+                rows.push(row);
+            })
+            .on('end', () => resolve(rows))
+            .on('error', reject);
+    });
 }
-
-/**
- * @param filePath `string`
- * @returns {Array<string>} **`jsonData`** — `Array<string>`
- */
-export function readFileLinesIntoArray(filePath: string): Array<string> {
-    const result: string[] = [];
-    try {
-        const data = fs.readFileSync(filePath, 'utf8');
-        const lines = data.split('\n');
-        for (const line of lines) {
-            if (line.trim()) {
-                result.push(line.trim());
-            }
-        }
-    } catch (err) {
-        mlog.error('Error reading the file:', err);
-    }
-    return result;
-}
-
-/**
- * 
- * @param filePath `string`
- * @returns {Record<string, any> | null} **`jsonData`** — `Record<string, any> | null` - JSON data as an object or null if an error occurs
- */
-export function readJsonFileAsObject(filePath: string): Record<string, any> | null {
-    filePath = validateFileExtension(filePath, 'json').validatedFilePath;
-    try {
-        const data = fs.readFileSync(filePath, 'utf8');
-        const jsonData = JSON.parse(data);
-        return jsonData;
-    } catch (err) {
-        mlog.error('Error reading or parsing the JSON file:', err, 
-            TAB+'Given File Path:', '"' + filePath + '"');
-        return null;
-    }
-}
-
-
-/**
- * @param filePath `string`
- * @param expectedExtension `string`
- * @returns **`result`** = `{ isValid`: `boolean`, `validatedFilePath`: `string }`
- */
-export function validateFileExtension(filePath: string, expectedExtension: string): {isValid: boolean, validatedFilePath: string} {
-    let isValid = false;
-    let validatedFilePath = filePath;
-    if (filePath && filePath.endsWith(`.${expectedExtension}`)) {
-        isValid = true;
-    } else {
-        validatedFilePath = `${filePath}.${applyStripOptions(expectedExtension, UNCONDITIONAL_STRIP_DOT_OPTIONS)}`;
-    }
-    return { isValid, validatedFilePath };
-}
-
-

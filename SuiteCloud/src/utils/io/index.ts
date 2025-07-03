@@ -4,5 +4,6 @@
 export * from  './dateTime';
 export * from './reading';
 export * from './writing';
-export * from './regex';
 export * from './types';
+export * from './parsers';
+export * from './regex/index';

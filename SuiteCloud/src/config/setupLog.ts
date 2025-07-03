@@ -10,8 +10,9 @@ import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 export const LOCAL_LOG_DIR = path.join(OUTPUT_DIR, "logs");  
 /**`OUTPUT_DIR/logs/DEBUG.txt` */
 export const DEFAULT_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, "DEBUG.txt");
-/**`OUTPUT_DIR/logs/ERROR.txt` */
-export const ERROR_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, "ERROR.txt");
+/**`CLOUD_LOG_DIR/ERROR.txt` */
+export const ERROR_LOG_FILEPATH = path.join(CLOUD_LOG_DIR, "ERROR.txt");
+/**`CLOUD_LOG_DIR/PARSE_LOG.txt` */
 export const PARSE_LOG_FILEPATH = path.join(CLOUD_LOG_DIR, 'PARSE_LOG.txt'); 
 /** 
  * `INDENT_LOG_LINE =  '\n\t• '` = newLine + tab + bullet + space
@@ -29,7 +30,9 @@ const timestampTemplate = `(${dateTemplate} ${timeTemplate})`;
 
 const logNameTemplate = "[{{name}}]"; //"[{{nameWithDelimiterPrefix}}{{name}}{{nameWithDelimiterSuffix}}]";
 const logLevelTemplate = "{{logLevelName}}:";
-const fileInfoTemplate = "{{filePathWithLine}}:{{fileColumn}} {{method}}";//"{{fileName}}:{{fileLine}}";
+const fileInfoTemplate = "{{filePathWithLine}}";
+    //:{{fileColumn}} {{method}}";
+    // "{{fileName}}:{{fileLine}}";
 /** 
  * use as value for {@link ISettingsParam.prettyLogTemplate} 
  * @description template string for log messages = {@link timestampTemplate} + {@link logNameTemplate} + {@link logLevelTemplate} + {@link fileInfoTemplate} + `\n\t{{logObjMeta}}`
@@ -131,9 +134,9 @@ errorLogger.attachTransport((logObj: ILogObj) => { //logObj: ILogObj & ILogObjMe
 
 /** `type: "hidden", name: "parseLogger"` */
 export const parseLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
-// parseLogger.attachTransport((logObj: ILogObj) => {
-//     appendFileSync(PARSE_LOG_FILEPATH, JSON.stringify(logObj, null, 4) + "\n", { encoding: "utf-8" });
-// });
+parseLogger.attachTransport((logObj: ILogObj) => {
+    appendFileSync(PARSE_LOG_FILEPATH, JSON.stringify(modifyLogObj(logObj), null, 4) + "\n", { encoding: "utf-8" });
+});
 
 /** `type: "hidden", name: "pruneLogger"` */
 export const pruneLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);

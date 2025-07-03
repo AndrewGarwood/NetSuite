@@ -28,5 +28,4 @@
 [post_process_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parseResultsProcessor.ts
 [sample_payloads_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/samplePayloads.ts
 [put_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/put.ts
-[new_put_options_image]: ./images/New_PostRecordOptions.png
-[old_put_options_image]: ./images/Old_PostRecordOptions.png
+

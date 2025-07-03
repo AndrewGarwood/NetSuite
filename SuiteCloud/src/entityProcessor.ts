@@ -11,8 +11,7 @@ import {
     getCurrentPacificTime
 } from "./utils/io";
 import { 
-    TOKEN_DIR, DATA_DIR, OUTPUT_DIR, STOP_RUNNING, CLOUD_LOG_DIR, 
-    SCRIPT_ENVIRONMENT as SE, DELAY, 
+    STOP_RUNNING,  DELAY, 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, INFO_LOGS, DEBUG_LOGS, 
     indentedStringify, DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, clearFile,
     ERROR_LOG_FILEPATH,
@@ -29,8 +28,8 @@ import {
 } from "./utils/api";
 import { CUSTOMER_PARSE_OPTIONS, CONTACT_PARSE_OPTIONS, 
     CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS as POST_PROCESSING_OPTIONS 
-} from "./parses/customer/customerParseDefinition";
-import * as customerConstants from './parses/customer/customerConstants';
+} from "./parse_configurations/customer/customerParseDefinition";
+import * as customerConstants from './parse_configurations/customer/customerConstants';
 import { parseRecordCsv } from "./csvParser";
 import { processParseResults } from "./parseResultsProcessor";
 import { RadioFieldBoolean, RADIO_FIELD_TRUE, isNonEmptyArray } from './utils/typeValidation';
@@ -52,7 +51,7 @@ export const CONTACT_RESPONSE_OPTIONS: RecordResponseOptions = {
 
 const TWO_SECONDS = 2000;
 
-enum StageEnum {
+export enum StageEnum {
     PARSE = 'PARSE',
     VALIDATE = 'VALIDATE',
     ENTITIES = 'PUT_ENTITIES',
@@ -60,14 +59,17 @@ enum StageEnum {
     GENERATE = 'GENERATE_UPDATES',
     UPDATE = 'PUT_ENTITY_UPDATES',
 }
-type EntityProcessorOptions = {
+export type ProcessorOptions = {
     clearLogFiles?: string[],
+    /**if outputDir is a valid directory, entityProcessor will write output to files here. */
     outputDir?: string,
     /**
      * - stop after specific stage for the first file in filePaths. 
      * - leave undefined to process all files in filePaths 
      * */
     stopAfter?: StageEnum,
+    parseOptions?: ParseOptions,
+    responseOptions?: RecordResponseOptions
 }
 /**
  * @param options 
@@ -77,7 +79,7 @@ type EntityProcessorOptions = {
  * @returns 
  */
 function done(
-    options: EntityProcessorOptions, 
+    options: ProcessorOptions, 
     fileName: string,
     stage: StageEnum,
     stageData: Record<string, any>,
@@ -87,7 +89,7 @@ function done(
         const outputPath = path.join(outputDir, `${fileName}_${stage}.json`);
         write(stageData, outputPath);
     }
-    if (stopAfter === stage) {
+    if (stopAfter && stopAfter === stage) {
         mlog.info(`[END processEntityFiles()] - done(options...) returned true`,
             TAB+`fileName: '${fileName}'`,
             TAB+`   stage: '${stage}'`,
@@ -102,7 +104,7 @@ function done(
 export async function processEntityFiles(
     entityType: EntityRecordTypeEnum,
     filePaths: string | string[],
-    options: EntityProcessorOptions
+    options: ProcessorOptions
 ): Promise<void> {
     if (!entityType || !filePaths 
         || (typeof filePaths !== 'string' && !isNonEmptyArray(filePaths))) {
@@ -150,7 +152,7 @@ export async function processEntityFiles(
         const updateResponses: RecordResponse[] = await putEntities(
             entityUpdates
         );
-        if (done(options, fileName, StageEnum.UPDATE, updateResponses)) return;
+        // if (done(options, fileName, StageEnum.UPDATE, updateResponses)) return;
     }
     mlog.info(`[END processEntityFiles()]`);
     STOP_RUNNING(0);
@@ -168,7 +170,7 @@ export async function putEntities(
 ): Promise<RecordResponse[]> {
     try {
         const entityRequest: RecordRequest = {
-            postOptions: entities,
+            recordOptions: entities,
             responseOptions
         };
         const entityResponses: RecordResponse[] = 
@@ -194,7 +196,7 @@ export async function putContacts(
 ): Promise<RecordResponse[]> {
     try {
         const contactRequest: RecordRequest = {
-            postOptions: contacts,
+            recordOptions: contacts,
             responseOptions
         };
         const contactResponses: RecordResponse[] = 

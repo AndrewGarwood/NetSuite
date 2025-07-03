@@ -1,5 +1,6 @@
 /**
  * @file src/utils/api/get.ts
+ * @TODO maybe rewrite the GET endpoing in GET_Record.js to have the request just be idProp, idVal, and recordType
  */
 import axios from "axios";
 import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify } from "../io";
@@ -13,14 +14,20 @@ import {
     SearchOperatorEnum
 } from "./types";
 import { getAccessToken, NOT_DYNAMIC, SB_REST_SCRIPTS } from "./configureRequests";
+import { anyNull } from "../typeValidation";
 
 
-const GET_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.GET_Record.scriptId as number;
-const GET_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.GET_Record.deployId as number;
+export const GET_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.GET_Record.scriptId as number;
+export const GET_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.GET_Record.deployId as number;
 
 /**
- * - {@link GET_RECORD_SCRIPT_ID} = `175`
- * - {@link GET_RECORD_DEPLOY_ID} = `1`
+ * @param request {@link GetRecordRequest}
+ * @returns **`response`** - `Promise<`{@link GetRecordResponse}`>`
+ */
+export async function getRecordById(
+    request: GetRecordRequest
+): Promise<GetRecordResponse>
+/**
  * @param recordType {@link RecordTypeEnum} | {@link EntityRecordTypeEnum}
  * @param recordId `string | number`
  * @param idProp {@link idPropertyEnum} - defaults to {@link idPropertyEnum.INTERNAL_ID}
@@ -28,38 +35,56 @@ const GET_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.GET_Record.deployId as number;
  * @returns **`response`** - `Promise<`{@link GetRecordResponse}`>`
  */
 export async function getRecordById(
-    recordType: RecordTypeEnum | EntityRecordTypeEnum, 
+    recordType: RecordTypeEnum | string, 
     recordId: string | number, 
-    idProp: idPropertyEnum = idPropertyEnum.INTERNAL_ID,
-    responseOptions: RecordResponseOptions = {} as RecordResponseOptions
+    idProp: idPropertyEnum,
+    responseOptions: RecordResponseOptions
+): Promise<GetRecordResponse>
+
+/**
+ * - {@link GET_RECORD_SCRIPT_ID} = `175`
+ * - {@link GET_RECORD_DEPLOY_ID} = `1`
+ *  */
+export async function getRecordById(
+    arg1: GetRecordRequest | RecordTypeEnum | string,
+    arg2?: string | number,
+    arg3?: idPropertyEnum,
+    arg4?: RecordResponseOptions
 ): Promise<GetRecordResponse> {
-    mlog.debug(`[Start getRecordById()]`);
-    if (!recordType || !recordId) {
-        mlog.error('[get.ts getRecordById()] recordType or idValue is undefined. Cannot call RESTlet.');
-        throw new Error('[get.ts getRecordById()] recordType or idValue is undefined. Cannot call RESTlet.');
+    mlog.info(`[Start getRecordById()]`);
+    const request = {} as GetRecordRequest;
+    if (typeof arg1 === 'string') {
+        if (anyNull(arg2, arg3)) {
+            mlog.error('[get.ts getRecordById()] recordType or idValue is undefined. Cannot call RESTlet.');
+            throw new Error('[get.ts getRecordById()] recordType or idValue is undefined. Cannot call RESTlet.');
+        }
+        const recordType = arg1;
+        const recordId = arg2;
+        const idProp = arg3;
+        const responseOptions = arg4;
+        const idValue = (idProp === idPropertyEnum.INTERNAL_ID 
+            ? Number(recordId) 
+            : String(recordId)
+        );
+        const searchOperator = (idProp === idPropertyEnum.INTERNAL_ID 
+            ? SearchOperatorEnum.RECORD.ANY_OF 
+            : SearchOperatorEnum.TEXT.IS
+        );
+        Object.assign(request, {
+            recordType,
+            idOptions: [{ idProp, idValue, searchOperator }] as idSearchOptions[],
+            responseOptions,
+        } as GetRecordRequest);
+    } else {
+        Object.assign(request, arg1);
     }
-    const idValue = (idProp === idPropertyEnum.INTERNAL_ID 
-        ? Number(recordId) 
-        : String(recordId)
-    );
-    const searchOperator = (idProp === idPropertyEnum.INTERNAL_ID 
-        ? SearchOperatorEnum.RECORD.ANY_OF 
-        : SearchOperatorEnum.TEXT.IS
-    );
-    const request = {
-        isDynamic: NOT_DYNAMIC,
-        recordType,
-        idOptions: [{ idProp, idValue, searchOperator }] as idSearchOptions[],
-        responseOptions,
-    } as GetRecordRequest;
-    // mlog.debug(`get.ts getRecordById() request: ${indentedStringify(request)}`);
     try {
         const accessToken = await getAccessToken();
         const response = await GET(
             accessToken,
             GET_RECORD_SCRIPT_ID,
             GET_RECORD_DEPLOY_ID,
-            request as Record<string, any>
+            request
         );
         return response.data as GetRecordResponse;
     } catch (error) {

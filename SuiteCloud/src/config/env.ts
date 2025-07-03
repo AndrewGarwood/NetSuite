@@ -123,7 +123,7 @@ export const SRC_DIR = path.join(NODE_HOME_DIR, 'src') as string;
 export const TOKEN_DIR = path.join(SRC_DIR, 'server', 'tokens') as string;
 
 export const USER = process.cwd().split(path.sep)[2];
-console.log(`USER = '${USER}'`);
+
 const ORGANIZATION = process.env.ORGANIZATION || 'MISSING_ENV_VAR-ORGANIZATION';
 /** `C:/Users/${USER}/OneDrive - ${ORGANIZATION}` */
 export const ONE_DRIVE_DIR = `C:/Users/${USER}/OneDrive - ${ORGANIZATION}` as string;
@@ -135,8 +135,8 @@ export const DATA_DIR = path.join(NODE_HOME_DIR, '..', 'data') as string;
 
 /** `/NetSuite/SuiteCloud/.output` */
 export const OUTPUT_DIR = path.join(NODE_HOME_DIR,'.output') as string;
-/**`/NetSuite/SuiteCloud/.output/errors` */
-export const ERROR_DIR = path.join(OUTPUT_DIR, 'errors') as string;
+/**`/CLOUD_LOG_DIR/errors` */
+export const ERROR_DIR = path.join(CLOUD_LOG_DIR, 'errors') as string;
 
 /** 
  * @example 
@@ -172,10 +172,10 @@ export const DELAY = async (ms: number, ...msg: any[]): Promise<void> => {
 }
 
 const TAB = '\n\t';
-console.log(` > Loading env...`,
-    TAB + `        USER: ${USER}`,
-    TAB + `   inSandbox: ${inSandbox}`,
-    TAB + `inProduction: ${inProduction}`
+console.log(`[env.ts] Loading env...`,
+    TAB + `        USER: '${USER}'`,
+    TAB + `   inSandbox:  ${inSandbox}`,
+    TAB + `inProduction:  ${inProduction}`
 );
 
 
