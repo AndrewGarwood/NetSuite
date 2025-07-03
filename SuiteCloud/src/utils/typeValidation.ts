@@ -4,17 +4,16 @@
 export * from "./api/types/typeGuards";
 export * from "./io/types/typeGuards";
 export { isValidCsv } from "./io/reading";
-
-import { FieldValue, SubrecordValue, idSearchOptions, idPropertyEnum, RecordOptions } from "src/utils/api/types";
+export { isTransactionEntityMatchOptions } from "../transactionProcessor";
+import { FieldValue } from "src/utils/api/types";
 import { mainLogger as mlog } from "src/config/setupLog";
 import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "./io/regex/index";
-import { FieldParseOptions, ValueMappingEntry } from "./io";
 
 /**
  * @param value the value to check
  * @returns **`isNullLike`** `boolean` = `value is null | undefined | '' | [] | Record<string, never>`
- * - `true` if the value is null, undefined, empty object (no keys), empty array, or empty string
- * - `false` otherwise
+ * - `true` `if` the `value` is null, undefined, empty object (no keys), empty array, or empty string
+ * - `false` `otherwise`
  */
 export function isNullLike(value: any): value is null | undefined | '' | [] | Record<string, never> {
     if (value === null || value === undefined) {
@@ -71,7 +70,7 @@ export function isEmptyArray(arr: any): arr is Array<any> & { length: 0 } {
     return Array.isArray(arr) && arr.length === 0; 
 }
 /**
- * @TODO add param that indicates whether all values be nontrivial or not
+ * @TODO add param that indicates whether all values must be nontrivial or not
  * @description Check if an object has at least 1 key with value that is non-empty (not `undefined`, `null`, or empty string). 
  * @note **passing in an array will return `false`.**
  * @param obj - The object to check.
@@ -105,8 +104,8 @@ export function hasNonTrivialKeys(
  * - `if` `true`, only the keys provided in the `keys` param are allowed in the object;
  * - `if` `false`, the object can keys not included in the `keys` param.
  * @returns **`hasKeys`** `boolean` 
- * - **`true`** `if` the object has the required key(s), 
- * - **`false`** otherwise
+ * - **`true`** `if` `obj` is of type 'object' and has the required key(s), 
+ * - **`false`** `otherwise`
  */
 export function hasKeys<T extends Object>(
     obj: T, 

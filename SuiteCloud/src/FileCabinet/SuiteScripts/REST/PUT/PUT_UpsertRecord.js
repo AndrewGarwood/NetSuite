@@ -26,31 +26,31 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     
     /**
      * @param {RecordRequest} reqBody **{@link RecordRequest}**
-     * - = `{ postOptions: `{@link RecordOptions}` | Array<`{@link RecordOptions}`>, responseOptions: `{@link RecordResponseOptions}` }`
+     * - = `{ recordOptions: `{@link RecordOptions}` | Array<`{@link RecordOptions}`>, responseOptions: `{@link RecordResponseOptions}` }`
      * @returns {RecordResponse} **`response`** **{@link RecordResponse}** = `{ success: boolean, message: string, results?: `{@link RecordResult}`[], rejects?: `{@link RecordOptions}`[], error?: string, logArray: `{@link LogStatement}`[] }`
      */
     const put = (reqBody) => {
-        const { postOptions, responseOptions } = reqBody;
-        if (!postOptions || !isNonEmptyArray(postOptions)) {
-            writeLog(LogTypeEnum.ERROR, 'put() Invalid Request Parameter', 'non-empty postOptions is required');
-            return { status: false, message: 'put() Invalid Request Parameter', error: 'non-empty postOptions is required', logArray };
+        const { recordOptions, responseOptions } = reqBody;
+        if (!recordOptions || !isNonEmptyArray(recordOptions)) {
+            writeLog(LogTypeEnum.ERROR, 'put() Invalid Request Parameter', 'non-empty recordOptions is required');
+            return { status: false, message: 'put() Invalid Request Parameter', error: 'non-empty recordOptions is required', logArray };
         }
-        if (!Array.isArray(postOptions)) {
-            postOptions = [postOptions];
+        if (!Array.isArray(recordOptions)) {
+            recordOptions = [recordOptions];
         }
         /**@type {RecordResult[]} */
         const results = [];
         /**@type {RecordOptions[]} */
         const rejects = [];
-        writeLog(LogTypeEnum.AUDIT, `put() received valid postOptions of length: ${postOptions.length}`);
+        writeLog(LogTypeEnum.AUDIT, `put() received valid recordOptions of length: ${recordOptions.length}`);
         try {
-            for (let i = 0; i < postOptions.length; i++) {
-                const options = postOptions[i];
+            for (let i = 0; i < recordOptions.length; i++) {
+                const options = recordOptions[i];
                 try {
                     const result = processRecordOptions(options, responseOptions);
                     if (!result) {
                         writeLog(LogTypeEnum.ERROR,
-                            `put() Invalid RecordOptions at index ${i}:`,
+                            `put() Invalid '${options.recordType}' RecordOptions at index ${i}:`,
                         )
                         rejects.push(options);
                         continue;
@@ -58,8 +58,8 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     results.push(result);
                 } catch (e) {
                     writeLog(LogTypeEnum.ERROR, 
-                        `put() Error processing RecordOptions at index ${i}:`, 
-                        JSON.stringify(e)
+                        `[put()] Error processing '${options.recordType}' RecordOptions at index ${i}:`, 
+                        JSON.stringify(e), // JSON.stringify(options)
                     );
                     rejects.push(options);
                     continue;
@@ -917,7 +917,7 @@ const SubrecordFieldEnum = {
 /**Type: RecordRequest {@link RecordRequest} */
 /**
  * @typedef {Object} RecordRequest
- * @property {RecordOptions | Array<RecordOptions>} postOptions = {@link RecordOptions} | `Array<`{@link RecordOptions}`>`
+ * @property {RecordOptions | Array<RecordOptions>} recordOptions = {@link RecordOptions} | `Array<`{@link RecordOptions}`>`
  * - {@link RecordOptions} = `{ recordType: `{@link RecordTypeEnum}`, isDynamic?: boolean, idOptions?: `{@link idSearchOptions}`[], fields?: `{@link FieldDictionary}`, sublists?: `{@link SublistDictionary}` }`
  * @property {RecordResponseOptions} [responseOptions] = {@link RecordResponseOptions} = `{ responseFields: string | string[], responseSublists: Record<string, string | string[]> }`
  */

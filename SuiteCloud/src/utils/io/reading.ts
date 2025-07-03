@@ -11,49 +11,67 @@ import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/
 import { DelimiterCharacterEnum, ValueMapping, DelimitedFileTypeEnum } from './types';
 import { FieldValue } from '../api/types/InternalApi';
 import { isNonEmptyArray, isValueMappingEntry, anyNull } from '../typeValidation';
-import { EntityRecordTypeEnum, RecordTypeEnum } from '../api';
 
 
 /**
  * @param filePath `string`
- * @param delimiter `string` {@link DelimiterCharacterEnum}
+ * @param requiredHeaders `string[]` - `optional` array of headers that must be present in the CSV file.
+ * - If provided, the function checks if all required headers are present in the CSV header row
  * @returns **`isValidCsv`** `boolean`
  * - **`true`** `if` the CSV file at `filePath` is valid (all rows have the same number of columns as the header),
  * - **`false`** `otherwise`. 
  */
 export function isValidCsv(
-    filePath: string, 
-    delimiter?: DelimiterCharacterEnum | string,
+    filePath: string,
+    requiredHeaders?: string[]
 ): boolean {
-    if (!filePath || !fs.existsSync(filePath)) {
-        mlog.error(`ERROR isValidCsv(): path does not exist: ${filePath}`);
+    if (!filePath || typeof filePath !== 'string' || !fs.existsSync(filePath)) {
+        mlog.error(`[ERROR isValidCsv()]: path does not exist: ${filePath}`);
         return false;
     }
-    if (!delimiter || delimiter.length === 0) {
-        delimiter = getDelimiterFromFilePath(filePath);
-    }   
+    const delimiter = getDelimiterFromFilePath(filePath);
     const data = fs.readFileSync(filePath, 'utf8');
     const lines = data.split('\n');
     if (lines.length < 2) {
-        mlog.error(`ERROR isValidCsv(): file has less than 2 lines: ${filePath}`);
+        mlog.error(`[ERROR isValidCsv()]: file has less than 2 lines: ${filePath}`);
         return false;
     }
-    const header: string[] = lines[0].split(delimiter).map(col => col.trim());
-    if (header.length < 1) {
-        mlog.error(`ERROR isValidCsv(): no header found in file: ${filePath}`);
+    const headerRow: string[] = lines[0].split(delimiter).map(col => col.trim());
+    if (headerRow.length < 1) {
+        mlog.error(`[ERROR isValidCsv()]: no header found in file: ${filePath}`);
         return false;
+    }
+    if (isNonEmptyArray(requiredHeaders)) {
+        const hasRequiredHeaders = requiredHeaders.every(header => {
+            if (!header || typeof header !== 'string') {
+                throw new Error([
+                    `[reading.isValidCsv]: Invalid parameter: 'requiredHeaders`,
+                    `requiredHeaders must be of type: Array<string>, but`,
+                    `found array element of type: '${typeof header}'`
+                ].join(' '))
+            }
+            return headerRow.includes(header)
+        });
+        if (!hasRequiredHeaders) {
+            mlog.warn(`[isValidCsv()]: Required headers missing from headerRow`,
+                TAB+`filePath: '${filePath}'`,
+                TAB+`requiredHeaders: ${JSON.stringify(requiredHeaders)}`,
+                TAB+` csvFileHeaders: ${JSON.stringify(headerRow)}`
+            ) 
+            return false; 
+        }
     }
     // Check if all rows have the same number of columns as the header
     for (let i = 1; i < lines.length; i++) {
         const rowValues: string[] = lines[i].split(delimiter).map(col => col.trim());
-        if (header.length !== rowValues.length 
+        if (headerRow.length !== rowValues.length 
             && i !== lines.length-1 // allow for empty last row in files.
         ) {
-            mlog.warn(`isValidCsv(): Invalid row found: header.length !== rowValues.length`,
-                TAB+`   header.length: ${header.length},`,
+            mlog.warn(`[isValidCsv()]: Invalid row found: header.length !== rowValues.length`,
+                TAB+`   header.length: ${headerRow.length},`,
                 TAB+`rowValues.length: ${rowValues.length}`,
-                TAB+` -> Difference =  ${header.length - rowValues.length}`,
-                TAB+`   header: ${JSON.stringify(header)}`,
+                TAB+` -> Difference =  ${headerRow.length - rowValues.length}`,
+                TAB+`   header: ${JSON.stringify(headerRow)}`,
                 TAB+`rowValues: ${JSON.stringify(rowValues)}`,
                 TAB+` rowIndex: ${i},`,
                 TAB+` filePath: '${filePath}'`,
@@ -211,7 +229,7 @@ export function getDelimiterFromFilePath(
     } else if (extension === DelimitedFileTypeEnum.TSV) {
         return DelimiterCharacterEnum.TAB;
     } else {
-        throw new Error(`Unsupported file extension: ${extension}`);
+        throw new Error(`[reading.getDelimiterFromFilePath()] Unsupported file extension: ${extension}`);
     }
 }
 
@@ -302,12 +320,16 @@ export function checkForOverride(
 }
 
 
-
+/**
+ * @param filePath `string`
+ * @returns **`rows`** `Promise<Array<Record<string, any>>>` 
+ * - an array of objects representing rows from a CSV file.
+ */
 export async function getCsvRows(
     filePath: string
 ): Promise<Array<Record<string, any>>> {
     const delimiter = getDelimiterFromFilePath(filePath);
-    if (!delimiter || !isValidCsv(filePath, delimiter)) {
+    if (!delimiter || !isValidCsv(filePath)) {
         return []
     }
     const rows: Array<Record<string, any>> = []; 
@@ -320,4 +342,39 @@ export async function getCsvRows(
             .on('end', () => resolve(rows))
             .on('error', reject);
     });
+}
+
+
+/**
+ * @param rows `Record<string, any>[]` - array of objects representing rows from a csv file. 
+ * @param keyColumn `string` - the column name whose contents will be keys in the dictionary.
+ * @param valueColumn `string` - the column name whose contents will be used as values in the dictionary.
+ * @returns **`dict`** `Record<string, string>`
+ */
+export function getOneToOneDictionary(
+    rows: Record<string, any>[],
+    keyColumn: string,
+    valueColumn: string,
+): Record<string, string> {
+    if (!isNonEmptyArray(rows) || !keyColumn || !valueColumn) {
+        throw new Error(`[getOneToOneDictionary()] Invalid parameters: rows, keyColumn, valueColumn`);
+    }
+    const dict: Record<string, string> = {};
+    for (const row of rows) {
+        const key = String(row[keyColumn]).trim();
+        const value = String(row[valueColumn]).trim();
+        if (!key || !value) {
+            mlog.warn(`[getOneToOneDictionary()] Row missing key or value column:`, 
+                TAB+`keyColumn: '${keyColumn}', valueColumn: '${valueColumn}'`
+            );
+            continue;
+        }
+        if (dict[key]) {
+            mlog.warn(`[getOneToOneDictionary()] Duplicate key found: '${key}'`,
+                TAB+`overwriting value '${dict[key]}' with '${value}'`
+            );
+        }
+        dict[key] = value;
+    }
+    return dict;
 }

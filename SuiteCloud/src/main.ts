@@ -11,7 +11,7 @@ import {
     SublistDictionaryParseOptions, SublistLineParseOptions,
     SublistLineIdOptions, SubrecordParseOptions, EvaluationContext, RowContext, 
     RecordKeyOptions, getCsvRows, HierarchyOptions, GroupReturnTypeEnum, 
-    STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, RowDictionary,
+    RowDictionary,
     trimFile,
 } from "./utils/io";
 import { 
@@ -38,17 +38,30 @@ import { parseRecordCsv } from "./csvParser";
 import { processParseResults } from "./parseResultsProcessor";
 import { RadioFieldBoolean, RADIO_FIELD_TRUE, isNonEmptyArray } from './utils/typeValidation';
 import { ENTITY_RESPONSE_OPTIONS, CONTACT_RESPONSE_OPTIONS, 
-    processEntityFiles, ProcessorOptions, StageEnum
+    processEntityFiles, EntityProcessorOptions, EntityProcessorStageEnum
 } from './entityProcessor';
 import { ParseManager } from './ParseManager';
 
 async function main() {
-    const filePath = soConstants.SMALL_SUBSET_FILE;
-    const parseOptions: ParseOptions = {
-        [RecordTypeEnum.SALES_ORDER]: SO_OPTIONS,
+    const entityType = EntityRecordTypeEnum.CUSTOMER;
+    const ALL_CUSTOMERS = [
+        customerConstants.FIRST_PART_FILE, 
+        customerConstants.SECOND_PART_FILE, 
+        customerConstants.THIRD_PART_FILE
+    ];
+    const customerFilePaths = [
+        // customerConstants.SUBSET_FILE,
+        ...ALL_CUSTOMERS
+    ];
+    const options: EntityProcessorOptions = {
+        clearLogFiles: [
+            DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH
+        ],
+        // outputDir: CLOUD_LOG_DIR,
+        // stopAfter: EntityProcessorStageEnum.CONTACTS,
     }
-    const parseResults = await parseRecordCsv(filePath, parseOptions);
-    write(parseResults, path.join(CLOUD_LOG_DIR, 'SO_ParseResults.json'));
+    await processEntityFiles(entityType, customerFilePaths, options);
+
     trimFile(undefined, DEFAULT_LOG_FILEPATH);
     STOP_RUNNING(0);
 }
@@ -61,22 +74,13 @@ main().catch(error => {
 
 
 /*
-    const entityType = EntityRecordTypeEnum.CUSTOMER;
-    const ALL_CUSTOMERS = [
-        customerConstants.FIRST_PART_FILE, 
-        customerConstants.SECOND_PART_FILE, 
-        customerConstants.THIRD_PART_FILE
-    ];
-    const customerFilePaths = [
-        // customerConstants.SMALL_SUBSET_FILE,
-        ...ALL_CUSTOMERS
-    ];
-    const options: EntityProcessorOptions = {
-        clearLogFiles: [DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH],
-        // outputDir: CLOUD_LOG_DIR,
-        // stopAfter: StageEnum.PARSE,
+
+    const filePath = soConstants.SMALL_SUBSET_FILE;
+    const parseOptions: ParseOptions = {
+        [RecordTypeEnum.SALES_ORDER]: SO_OPTIONS,
     }
-    await processEntityFiles(entityType, customerFilePaths, options);
+    const parseResults = await parseRecordCsv(filePath, parseOptions);
+    write(parseResults, path.join(CLOUD_LOG_DIR, 'SO_ParseResults.json'));
 */
 
 const entityId: FieldEvaluator = (

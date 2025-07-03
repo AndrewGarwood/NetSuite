@@ -35,9 +35,9 @@ export const LAST_NAME_COMMA_FIRST_NAME_PATTERN = new RegExp(
     RegExpFlagsEnum.IGNORE_CASE
 );
 
-export const REMOVE_ATTN_SALUTATION_PREFIX: StringReplaceParams = 
-    {searchValue: ATTN_SALUTATION_PREFIX_PATTERN, replaceValue: ''}
-;
+export const REMOVE_ATTN_SALUTATION_PREFIX: StringReplaceParams = {
+    searchValue: ATTN_SALUTATION_PREFIX_PATTERN, replaceValue: ''
+};
 /**
  * re = `/(, (` + JOB_TITLE_SUFFIX_LIST.join('|') + `)\.?,?){asterisk}/g`,
  */
@@ -55,9 +55,10 @@ export const JOB_TITLE_SUFFIX_PATTERN = new RegExp(
     RegExpFlagsEnum.GLOBAL
 ); 
 
-export const REMOVE_JOB_TITLE_SUFFIX: StringReplaceParams = 
-    {searchValue: JOB_TITLE_SUFFIX_PATTERN, replaceValue: ''};
-    // {searchValue: JOB_TITLE_SUFFIX_PATTERN_FROM_LIST, replaceValue: ''}
+export const REMOVE_JOB_TITLE_SUFFIX: StringReplaceParams = {
+    searchValue: JOB_TITLE_SUFFIX_PATTERN, replaceValue: ''
+};
+// {searchValue: JOB_TITLE_SUFFIX_PATTERN_FROM_LIST, replaceValue: ''}
 
 
 

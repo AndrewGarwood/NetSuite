@@ -107,9 +107,9 @@ export function writeObjectToJson(
 
 /**
  * @param data `Record<string, any> | string` - JSON data to stringify
- * @param indent `number` - `optional`, default=`0` - number of additional indents to add to each line
- * @param spaces `number` - `optional`, default=`4`
- * @returns 
+ * @param indent `number` `optional`, default=`0` - number of additional indents to add to each line
+ * @param spaces `number` `optional`, default=`4`
+ * @returns **`jsonString`** `string`
  */
 export function indentedStringify(
     data: Record<string, any> | string,

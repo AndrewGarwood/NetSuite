@@ -1,5 +1,5 @@
 /**
- * @inprogress
+ * @incomplete
  * @file src/utils/io/parsers/GroupedParser.ts
  * @description Hierarchical grouping CSV parsing strategy
  */
@@ -10,6 +10,7 @@ import {
     NodeStructure,
     RowDictionary
 } from "./types/ParseStrategy";
+import { FieldDependencyResolver } from "./FieldDependencyResolver";
 import { 
     ParseResults, EvaluationContext, RowContext,
     FieldDictionaryParseOptions, SublistDictionaryParseOptions, FieldParseOptions,
@@ -71,8 +72,7 @@ export class GroupedParser implements ParseStrategy {
             throw new Error(`Invalid file path: ${filePath}`);
         }
         
-        const delimiter = getDelimiterFromFilePath(filePath);
-        if (!isValidCsv(filePath, delimiter)) {
+        if (!isValidCsv(filePath)) {
             throw new Error(`Invalid CSV file: ${filePath}`);
         }
         
@@ -316,7 +316,7 @@ export class GroupedParser implements ParseStrategy {
 
     /**
      * @TODO field subrecords
-     * Process body fields from a single representative row
+     * @description Process body fields from a single representative row
      */
     private async processFieldsFromRow(
         row: Record<string, any>,

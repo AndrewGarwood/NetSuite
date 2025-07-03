@@ -1,10 +1,8 @@
 /**
  * @file src/utils/io/types/PostProcessing.ts
  */
-import { 
-    EntityRecordTypeEnum, FieldValue, idPropertyEnum, idSearchOptions, RecordOptions, 
-    RecordTypeEnum 
-} from "src/utils/api";
+import { FieldValue } from "src/utils/api/types/InternalApi";
+import { RecordOptions } from "src/utils/api/types/RecordEndpoint";
 
 /**
  * Defines the order of operations for post-processing
@@ -53,9 +51,9 @@ export type ProcessParseResultsOptions = {
  * @property {Array<string>} sublistIds - `Array<string>` - `sublistIds` to clone from the donor's {@link SublistDictionary}
  */
 export type CloneOptions = {
-    donorType: RecordTypeEnum | EntityRecordTypeEnum | string;
-    recipientType: RecordTypeEnum | EntityRecordTypeEnum | string;
-    idProp: idPropertyEnum;
+    donorType: string;
+    recipientType: string;
+    idProp: string;
     fieldIds?: string[];
     sublistIds?: string[];
 }
@@ -68,8 +66,8 @@ export type CloneOptions = {
  * @property {RecordTypeEnum | EntityRecordTypeEnum | string} recordType - {@link RecordTypeEnum}
  */
 export type ComposeOptions = {
-    recordType: RecordTypeEnum | EntityRecordTypeEnum | string,
-    idOptions?: { composer: (options: RecordOptions) => idSearchOptions[] },
+    recordType: string,
+    idOptions?: { composer: (options: RecordOptions) => any[] },
     fields?: {
         [fieldId: string]: {
             composer: (options: RecordOptions) => FieldValue;

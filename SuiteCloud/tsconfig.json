@@ -1,11 +1,12 @@
 {    
     "compilerOptions": {
         "strict": true,
-        "module": "amd",
+        "module": "commonjs", // "amd"
         "target": "es5",
         "moduleResolution": "node",
+        "downlevelIteration": true,
         "sourceMap": false,
-        "newLine": "LF",
+        "newLine": "CRLF",
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "experimentalDecorators": true,

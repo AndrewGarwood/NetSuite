@@ -4,6 +4,7 @@
 
 import { hasKeys, isPrimitiveValue } from "../../typeValidation";
 import { SubrecordValue, FieldValue } from "./InternalApi";
+import { RecordResponseOptions } from "./Requests";
 
 /**
  * - {@link SubrecordValue}
@@ -50,4 +51,10 @@ export function isFieldValue(value: any): value is FieldValue {
         return value.every(item => isPrimitiveValue(item));
     }
     return false;
+}
+
+export function isRecordResponseOptions(value: any): value is RecordResponseOptions {
+    return (value && typeof value === 'object'
+        && hasKeys(value, ['responseFields', 'responseSublists'], false, true)
+    )
 }

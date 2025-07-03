@@ -6,6 +6,7 @@ import { OUTPUT_DIR, CLOUD_LOG_DIR } from './env';
 import { Logger, ISettingsParam, ISettings, ILogObj, ILogObjMeta, IPrettyLogStyles, IMeta } from 'tslog';
 import path from 'node:path';
 import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
+
 /** LOCAL_LOG_DIR (in onedrive) or `OUTPUT_DIR/logs` */
 export const LOCAL_LOG_DIR = path.join(OUTPUT_DIR, "logs");  
 /**`OUTPUT_DIR/logs/DEBUG.txt` */
@@ -35,7 +36,8 @@ const fileInfoTemplate = "{{filePathWithLine}}";
     // "{{fileName}}:{{fileLine}}";
 /** 
  * use as value for {@link ISettingsParam.prettyLogTemplate} 
- * @description template string for log messages = {@link timestampTemplate} + {@link logNameTemplate} + {@link logLevelTemplate} + {@link fileInfoTemplate} + `\n\t{{logObjMeta}}`
+ * @description template string for log messages 
+ * = {@link timestampTemplate} + {@link logNameTemplate} + {@link logLevelTemplate} + {@link fileInfoTemplate} + `\n\t{{logObjMeta}}`
  * - {@link timestampTemplate} = `({{yyyy}}-{{mm}}-{{dd}} {{hh}}:{{MM}}:{{ss}}.{{ms}})`
  * - {@link logNameTemplate} = `"[{{name}}]"`
  * - {@link logLevelTemplate} = `{{logLevelName}}:`
@@ -44,10 +46,10 @@ const fileInfoTemplate = "{{filePathWithLine}}";
  * - = `<{{yyyy}}-{{mm}}-{{dd}} {{hh}}:{{MM}}:{{ss}}.{{ms}}> [{{nameWithDelimiterPrefix}}{{name}}{{nameWithDelimiterSuffix}}] {{logLevelName}}: {{fileName}}:{{fileLine}}\n\t{{logObjMeta}}`
  * */
 const LOG_TEMPLATE = [
+    logLevelTemplate, 
     timestampTemplate, 
     // logNameTemplate, 
     fileInfoTemplate,
-    logLevelTemplate, 
 ].join(' ') + NEW_LINE;
 
 const errorInfoTemplate = "{{errorName}}: {{errorMessage}}\n\t{{errorStack}}";
@@ -93,7 +95,7 @@ const PRETTY_LOG_STYLES: IPrettyLogStyles = {
 };   
 
 const MAIN_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
-    type: "pretty",
+    type: "pretty", // "pretty" | "hidden" | "json"
     name: "NS_Main",
     minLevel: 0,
     prettyLogTemplate: LOG_TEMPLATE,
@@ -161,4 +163,4 @@ function modifyLogObj(logObj: ILogObj): ILogObj {
 
 export const INFO_LOGS: any[] = []
 export const DEBUG_LOGS: any[] = [];
-export { indentedStringify, trimFile, clearFile } from '../utils/io'
+export { indentedStringify, trimFile, clearFile } from '../utils/io/writing';

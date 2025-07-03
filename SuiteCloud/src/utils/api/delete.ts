@@ -6,7 +6,7 @@ import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify } 
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "./url";
-import { AxiosCallEnum, AxiosContentTypeEnum } from "../../server";
+import { AxiosContentTypeEnum } from "../../server";
 import { 
     DeleteRecordByTypeRequest, DeleteExcludeOptions, DeleteRecordByTypeResponse,
 } from "./types";
