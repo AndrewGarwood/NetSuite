@@ -1,7 +1,6 @@
 /**
  * @file src/parseResultsProcessor.ts
  * @description handle post processing options of csvParser ParseResults.
- * @TODO add another post processing options object.. something like "ComputeOptions" for fields whose values can only be determined after parse is complete.
  */
 
 import { 
@@ -29,8 +28,8 @@ import {
     isRecordOptions, isCloneOptions, isComposeOptions,
     ValidatedParseResults,
     ProcessParseResultsOptions,
-    PostProcessingOperationEnum as OperationEnum
 } from "./utils/io";
+import { PostProcessingOperationEnum as OperationEnum } from "./utils/io/types/PostProcessing";
 import { cloneDeep } from "lodash";
 
 

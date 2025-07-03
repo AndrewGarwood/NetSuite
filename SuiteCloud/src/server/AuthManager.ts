@@ -1,6 +1,5 @@
 /**
  * @file src/server/AuthManager.ts
- * @export { AuthManager, TokenStatus, AuthState, type AuthOptions, type TokenMetadata }
  */
 import express, { Request, Response } from 'express';
 import { Server } from 'node:http';
@@ -17,11 +16,17 @@ import {
 import { createUrlWithParams } from '../utils/api/url';
 import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from './types';
 import { 
-    writeObjectToJson as write, 
-    readJsonFileAsObject as read, 
-    getCurrentPacificTime 
-} from '../utils/io';
-import { mainLogger as mlog, authLogger as alog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from '../config/setupLog';
+    writeObjectToJson as write 
+} from '../utils/io/writing';
+import { 
+    readJsonFileAsObject as read
+} from '../utils/io/reading';
+import { getCurrentPacificTime } from '../utils/io/dateTime';
+import { 
+    mainLogger as mlog, authLogger as alog, INDENT_LOG_LINE as TAB, NEW_LINE as NL 
+} from '../config/setupLog';
+
+export { AuthManager, TokenStatus, AuthState, type AuthOptions, type TokenMetadata };
 
 // ============================================================================
 // TYPES
@@ -695,4 +700,3 @@ class AuthManager {
     }
 }
 
-export { AuthManager, TokenStatus, AuthState, type AuthOptions, type TokenMetadata };

@@ -1,10 +1,9 @@
 /**
- * @file src/EntityManager.ts
+ * @file src/entityProcessor.ts
  */
 import path from 'node:path';
 import * as fs from 'fs';
 import {
-    readJsonFileAsObject as read,
     writeObjectToJson as write,
     ValidatedParseResults,
     ProcessParseResultsOptions, ParseOptions, ParseResults,
@@ -12,14 +11,18 @@ import {
 } from "./utils/io";
 import { 
     STOP_RUNNING,  DELAY, 
-    mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, INFO_LOGS, DEBUG_LOGS, 
-    indentedStringify, DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, clearFile,
+    mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
+    INFO_LOGS, DEBUG_LOGS, 
+    indentedStringify, DEFAULT_LOG_FILEPATH, 
+    PARSE_LOG_FILEPATH, clearFile,
     ERROR_LOG_FILEPATH,
     ERROR_DIR
 } from "./config";
 import { 
-    EntityRecordTypeEnum, RecordOptions, RecordRequest, RecordResponse, RecordResult, idPropertyEnum,
-    RecordResponseOptions, upsertRecordPayload, getRecordById, GetRecordResponse,
+    EntityRecordTypeEnum, RecordOptions, RecordRequest, RecordResponse, 
+    RecordResult, idPropertyEnum,
+    RecordResponseOptions, upsertRecordPayload, getRecordById, 
+    GetRecordResponse,
     SAMPLE_POST_CUSTOMER_OPTIONS as SAMPLE_CUSTOMER,
     RecordTypeEnum,
     FieldDictionary,
@@ -51,7 +54,7 @@ export const CONTACT_RESPONSE_OPTIONS: RecordResponseOptions = {
 
 const TWO_SECONDS = 2000;
 
-export enum StageEnum {
+export enum EntityProcessorStageEnum {
     PARSE = 'PARSE',
     VALIDATE = 'VALIDATE',
     ENTITIES = 'PUT_ENTITIES',
@@ -59,7 +62,7 @@ export enum StageEnum {
     GENERATE = 'GENERATE_UPDATES',
     UPDATE = 'PUT_ENTITY_UPDATES',
 }
-export type ProcessorOptions = {
+export type EntityProcessorOptions = {
     clearLogFiles?: string[],
     /**if outputDir is a valid directory, entityProcessor will write output to files here. */
     outputDir?: string,
@@ -67,7 +70,7 @@ export type ProcessorOptions = {
      * - stop after specific stage for the first file in filePaths. 
      * - leave undefined to process all files in filePaths 
      * */
-    stopAfter?: StageEnum,
+    stopAfter?: EntityProcessorStageEnum,
     parseOptions?: ParseOptions,
     responseOptions?: RecordResponseOptions
 }
@@ -78,12 +81,12 @@ export type ProcessorOptions = {
  * @param stageData 
  * @returns 
  */
-function done(
-    options: ProcessorOptions, 
+async function done(
+    options: EntityProcessorOptions, 
     fileName: string,
-    stage: StageEnum,
+    stage: EntityProcessorStageEnum,
     stageData: Record<string, any>,
-): boolean {
+): Promise<boolean> {
     const { stopAfter, outputDir } = options;
     if (outputDir && fs.existsSync(outputDir)) {
         const outputPath = path.join(outputDir, `${fileName}_${stage}.json`);
@@ -101,10 +104,20 @@ function done(
     }
     return false;
 }
+
+
+
+/**
+ * @note updating entities might not be necessary any more?
+ * @param entityType {@link EntityRecordTypeEnum} (`string`)
+ * @param filePaths `string | string[]`
+ * @param options {@link EntityProcessorOptions}
+ * @returns **`void`**
+ */
 export async function processEntityFiles(
     entityType: EntityRecordTypeEnum,
     filePaths: string | string[],
-    options: ProcessorOptions
+    options: EntityProcessorOptions
 ): Promise<void> {
     if (!entityType || !filePaths 
         || (typeof filePaths !== 'string' && !isNonEmptyArray(filePaths))) {
@@ -123,36 +136,36 @@ export async function processEntityFiles(
         const parseResults: ParseResults = await parseRecordCsv(
             csvFilePath, parseOptions
         );
-        if (done(options, fileName, StageEnum.PARSE, parseResults)) return;
+        if (await done(options, fileName, EntityProcessorStageEnum.PARSE, parseResults)) return;
         const validatedResults: ValidatedParseResults = processParseResults(
             parseResults, 
             POST_PROCESSING_OPTIONS as ProcessParseResultsOptions 
         );
-        if (done(options, fileName, StageEnum.VALIDATE, validatedResults)) return;
+        if (await done(options, fileName, EntityProcessorStageEnum.VALIDATE, validatedResults)) return;
         
         const entityResponses: RecordResponse[] 
             = await putEntities(validatedResults[entityType].valid);
-        if (done(options, fileName, StageEnum.ENTITIES, entityResponses)) return;
+        if (await done(options, fileName, EntityProcessorStageEnum.ENTITIES, entityResponses)) return;
         
         await DELAY(TWO_SECONDS);
-        const companyContacts: RecordOptions[] = matchContactsToEntityResponses(
+        const matches: RecordOptions[] = matchContactsToEntityResponses(
             validatedResults[RecordTypeEnum.CONTACT].valid, 
             entityResponses
-        ).companyContacts;
-        const contactResponses: RecordResponse[] = await putContacts(companyContacts);
-        if (done(options, fileName, StageEnum.CONTACTS, contactResponses)) return;
+        ).matches;
+        const contactResponses: RecordResponse[] = await putContacts(matches);
+        if (await done(options, fileName, EntityProcessorStageEnum.CONTACTS, contactResponses)) return;
         
-        const entityUpdates: RecordOptions[] = generateEntityUpdates(
-            entityType,
-            contactResponses
-        );
-        if (done(options, fileName, StageEnum.GENERATE, entityUpdates)) return;
+        // const entityUpdates: RecordOptions[] = generateEntityUpdates(
+        //     entityType,
+        //     contactResponses
+        // );
+        // if (await done(options, fileName, EntityProcessorStageEnum.GENERATE, entityUpdates)) return;
         
-        await DELAY(TWO_SECONDS);
-        const updateResponses: RecordResponse[] = await putEntities(
-            entityUpdates
-        );
-        // if (done(options, fileName, StageEnum.UPDATE, updateResponses)) return;
+        // await DELAY(TWO_SECONDS);
+        // const updateResponses: RecordResponse[] = await putEntities(
+        //     entityUpdates
+        // );
+        // if (await done(options, fileName, EntityProcessorStageEnum.UPDATE, updateResponses)) return;
     }
     mlog.info(`[END processEntityFiles()]`);
     STOP_RUNNING(0);
@@ -186,7 +199,7 @@ export async function putEntities(
 }
 
 /**
- * @param contacts `Array<`{@link RecordOptions}`>` - should be {@link matchContactsToEntityResponses}'s return value, `companyContacts`
+ * @param contacts `Array<`{@link RecordOptions}`>` - should be {@link matchContactsToEntityResponses}'s return value, `matches`
  * @param responseProps {@link RecordResponseOptions} - properties to return in the response.
  * @returns **`contactResponses`** `Promise<`{@link RecordResponse}`[]>`
  */
@@ -212,61 +225,6 @@ export async function putContacts(
 }
 
 
-/** 
- * @param entityType {@link EntityRecordTypeEnum} - type of the primary entity to update
- * @param contactResponses `Array<`{@link RecordResponse}`>` - responses from initial contact post.
- * @returns **`entityUpdates`** = `Array<`{@link RecordOptions}`>` - updates to set `entity.contact` to `internalid` of entity-company's corresponding contact 
- * */
-export function generateEntityUpdates(
-    entityType: EntityRecordTypeEnum | RecordTypeEnum,
-    contactResponses: RecordResponse[]
-): RecordOptions[] {
-    const entityUpdates: RecordOptions[] = [];
-    const contactResults: RecordResult[] = getRecordResults(contactResponses);    
-    for (let contactResult of contactResults) {
-        if (!contactResult || !contactResult.fields) {
-            mlog.warn(`[generateEntityUpdates()] contactResult or contactResult.fields is undefined. Continuing...`);
-            continue;
-        }
-        const update: RecordOptions = {
-            recordType: entityType,
-            idOptions: [],
-            fields: {
-                contact: contactResult.internalid 
-            } as FieldDictionary,
-        };
-        update.idOptions?.push(
-            { 
-                idProp: idPropertyEnum.INTERNAL_ID, 
-                searchOperator: SearchOperatorEnum.RECORD.ANY_OF, 
-                idValue: contactResult.fields.company as number
-                // contact.fields.company = ${entityType}'s internalid
-            },
-            { 
-                idProp: idPropertyEnum.ENTITY_ID, 
-                searchOperator: SearchOperatorEnum.RECORD.ANY_OF, 
-                idValue: contactResult.fields.company as string
-            },
-            { 
-                idProp: idPropertyEnum.ENTITY_ID, 
-                searchOperator: SearchOperatorEnum.TEXT.IS, 
-                idValue: contactResult.fields.entityid as string
-            },
-        );
-        if (typeof contactResult.fields.externalid === 'string' 
-            && contactResult.fields.externalid
-        ) {
-            update.idOptions?.push({
-                idProp: idPropertyEnum.EXTERNAL_ID, 
-                searchOperator: SearchOperatorEnum.TEXT.IS, 
-                idValue: contactResult.fields.externalid.split('<')[0] + `<${entityType}>`
-            });
-        }
-        entityUpdates.push(update);
-    }
-    return entityUpdates;
-}
-
 /**
  * @param postResponses `Array<`{@link RecordResponse}`>`
  * @returns **`recordResults`** = `Array<`{@link RecordResult}`>`
@@ -286,41 +244,23 @@ export function getRecordResults(
 }
 
 /**
- * @param entities `Array<`{@link RecordOptions}`>`
- * @returns **`numCompanyEntities`** - `number`
- */
-export function countCompanyEntities(entities: RecordOptions[]): number {
-    let numCompanyEntities = 0;
-    for (let i = 0; i < entities.length; i++) {
-        const entity: RecordOptions = entities[i];
-        
-        const isPerson: RadioFieldBoolean = entity?.fields?.isperson as RadioFieldBoolean;
-        if (isPerson === RADIO_FIELD_TRUE) {
-            continue;
-        } // else, this (entity: RecordOptions) is a company
-        numCompanyEntities++;
-    }
-    return numCompanyEntities;
-}
-
-/**
  * @description match `internalid`s of entity post results to contacts
  * @param contacts `Array<`{@link RecordOptions}`>`
  * @param entityResponses `Array<`{@link RecordResponse}`>`
- * @returns `{ companyContacts: Array<`{@link RecordOptions}`>, unmatchedContacts: Array<`{@link RecordOptions}`> }`
- * - **`companyContacts`**: - contacts corresponding to an entity in netsuite where `entity.isperson === 'F'` (i.e. a company) -> need to make a contact record.
- * - **`unmatchedContacts`**: - contacts corresponding to an entity in netsuite where `entity.isperson === 'T'` (i.e. a person) -> no need to make a contact record.
+ * @returns `{ matches: Array<`{@link RecordOptions}`>, errors: Array<`{@link RecordOptions}`> }`
+ * - **`matches`**: - contacts corresponding to an entity in netsuite where `entity.isperson === 'F'` (i.e. a company) -> need to make a contact record.
+ * - **`errors`**: - contacts corresponding to an entity in netsuite where `entity.isperson === 'T'` (i.e. a person) -> no need to make a contact record.
  */
 export function matchContactsToEntityResponses(
     contacts: RecordOptions[], 
     entityResponses: RecordResponse[]
 ): {
-    companyContacts: RecordOptions[], 
-    unmatchedContacts: RecordOptions[],
+    matches: RecordOptions[], 
+    errors: RecordOptions[],
 } {
     const entityResults: RecordResult[] = getRecordResults(entityResponses);
-    const companyContacts: RecordOptions[] = [];
-    const unmatchedContacts: RecordOptions[] = [];
+    const matches: RecordOptions[] = [];
+    const errors: RecordOptions[] = [];
     for (let i = 0; i < contacts.length; i++) {
         const contact: RecordOptions = contacts[i];
         if (!contact || !contact.fields) {
@@ -330,7 +270,7 @@ export function matchContactsToEntityResponses(
         const contactCompany: string = contact?.fields?.company as string;
         if (!contactCompany) {
             // mlog.debug(`contactCompany is undefined -> isPerson(entity)===true -> no need to worry about the select field. continuing...`);
-            unmatchedContacts.push(contact);
+            errors.push(contact);
             continue;
         }
         const contactId = String(contact?.fields?.entityid) || '';
@@ -365,14 +305,87 @@ export function matchContactsToEntityResponses(
                 TAB+`   no internalid ? ${entityMatch && !entityMatch.internalid}`,
                 TAB+`isperson === 'T' ? ${entityMatch && entityMatch.fields && entityMatch.fields.isperson === RADIO_FIELD_TRUE}`,
             ); 
-            unmatchedContacts.push(contact);
+            errors.push(contact);
             continue;
         }
         contact.fields.company = entityMatch.internalid;
-        companyContacts.push(contact);
+        matches.push(contact);
     }
     return {
-        companyContacts: companyContacts,
-        unmatchedContacts: unmatchedContacts
+        matches: matches,
+        errors: errors
     };
+}
+
+
+/** 
+ * @param entityType {@link EntityRecordTypeEnum} - type of the primary entity to update
+ * @param contactResponses `Array<`{@link RecordResponse}`>` - responses from initial contact post.
+ * @returns **`entityUpdates`** = `Array<`{@link RecordOptions}`>` - updates to set `entity.contact` to `internalid` of entity-company's corresponding contact 
+ * */
+export function generateEntityUpdates(
+    entityType: EntityRecordTypeEnum,
+    contactResponses: RecordResponse[]
+): RecordOptions[] {
+    const entityUpdates: RecordOptions[] = [];
+    const contactResults: RecordResult[] = getRecordResults(contactResponses);    
+    for (let contactResult of contactResults) {
+        if (!contactResult || !contactResult.fields) {
+            mlog.warn(`[generateEntityUpdates()] contactResult or contactResult.fields is undefined. Continuing...`);
+            continue;
+        }
+        const update: RecordOptions = {
+            recordType: entityType,
+            idOptions: [],
+            fields: {
+                contact: contactResult.internalid 
+            } as FieldDictionary,
+        };
+        update.idOptions?.push(
+            { 
+                idProp: idPropertyEnum.INTERNAL_ID, 
+                searchOperator: SearchOperatorEnum.RECORD.ANY_OF, 
+                idValue: contactResult.fields.company as number
+                // contact.fields.company = ${entityType}'s internalid
+            },
+            // { 
+            //     idProp: idPropertyEnum.ENTITY_ID, 
+            //     searchOperator: SearchOperatorEnum.RECORD.ANY_OF, 
+            //     idValue: contactResult.fields.company as string
+            // },
+            { 
+                idProp: idPropertyEnum.ENTITY_ID, 
+                searchOperator: SearchOperatorEnum.TEXT.IS, 
+                idValue: contactResult.fields.entityid as string
+            },
+        );
+        if (typeof contactResult.fields.externalid === 'string' 
+            && contactResult.fields.externalid
+        ) {
+            update.idOptions?.push({
+                idProp: idPropertyEnum.EXTERNAL_ID, 
+                searchOperator: SearchOperatorEnum.TEXT.IS, 
+                idValue: contactResult.fields.externalid.replace(/<.*?>/g, `<${entityType}>`)
+            });
+        }
+        entityUpdates.push(update);
+    }
+    return entityUpdates;
+}
+/**
+ * @param entities `Array<`{@link RecordOptions}`>`
+ * @returns **`numCompanyEntities`** - `number`
+ */
+export function countCompanyEntities(entities: RecordOptions[]): number {
+    let numCompanyEntities = 0;
+    for (let i = 0; i < entities.length; i++) {
+        const entity: RecordOptions = entities[i];
+        
+        const isPerson: RadioFieldBoolean = entity?.fields?.isperson as RadioFieldBoolean;
+        if (isPerson === RADIO_FIELD_TRUE) {
+            continue;
+        } // else, this (entity: RecordOptions) is a company
+        numCompanyEntities++;
+    }
+    return numCompanyEntities;
 }

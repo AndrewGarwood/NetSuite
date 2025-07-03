@@ -1,17 +1,11 @@
 /**
  * @file src/utils/api/callApi.ts
  */
-import axios from "axios";
-import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify } from "../io";
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
-import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
-import { createUrlWithParams } from "./url";
-import { AxiosCallEnum, AxiosContentTypeEnum } from "src/server";
-import { AuthManager, AuthState } from "../../server/AuthManager";
-import { 
-    RecordRequest, RecordResponse, RecordOptions, RecordResponseOptions,
-    RecordResult, DeleteRecordByTypeRequest, 
-} from "./types";
+import { mainLogger as mlog, 
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
+    STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, 
+} from "../../config";
+import { AuthManager, AuthState } from "../../server";
 import { ScriptDictionary } from "../ns";
 
 export const SB_REST_SCRIPTS = SE.sandbox?.restlet || {} as ScriptDictionary;

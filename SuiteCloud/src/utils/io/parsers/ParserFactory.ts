@@ -1,5 +1,4 @@
 /**
- * @inprogress
  * @file src/utils/io/parsers/ParserFactory.ts
  * @description Factory for creating parsing strategy instances
  */

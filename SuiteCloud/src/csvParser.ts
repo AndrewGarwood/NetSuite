@@ -1,13 +1,5 @@
 /**
  * @file src/csvParser.ts
- * @consideration maybe try to enacpsulate parse output into a class that evaluator functions can use...
- * - so that they can reference fields that have already been parsed to prevent repeat function calls...
- * - and other global variables like rowIndex and csvFilePath 
- * @consideration
- * - instead of parsing csv directly to type of `RecordOptions`, could instead parse to
- * record interfaces from src/utils/ns, then have a function that converts those
- * to `RecordOptions`
- * @TODO allow one FieldParseOptions to generate multiple fieldId:FieldValue pairs for the FieldDictionary
  */
 import { 
     mainLogger as mlog, 
@@ -70,11 +62,9 @@ export async function parseRecordCsv(
         );
         return {};
     }
-    const delimiter = getDelimiterFromFilePath(filePath);
-    if (!isValidCsv(filePath, delimiter)) {
+    if (!isValidCsv(filePath)) {
         mlog.error(`ERROR parseRecords(): Invalid CSV file: isValidCsv() returned false`,
             TAB+` filePath: '${filePath}'`,
-            TAB+`delimiter: '${delimiter}'`,
             TAB+`Please check the file and try again.`,
         );
         return {};
@@ -99,7 +89,7 @@ export async function parseRecordCsv(
     return new Promise((resolve, reject) => {
         rowIndex = 0;
         fs.createReadStream(filePath)
-            .pipe(csv({ separator: delimiter}))
+            .pipe(csv({ separator: getDelimiterFromFilePath(filePath) }))
             .on('data', (row: Record<string, any>) => {
                 DEBUG.push(
                     (DEBUG.length > 0 ? NL : '')+`[START ROW] rowIndex: ${rowIndex}:`,
