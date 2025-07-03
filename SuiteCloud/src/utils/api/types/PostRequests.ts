@@ -10,12 +10,12 @@ import {
 
 /**
  * @typedefn **`RecordRequest`**
- * @property {RecordOptions | Array<RecordOptions>} postOptions = {@link RecordOptions} | `Array<`{@link RecordOptions}`>`
+ * @property {RecordOptions | Array<RecordOptions>} recordOptions = {@link RecordOptions} | `Array<`{@link RecordOptions}`>`
  * - {@link RecordOptions} = `{ recordType: `{@link RecordTypeEnum}`, isDynamic?: boolean, idOptions?: `{@link idSearchOptions}`[], fields?: `{@link FieldDictionary}`, sublists?: `{@link SublistDictionary}` }`
- * @property {ResponseOptions} [responseOptions] = {@link RecordResponseOptions} = `{ responseFields: string | string[], responseSublists: Record<string, string | string[]> }`
+ * @property {RecordResponseOptions} [responseOptions] = {@link RecordResponseOptions} = `{ responseFields: string | string[], responseSublists: Record<string, string | string[]> }`
  */
 export type RecordRequest = {
-    postOptions: RecordOptions | Array<RecordOptions>;
+    recordOptions: RecordOptions | Array<RecordOptions>;
     responseOptions?: RecordResponseOptions;
 }
 
@@ -52,7 +52,10 @@ export type RecordOptions = {
     isDynamic?: boolean;
     idOptions?: idSearchOptions[];
     fields?: FieldDictionary | { [fieldId: string]: FieldValue | SubrecordValue };
-    sublists?: SublistDictionary | { [sublistId: string]: Array<SublistLine> | Array<{[sublistFieldId: string]: FieldValue | SubrecordValue}> };
+    sublists?: SublistDictionary | { 
+        [sublistId: string]: Array<SublistLine> 
+            | Array<{[sublistFieldId: string]: FieldValue | SubrecordValue}> 
+    };
 }
 
 

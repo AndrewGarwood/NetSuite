@@ -4,7 +4,7 @@
 
 
 /**
- * @enum {string} DateFormatEnum
+ * @enum {string} **`DateFormatEnum`**
  * @property {string} ISO - ISO format (YYYY-MM-DDTHH:mm:ss.sssZ)
  * @property {string} UTC - UTC format (YYYY-MM-DDTHH:mm:ss.sssZ)
  * @property {string} LOCALE - Local format (YYYY-MM-DDTHH:mm:ss.sssZ)
@@ -22,7 +22,7 @@ export enum DateFormatEnum {
 };
 
 /**
- * @enum {string} TimeUnitEnum
+ * @enum {string} **`TimeUnitEnum`**
  * @property {string} MILLISECONDS - milliseconds
  * @property {string} SECONDS - seconds
  * @property {string} MINUTES - minutes
@@ -38,20 +38,20 @@ export enum TimeUnitEnum {
 }
 
 /** 
- * /^\d{4}-\d{2}-\d{2}$/ 
+ * `re = /^\d{4}-\d{2}-\d{2}$/`
  * @description Regular expression pattern for ISO date format (YYYY-MM-DD)
  * @example "2025-04-16"
  * */
 export const ISO_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * - defaultValue: string = "en-US"
+ * - defaultValue: string = `"en-US"`
  * @description set as first param, locales, in {@link Date}.toLocaleString(locales?: Intl.LocalesArgument, options?: Intl.DateTimeFormatOptions)
  * @reference ~\node_modules\typescript\lib\lib.es2020.date.d.ts @see {@link Date}
  */
 export const DEFAULT_LOCALE = 'en-US';
 /**
- * - defaultValue: string = "America/Los_Angeles"
+ * - defaultValue: string = `"America/Los_Angeles"`
  * @description set as second param, options, in {@link Date}.toLocaleString(locales?: Intl.LocalesArgument, options?: Intl.DateTimeFormatOptions)
  * @reference ~\node_modules\typescript\lib\lib.es2020.date.d.ts @see {@link Date}
  */
@@ -82,8 +82,8 @@ export function toPacificTime(initialDateString: string): string {
 
 /**
  * @description Converts a date string in ISO format (YYYY-MM-DD) to a Unix timestamp in milliseconds
- * @param {string} dateString The date string to convert
- * @returns {number | null} The Unix timestamp in milliseconds
+ * @param dateString `string` to convert
+ * @returns **`timestamp`** `date.getTime() | null` The Unix timestamp in milliseconds
  */
 export function getUnixTimestampFromISO(dateString: string): number | null {
     if (!dateString) {
@@ -107,8 +107,8 @@ export function getUnixTimestampFromISO(dateString: string): number | null {
 
 /**
  * @description Converts a Unix timestamp to a date string in the specified format
- * @param {number} unixTimestamp - number - The unix timestamp in milliseconds or seconds to convert
- * @param {DateFormatEnum} dateFormat {@link DateFormatEnum} - The format to return the date in
+ * @param unixTimestamp `number` - The unix timestamp in milliseconds or seconds to convert
+ * @param dateFormat {@link DateFormatEnum} - The format to return the date in
  * @returns {string|null} The date string in the specified format
  * @example "2025-04-16T00:00:00.000Z"
  * @note dateFormat === DateFormatEnum.LOCALE -> use {@link DEFAULT_LOCALE} and {@link DEFAULT_TIMEZONE}
@@ -181,7 +181,7 @@ export function calculateDifferenceOfDateStrings(
 /**
  * Parses a locale string into a Date object
  * @param dateStr Date string in locale format (e.g., '4/21/2025, 4:22:45 PM')
- * @returns {Date} Date object
+ * @returns {Date} **`date`** {@link Date} object
  */
 export function parseLocaleStringToDate(dateStr: string): Date {
     try {

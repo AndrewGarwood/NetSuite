@@ -38,7 +38,8 @@ export type SublistLine = {
     [sublistFieldId: string]: FieldValue | SubrecordValue;
 } & {
     line?: number;
-    /**`string` - the `'sublistFieldId'` of the list entry with defined value at `SublistLine[sublistFieldId]` that you want to use to search for existing lines */
+    /**`string` - the `'sublistFieldId'` of the list entry with defined value at `SublistLine[sublistFieldId]` 
+     * that you want to use to search for existing lines */
     lineIdProp?: string;
 }
 

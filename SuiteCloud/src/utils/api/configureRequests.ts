@@ -15,7 +15,7 @@ import {
 import { ScriptDictionary } from "../ns";
 
 export const SB_REST_SCRIPTS = SE.sandbox?.restlet || {} as ScriptDictionary;
-export const BATCH_SIZE = 100;
+export const BATCH_SIZE = 50;
 export const TWO_SECONDS = 2000;
 /** use to set the field `"isinactive"` to false when loading or creating records*/
 export const NOT_DYNAMIC = false;
@@ -24,11 +24,11 @@ export const auth = new AuthManager();
 
 /**
  * when called, performs the following:
- * 1. `if` a request to this function is already in progress `and` queueing is enabled, `then` add new {@link auth.PendingRequest} to {@link pendingRequests} queue
+ * 1. `if` a request to this function is already in progress `and` queueing is enabled, `then` add new {@link auth.PendingRequest} to {@link auth.pendingRequests} queue
  * and reject any requests in the queue that are older than 2 minutes (and remove them from {@link auth.pendingRequests})
  * 2. `if` the state is not {@link AuthState.IDLE}, wait for 1 second and call this function again
  * 3. `if` `currentToken` = return value from {@link auth.getCurrentValidToken} is not null,
- * `then` set {@link auth.lastTokenResponse} to `currentToken`, 
+ * `then` set {@link AuthManager.lastTokenResponse} to `currentToken`, 
  * call {@link auth.resolvePendingRequests}`(currentToken.access_token)`, 
  * and return `currentToken.access_token`
  * 4. `else` `currentToken` is null (Need to acquire new token), so set {@link auth.state} to `REFRESHING`,

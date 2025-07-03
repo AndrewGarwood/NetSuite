@@ -7,7 +7,12 @@ import {
     writeObjectToJson as write,
     ValidatedParseResults,
     ProcessParseResultsOptions, ParseOptions, ParseResults,
-    getCurrentPacificTime
+    getCurrentPacificTime, FieldParseOptions, FieldDictionaryParseOptions, FieldEvaluator,
+    SublistDictionaryParseOptions, SublistLineParseOptions,
+    SublistLineIdOptions, SubrecordParseOptions, EvaluationContext, RowContext, 
+    RecordKeyOptions, getCsvRows, HierarchyOptions, GroupReturnTypeEnum, 
+    STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, RowDictionary,
+    trimFile,
 } from "./utils/io";
 import { 
     TOKEN_DIR, DATA_DIR, OUTPUT_DIR, STOP_RUNNING, CLOUD_LOG_DIR, 
@@ -26,47 +31,73 @@ import {
     idSearchOptions,
     SearchOperatorEnum, 
 } from "./utils/api";
-import { CUSTOMER_PARSE_OPTIONS, CONTACT_PARSE_OPTIONS, 
-    CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS as POST_PROCESSING_OPTIONS 
-} from "src/parses/customer/customerParseDefinition"
-import * as customerConstants from './parses/customer/customerConstants';
+import { SALES_ORDER_PARSE_OPTIONS as SO_OPTIONS } from './parse_configurations/salesorder/salesOrderParseDefinition';
+import * as customerConstants from './parse_configurations/customer/customerConstants';
+import * as soConstants from './parse_configurations/salesorder/salesOrderConstants';
 import { parseRecordCsv } from "./csvParser";
 import { processParseResults } from "./parseResultsProcessor";
 import { RadioFieldBoolean, RADIO_FIELD_TRUE, isNonEmptyArray } from './utils/typeValidation';
-import { ENTITY_RESPONSE_OPTIONS, CONTACT_RESPONSE_OPTIONS } from './entityProcessor';
+import { ENTITY_RESPONSE_OPTIONS, CONTACT_RESPONSE_OPTIONS, 
+    processEntityFiles, ProcessorOptions, StageEnum
+} from './entityProcessor';
+import { ParseManager } from './ParseManager';
 
-const ALL_CUSTOMERS = [
-    customerConstants.FIRST_PART_FILE, 
-    customerConstants.SECOND_PART_FILE, 
-    customerConstants.THIRD_PART_FILE
-];
 async function main() {
-
+    const filePath = soConstants.SMALL_SUBSET_FILE;
+    const parseOptions: ParseOptions = {
+        [RecordTypeEnum.SALES_ORDER]: SO_OPTIONS,
+    }
+    const parseResults = await parseRecordCsv(filePath, parseOptions);
+    write(parseResults, path.join(CLOUD_LOG_DIR, 'SO_ParseResults.json'));
+    trimFile(undefined, DEFAULT_LOG_FILEPATH);
+    STOP_RUNNING(0);
 }
+
 main().catch(error => {
     mlog.error('Error executing main() function', Object.keys(error));
     STOP_RUNNING(1);
 });
 
-async function test_getRecordById() {
-    mlog.debug(`Start of test_getRecordById()`);
-    const recordType = EntityRecordTypeEnum.CUSTOMER;
-    // mlog.debug(`recordType: ${recordType}`);
-    const id = 41810;
-    // mlog.debug(`recordInternalId: ${id}`);
-    const response = await getRecordById(
-        recordType, id, undefined, ENTITY_RESPONSE_OPTIONS
-    ) as GetRecordResponse;
-    write(response, path.join(OUTPUT_DIR, 'test_getRecordById_Response.json'));
-    mlog.debug(`End of test_getRecordById()`);
+
+
+/*
+    const entityType = EntityRecordTypeEnum.CUSTOMER;
+    const ALL_CUSTOMERS = [
+        customerConstants.FIRST_PART_FILE, 
+        customerConstants.SECOND_PART_FILE, 
+        customerConstants.THIRD_PART_FILE
+    ];
+    const customerFilePaths = [
+        // customerConstants.SMALL_SUBSET_FILE,
+        ...ALL_CUSTOMERS
+    ];
+    const options: EntityProcessorOptions = {
+        clearLogFiles: [DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH],
+        // outputDir: CLOUD_LOG_DIR,
+        // stopAfter: StageEnum.PARSE,
+    }
+    await processEntityFiles(entityType, customerFilePaths, options);
+*/
+
+const entityId: FieldEvaluator = (
+    row: Record<string, any>, 
+    context: EvaluationContext, 
+    entityIdColumn: string
+): string => {
+        return '';
+}
+const testParseOptions: ParseOptions = {
+    [RecordTypeEnum.CUSTOMER]: {
+        keyColumn: 'Customer',
+        fieldOptions: {
+            // isperson: {
+            //     dependencies: [], priority: 1, cache: true, evaluator: (row, context}}
+            entityid: {
+                dependencies: [], priority: 1, cache: true, evaluator: entityId 
+            } as FieldParseOptions
+        },
+        sublistOptions: {}
+    },
 }
 
-async function test_upsertRecordPayload() {
-    const payload: RecordRequest = {
-        postOptions: [SAMPLE_CUSTOMER] as RecordOptions[],
-        responseOptions: ENTITY_RESPONSE_OPTIONS,
-    };
-    const responses = await upsertRecordPayload(payload) as RecordResponse[];
-    mlog.debug(`End of testUpsertRecordPayload()`);
-    write(responses, path.join(OUTPUT_DIR, 'test_upsertRecordPayload_Response.json'));
-}
+function test_ParseManager() {}

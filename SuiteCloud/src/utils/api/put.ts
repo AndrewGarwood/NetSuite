@@ -31,12 +31,12 @@ export async function upsertRecordPayload(
     deployId: number=UPSERT_RECORD_DEPLOY_ID,
 ): Promise<RecordResponse[]> {
     if (!payload || Object.keys(payload).length === 0) {
-        mlog.error(`[upsertRecordPayload()] Invalid parameters`,
+        mlog.error(`[put.upsertRecordPayload()] Invalid parameters`,
             TAB+`param 'payload'  is undefined or empty. Cannot call RESTlet. Exiting...`
         );
         STOP_RUNNING(1);
     }
-    const { postOptions, responseOptions } = payload;
+    const { recordOptions: postOptions, responseOptions } = payload;
     const upsertRecordArray = (Array.isArray(postOptions) 
         ? postOptions : [postOptions]
     );
@@ -50,13 +50,13 @@ export async function upsertRecordPayload(
             const accessToken = await getAccessToken();
             const res = await PUT(
                 accessToken, scriptId, deployId, { 
-                    postOptions: batch, 
+                    recordOptions: batch, 
                     responseOptions: responseOptions, 
                 } as RecordRequest,
             );
             await DELAY(TWO_SECONDS, null);
             if (!res || !res.data) {
-                mlog.warn(`[upsertRecordPayload()] batchIndex=${i} res.data is undefined. Skipping...`);
+                mlog.warn(`[put.upsertRecordPayload()] batchIndex=${i} res.data is undefined. Skipping...`);
                 continue;
             }
             const resData = res.data as RecordResponse;
@@ -71,13 +71,13 @@ export async function upsertRecordPayload(
             summary.numFailed = (resData?.rejects?.length || 0);
             summary.batchSize = batch.length;
             // summary.successRatio = (resData?.results?.length || 0) / batch.length;
-            mlog.debug(
-                `[upsertRecordPayload()] finished batch ${i+1} of ${batches.length};`,
+            mlog.info(
+                `[put.upsertRecordPayload()] finished batch ${i+1} of ${batches.length};`,
                 TAB+`summary:`, indentedStringify(summary)
             );
             continue;
         } catch (error) {
-            mlog.error(`Error in put.ts [upsertRecordPayload()].upsertRecordArray.PUT(batchIndex=${i}):`);
+            mlog.error(`[Error in put.upsertRecordPayload()] (batchIndex=${i}):`);
             write({timestamp: getCurrentPacificTime(), caught: error}, ERROR_DIR, `ERROR_upsertRecordPayload_batch_${i}.json`);
             continue;
         }

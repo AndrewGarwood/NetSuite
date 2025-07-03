@@ -25,7 +25,6 @@ import {
     EntityRecordTypeEnum, 
 } from "./utils/api";
 import { 
-    cleanString, equivalentAlphanumericStrings as equivalentAlphanumeric,
     ParseResults, RecordPostProcessingOptions, CloneOptions, ComposeOptions,
     isRecordOptions, isCloneOptions, isComposeOptions,
     ValidatedParseResults,
