@@ -5,30 +5,34 @@
  */
 import csv from 'csv-parser';
 import fs from 'fs';
+import { BaseParser } from "./BaseParser";
 import { 
-    ParseStrategy, ParseManagerContext, ParseStrategyEnum, 
+    ParseManagerContext, ParseStrategyEnum, 
     NodeStructure,
     RowDictionary
 } from "./types/ParseStrategy";
 import { FieldDependencyResolver } from "./FieldDependencyResolver";
 import { 
-    ParseResults, EvaluationContext, RowContext,
+    ParseResults, EvaluationContext,
     FieldDictionaryParseOptions, SublistDictionaryParseOptions, FieldParseOptions,
     SubrecordParseOptions
 } from "../types";
 import { 
     FieldDictionary, SublistDictionary, SublistLine, RecordOptions,
     RecordTypeEnum, FieldValue, SubrecordValue,
-    EntityRecordTypeEnum
+    EntityRecordTypeEnum,
+    SetFieldSubrecordOptions,
+    NOT_DYNAMIC
 } from "../../api";
 import {
-    isNonEmptyArray, isEmptyArray, anyNull, 
+    isNonEmptyArray, isEmptyArray, anyNull, isNullLike as isNull, isSubrecordValue,
     isFieldParseOptions, isNodeLeaves, isNodeStucture, isRowDictionary
 } from "../../typeValidation";
 import { 
-    getDelimiterFromFilePath, isValidCsv, NodeLeaves, 
+    getDelimiterFromFilePath, isValidCsv, NodeLeaves,
     ParseOptions, RecordParseOptions, CleanStringOptions, RecordRowGroup, 
-    GroupReturnTypeEnum, GroupContext, Ancestor, HierarchyOptions 
+    GroupReturnTypeEnum, GroupContext, Ancestor, HierarchyOptions, 
+    SublistLineParseOptions
 } from "../";
 import { 
     mainLogger as mlog, 
@@ -38,51 +42,37 @@ import {
     indentedStringify
 } from "../../../config";
 import { clean } from "../regex/index";
-/** use to set the field `"isinactive"` to false */
-const NOT_DYNAMIC = false;
 
 
 /**
  * @class **`GroupedParser`**
  * Implements {@link ParseStrategy} with the hierarchical grouping parsing approach
  */
-export class GroupedParser implements ParseStrategy {
+export class GroupedParser extends BaseParser {
     private groupOptions?: HierarchyOptions;
-    private rowContext: RowContext;
-    private globalCache: { 
-        [recordType: string]: { [recordId: string]: FieldDictionary } 
-    } = {};
 
     constructor(groupOptions?: HierarchyOptions) {
+        super();
         this.groupOptions = groupOptions;
-        this.rowContext = {
-            recordType: '',
-            rowIndex: 0,
-            filePath: '',
-            cache: {}
-        };
+        /** GroupedParser does not check for SublistLine duplicates (because of groupRows()...)*/
+        this.checkSublistLineDuplicates = false; 
     }
     getStrategyName(): string {
         return ParseStrategyEnum.GROUPED;
     }
     validateInput(context: ParseManagerContext): void {
         const { filePath, parseOptions, groupOptions } = context;
-        
-        if (!filePath || typeof filePath !== 'string' || !fs.existsSync(filePath)) {
-            throw new Error(`Invalid file path: ${filePath}`);
-        }
-        
         if (!isValidCsv(filePath)) {
-            throw new Error(`Invalid CSV file: ${filePath}`);
+            throw new Error(`[GroupedParser.validateInput()] Invalid CSV file: ${filePath}`);
         }
         
         if (!groupOptions || !isNonEmptyArray(groupOptions.groups)) {
-            throw new Error(`GroupedParser requires valid groupOptions with at least one group`);
+            throw new Error(`[GroupedParser.validateInput()] GroupedParser requires valid groupOptions with at least one group`);
         }
         
         for (const [recordType, options] of Object.entries(parseOptions)) {
             if (!options.keyColumn) {
-                throw new Error(`Missing keyColumn for record type: ${recordType}`);
+                throw new Error(`[GroupedParser.validateInput()] Missing keyColumn for record type: ${recordType}`);
             }
         }
     }
@@ -90,9 +80,13 @@ export class GroupedParser implements ParseStrategy {
     async parseFile(context: ParseManagerContext): Promise<ParseResults> {
         this.validateInput(context);
         this.groupOptions = context.groupOptions;
-        
-        const { filePath, parseOptions, meta, errors, globalCache } = context;
-        const { groups } = this.groupOptions!;
+        if (!this.groupOptions || !isNonEmptyArray(this.groupOptions.groups)) {
+            throw new Error(`[GroupedParser.parseFile()] No valid groupOptions provided`);
+        }
+        const { 
+            filePath, parseOptions, meta, errors, globalCache 
+        } = context as ParseManagerContext;
+        const { groups } = this.groupOptions;
         const recordTypes = groups.map(g => g.recordType);
         
         // Step 1: Group rows hierarchically
@@ -112,7 +106,9 @@ export class GroupedParser implements ParseStrategy {
         }
         this.globalCache = globalCache;
         // Step 4: Extract and process grouped data
-        const groupedRowDataArray = this.getNodeLeaves(rootData, recordTypes);
+        const groupedRowDataArray = this.getNodeLeaves(
+            rootData, recordTypes
+        ) as RecordRowGroup[];
         
         // Step 5: Process each group
         for (const groupData of groupedRowDataArray) {
@@ -120,7 +116,7 @@ export class GroupedParser implements ParseStrategy {
                 await this.processGroupedData(groupData, parseOptions, results);
                 meta.successfulRows++;
             } catch (error) {
-                this.handleGroupError(error as Error, groupData, errors);
+                this.handleRowError(error as Error, {}, errors);
             }
         }
         
@@ -129,12 +125,17 @@ export class GroupedParser implements ParseStrategy {
         }
         return results;
     }
-
-    /**
-     * Groups CSV rows into hierarchical structure based on groupOptions
+    
+    /** e.g. groupOptions.returnType = INDEXED_ROWS -> `{ customerA: { salesorder100: { 0: <row0>, 1: <row1> }, salesorder108: { 12: <row12>, 13: <row13>, 14: <row14> } } }`
+     * @description Groups CSV rows into hierarchical structure based on groupOptions ({@link HierarchyOptions}) from constructor
+     * @param filePath `string`
+     * @returns **`rootData`** {@link NodeStructure} - hierarchical structure of grouped rows
      */
     private async groupRows(filePath: string): Promise<NodeStructure> {
-        const { groups, returnType = GroupReturnTypeEnum.INDEXED_ROWS } = this.groupOptions!;
+        if (!this.groupOptions) {
+            throw new Error(`[GroupedParser.groupRows()] No groupOptions provided`);
+        }
+        const { groups, returnType = GroupReturnTypeEnum.INDEXED_ROWS } = this.groupOptions;
         const delimiter = getDelimiterFromFilePath(filePath);
         const context: GroupContext = {
             filePath, 
@@ -144,7 +145,7 @@ export class GroupedParser implements ParseStrategy {
             groups 
         };
         const { keyColumn: primaryColumn, keyOptions: primaryOptions } = groups[0];
-        const result: NodeStructure = {};
+        const rootData: NodeStructure = {};
         return new Promise((resolve, reject) => {
             let rowIndex = 0;
             fs.createReadStream(filePath)
@@ -158,10 +159,10 @@ export class GroupedParser implements ParseStrategy {
                         rowIndex++;
                         return;
                     }
-                    this.assignGroup(context, 1, result, primaryKey);
+                    this.assignGroup(context, 1, rootData, primaryKey);
                     rowIndex++;
                 })
-                .on('end', () => resolve(result))
+                .on('end', () => resolve(rootData))
                 .on('error', reject);
         });
     }
@@ -178,7 +179,7 @@ export class GroupedParser implements ParseStrategy {
         const { keyColumn: childKeyColumn, keyOptions: childKeyOptions } = context.groups[childGroupIndex];
         const childKey = clean(context.row[childKeyColumn], childKeyOptions);
         if (!childKey) {
-            mlog.warn(`Row ${context.rowIndex} has no value for column '${childKeyColumn}'. Skipping this grouping level.`);
+            mlog.warn(`[GroupedParser.assignGroup()] Row ${context.rowIndex} has no value for column '${childKeyColumn}'. Skipping this grouping level.`);
             return;
         }
         // Ensure parent structure exists
@@ -213,15 +214,15 @@ export class GroupedParser implements ParseStrategy {
     }
 
     /**
-     * Extracts leaf nodes (final grouped data) from the hierarchical structure
+     * @TODO handle returnType = ROW_INDICES
+     * @description Extracts leaf nodes (final grouped data) from the hierarchical structure
      */
     private getNodeLeaves(rootData: NodeStructure, recordTypes: string[]): RecordRowGroup[] {
         const groupedData: RecordRowGroup[] = [];
         const maxDepth = recordTypes.length;
         
         const traverse = (branch: NodeStructure, depth: number, ancestors: Ancestor[]) => {
-            if (depth === maxDepth - 1) { 
-                // Leaf level - extract row data
+            if (depth === maxDepth - 1) { // Leaf level - extract row data
                 for (const [key, value] of Object.entries(branch)) {
                     if (isNodeLeaves(value)) {
                         const currentAncestors = [
@@ -229,7 +230,6 @@ export class GroupedParser implements ParseStrategy {
                             { recordId: key, recordType: recordTypes[depth] }
                         ];
                         if (isRowDictionary(value)) {
-                            // For each ancestor, create a record
                             for (const ancestor of currentAncestors) {
                                 groupedData.push({
                                     ancestors: currentAncestors,
@@ -238,19 +238,18 @@ export class GroupedParser implements ParseStrategy {
                                 });
                             }
                         } else {
-                            throw new Error(`Expected RowDictionary at leaf level but found ${typeof value}`);
+                            throw new Error(`[GroupedParser.getNodeLeaves()] Expected RowDictionary at leaf level but found ${typeof value}`);
                         }
                     } else {
-                        throw new Error(`Expected NodeLeaves at depth ${depth} but found ${typeof value}`);
+                        throw new Error(`[GroupedParser.getNodeLeaves()] Expected NodeLeaves at depth ${depth} but found ${typeof value}`);
                     }
                 }
-            } else { 
-                // Intermediate node - continue traversal
+            } else { // Intermediate node - continue traversal
                 for (const [key, subBranch] of Object.entries(branch)) {
                     if (isNodeStucture(subBranch)) {
                         traverse(subBranch as NodeStructure, depth + 1, [...ancestors, { recordId: key, recordType: recordTypes[depth] }]);
                     } else {
-                        throw new Error(`Expected NodeStructure at depth ${depth} but found ${typeof subBranch}`);
+                        throw new Error(`[GroupedParser.getNodeLeaves()] Expected NodeStructure at depth ${depth} but found ${typeof subBranch}`);
                     }
                 }
             }
@@ -261,6 +260,9 @@ export class GroupedParser implements ParseStrategy {
 
     /**
      * Processes a single grouped data entry
+     * @param groupData {@link RecordRowGroup}
+     * @param parseOptions {@link ParseOptions}
+     * @param results {@link ParseResults} - object to populate with parsed records from the groupData
      */
     private async processGroupedData(
         groupData: RecordRowGroup,
@@ -271,14 +273,14 @@ export class GroupedParser implements ParseStrategy {
         const recordOptions = parseOptions[recordType] as RecordParseOptions;
         
         if (!recordOptions) {
-            mlog.warn(`No parse options found for record type: ${recordType}`);
+            mlog.warn(`[GroupedParser.processGroupedData()] No parse options found for record type: ${recordType}`);
             return;
         }
         
         /** the record ID for this record type */
         const recordAncestor = ancestors.find(a => a.recordType === recordType);
         if (!recordAncestor) {
-            mlog.warn(`No ancestor found for record type: ${recordType}`);
+            mlog.warn(`[GroupedParser.processGroupedData()] No ancestor found for record type: ${recordType}`);
             return;
         }
         const recordId = recordAncestor.recordId;
@@ -291,10 +293,22 @@ export class GroupedParser implements ParseStrategy {
 
         
         // Process body fields from a single row in RowDictionary (they should be consistent)
-        const representativeRow = Object.values(rows)[0];
-        if (representativeRow && recordOptions.fieldOptions) {
-            record.fields = await this.processFieldsFromRow(
-                representativeRow, 
+        const repRow = Object.values(rows)[0];
+        const repRowIndex = (Object.keys(rows)[0] 
+            ? parseInt(Object.keys(rows)[0], 10) 
+            : -1
+        );
+        if (!repRow || isNaN(repRowIndex) || repRowIndex < 0) {
+            mlog.error(`[GroupedParser.processGroupedData()]: Error defining representative row`,
+                TAB+`recordType: '${recordType}'`,
+                TAB+`  recordId: '${recordId}'`,
+                TAB+`  filePath: '${this.rowContext.filePath}'`,
+            );
+            throw new Error(`[GroupedParser.processGroupedData()]: Error defining representative row`);
+        }
+        this.rowContext.rowIndex = repRowIndex;
+        if (repRow && recordOptions.fieldOptions) {
+            record.fields = await this.getFieldsFromRepresentativeRow(repRow, 
                 recordOptions.fieldOptions,
                 recordId,
                 recordType
@@ -303,11 +317,8 @@ export class GroupedParser implements ParseStrategy {
         
         // Process sublists from all rows
         if (recordOptions.sublistOptions) {
-            record.sublists = await this.processSublistsFromRows(
-                rows,
+            record.sublists = await this.getSublistsFromRowDictionary(rows,
                 recordOptions.sublistOptions,
-                recordId,
-                recordType
             );
         }
         
@@ -315,22 +326,24 @@ export class GroupedParser implements ParseStrategy {
     }
 
     /**
-     * @TODO field subrecords
-     * @description Process body fields from a single representative row
+     * @description Given a representative row (e.g. first row in RowDictionary),
+     * - resolve evaluationOrder of fields using {@link FieldDependencyResolver}
      */
-    private async processFieldsFromRow(
+    private async getFieldsFromRepresentativeRow(
         row: Record<string, any>,
         fieldOptions: FieldDictionaryParseOptions,
         recordId: string,
         recordType: string
     ): Promise<FieldDictionary> {
         const fields: FieldDictionary = {};
+        const resolver = new FieldDependencyResolver(fieldOptions);
+        const evaluationOrder = resolver.getEvaluationOrder();
         
         this.rowContext.recordType = recordType;
         this.rowContext.recordId = recordId;
         this.rowContext.cache = {
             ...(this.rowContext.cache || {}), 
-            ...this.globalCache[recordType][recordId] || {}
+            ...(this.globalCache[recordType][recordId] || {})
         };
         const evalContext: EvaluationContext = {
             ...this.rowContext,
@@ -338,17 +351,24 @@ export class GroupedParser implements ParseStrategy {
             fields
         };
         
-        // Simple field processing - could be enhanced with dependency resolution
-        for (const [fieldId, valueOptions] of Object.entries(fieldOptions)) {
+        for (const fieldId of evaluationOrder) {
             evalContext.currentFieldId = fieldId;
             try {
+                const valueOptions = fieldOptions[fieldId];
+                let value; 
                 if (isFieldParseOptions(valueOptions)) {
-                    const fieldValue = await this.processFieldValue(row, evalContext, valueOptions);
-                    fields[fieldId] = fieldValue;
+                    value = await this.processFieldValue(row, evalContext, 
+                        valueOptions as FieldParseOptions
+                    ) as FieldValue;
+                } else {
+                    value = await this.generateFieldSubrecordOptions(row, 
+                        evalContext, 
+                        valueOptions as SubrecordParseOptions
+                    ) as SubrecordValue;
                 }
-                // Handle subrecord options if needed
+                fields[fieldId] = value;
             } catch (error) {
-                mlog.error(`Error processing field '${fieldId}': ${error}`);
+                this.handleFieldError(error as Error, row, evalContext);
             }
         }
         
@@ -356,95 +376,43 @@ export class GroupedParser implements ParseStrategy {
     }
 
     /**
-     * @TODO sublist subrecords
-     * Process sublists from all grouped rows
+     * @description Given a {@link RowDictionary} corresponding to a single record (assume have already used groupRows()), 
+     * - `for` each `[rowIndex, row]` of `RowDictionary`: 
+     * - - `for` each `sublistId` in `sublistOptions`: 
+     * - - - make a {@link SublistLine} entry
+     * @param rows {@link RowDictionary} - rows corresponding to a single record
+     * @param sublistOptions {@link SublistDictionaryParseOptions} - options for to parse sublist lines from the rows
+     * @returns **`sublists`** {@link SublistDictionary} 
      */
-    private async processSublistsFromRows(
+    private async getSublistsFromRowDictionary(
         rows: RowDictionary,
         sublistOptions: SublistDictionaryParseOptions,
-        recordId: string,
-        recordType: string
     ): Promise<SublistDictionary> {
         const sublists: SublistDictionary = {};
-        
-        for (const [sublistId, lineOptionsArray] of Object.entries(sublistOptions)) {
-            const sublistLines: SublistLine[] = [];
-            
-            // Process each row as a potential sublist line
-            for (const [rowIndex, row] of Object.entries(rows)) {
-                for (const lineOptions of lineOptionsArray) {
-                    const sublistLine: SublistLine = {};
-                    
-                    // Process each field in the sublist line
-                    for (const [sublistFieldId, valueOptions] of Object.entries(lineOptions)) {
-                        if (sublistFieldId === 'lineIdOptions') continue;
-                        
-                        try {
-                            if (isFieldParseOptions(valueOptions)) {
-                                const evalContext: EvaluationContext = {
-                                    ...this.rowContext,
-                                    sublistId,
-                                    currentFieldId: sublistFieldId,
-                                    fields: sublistLine,
-                                };
-                                
-                                const fieldValue = await this.processFieldValue(
-                                    row, evalContext, valueOptions
-                                );
-                                sublistLine[sublistFieldId] = fieldValue;
-                            }
-                        } catch (error) {
-                            mlog.error(`[GroupedParser.processSublistsFromRows()] Error processing sublist field`,
-                                TAB+`recordType: '${recordType}', recordId: '${recordId}'`,
-                                TAB+`rowIndex: ${rowIndex}, filePath: '${this.rowContext.filePath}'`,
-                                TAB+`sublistId: '${sublistId}'`,
-                                TAB+`sublistFieldId: '${sublistFieldId}'`,
-                                error
-                            );
-                        }
-                    }
-                    // Only add non-empty sublist lines
-                    if (Object.keys(sublistLine).length > 0) {
-                        sublistLines.push(sublistLine);
-                    }
-                }
-            }
-            sublists[sublistId] = sublistLines;
+        for (const [sublistId] of Object.entries(sublistOptions)) {
+            sublists[sublistId] = [];
+        }
+        for (const [rowIndex, row] of Object.entries(rows)) {
+            this.rowContext.rowIndex = parseInt(rowIndex, 10);
+            await this.processSublists(row, sublists, sublistOptions);
         }
         return sublists;
     }
 
-    /**
-     * Process a single field value (simplified version)
-     */
-    private async processFieldValue(
-        row: Record<string, any>,
-        context: EvaluationContext,
-        valueOptions: FieldParseOptions,
-    ): Promise<FieldValue> {
-        const { colName, evaluator, defaultValue, args } = valueOptions;
-        
-        if (evaluator) {
-            return evaluator(row, context, ...(args || []));
-        } else if (colName) {
-            const value = row[colName];
-            return value !== undefined ? value : (defaultValue || '');
-        }
-        
-        return defaultValue || '';
-    }
-
+// ============================================================================
+// VALIDATION
+// ============================================================================
     /**
      * Validates the grouped data structure
      */
     private validateGroupData(rootData: NodeStructure, recordTypes: string[]): void {
         if (Object.keys(rootData).length === 0) {
-            mlog.warn(`Empty root data structure`);
+            mlog.warn(`[GroupedParser.validateGroupData()] Empty root data structure`);
             return;
         }
         
         if (!isNonEmptyArray(recordTypes)) {
-            throw new Error(`Invalid recordTypes: expected non-empty array but got ${JSON.stringify(recordTypes)}`);
+            throw new Error(`[GroupedParser.validateGroupData()] Invalid recordTypes: expected non-empty array but got ${JSON.stringify(recordTypes)}`);
         }
         
         if (recordTypes.length === 1) {
@@ -453,7 +421,7 @@ export class GroupedParser implements ParseStrategy {
         
         for (const [recordId, branches] of Object.entries(rootData)) {
             if (typeof branches !== 'object' || Array.isArray(branches)) {
-                throw new Error(`Invalid structure for recordId '${recordId}':`
+                throw new Error(`[GroupedParser.validateGroupData()] Invalid structure for recordId '${recordId}':`
                     +`expected object but got ${typeof branches}`
                 );
             }
@@ -471,11 +439,11 @@ export class GroupedParser implements ParseStrategy {
         recordId: string,
     ): void {
         if (depth >= recordTypes.length) {
-            throw new Error(`Exceeded maximum expected depth for recordId '${recordId}'`);
+            throw new Error(`[GroupedParser.validateBranch()] Exceeded maximum expected depth for recordId '${recordId}'`);
         }
         
         if (Object.keys(branch).length === 0) {
-            throw new Error(`Empty branch for recordId '${recordId}' at depth ${depth}`);
+            throw new Error(`[GroupedParser.validateBranch()] Empty branch for recordId '${recordId}' at depth ${depth}`);
         }
         
         for (const [key, value] of Object.entries(branch)) {
@@ -483,21 +451,11 @@ export class GroupedParser implements ParseStrategy {
                 this.validateBranch(value as NodeStructure, recordTypes, depth + 1, recordId);
             } else if (isNodeLeaves(value)) {
                 if (depth !== recordTypes.length - 1) {
-                    throw new Error(`Expected leaf node at depth ${recordTypes.length - 1} for recordId '${recordId}' but found at depth ${depth}`);
+                    throw new Error(`[GroupedParser.validateBranch()] Expected leaf node at depth ${recordTypes.length - 1} for recordId '${recordId}' but found at depth ${depth}`);
                 }
             } else {
-                throw new Error(`Invalid value type for key '${key}' in recordId '${recordId}': expected object or array but got ${typeof value}`);
+                throw new Error(`[GroupedParser.validateBranch()] Invalid value type for key '${key}' in recordId '${recordId}': expected object or array but got ${typeof value}`);
             }
         }
-    }
-
-    private handleGroupError(error: Error, groupData: RecordRowGroup, errors: any[]): void {
-        const parseError = {
-            recordType: groupData.recordType,
-            error,
-            context: this.rowContext
-        };
-        errors.push(parseError);
-        mlog.error(`Group processing error: ${error.message}`, parseError);
     }
 }

@@ -1,5 +1,4 @@
 /**
- * @inprogress
  * @file src/ParseManager.ts
  */
 import { 
@@ -15,9 +14,7 @@ import {
     ParseStrategy, ParseStrategyEnum, ParseManagerContext 
 } from "./utils/io/parsers/types/ParseStrategy";
 import { ParserFactory } from "./utils/io/parsers/ParserFactory";
-import csv from 'csv-parser';
-import fs from 'fs';
-import { FieldDictionary,} from "./utils/api";
+import { FieldDictionary } from "./utils/api";
 
 /** use to set the field `"isinactive"` to false */
 const NOT_DYNAMIC = false;
@@ -96,11 +93,11 @@ export interface ParseError {
  * 
  */
 export class ParseManager {
+    private parseContext: ParseManagerContext;
+    private parseStrategy: ParseStrategyEnum;
     private parseOptions: ParseOptions;
     private groupOptions?: HierarchyOptions;
-    private parseStrategy: ParseStrategyEnum;
     private parser?: ParseStrategy;
-    private rowContext: RowContext;
     private meta: ParseMetaData;
     private errors: ParseError[];
     private globalCache: { [recordType: string]: { [recordId: string]: FieldDictionary} };
@@ -116,12 +113,6 @@ export class ParseManager {
         this.groupOptions = options?.groupOptions;
         this.parseStrategy = options?.strategy 
             || ParserFactory.recommendStrategy(this.groupOptions);
-        this.rowContext = {
-            recordType: '',
-            rowIndex: 0,
-            filePath: '',
-            cache: {}
-        }
         this.meta = {
             totalRows: 0,
             successfulRows: 0,
@@ -136,13 +127,20 @@ export class ParseManager {
         for (const recordType in parseOptions) {
             this.globalCache[recordType] = {};
         }
+        this.parseContext = {
+            filePath: 'PARSE_MANAGER_UNDEFINED_FILE_PATH',
+            parseOptions: this.parseOptions,
+            groupOptions: this.groupOptions,
+            meta: this.meta,
+            errors: this.errors,
+            globalCache: this.globalCache
+        };
     }
 
     async parseRecordCsv(filePath: string): Promise<ParseSummary> {
         const startTime = Date.now();
         this.meta.startTime = startTime;
         this.meta.filePath = filePath;
-        this.rowContext.filePath = filePath;
         this.meta.status = ParseStatusEnum.SETTING_UP;
         
         try {
@@ -150,17 +148,10 @@ export class ParseManager {
             this.parser = ParserFactory.createParser(
                 this.parseStrategy, this.groupOptions
             );
-            const context: ParseManagerContext = {
-                filePath,
-                parseOptions: this.parseOptions,
-                groupOptions: this.groupOptions,
-                meta: this.meta,
-                errors: this.errors,
-                globalCache: this.globalCache
-            };
+            this.parseContext.filePath = filePath;
             
-            mlog.info(`Using parsing strategy: ${this.parser.getStrategyName()}`);
-            const results = await this.parser.parseFile(context);
+            mlog.info(`[ParseManager.parseRecordCsv()] Using parsing strategy: ${this.parser.getStrategyName()}`);
+            const results = await this.parser.parseFile(this.parseContext);
             this.meta.processingTimeMs = Date.now() - startTime;
             this.meta.status = ParseStatusEnum.FINISHED; 
             return {
@@ -170,7 +161,7 @@ export class ParseManager {
             };
         } catch (error) {
             this.meta.status = ParseStatusEnum.ERROR;
-            mlog.error(`Failed to parse CSV file: ${error}`);
+            mlog.error(`[ParseManager.parseRecordCsv()] Failed to parse CSV file: ${error}`);
             throw error;
         }
     }

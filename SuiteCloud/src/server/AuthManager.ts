@@ -688,6 +688,9 @@ class AuthManager {
     // ========================================================================
 
     public destroy(): void {
+        const authWasActive = (
+            this.state !== AuthState.IDLE || this.server !== null
+        );
         this.closeServer();
         if (this.validationTimer) {
             clearInterval(this.validationTimer);
@@ -696,7 +699,7 @@ class AuthManager {
         this.rejectPendingRequests(new Error('[AuthManager.destroy()] OAuth manager destroyed'));
         
         this.state = AuthState.IDLE;
-        mlog.info('[AuthManager.destroy()] OAuth manager destroyed');
+        if (authWasActive) mlog.info('[AuthManager.destroy()] OAuth manager destroyed');
     }
 }
 

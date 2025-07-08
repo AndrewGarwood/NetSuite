@@ -7,14 +7,16 @@ import xlsx from 'xlsx';
 import { StringCaseOptions, StringPadOptions, StringReplaceOptions, StringStripOptions } from './regex/index';
 import { ParseOneToManyOptions,} from './types/Reading';
 import { applyStripOptions, clean, UNCONDITIONAL_STRIP_DOT_OPTIONS } from './regex/index'
+import { STOP_RUNNING } from 'src/config/env';
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
 import { DelimiterCharacterEnum, ValueMapping, DelimitedFileTypeEnum } from './types';
 import { FieldValue } from '../api/types/InternalApi';
-import { isNonEmptyArray, isValueMappingEntry, anyNull } from '../typeValidation';
+import { isNonEmptyArray, isValueMappingEntry, anyNull, isNullLike as isNull, hasKeys } from '../typeValidation';
 
 
 /**
- * @param filePath `string`
+ * @TODO handle csv where a value contains the delimiter character
+ * @param filePath `string` - must be a string to an existing file, otherwise return `false`.
  * @param requiredHeaders `string[]` - `optional` array of headers that must be present in the CSV file.
  * - If provided, the function checks if all required headers are present in the CSV header row
  * @returns **`isValidCsv`** `boolean`
@@ -92,7 +94,7 @@ export function isValidCsv(
  * - {@link StringStripOptions} = `{ char`: `string`, `escape`?: `boolean`, `stripLeftCondition`?: `(s: string, ...args: any[]) => boolean`, `leftArgs`?: `any[]`, `stripRightCondition`?: `(s: string, ...args: any[]) => boolean`, `rightArgs`?: `any[] }`
  * - {@link StringCaseOptions} = `{ toUpper`?: `boolean`, `toLower`?: `boolean`, `toTitle`?: `boolean }`
  * - {@link StringPadOptions} = `{ padLength`: `number`, `padChar`?: `string`, `padLeft`?: `boolean`, `padRight`?: `boolean }`
- * @returns {Record<string, Array<string>>} `dict`: `Record<string, Array<string>>` — key-value pairs where key is from `keyColumn` and value is an array of values from `valueColumn`
+ * @returns **`dict`** `Record<string, Array<string>>` — key-value pairs where key is from `keyColumn` and value is an array of values from `valueColumn`
  */
 export function parseExcelForOneToMany(
     filePath: string, 
@@ -356,15 +358,23 @@ export function getOneToOneDictionary(
     keyColumn: string,
     valueColumn: string,
 ): Record<string, string> {
-    if (!isNonEmptyArray(rows) || !keyColumn || !valueColumn) {
-        throw new Error(`[getOneToOneDictionary()] Invalid parameters: rows, keyColumn, valueColumn`);
+    if (!isNonEmptyArray(rows) 
+        || !keyColumn || !valueColumn 
+        || typeof keyColumn !== 'string' || typeof valueColumn !== 'string'
+    ) {
+        throw new Error(`[reading.getOneToOneDictionary()] Invalid parameters: rows, keyColumn, valueColumn`);
     }
     const dict: Record<string, string> = {};
     for (const row of rows) {
+        if (!hasKeys(row, [keyColumn, valueColumn])) {
+            mlog.error(`[getOneToOneDictionary()] Row missing keys: '${keyColumn}' or '${valueColumn}'`, 
+            );
+            throw new Error(`[getOneToOneDictionary()] Row missing keys: '${keyColumn}' or '${valueColumn}'`);
+        }
         const key = String(row[keyColumn]).trim();
         const value = String(row[valueColumn]).trim();
         if (!key || !value) {
-            mlog.warn(`[getOneToOneDictionary()] Row missing key or value column:`, 
+            mlog.warn(`[getOneToOneDictionary()] Row missing key or value.`, 
                 TAB+`keyColumn: '${keyColumn}', valueColumn: '${valueColumn}'`
             );
             continue;
@@ -377,4 +387,12 @@ export function getOneToOneDictionary(
         dict[key] = value;
     }
     return dict;
+}
+
+export async function validatePath(...paths: string[]): Promise<void> {
+    for (const path of paths) {
+        if (!fs.existsSync(path)) {
+            throw new Error(`[ERROR reading.validatePath()]: path does not exist: ${path}`);
+        }
+    }
 }

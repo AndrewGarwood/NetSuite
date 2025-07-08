@@ -2,11 +2,13 @@
  * @file src/parse_configurations/customer/customerConstants.ts
  */
 import path from "node:path";
-import { DATA_DIR } from "src/config/env";
+import { DATA_DIR, CLOUD_LOG_DIR } from "src/config/env";
 import { ValueMapping, readJsonFileAsObject as read } from "src/utils/io";
 
 /** `${DATA_DIR}/customers` */
 export const CUSTOMER_DIR = `${DATA_DIR}/customers` as string;
+/** `${CLOUD_LOG_DIR}/customers` */
+export const CUSTOMER_LOG_DIR = `${CLOUD_LOG_DIR}/customers` as string;
 /** `${DATA_DIR}/customers/company.tsv` */
 export const SINGLE_COMPANY_FILE = `${CUSTOMER_DIR}/company.tsv` as string;
 /** `${DATA_DIR}/customers/human.tsv` */

@@ -55,10 +55,10 @@ const DEFAULT_OPERATION_ORDER: OperationEnum[] = [
  * @returns **`results`** {@link ValidatedParseResults} 
  * - = `{ [recordType: string]: {valid:` {@link RecordOptions}`[]; invalid: RecordOptions[]; } }`
  */
-export function processParseResults(
+export async function processParseResults(
     initialResults: ParseResults,
     options: ProcessParseResultsOptions,
-): ValidatedParseResults {
+): Promise<ValidatedParseResults> {
     if (!initialResults || !hasNonTrivialKeys(initialResults) || !options) {
         mlog.error(`processParseResults() Invalid arguments:`,
             TAB+`expected: 'initialResults' (ParseResults object) and 'options' (array of ProcessParseResultsOptions).`,

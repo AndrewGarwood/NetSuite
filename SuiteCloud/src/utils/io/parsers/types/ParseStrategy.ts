@@ -8,8 +8,17 @@ import type { ParseMetaData, ParseError } from "../../../../ParseManager";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "src/utils/api";
 
 /**
+ * @TODO 
+ * - maybe move this to ParseManager.ts
+ * - maybe don't need globalCache
  * @interface **`ParseManagerContext`**
- * Shared context for parsing operations
+ * @property **`filePath`**`string` - Path to the CSV file being parsed
+ * @property **`parseOptions`** {@link ParseOptions}
+ * @property **`groupOptions`** {@link HierarchyOptions} - (if using GroupedParser) Optional grouping options for hierarchical parsing
+ * @property **`meta`** {@link ParseMetaData} - Metadata about the parsing operation
+ * @property **`errors`** {@link ParseError}`[]` - Array to collect any parsing
+ * @property **`globalCache`** `any` | `{ [recordType: string]: { [recordId: string]: FieldDictionary } }` 
+ * - cache for storing and accessing intermediate results
  */
 export interface ParseManagerContext {
     filePath: string;
@@ -58,6 +67,9 @@ export enum ParseStrategyEnum {
     GROUPED = 'GROUPED'
 }
 
+// ============================================================================
+// TYPES FOR GROUPED PARSER ... maybe put some of these in GroupedParser.ts
+// ============================================================================
 /**
  * @interface **`GroupedParseResult`**
  * Extended result type for grouped parsing with additional metadata

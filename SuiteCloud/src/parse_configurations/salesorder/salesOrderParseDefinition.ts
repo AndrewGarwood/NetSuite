@@ -24,12 +24,11 @@ import {
     ProcessParseResultsOptions, ComposeOptions,
     SublistLineIdOptions,
 } from "../../utils/io";
+import * as prune from "../pruneFunctions";
 import * as evaluate from "../evaluatorFunctions";
 import * as customerEval from "../customer/customerEvaluatorFunctions";
 import * as soEval from "./salesOrderEvaluatorFunctions";
 import { SalesOrderColumnEnum as SO } from "./salesOrderConstants";
-/** use to set the field `"isinactive"` to false */
-const NOT_INACTIVE = false;
 /**
  * if `'First Name'` and `Columns.LAST_NAME` not filled, 
  * then look for name to extract from these columns
@@ -85,7 +84,7 @@ const SHIPPING_STREET_ARGS: evaluate.StreetArguments = {
 
 /** 
  * (body subrecord) 
- * - fieldId: `'billaddress'` 
+ * - `fieldId`: `'billaddress'` 
  * */
 const BILLING_ADDRESS_OPTIONS: SubrecordParseOptions = {
     subrecordType: 'address',
@@ -103,7 +102,7 @@ const BILLING_ADDRESS_OPTIONS: SubrecordParseOptions = {
 
 /** 
  * (body subrecord) 
- * - fieldId: `'shipaddress'` 
+ * - `fieldId`: `'shipaddress'` 
  * */
 const SHIPPING_ADDRESS_OPTIONS: SubrecordParseOptions = {
     subrecordType: 'address',
@@ -125,7 +124,8 @@ const lineItemIdEvaluator = (sublistLine: SublistLine, ...args: string[]): strin
         `item:${sublistLine.item}`,
         `quantity:${sublistLine.quantity}`,
         `rate:${sublistLine.rate}`,
-        `amount:${sublistLine.amount}`
+        `amount:${sublistLine.amount}`,
+        `description:${sublistLine.description}`
     ].join(',') + `}`;
     return idString;
 }
@@ -133,11 +133,11 @@ const lineItemIdEvaluator = (sublistLine: SublistLine, ...args: string[]): strin
 const LINE_ITEM_SUBLIST_OPTIONS: SublistDictionaryParseOptions = {
     item: [{
         lineIdOptions: {lineIdEvaluator: lineItemIdEvaluator},
-        item: { evaluator: soEval.itemSku, args: [SO.ITEM] },
+        item: { evaluator: soEval.itemSkuAsync, args: [SO.ITEM] },
         quantity: { colName: SO.QUANTITY },
         rate: { colName: SO.RATE },
         amount: { colName: SO.AMOUNT },
-        description: { colName: SO.ITEM_DESCRIPTION },
+        description: { colName: SO.ITEM_MEMO },
     }] as SublistLineParseOptions[],
 };
 
@@ -150,28 +150,37 @@ export const INTERMEDIATE_ENTRIES: FieldDictionaryParseOptions = {
 /**
  * - `'S. O. #'` -> `'SO'`
  * - `'P. O. #'` -> `'PO'`
- * - `'Num'` -> `'INVOICE'`
+ * - `'Num'` -> `'NUM'`
  */
-const cleanKeyOptions: CleanStringOptions = {
+const externalIdKeyOptions: CleanStringOptions = {
     replace: [
         {searchValue: /(\.| |#)*/g, replaceValue: ''}, 
-        {searchValue: /Num/g, replaceValue: 'INVOICE'}
     ],
+    case: { toUpper: true }
 }
+const EXTERNAL_ID_ARGS: any[] = [
+    externalIdKeyOptions, 
+    SO.TRAN_TYPE, SO.TRAN_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER
+];
 
 /**@TODO decide what to assign to the `otherrefnum` property */
 export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: SO.TRAN_ID,
     fieldOptions: {
         // ...INTERMEDIATE_ENTRIES,
-        externalid: { evaluator: soEval.externalId, 
-            args: [cleanKeyOptions, SO.TRAN_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER]
+        location: { defaultValue: 1 },
+        externalid: { evaluator: soEval.transactionExternalId, args: EXTERNAL_ID_ARGS
+        },
+        otherrefnum: { evaluator: soEval.otherReferenceNumber, 
+            args: [SO.CHECK_NUMBER, SO.PO_NUMBER]
         },
         entity: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
         terms: { evaluator: evaluate.terms, args: [SO.TERMS, TERM_DICT] },
         checknumber: { colName: SO.CHECK_NUMBER },
         trandate: { colName: SO.TRAN_DATE },
         saleseffectivedate: { colName: SO.TRAN_DATE },
+        startdate: { colName: SO.START_DATE },
+        enddate: { colName: SO.END_DATE },
         shipdate: { colName: SO.SHIP_DATE },
         billaddress: BILLING_ADDRESS_OPTIONS,
         shipaddress: SHIPPING_ADDRESS_OPTIONS,
@@ -179,4 +188,8 @@ export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
     sublistOptions: {
         ...LINE_ITEM_SUBLIST_OPTIONS,
     }
+}
+
+export const SALES_ORDER_POST_PROCESSING_OPTIONS: RecordPostProcessingOptions = {
+    pruneFunc: prune.salesOrder,
 }

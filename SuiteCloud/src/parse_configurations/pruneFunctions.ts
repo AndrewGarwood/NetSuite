@@ -71,45 +71,46 @@ export const entity = (
 }
 
 /**
- * - {@link ADDRESS_REQUIRED_FIELDS}
- * @param address {@link SetFieldSubrecordOptions} | {@link SetSublistSubrecordOptions}
- * @returns **`address`** {@link SetFieldSubrecordOptions} | {@link SetSublistSubrecordOptions} | null
+ * - {@link ADDRESS_REQUIRED_FIELDS} = `['addr1']`
+ * @param addressOptions {@link SetFieldSubrecordOptions} | {@link SetSublistSubrecordOptions}
+ * @returns **`addressOptions`** {@link SetFieldSubrecordOptions} | {@link SetSublistSubrecordOptions} | null
  */
 export const address = (
-    address: SetFieldSubrecordOptions | SetSublistSubrecordOptions
+    addressOptions: SetFieldSubrecordOptions | SetSublistSubrecordOptions
 ): SetFieldSubrecordOptions | SetSublistSubrecordOptions | null => {
-    if (!address || !address.fields) {
+    if (!addressOptions || !addressOptions.fields) {
         mlog.error(`[prune.address()] Invalid 'address' parameter:`, 
             TAB+`address is undefined or does not have the 'fields' property`
         );
         return null;
     }
-    if (!hasKeys(address.fields, ADDRESS_REQUIRED_FIELDS)) {
+    if (!hasKeys(addressOptions.fields, ADDRESS_REQUIRED_FIELDS)) {
         plog.warn(`[prune.address()]: address not have required fields. returning null.`,
             TAB+`required: ${JSON.stringify(ADDRESS_REQUIRED_FIELDS)}`,
-            TAB+`received: ${JSON.stringify(Object.keys(address.fields))}`,
+            TAB+`received: ${JSON.stringify(Object.keys(addressOptions.fields))}`,
         );
         return null;
     }
-    const attentionIsRedundant = Boolean(address.fields 
-        && typeof address.fields.addressee === 'string'
-        && typeof address.fields.attention === 'string'
+    const attentionIsRedundant = Boolean(addressOptions.fields 
+        && typeof addressOptions.fields.addressee === 'string'
+        && typeof addressOptions.fields.attention === 'string'
         && (
             equivalentAlphanumeric(
-                address.fields.addressee, 
-                address.fields.attention
+                addressOptions.fields.addressee, 
+                addressOptions.fields.attention
             ) 
-            || (address.fields.addressee).includes(address.fields.attention)
+            || (addressOptions.fields.addressee).includes(addressOptions.fields.attention)
         )
     );
     if (attentionIsRedundant) {
         plog.info(`[prune.address()]: address.attention is redundant with address.addressee , deleting it.`,
-            TAB+`addressee: ${address.fields.addressee}`,
-            TAB+`attention: ${address.fields.attention}`
+            TAB+`addressee: ${addressOptions.fields.addressee}`,
+            TAB+`attention: ${addressOptions.fields.attention}`
         );
-        delete address.fields.attention;
+        delete addressOptions.fields.attention;
     }
-    return address;
+    delete addressOptions.sublists; // delete the empty object created by the parser
+    return addressOptions;
 
 }
 /**
@@ -148,8 +149,8 @@ export const pruneAddressBook = (
 /**
  * `if options.fields.isperson === 'T'` -> do not make the contact record because the customer 
  * is a person (and netsuite won't allow it)
- * @param options 
- * @returns `options` with required fields for contact records, or `null` if required fields are missing
+ * @param options {@link RecordOptions} 
+ * @returns **`options`** with required fields for contact records, or `null` if required fields are missing
  */
 export const contact = (
     options: RecordOptions,
@@ -181,8 +182,8 @@ export const contact = (
 
 /**
  * - {@link SALES_ORDER_REQUIRED_FIELDS} = `['entity', 'trandate']`
- * - validate address in options.fields.billaddress and options.fields.shipaddress
- * - make sure options.sublists.item.length > 1
+ * - validate address in `options.fields.billaddress` and `options.fields.shipaddress`
+ * - make sure `options.sublists.item.length > 1`
  * @param options {@link RecordOptions}
  * @returns **`options`** or **`null`**
  */

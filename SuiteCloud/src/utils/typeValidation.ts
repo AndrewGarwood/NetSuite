@@ -71,7 +71,7 @@ export function isEmptyArray(arr: any): arr is Array<any> & { length: 0 } {
 }
 /**
  * @TODO add param that indicates whether all values must be nontrivial or not
- * @description Check if an object has at least 1 key with value that is non-empty (not `undefined`, `null`, or empty string). 
+ * @description Check if an `object` has at least 1 key with value that is non-empty (not `undefined`, `null`, or empty string). 
  * @note **passing in an array will return `false`.**
  * @param obj - The object to check.
  * @returns **`true`** if the object has any non-empty keys, **`false`** otherwise.
@@ -80,7 +80,7 @@ export function hasNonTrivialKeys(
     obj: any
 ): obj is Record<string, any> 
 | { [key: string]: any } 
-| { [key: string]: FieldValue } 
+// | { [key: string]: FieldValue } 
 {
     if (typeof obj !== 'object' || !obj || Array.isArray(obj)) {
         return false;
