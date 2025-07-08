@@ -13,7 +13,7 @@ export const DATE_STRING_PATTERN = new RegExp(
     /^\s*(\d{4}-\d{2}-\d{2}|\d{1,2}[\/-]\d{1,2}[\/-]\d{4})\s*$/
 );
 
-// e.g. "Pangyo-ro, Bundag-Gu, Seongnam-si"
+/** e.g. `"Pangyo-ro, Bundag-Gu, Seongnam-si"` */
 export const KOREA_ADDRESS_LATIN_TEXT_PATTERN = new RegExp(
     /^\s*([a-zA-Z]{2,}-[a-zA-Z]{2,},\s*){1,}[a-zA-Z]{2,}-[a-zA-Z]{2,}\s*$/
 );

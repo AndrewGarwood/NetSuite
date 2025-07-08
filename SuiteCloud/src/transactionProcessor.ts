@@ -34,13 +34,19 @@ import {
 import { parseRecordCsv } from "./csvParser";
 import { processParseResults } from "./parseResultsProcessor";
 import { isNonEmptyArray, anyNull, isNullLike as isNull, isEmptyArray, isValidCsv, hasKeys } from './utils/typeValidation';
-import { ENTITY_RESPONSE_OPTIONS } from './entityProcessor';
 
 export const SO_RESPONSE_OPTIONS: RecordResponseOptions = {
     responseFields: ['tranid', 'trandate', 'entity', 'externalid','otherrefnum', ]
 };
 const TWO_SECONDS = 2000;
 
+/**
+ * @enum {string} **`TransactionProcessorStageEnum`**
+ * @property **`PARSE`** = `'PARSE'`
+ * @property **`VALIDATE`** = `'VALIDATE'`
+ * @property **`MATCH_ENTITY`** = `'MATCH_ENTITY'`
+ * @property **`PUT_SALES_ORDERS`** = `'PUT_SALES_ORDERS'`
+ */
 export enum TransactionProcessorStageEnum {
     PARSE = 'PARSE',
     VALIDATE = 'VALIDATE',
@@ -56,7 +62,6 @@ export enum MatchSourceEnum {
 export type TransactionEntityMatchOptions = {
     entityType: EntityRecordTypeEnum | string,
     entityFieldId: string,
-    transactionFileName: string;
     matchMethod: MatchSourceEnum
     localFileOptions?: LocalFileMatchOptions 
 }
@@ -70,8 +75,9 @@ export type LocalFileMatchOptions = {
 export type TransactionProcessorOptions = {
     parseOptions: ParseOptions,
     postProcessingOptions: ProcessParseResultsOptions,
+    /** {@link TransactionEntityMatchOptions} */
+    matchOptions?: TransactionEntityMatchOptions,
     /** responseOptions for the transaction put request */
-    matchOptions: TransactionEntityMatchOptions,
     responseOptions?: RecordResponseOptions,
     clearLogFiles?: string[],
     /**
@@ -153,11 +159,18 @@ export async function processTransactionFiles(
         );
         if (done(options, fileName, TransactionProcessorStageEnum.PARSE, parseResults)) return;
         
-        const validatedResults: ValidatedParseResults = processParseResults(
+        const validatedResults: ValidatedParseResults = await processParseResults(
             parseResults, postProcessingOptions
         );
-        if (done(options, fileName, TransactionProcessorStageEnum.VALIDATE, validatedResults)) return;
-        
+        if (done(options, fileName, TransactionProcessorStageEnum.VALIDATE, validatedResults)) return
+        if (!options.matchOptions) {
+            mlog.warn(`[processTransactionFiles()] Aborting Process.`,
+                TAB+`No matchOptions provided && stopAfter stage !== PARSE or VALIDATE`,
+                TAB+`If want to continue past PARSE or VALIDATE, provide valid matchOptions`,
+                TAB+`stopAfter received: '${options.stopAfter}'`,
+            );
+            return;
+        }
         const invalidDict = Object.keys(validatedResults).reduce((acc, key) => {
             acc[key] = validatedResults[key].invalid;
             return acc;

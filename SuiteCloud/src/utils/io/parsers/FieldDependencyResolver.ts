@@ -18,7 +18,7 @@ import {
 } from "../../../config";
 
 /**
- * Field Dependency Resolver - moved from ParseManager
+ * Field Dependency Resolver
  */
 export class FieldDependencyResolver {
     private fieldOptions: Record<string, FieldParseOptions>;
@@ -49,7 +49,7 @@ export class FieldDependencyResolver {
                     if (this.dependencyGraph.has(dependency)) {
                         this.dependencyGraph.get(dependency)!.add(fieldId);
                     } else {
-                        mlog.warn(`Field '${fieldId}' depends on '${dependency}' which is not defined`);
+                        mlog.warn(`[FieldDependencyResolver.buildDependencyGraph()] Field '${fieldId}' depends on '${dependency}' which is not defined`);
                     }
                 }
             }
@@ -64,7 +64,7 @@ export class FieldDependencyResolver {
         
         const visit = (fieldId: string): void => {
             if (visiting.has(fieldId)) {
-                throw new Error(`Circular dependency detected involving field '${fieldId}'`);
+                throw new Error(`[FieldDependencyResolver.resolveEvaluationOrder()] Circular dependency detected involving field '${fieldId}'`);
             }
             if (visited.has(fieldId)) {
                 return;

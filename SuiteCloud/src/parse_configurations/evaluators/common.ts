@@ -1,26 +1,20 @@
+/**
+ * @file src/parse_configurations/evaluators/common.ts
+ * @description evaluators to use across multiple record types
+ */
 import { parseLogger as plog, mainLogger as mlog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG 
 } from '../../config';
-import { HUMAN_VENDORS_TRIMMED } from '../vendor/vendorConstants';
 import { 
     FieldValue, 
-    StateAbbreviationEnum as STATES, 
-    CountryAbbreviationEnum as COUNTRIES, 
     TermBase as Term,
     RecordTypeEnum,
     SB_TERM_DICTIONARY as TERM_DICT,
 } from "../../utils/api/types";
 import { 
-    extractPhone, clean, extractEmail, extractName, stringEndsWithAnyOf, RegExpFlagsEnum,
-    STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, COMPANY_KEYWORDS_PATTERN, COMPANY_ABBREVIATION_PATTERN,
-    isValidEmail,
-    SALUTATION_REGEX, ATTN_SALUTATION_PREFIX_PATTERN, LAST_NAME_COMMA_FIRST_NAME_PATTERN,
-    REMOVE_ATTN_SALUTATION_PREFIX, ENSURE_SPACE_AROUND_HYPHEN, REPLACE_EM_HYPHEN,
-    equivalentAlphanumericStrings as equivalentAlphanumeric,
-    stringContainsAnyOf, JOB_TITLE_SUFFIX_PATTERN, extractJobTitleSuffix,
-    REMOVE_JOB_TITLE_SUFFIX
+    clean,
 } from "../../utils/io/regex/index";
-import { checkForOverride, CLEAN_NAME_REPLACE_OPTIONS, ColumnSliceOptions, ValueMapping } from '../../utils/io';
+import { ColumnSliceOptions } from '../../utils/io';
 
 export const SUPPRESS: any[] = [];
 /**
@@ -97,13 +91,13 @@ export const externalId = (
  * @param row 
  * @param termsColumn 
  * @param termsDict 
- * @returns 
+ * @returns `number | null` - the internalid of the terms, or `null` if not found.
  */
 export const terms = (
     row: Record<string, any>,
     termsColumn: string,
     termsDict: Record<string, Term>=TERM_DICT
-): FieldValue => {
+): number | null => {
     if (!row || !termsColumn || !termsDict) {
         mlog.error('[terms()]: Invalid params. Cannot evaluate terms.');
         return null;

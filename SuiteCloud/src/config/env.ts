@@ -152,7 +152,7 @@ export const READLINE = readline.createInterface({ input, output });
  * @returns {void}
  * */
 export const STOP_RUNNING = (exitCode: number=0, ...msg: any[]): void => {
-    console.log(` > STOP_RUNNING() called with exitCode ${exitCode}.`, ...(msg || []));
+    console.log(` > STOP_RUNNING() called with exitCode ${exitCode} at (${new Date().toLocaleString()}).`, ...(msg || []));
     process.exit(exitCode);
 }
 /**
@@ -171,8 +171,8 @@ export const DELAY = async (ms: number, ...msg: any[]): Promise<void> => {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const TAB = '\n\t';
-console.log(`[env.ts] Loading env...`,
+const TAB = '\n\t• ';
+console.log(`[env.ts] Loading env at (${new Date().toLocaleString()})`,
     TAB + `        USER: '${USER}'`,
     TAB + `   inSandbox:  ${inSandbox}`,
     TAB + `inProduction:  ${inProduction}`
@@ -183,7 +183,7 @@ validatePath(
     NODE_HOME_DIR, SRC_DIR, TOKEN_DIR, ONE_DRIVE_DIR, CLOUD_LOG_DIR, 
     DATA_DIR, OUTPUT_DIR, ERROR_DIR
 );
-export async function validatePath(...paths: string[]): Promise<void> {
+async function validatePath(...paths: string[]): Promise<void> {
     for (const path of paths) {
         if (!fs.existsSync(path)) {
             console.error(`ERROR validatePath(): path does not exist: ${path}`);

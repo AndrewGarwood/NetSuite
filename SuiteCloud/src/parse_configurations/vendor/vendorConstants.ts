@@ -1,8 +1,9 @@
 /**
- * @file src/parses/vendor/vendorConstants.ts
+ * @file src/parse_configurations/vendor/vendorConstants.ts
  */
-import { DATA_DIR, validatePath, mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING } from "../../config";
-import { cleanString, readJsonFileAsObject as read, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION } from "../../utils/io";
+import { DATA_DIR, mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING } from "../../config";
+import { clean, readJsonFileAsObject as read, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION } from "../../utils/io";
+import { validatePath } from "../../utils/io/reading";
 import { hasKeys } from "../../utils/typeValidation";
 import path from "node:path";
 
@@ -23,5 +24,5 @@ if (!hasKeys(jsonObject, ['humanVendors'])) {
 }
 export const HUMAN_VENDOR_LIST = jsonObject.humanVendors as string[];
 export const HUMAN_VENDORS_TRIMMED = HUMAN_VENDOR_LIST.map(
-    (name: string) => cleanString(name, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
+    (name: string) => clean(name, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
 );

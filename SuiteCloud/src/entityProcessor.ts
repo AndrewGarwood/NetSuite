@@ -137,7 +137,7 @@ export async function processEntityFiles(
             csvFilePath, parseOptions
         );
         if (await done(options, fileName, EntityProcessorStageEnum.PARSE, parseResults)) return;
-        const validatedResults: ValidatedParseResults = processParseResults(
+        const validatedResults: ValidatedParseResults = await processParseResults(
             parseResults, 
             POST_PROCESSING_OPTIONS as ProcessParseResultsOptions 
         );

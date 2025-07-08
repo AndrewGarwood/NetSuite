@@ -37,7 +37,7 @@ export const entityId = (
 ): string => {
     let entity = clean(row[entityIdColumn], {
         strip: STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
-        replace: [ENSURE_SPACE_AROUND_HYPHEN, REPLACE_EM_HYPHEN]
+        replace: [REPLACE_EM_HYPHEN, ENSURE_SPACE_AROUND_HYPHEN]
     });
     return checkForOverride(
         entity, entityIdColumn, ENTITY_VALUE_OVERRIDES
@@ -88,7 +88,7 @@ export const isPerson = (
     let company = (companyColumn 
         ? clean(row[companyColumn], {
             strip: STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
-            replace: [ENSURE_SPACE_AROUND_HYPHEN, REPLACE_EM_HYPHEN]
+            replace: [REPLACE_EM_HYPHEN, ENSURE_SPACE_AROUND_HYPHEN]
         })
         : ''
     );

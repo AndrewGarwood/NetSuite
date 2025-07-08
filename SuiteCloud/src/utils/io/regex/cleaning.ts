@@ -36,15 +36,6 @@ export function clean(
     replaceOptions?: StringReplaceOptions
 ): string
 
-/**
- * @description
- * - converts to string and trims, then: 
- * - applies options in this order: `StringReplaceOptions`, `StringStripOptions`, `StringCaseOptions`, `StringPadOptions`
- * - Removes leading+trailing spaces, extra spaces, commas, and dots from a string (e.g. `'..'` becomes `'.'`)
- * - optionally applies 4 option params with: {@link String.replace}, {@link applyStripOptions}, {@link applyCaseOptions}, and {@link applyPadOptions}.
- * @param s - the `string` to clean
- * @returns **`s`** - the cleaned `string`
- */
 export function clean(
     s: string,
     arg2?: CleanStringOptions | StringStripOptions, 
@@ -67,7 +58,7 @@ export function clean(
             replace: arg5
         } as CleanStringOptions
     );
-    s = String(s).trim();
+    s = String(s).trim() || '';
     s = s.replace(/\s+/g, ' ').replace(/\.{2,}/g, '.').replace(/,{2,}/g, ',');
     // @consideration could put this in its own function for consistency
     if (replaceOptions && isNonEmptyArray(replaceOptions)) {

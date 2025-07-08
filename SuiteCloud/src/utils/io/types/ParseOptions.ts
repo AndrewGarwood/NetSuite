@@ -3,14 +3,14 @@
  */
 import { 
     RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum, NumericOperatorEnum, 
-    RecordTypeEnum, EntityRecordTypeEnum 
+    RecordTypeEnum 
 } from "../../ns";
 import { FieldDictionary, FieldValue, RecordOptions, SublistDictionary, 
     SublistLine, idPropertyEnum 
 } from '../../api/types';
 
 export type ParseOptions = {
-    [recordType: RecordTypeEnum | EntityRecordTypeEnum | string]: RecordParseOptions;
+    [recordType: RecordTypeEnum | string]: RecordParseOptions;
 }
 
 export type RecordParseOptions = {
@@ -20,15 +20,15 @@ export type RecordParseOptions = {
 }
 
 export type IntermediateParseResults = {
-    [recordType: RecordTypeEnum | EntityRecordTypeEnum | string]: {
+    [recordType: RecordTypeEnum | string]: {
         [recordId: string]: RecordOptions
     }
 };
 export type ParseResults = {
-    [recordType: RecordTypeEnum | EntityRecordTypeEnum | string]: RecordOptions[]
+    [recordType: RecordTypeEnum | string]: RecordOptions[]
 };
 export type ValidatedParseResults = {
-    [recordType: RecordTypeEnum | EntityRecordTypeEnum | string]: {
+    [recordType: RecordTypeEnum | string]: {
         valid: RecordOptions[], 
         invalid: RecordOptions[]
     }
@@ -54,7 +54,7 @@ export type SublistDictionaryParseOptions = {
 
 /**
  * @typedefn **`SublistLineParseOptions`**
- * @property {string} [lineIdProp] `string` - `optional` the `'internalid'` of the sublist field used to identify existing sublist lines for editing.
+ * @property {string} [lineIdOptions.lineIdProp] `string` - `optional` the `'internalid'` of the sublist field used to identify existing sublist lines for editing.
  * - e.g. for the addressbook sublist, can define values for the sublistFieldId 'label', then set 'label' as the `lineIdProp`. 
  */
 export type SublistLineParseOptions = { 
@@ -79,11 +79,11 @@ export type SublistLineIdOptions = {
 /**
  * `evaluator` and `colName` are mutually exclusive.
  * @typedefn **`FieldParseOptions`**
- * @property {FieldValue} [defaultValue] - The default value to use if `row[colName]` or `evaluator(row)` is `undefined`.
- * @property {string} [colName] - The column name in the CSV file containing the value for the body field.
- * @property {function} [evaluator] - A function that takes a `row` object and returns the value for the `fieldId`. 
+ * @property {FieldValue} defaultValue - The default value to use if `row[colName]` or `evaluator(row)` is `undefined`.
+ * @property {string} colName - The column name in the CSV file containing the value for the body field.
+ * @property {function} evaluator - A function that takes a `row` object and returns the value for the `fieldId`. 
  * - This is used when the value is not in the CSV file or is determined by the contents/context of the `row`.
- * @property {Array<any>} [args] - An optional array of arguments to pass to the `evaluator` function.
+ * @property {Array<any>} args - An optional array of arguments to pass to the `evaluator` function.
  */
 export type FieldParseOptions = {
     defaultValue?: FieldValue;
@@ -101,7 +101,7 @@ export type FieldParseOptions = {
 } | { 
     colName?: never; 
     /**`function` that takes a `row` object (and arbitrary `args`) and returns the value for the `field`. */
-    evaluator?: ((row: Record<string, any>, ...args: any[]) => FieldValue); 
+    evaluator?: ((row: Record<string, any>, ...args: any[]) => FieldValue | Promise<FieldValue>); 
     /**`optional` `array` of arguments to pass to the `evaluator` function. */
     args?: any[]; 
 });
@@ -111,13 +111,14 @@ export type FieldEvaluator = (
     context: EvaluationContext,
     ...args: any[]
 ) => any;
+
 /**
  * @interface **`RowContext`**
- * @property `rowIndex` `number` - The index of the current row (0-based)
- * @property `recordType` `string` - The type of record being processed (e.g., 'salesorder', 'customer')
- * @property `recordId` `string` - The ID of the current record being processed (optional)
- * @property `filePath` `string` - The path to the source CSV file being processed
- * @property `cache` `Record<string, any>` - Cache for expensive computations to avoid re-evaluation
+ * @property **`rowIndex`** `number` - The index of the current row (0-based)
+ * @property **`recordType`** `string` - The type of record being processed (e.g., 'salesorder', 'customer')
+ * @property **`recordId`** `string` - The ID of the current record being processed (optional)
+ * @property **`filePath`** `string` - The path to the source CSV file being processed
+ * @property **`cache`** {@link FieldDictionary} - Cache for expensive computations to avoid re-evaluation
  */
 export type RowContext = {
     /** Current row index (0-based) */
@@ -125,7 +126,7 @@ export type RowContext = {
     /** Current record type being processed */
     recordType: string;
     /** id of current record being processed */
-    recordId?: string;
+    recordId: string;
     /** Source file path */
     filePath: string;
     /** 
@@ -141,10 +142,10 @@ export type RowContext = {
 /**
  * @typedefn **`EvaluationContext`**
  * @extends RowContext {@link RowContext} = `{ rowIndex: number, recordType: string, recordId?: string, filePath: string, cache: Record<string, any> }`
- * @property `currentFieldId` `string` - The ID of the field currently being evaluated
- * @property `fields` {@link FieldDictionary} - Dictionary of field values for the current record
- * @property `sublistId` `string` - The ID of the sublist currently being evaluated (optional)
- * @property `sublists` {@link SublistDictionary} - Dictionary of sublist lines
+ * @property **`currentFieldId`** `string` - The ID of the field currently being evaluated
+ * @property **`fields`** {@link FieldDictionary} - Dictionary of field values for the current record
+ * @property **`sublistId`** `string` - The ID of the sublist currently being evaluated (optional)
+ * @property **`sublists`** {@link SublistDictionary} - Dictionary mapping `sublistId` to {@link SublistLine}`[]`.
  */
 export type EvaluationContext = RowContext & {
     /** Field ID currently being evaluated */

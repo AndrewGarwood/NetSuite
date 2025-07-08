@@ -3,7 +3,7 @@
  * @description Factory for creating parsing strategy instances
  */
 
-import { ParseStrategy, ParseStrategyEnum } from "./types/ParseStrategy";
+import { ParseStrategy as Parser, ParseStrategyEnum } from "./types/ParseStrategy";
 import { StandardParser } from "./StandardParser";
 import { GroupedParser } from "./GroupedParser";
 import { HierarchyOptions } from "./types";
@@ -17,29 +17,31 @@ export class ParserFactory {
      * Creates a parsing strategy instance based on the strategy type
      * @param strategy - The parsing strategy to use
      * @param groupOptions - Optional group options for grouped parsing
-     * @returns The appropriate parser instance
+     * @returns The appropriate parser instance - {@link Parser}
      */
     static createParser(
         strategy: ParseStrategyEnum, 
         groupOptions?: HierarchyOptions
-    ): ParseStrategy {
+    ): Parser {
         switch (strategy) {
             case ParseStrategyEnum.STANDARD:
                 return new StandardParser();
             case ParseStrategyEnum.GROUPED:
                 if (!groupOptions) {
-                    throw new Error('GroupedParser requires groupOptions to be provided');
+                    throw new Error('[ParserFactory.createParser()] GroupedParser requires groupOptions to be provided');
                 }
                 return new GroupedParser(groupOptions);
             default:
-                throw new Error(`Unsupported parsing strategy: ${strategy}`);
+                throw new Error(`[ParserFactory.createParser()] Unsupported parsing strategy: ${strategy}`);
         }
     }
 
     /**
      * Determines the best parsing strategy based on available options
      * @param groupOptions - Optional group options
-     * @returns Recommended parsing strategy
+     * @returns **`strategy`** {@link ParseStrategyEnum} | `string`
+     * - `ParseStrategyEnum.GROUPED` if `groupOptions` are provided and has valid 'groups' property
+     * - `ParseStrategyEnum.STANDARD` `otherwise`
      */
     static recommendStrategy(groupOptions?: HierarchyOptions): ParseStrategyEnum {
         if (groupOptions && groupOptions.groups && groupOptions.groups.length > 0) {

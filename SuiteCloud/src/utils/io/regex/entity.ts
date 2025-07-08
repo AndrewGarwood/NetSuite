@@ -88,11 +88,7 @@ export const CLEAN_NAME_REPLACE_OPTIONS: StringReplaceOptions = [
 export function extractName(
     name: string,
     includeJobTitleSuffix: boolean = true
-): {
-    first: string, 
-    middle?: string, 
-    last?: string
-} {
+): { first: string, middle?: string, last?: string } {
     if (!name || typeof name !== 'string') return { first: '', middle: '', last: '' };
     const originalName = name;
     const jobTitleSuffix = extractJobTitleSuffix(name);
@@ -106,11 +102,11 @@ export function extractName(
         || KOREA_ADDRESS_LATIN_TEXT_PATTERN.test(name)) {
         return { first: '', middle: '', last: '' };
     }
-    // mlog.debug(`extractName()`,
-    //     TAB + `  originalName = "${originalName}"`,
-    //     TAB + `  cleaned name = "${name}"`,
-    //     TAB + `jobTitleSuffix = "${jobTitleSuffix}"`
-    // );
+    SUPPRESS.push(`extractName()`,
+        TAB + `  originalName = "${originalName}"`,
+        TAB + `  cleaned name = "${name}"`,
+        TAB + `jobTitleSuffix = "${jobTitleSuffix}"`
+    );
     let nameSplit = name.split(/(?<!,)\s+/);
     if (nameSplit.length === 0) {
         return { first: '', middle: '', last: '' };
@@ -123,9 +119,9 @@ export function extractName(
         strip: STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
         replace: [{searchValue: /(^[-+])*/g, replaceValue: ''}]
     }));
-    // mlog.debug(NL + `nameSplit.length === ${nameSplit.length},`,
-    //     `nameSplit: ${JSON.stringify(nameSplit)}`
-    // );
+    SUPPRESS.push(NL + `nameSplit.length === ${nameSplit.length},`,
+        `nameSplit: ${JSON.stringify(nameSplit)}`
+    );
     if (nameSplit.length == 1) {
         return { 
             first: nameSplit[0].replace(/(,|\.)$/g, ''), 

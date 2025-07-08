@@ -1,19 +1,21 @@
 /**
  * @file src/utils/io/regex/configureParameters.ts
  */
-import { DATA_DIR, validatePath, DEBUG_LOGS as DEBUG, 
+import { DATA_DIR, DEBUG_LOGS as DEBUG, 
     parseLogger as log, 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
     STOP_RUNNING
 } from '../../../config';
-import { readJsonFileAsObject as read } from '../reading';
+import { readJsonFileAsObject as read, validatePath } from '../reading';
 import { StringCaseOptions, StringPadOptions, StringStripOptions, StringReplaceParams, 
     StringReplaceOptions, CleanStringOptions } from ".";
 import { hasKeys, isNonEmptyArray, isCleanStringOptions } from '../../typeValidation';
 import { distance as levenshteinDistance } from 'fastest-levenshtein';
 import path from 'path';
+
 const filePath = path.join(DATA_DIR, '.constants', 'regex_constants.json');
 validatePath(filePath);
+
 const REGEX_CONSTANTS = read(filePath) as Record<string, any>;
 if (!REGEX_CONSTANTS 
     || !hasKeys(REGEX_CONSTANTS, ['COMPANY_KEYWORD_LIST', 'JOB_TITLE_SUFFIX_LIST'])
@@ -22,11 +24,13 @@ if (!REGEX_CONSTANTS
         +`Expected json object to have 'COMPANY_KEYWORD_LIST' key.`
     );
 }
+
 export const COMPANY_KEYWORD_LIST: string[] = REGEX_CONSTANTS.COMPANY_KEYWORD_LIST || [];
-export const JOB_TITLE_SUFFIX_LIST: string[] = REGEX_CONSTANTS.JOB_TITLE_SUFFIX_LIST || [];
 if (!isNonEmptyArray(COMPANY_KEYWORD_LIST)) {
     throw new Error(`[regex.ts] Invalid COMPANY_KEYWORD_LIST in REGEX_CONSTANTS file at '${filePath}'.`);
 }
+
+export const JOB_TITLE_SUFFIX_LIST: string[] = REGEX_CONSTANTS.JOB_TITLE_SUFFIX_LIST || [];
 if (!isNonEmptyArray(JOB_TITLE_SUFFIX_LIST)) {
     throw new Error(`[regex.ts] Invalid JOB_TITLE_SUFFIX_LIST in REGEX_CONSTANTS file at '${filePath}'.`);
 }
@@ -67,8 +71,12 @@ export const UNCONDITIONAL_STRIP_DOT_OPTIONS: StringStripOptions = {
 /**
  * add space around hyphen if it already has one on a single side, 
  */
-export const ENSURE_SPACE_AROUND_HYPHEN: StringReplaceParams = { searchValue: /( -(\S)|(\S)- )/g, replaceValue: ' - ' };
+export const ENSURE_SPACE_AROUND_HYPHEN: StringReplaceParams = { 
+    searchValue: /( -(?=\S)|(?<=\S)- )/g, replaceValue: ' - ' 
+};
 /**
  * replace em hyphen with a regular hyphen
  */
-export const REPLACE_EM_HYPHEN: StringReplaceParams = { searchValue: /—/g, replaceValue: '-' }
+export const REPLACE_EM_HYPHEN: StringReplaceParams = { 
+    searchValue: /—/g, replaceValue: '-' 
+};
