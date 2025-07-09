@@ -73,6 +73,7 @@ export type SublistLineIdOptions = {
     lineIdProp?: string;
     /** function to calculate an id value used to compare if a sublist line is identical to another. */
     lineIdEvaluator?: (sublistLine: SublistLine, ...args: any[]) => string;
+    /**arguments for `lineIdEvaluator` */
     args?: any[]; 
 }
 

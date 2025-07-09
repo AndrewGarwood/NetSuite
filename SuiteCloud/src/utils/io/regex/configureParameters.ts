@@ -20,19 +20,19 @@ const REGEX_CONSTANTS = read(filePath) as Record<string, any>;
 if (!REGEX_CONSTANTS 
     || !hasKeys(REGEX_CONSTANTS, ['COMPANY_KEYWORD_LIST', 'JOB_TITLE_SUFFIX_LIST'])
 ) {
-    throw new Error(`[regex.ts] Invalid REGEX_CONSTANTS file at '${filePath}'.`
-        +`Expected json object to have 'COMPANY_KEYWORD_LIST' key.`
+    throw new Error(`[regex.configureParameters.ts] Invalid REGEX_CONSTANTS file at '${filePath}'`
+        +` - Expected json object to have 'COMPANY_KEYWORD_LIST' key.`
     );
 }
 
 export const COMPANY_KEYWORD_LIST: string[] = REGEX_CONSTANTS.COMPANY_KEYWORD_LIST || [];
 if (!isNonEmptyArray(COMPANY_KEYWORD_LIST)) {
-    throw new Error(`[regex.ts] Invalid COMPANY_KEYWORD_LIST in REGEX_CONSTANTS file at '${filePath}'.`);
+    throw new Error(`[regex.configureParameters.ts] Invalid COMPANY_KEYWORD_LIST in REGEX_CONSTANTS file at '${filePath}'`);
 }
 
 export const JOB_TITLE_SUFFIX_LIST: string[] = REGEX_CONSTANTS.JOB_TITLE_SUFFIX_LIST || [];
 if (!isNonEmptyArray(JOB_TITLE_SUFFIX_LIST)) {
-    throw new Error(`[regex.ts] Invalid JOB_TITLE_SUFFIX_LIST in REGEX_CONSTANTS file at '${filePath}'.`);
+    throw new Error(`[regex.configureParameters.ts] Invalid JOB_TITLE_SUFFIX_LIST in REGEX_CONSTANTS file at '${filePath}'`);
 }
 
 /**

@@ -5,7 +5,8 @@ export {
     VendorCategoryEnum, CustomerStatusEnum, 
     CustomerTaxItemEnum, ContactRoleEnum, SubrecordTypeEnum, 
     EntityRecordTypeEnum, NetSuiteRecordTypeEnum, RecordTypeEnum, 
-    LeadSourceEnum, LeadStatusEnum } from './record';
+    LeadSourceEnum, LeadStatusEnum, SalesOrderStatusEnum 
+} from './record';
 export { AccountEnvironmentEnum, ScriptTypeEnum } from './SuiteScriptEnvironment';
 export { 
     FilterOperatorEnum, SearchSortEnum, DateOperatorEnum, TextOperatorEnum, 

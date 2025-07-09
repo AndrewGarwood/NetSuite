@@ -1,9 +1,6 @@
 /**
  * @file src/utils/io/types/Csv.ts
  */
-import { 
-    FieldValue,
-} from "../../api/types/InternalApi";
 
 /**
  * @description The DelimitedFileTypeEnum enum defines the possible file types for delimited files.

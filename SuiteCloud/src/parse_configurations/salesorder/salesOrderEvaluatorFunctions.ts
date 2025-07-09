@@ -14,7 +14,7 @@ import {
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
     equivalentAlphanumericStrings as equivalentAlphanumeric, 
 } from "../../utils/io/regex/index";
-import { SalesOrderColumnEnum as SO, getSkuDictionary, getSkuDictionarySync, hasSkuInDictionary } from "./salesOrderConstants";
+import { SalesOrderColumnEnum as SO, getSkuDictionary, hasSkuInDictionary } from "./salesOrderConstants";
 import { EvaluationContext,  } from "../../utils/io";
 import { isNullLike as isNull, anyNull, isCleanStringOptions, hasKeys, hasNonTrivialKeys } from "src/utils/typeValidation";
 
@@ -68,46 +68,16 @@ export const otherReferenceNumber = (
 ): string => {
     const checkNumber = clean(row[checkNumberColumn]);
     const poNumber = clean(row[poNumberColumn]);
-    return checkNumber ? checkNumber : poNumber;
+    return (checkNumber 
+        ? `Check #: ${checkNumber}` : poNumber 
+        ? `${poNumber}` : '');
 }
 
 
 
-/**
- * Gets the internal ID for an item SKU (synchronous version).
- * Requires the SKU dictionary to be pre-loaded.
- * 
- * @param row `Record<string, any>`
- * @param itemColumn `string`
- * @returns **`internalId`** `string` of the item in the row, or an empty string if the item is null.
- * @throws Error if SKU dictionary is not loaded or SKU is not found
- */
-export const itemSku = (
-    row: Record<string, any>,
-    itemColumn: string = SO.ITEM
-): string => {
-    if (anyNull(row, itemColumn, row[itemColumn])) {
-        return '';
-    }
-    
-    const sku = extractSku(clean(row[itemColumn]));
-    if (!sku) {
-        throw new Error(`[itemSku()] Could not extract SKU from: '${row[itemColumn]}'`);
-    }
-
-    const skuDict = getSkuDictionarySync();
-    if (!skuDict) {
-        throw new Error(`[itemSku()] SKU dictionary not loaded. Call getSkuDictionary() first.`);
-    }
-
-    if (!hasKeys(skuDict, sku)) {
-        throw new Error(`[itemSku()] Unrecognized item sku: '${sku}' (from '${row[itemColumn]}')`);
-    }
-    
-    return skuDict[sku];
-}
 
 /**
+ * @TODO handle hasSkuExists logic in post processing instead of here.
  * Gets the internal ID for an item SKU (asynchronous version).
  * Automatically loads the SKU dictionary if not already loaded.
  * 

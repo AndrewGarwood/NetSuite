@@ -24,7 +24,7 @@ import {
 } from "./config";
 import { 
     EntityRecordTypeEnum, RecordOptions, RecordRequest, RecordResponse, RecordResult, idPropertyEnum,
-    RecordResponseOptions, upsertRecordPayload, getRecordById, GetRecordResponse,
+    RecordResponseOptions, upsertRecordPayload, getRecordById, GetRecordResponse, GetRecordRequest,
     SAMPLE_POST_CUSTOMER_OPTIONS as SAMPLE_CUSTOMER,
     RecordTypeEnum,
     FieldDictionary,
@@ -47,22 +47,17 @@ import { ParseManager } from './ParseManager';
 
 async function main() {
     clearFile(DEFAULT_LOG_FILEPATH);
-    
-    // Pre-load the SKU dictionary to ensure async operations have the data they need
     try {
-        mlog.info('Pre-loading SKU dictionary...');
         await soConstants.getSkuDictionary();
-        mlog.info('SKU dictionary loaded successfully');
     } catch (error) {
         mlog.error('Failed to load SKU dictionary:', error);
         STOP_RUNNING(1);
-        return;
     }
-    
+
     await callTransactionProcessor(
         true, 
         soConstants.SALES_ORDER_LOG_DIR, 
-        TransactionProcessorStageEnum.PARSE
+        // TransactionProcessorStageEnum.VALIDATE
     );
     trimFile(5, DEFAULT_LOG_FILEPATH);
     STOP_RUNNING(0);
@@ -72,15 +67,23 @@ main().catch(error => {
     mlog.error('Error executing main() function', Object.keys(error));
     STOP_RUNNING(1);
 });
-
+// const request: GetRecordRequest = {
+//     recordType: RecordTypeEnum.SALES_ORDER,
+//     idOptions:[{idProp: idPropertyEnum.EXTERNAL_ID, searchOperator: SearchOperatorEnum.TEXT.IS, idValue: 'SO:335745_NUM:24-31127_PO:16835(INVOICE)&lt;salesorder&gt;'}],
+//     responseOptions: {
+//         responseFields: ['externalid', 'tranid', 'entity', 'trandate', 'orderstatus'],
+//     }
+// }
+// const response: GetRecordResponse = await getRecordById(request);
+// mlog.debug(`GetRecordResponse: ${indentedStringify(response)}`);
 async function callTransactionProcessor(
     useSubset: boolean = true,
     outputDir?: string,
     stopAfter?: TransactionProcessorStageEnum
 ): Promise<void> {
     const transactionFilePaths = (useSubset 
-        ? [soConstants.SMALL_SUBSET_FILE]
-        : [soConstants.SMALL_SUBSET_FILE] // no other option available yet
+        ? [soConstants.SINGLE_ORDER_FILE]
+        : [soConstants.SMALL_SUBSET_FILE]
     );
     const parseOptions: ParseOptions = { 
         [RecordTypeEnum.SALES_ORDER]: SO_PARSE_OPTIONS 
@@ -159,4 +162,4 @@ const testParseOptions: ParseOptions = {
     },
 }
 
-function test_ParseManager() {}
+export { callEntityProcessor, callTransactionProcessor}

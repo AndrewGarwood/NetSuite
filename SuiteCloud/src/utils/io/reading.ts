@@ -1,20 +1,21 @@
 /**
  * @file src/utils/io/reading.ts
  */
-import fs from 'fs';
-import csv from 'csv-parser';
-import xlsx from 'xlsx';
-import { StringCaseOptions, StringPadOptions, StringReplaceOptions, StringStripOptions } from './regex/index';
-import { ParseOneToManyOptions,} from './types/Reading';
-import { applyStripOptions, clean, UNCONDITIONAL_STRIP_DOT_OPTIONS } from './regex/index'
-import { STOP_RUNNING } from 'src/config/env';
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
-import { DelimiterCharacterEnum, ValueMapping, DelimitedFileTypeEnum } from './types';
-import { FieldValue } from '../api/types/InternalApi';
-import { isNonEmptyArray, isValueMappingEntry, anyNull, isNullLike as isNull, hasKeys } from '../typeValidation';
+import fs from "fs";
+import csv from "csv-parser";
+import xlsx from "xlsx";
+import { StringCaseOptions, StringPadOptions, StringReplaceOptions, StringStripOptions } from "./regex/index";
+import { ParseOneToManyOptions,} from "./types/Reading";
+import { applyStripOptions, clean, UNCONDITIONAL_STRIP_DOT_OPTIONS } from "./regex/index"
+import { STOP_RUNNING } from "src/config/env";
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
+import { DelimiterCharacterEnum, ValueMapping, DelimitedFileTypeEnum } from "./types";
+import { FieldValue } from "../api/types/InternalApi";
+import { isNonEmptyArray, isValueMappingEntry, anyNull, isNullLike as isNull, hasKeys } from "../typeValidation";
 
 
 /**
+ * @consideration make requiredHeaders a rest parameter i.e. `...string[]`
  * @TODO handle csv where a value contains the delimiter character
  * @param filePath `string` - must be a string to an existing file, otherwise return `false`.
  * @param requiredHeaders `string[]` - `optional` array of headers that must be present in the CSV file.
@@ -46,11 +47,12 @@ export function isValidCsv(
     if (isNonEmptyArray(requiredHeaders)) {
         const hasRequiredHeaders = requiredHeaders.every(header => {
             if (!header || typeof header !== 'string') {
-                throw new Error([
+                mlog.warn([
                     `[reading.isValidCsv]: Invalid parameter: 'requiredHeaders`,
                     `requiredHeaders must be of type: Array<string>, but`,
-                    `found array element of type: '${typeof header}'`
-                ].join(' '))
+                    `found array element of type: '${typeof header}' (skipping)`
+                ].join(' '));
+                return true; // skip headers if they are not strings
             }
             return headerRow.includes(header)
         });
@@ -84,7 +86,19 @@ export function isValidCsv(
     }
     return true;
 }
+
+
+export async function validatePath(...paths: string[]): Promise<void> {
+    for (const path of paths) {
+        if (!fs.existsSync(path)) {
+            throw new Error(`[ERROR reading.validatePath()]: path does not exist: ${path}`);
+        }
+    }
+}
+
+
 /**
+ * @TODO implement overload that uses CleanStringOptions
  * @param filePath `string`
  * @param sheetName `string`
  * @param keyColumn `string`
@@ -115,7 +129,7 @@ export function parseExcelForOneToMany(
         } = options;
         const workbook = xlsx.readFile(filePath);
         const sheet = workbook.Sheets[sheetName];
-        const jsonData: any[] = xlsx.utils.sheet_to_json(sheet);
+        const jsonData: Record<string, any>[] = xlsx.utils.sheet_to_json(sheet);
         const dict: Record<string, Array<string>> = {};
         jsonData.forEach(row => {
             let key: string = clean(
@@ -321,20 +335,63 @@ export function checkForOverride(
     return originalValue;
 }
 
+export async function getRows(
+    filePath: string,
+    sheetName: string = 'Sheet1'
+): Promise<Record<string, any>[]> {
+    if (!filePath || typeof filePath !== 'string' || !fs.existsSync(filePath)) {
+        mlog.error(`[reading.getRows()] Invalid file path: '${filePath}'`);
+        return [];
+    }
+    if (filePath.endsWith('.xlsx') || filePath.endsWith('.xls')) {
+        return getExcelRows(filePath, sheetName);
+    }
+    return getCsvRows(filePath);
+}
+
+
+export async function getExcelRows(
+    filePath: string,
+    sheetName: string = 'Sheet1'
+): Promise<Record<string, any>[]> {
+    if (!filePath || typeof filePath !== 'string' || !fs.existsSync(filePath)) {
+        mlog.error(`[getExcelRows()] Invalid file path: '${filePath}'`);
+        return [];
+    }
+    const { isValid, validatedFilePath } = validateFileExtension(filePath, 'xlsx');
+    if (!isValid) {
+        mlog.error(`[getExcelRows()] Invalid file extension for file: '${filePath}'`);
+        return [];
+    }
+    try {
+        const workbook = xlsx.readFile(validatedFilePath);
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet) {
+            mlog.error(`[getExcelRows()] Sheet '${sheetName}' not found in file: ${validatedFilePath}`);
+            return [];
+        }
+        const jsonData: Record<string, any>[] = xlsx.utils.sheet_to_json(sheet);
+        return jsonData;
+    } catch (err) {
+        mlog.error('Error reading or parsing the Excel file:', err, 
+            TAB+`Given File Path: '${filePath}'`);
+        return [];
+    }
+}
 
 /**
  * @param filePath `string`
- * @returns **`rows`** `Promise<Array<Record<string, any>>>` 
+ * @returns **`rows`** `Promise<Record<string, any>[]>` 
  * - an array of objects representing rows from a CSV file.
  */
 export async function getCsvRows(
     filePath: string
-): Promise<Array<Record<string, any>>> {
+): Promise<Record<string, any>[]> {
     const delimiter = getDelimiterFromFilePath(filePath);
     if (!delimiter || !isValidCsv(filePath)) {
         return []
     }
-    const rows: Array<Record<string, any>> = []; 
+    const rows: Record<string, any>[] = []; 
     return new Promise((resolve, reject) => {
         fs.createReadStream(filePath)
             .pipe(csv({ separator: delimiter }))
@@ -345,24 +402,42 @@ export async function getCsvRows(
             .on('error', reject);
     });
 }
+export async function getOneToOneDictionary(
+    filePath: string,
+    keyColumn: string,
+    valueColumn: string,
+): Promise<Record<string, string>>
 
+export async function getOneToOneDictionary(
+    rows: Record<string, any>[],
+    keyColumn: string,
+    valueColumn: string,
+): Promise<Record<string, string>>
 
 /**
- * @param rows `Record<string, any>[]` - array of objects representing rows from a csv file. 
+ * @param arg1 `string | Record<string, any>[]` - the file path to a CSV file or an array of rows.
  * @param keyColumn `string` - the column name whose contents will be keys in the dictionary.
  * @param valueColumn `string` - the column name whose contents will be used as values in the dictionary.
  * @returns **`dict`** `Record<string, string>`
  */
-export function getOneToOneDictionary(
-    rows: Record<string, any>[],
+export async function getOneToOneDictionary(
+    arg1: string | Record<string, any>[],
     keyColumn: string,
     valueColumn: string,
-): Record<string, string> {
-    if (!isNonEmptyArray(rows) 
-        || !keyColumn || !valueColumn 
-        || typeof keyColumn !== 'string' || typeof valueColumn !== 'string'
-    ) {
-        throw new Error(`[reading.getOneToOneDictionary()] Invalid parameters: rows, keyColumn, valueColumn`);
+): Promise<Record<string, string>> {
+    if (!keyColumn || typeof keyColumn !== 'string' 
+        || !valueColumn || typeof valueColumn !== 'string') {
+        throw new Error(`[reading.getOneToOneDictionary()] Invalid parameter(s): keyColumn, valueColumn`);
+    }
+    let rows: Record<string, any>[] = [];
+    if (typeof arg1 === 'string' && !isValidCsv(arg1, [keyColumn, valueColumn])) {
+        throw new Error(`[reading.getOneToOneDictionary()] Invalid CSV filePath provided: '${arg1}'`);
+    } else if (typeof arg1 === 'string') {
+        rows = await getRows(arg1);
+    } else if (isNonEmptyArray(rows)) {
+        rows = arg1 as Record<string, any>[];
+    } else {
+        throw new Error(`[reading.getOneToOneDictionary()] Invalid parameter: arg1 must be a string or an array of rows.`);
     }
     const dict: Record<string, string> = {};
     for (const row of rows) {
@@ -389,10 +464,57 @@ export function getOneToOneDictionary(
     return dict;
 }
 
-export async function validatePath(...paths: string[]): Promise<void> {
-    for (const path of paths) {
-        if (!fs.existsSync(path)) {
-            throw new Error(`[ERROR reading.validatePath()]: path does not exist: ${path}`);
+export async function getColumnValues(
+    filePath: string,
+    columnName: string,
+    allowDuplicates: boolean
+): Promise<Array<string>>
+
+export async function getColumnValues(
+    rows: Record<string, any>[],
+    columnName: string,
+    allowDuplicates?: boolean
+): Promise<Array<string>>
+
+/**
+ * @TODO add CleanStringOptions param to apply to column values.. and a sortValues boolean param
+ * @param arg1 `string | Record<string, any>[]` - the file path to a CSV file or an array of rows.
+ * @param columnName `string` - the column name whose values will be returned.
+ * @param allowDuplicates `boolean` - `optional` if `true`, allows duplicate values in the returned array, otherwise only unique values are returned.
+ * - Defaults to `false`.
+ * @returns **`values`** `Promise<Array<string>>` - array of all values (as strings) from the specified column.
+ */
+export async function getColumnValues(
+    arg1: string | Record<string, any>[],
+    columnName: string,
+    allowDuplicates: boolean = false
+): Promise<Array<string>> {
+    if (!columnName || typeof columnName !== 'string') {
+        throw new Error(`[reading.getColumnValues()] Invalid parameter: columnName must be a string.`);
+    }
+    let rows: Record<string, any>[] = [];
+    if (typeof arg1 === 'string' && !isValidCsv(arg1, [columnName])) {
+        throw new Error(`[reading.getColumnValues()] Invalid CSV filePath provided: '${arg1}'`);
+    } else if (typeof arg1 === 'string') {
+        rows = await getRows(arg1);
+    } else if (isNonEmptyArray(arg1)) {
+        rows = arg1 as Record<string, any>[];
+    } else {
+        throw new Error(`[reading.getColumnValues()] Invalid parameter: arg1 must be a string or an array of rows.`);
+    }
+    const values: Array<string> = [];
+    for (const row of rows) {
+        if (!hasKeys(row, columnName)) {
+            mlog.warn(`[getColumnValues()] Row missing key: '${columnName}'`, 
+            );
+            continue;
+        }
+        if (!row[columnName]) continue;
+        const value = String(row[columnName]).trim();
+        if (!value) { continue; }
+        if (allowDuplicates || !values.includes(value)) {
+            values.push(value);
         }
     }
+    return values;
 }

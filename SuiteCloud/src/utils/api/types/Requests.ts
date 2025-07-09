@@ -45,7 +45,7 @@ export type SublistLine = {
 
 /**
  * @typedefn **`SetFieldSubrecordOptions`**
- * @property {string} fieldId The `'internalid'` of the main record field that is a subrecord.
+ * @property {string} fieldId `'internalid'` of the main record field that is a subrecord.
  * -  use `rec.getSubrecord({fieldId})` = `getSubrecord(options: GetFieldOptions): Omit<Record, 'save'>`;
  * @property {FieldDictionary} [fields] {@link FieldDictionary}
  * @property {SublistDictionary} [sublists] {@link SublistDictionary}
@@ -117,17 +117,24 @@ export type idSearchOptions = {
 
 /**
  * @enum {string} **`idPropertyEnum`**
- * @property {string} INTERNAL_ID - The `'internalid'` (for all records).
- * @property {string} EXTERNAL_ID - The `'externalid'` (for all records).
- * @property {string} ENTITY_ID - The `'entityid'` (for relationship records). appears on vendor records.
- * @property {string} ITEM_ID - The `'itemid'` (for inventory records)
+ * @property {string} INTERNAL_ID - `'internalid'` (for all records).
+ * @property {string} EXTERNAL_ID - `'externalid'` (for all records).
+ * @property {string} ENTITY_ID - `'entityid'` (for relationship records). appears on EntityTypeEnum records.
+ * @property {string} ITEM_ID - `'itemid'` (for inventory records)
+ * @property {string} TRANSACTION_ID - `'tranid'` (for transaction records)
  * @readonly
  */
 export enum idPropertyEnum {
+    /**`'internalid'` (for all records) */
     INTERNAL_ID = 'internalid',
+    /** `'externalid'` (for all records) */
     EXTERNAL_ID = 'externalid',
+    /**`'entityid'` (for relationship records) */
     ENTITY_ID = 'entityid',
-    ITEM_ID = 'itemid'
+    /**`'itemid'` (for inventory records) */
+    ITEM_ID = 'itemid',
+    /** `'tranid'` (for transaction records) */
+    TRANSACTION_ID = 'tranid',
 }
 
 /** Type: **`SubrecordDictionary`** {@link SubrecordDictionary} */

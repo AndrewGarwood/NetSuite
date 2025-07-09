@@ -182,7 +182,7 @@ export const contact = (
 
 /**
  * - {@link SALES_ORDER_REQUIRED_FIELDS} = `['entity', 'trandate']`
- * - validate address in `options.fields.billaddress` and `options.fields.shipaddress`
+ * - validate address in `options.fields.billingaddress` and `options.fields.shippingaddress`
  * - make sure `options.sublists.item.length > 1`
  * @param options {@link RecordOptions}
  * @returns **`options`** or **`null`**
@@ -211,30 +211,31 @@ export const salesOrder = (
         );
         return null; 
     }
-    if (options.fields.billaddress) {
+    if (options.fields.billingaddress) {
         let validatedAddress = address(
-            options.fields.billaddress as SetFieldSubrecordOptions
+            options.fields.billingaddress as SetFieldSubrecordOptions
         );
         if (!validatedAddress) {
-            delete options.fields.billaddress
+            delete options.fields.billingaddress
         } else {
-            options.fields.billaddress = validatedAddress;
+            options.fields.billingaddress = validatedAddress;
         }
     }
-    if (options.fields.shipaddress) {
+    if (options.fields.shippingaddress) {
         let validatedAddress = address(
-            options.fields.shipaddress as SetFieldSubrecordOptions
+            options.fields.shippingaddress as SetFieldSubrecordOptions
         );
         if (!validatedAddress) {
-            delete options.fields.shipaddress
+            delete options.fields.shippingaddress
         } else {
-            options.fields.shipaddress = validatedAddress;
+            options.fields.shippingaddress = validatedAddress;
         }
     }
-    if (!options.fields.billaddress && !options.fields.shipaddress) {
+    if (!options.fields.billingaddress && !options.fields.shippingaddress) {
         mlog.warn(`[prune.salesOrder()]: options.fields does not have any address fields.`,
             TAB+`options.fields.externalid: '${options.fields.externalid}'`,
         );
+        return null;
     }
     if (!isNonEmptyArray(options.sublists.item)) {
         mlog.warn(`[prune.salesOrder()]: options.sublists.item is empty or not an array.`,

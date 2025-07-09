@@ -42,12 +42,11 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
                 records: []
             }; // as `GetRecordResponse`
         }
-        let { isDynamic, recordType} = reqParams;
+        let { recordType } = reqParams;
         /**@type {idSearchOptions[]} */
         let idOptions = JSON.parse(reqParams.idOptions || '[]');
         /**@type {RecordResponseOptions} */
         let responseOptions = JSON.parse(reqParams.responseOptions || '{}');
-        isDynamic = typeof isDynamic !== 'boolean' ? NOT_DYNAMIC : isDynamic;
         recordType = validateRecordType(recordType);
         if (!recordType) {
             writeLog(LogTypeEnum.ERROR,
@@ -107,7 +106,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
             fields: {}, 
             sublists: {}
         }];
-        rec = record.load({type: recordType, id: recId, isDynamic });
+        rec = record.load({type: recordType, id: recId, isDynamic: NOT_DYNAMIC });
         writeLog(LogTypeEnum.DEBUG, 
             `Loading Existing ${recordType} record with internalid: '${recId}'`, 
         );
@@ -126,6 +125,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     }
 
     /**
+     * @notimplemented
      * @param {RecordTypeEnum | string} recordType 
      * @param {RecordResponseOptions} responseOptions 
      * @returns {GetRecordResponse}
@@ -473,7 +473,6 @@ const NOT_DYNAMIC = false;
  * - {@link idSearchOptions}
  * - {@link RecordResponseOptions} = `{ responseFields?: string | string[], responseSublists?: Record<string, string | string[]> }`
  * @typedef {{
- * isDynamic?: boolean; 
  * recordType: string | RecordTypeEnum;
  * idOptions: idSearchOptions[],
  * responseOptions: RecordResponseOptions,
@@ -693,6 +692,7 @@ const NOT_DYNAMIC = false;
  * @property {string} EXTERNAL_ID - The `'externalid'` (for all records).
  * @property {string} ENTITY_ID - The `'entityid'` (for relationship records)
  * @property {string} ITEM_ID - The `'itemid'` (for inventory records)
+ * @property {string} TRANSACTION_ID - The `'tranid'` (for transaction records)
  * @readonly
  */
 const idPropertyEnum = {
@@ -704,6 +704,8 @@ const idPropertyEnum = {
     ENTITY_ID: 'entityid',
     /**`'itemid'` (for inventory records) */
     ITEM_ID: 'itemid',
+    /** `'tranid'` (for transaction records) */
+    TRANSACTION_ID: 'tranid',
 };
 
 /**

@@ -9,6 +9,8 @@
  */
 
 /**
+ * @TODO decide whether to handle converting values for date fields from strings 
+ * to date objects here or on client side.
  * @consideration could use rec.submitFields() instead of rec.setValue() and rec.setSublistValue(), but initially 
  * went with the latter because I wanted granular logging and thought I could wrap each setValue in a try catch to check for errors.
  * @consideration make an enum for subrecord fieldIds so don't have to use less robust {@link isSubrecord}`()`
@@ -255,7 +257,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 const resultRange = resultSet.getRange({ start: 0, end: 10 });
                 if (resultRange.length === 0) {
                     writeLog(LogTypeEnum.DEBUG,
-                        `searchForRecordById() 0 records found for idSearchOption ${i+1}/${idOptions.length}`,
+                        `[searchForRecordById()] 0 records found for idSearchOption ${i+1}/${idOptions.length}`,
                         `0 '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                     );
                     continue;
@@ -312,6 +314,28 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             );
             return rec;
         }
+        // if fieldId refers to a date field and the value is a string, 
+        // try to make a new date object from the value
+        if (fieldId.includes('date') && typeof value === 'string') {
+            try {
+                const dateValue = new Date(value);
+                if (!isNaN(dateValue.getTime())) {
+                    value = dateValue; // update value to be a Date object
+                } else {
+                    writeLog(LogTypeEnum.WARN, 
+                        `WARNING: upsertFieldValue() Invalid date string for fieldId '${fieldId}' on recordType '${recordType}':`,
+                        `value: '${value}' is not a valid date string, keeping value as string`
+                    );
+                    return rec; // keep value as string if date parsing fails
+                }
+            } catch (e) {
+                writeLog(LogTypeEnum.ERROR,
+                    `ERROR: upsertFieldValue() Error parsing date string for fieldId '${fieldId}' on recordType '${recordType}':`,
+                    `value: '${value}' could not be parsed to a Date object, keeping value as string`,
+                );
+                return rec;
+            }
+        }
         /**@type {SetFieldValueOptions} */
         const setOptions = { fieldId, value };
         try {
@@ -320,8 +344,8 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 return rec;
             }
             writeLog(LogTypeEnum.DEBUG, 
-                `upsertFieldValue() attempting <${recordType}>rec.setValue();`,
-                `<${recordType}>rec.setValue({ fieldId: '${fieldId}', value: '${value}' });`,
+                `upsertFieldValue() attempting <${recordType}>rec.setValue()`,
+                `<${recordType}>rec.setValue({ fieldId: '${fieldId}', value: '${value}' })`,
                 `originalValue === newValue ? ${originalValue === value}`,
                 `originalValue: '${originalValue}'`, 
                 `     newValue: '${value}'`, 
@@ -408,6 +432,8 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     }
 
     /**
+     * @TODO maybe add a param somewhere indicating whether to clear previous 
+     * line entries for sublists when upserting
      * @param {object} rec 
      * @param {RecordTypeEnum | string} recordType 
      * @param {SublistDictionary} sublists 
@@ -436,47 +462,42 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             for (let i = 0; i < sublistLines.length; i++) {
                 /**@type {SublistLine} */
                 const sublistLine = sublistLines[i];
-                let { line, lineIdProp } = sublistLine;
+                let { line, idFields } = sublistLine;
                 const remainingSublistFieldIds = Object.keys(sublistLine).filter(
                     key => key !== 'line' && key !== idPropertyEnum.INTERNAL_ID
                 );
                 let lineIndices = [];
-                const wantToEditExistingLine = (
-                    typeof line !== 'number' 
-                    && typeof lineIdProp === 'string' 
-                    && sublistLine[lineIdProp] !== undefined
-                );
                 if (typeof line === 'number') { 
                     lineIndices.push(line); 
-                } else if (wantToEditExistingLine) {
-                    lineIndices.push(...getSublistLineIndexByFieldValue(
-                        rec, 
-                        sublistId, 
-                        sublistLine[lineIdProp], 
-                        lineIdProp || idPropertyEnum.INTERNAL_ID
+                } else if (idFields) {
+                    lineIndices.push(...getSublistLineIndexByFieldEquality(
+                        rec, sublistId, sublistLine,
+                        (typeof idFields === 'string' 
+                            ? [idFields] : isNonEmptyArray(idFields) ? idFields : []
+                        )
                     ));
-                    delete sublistLine.lineIdProp; // remove key 'lineIdProp' as it's only used to identify the line(s) to edit
-                } else if (typeof line !== 'number') {
+                    delete sublistLine.idFields; // remove key 'idFields' as it's only used to identify the line(s) to edit
+                } else { 
+                    // sublistLine will overwrite existing values at lineIndex i 
+                    // or insert a new line if line i does not exist
                     lineIndices.push(i); 
                 }
-                if (lineIndices.length === 0) { 
-                    // default to new line if no line specified or no existing lines found
-                    lineIndices.push(rec.getLineCount({sublistId})); 
-                }
-                lineIndices = lineIndices.map(index => 
-                    validateSublistLineIndex(rec, sublistId, index)
-                );
+                
                 for (const lineIndex of lineIndices) {
                     for (const fieldId of remainingSublistFieldIds) {
                         const value = sublistLine[fieldId];
                         if (isSubrecord(value)) {
-                            rec = processSublistSubrecordOptions(
-                                rec, recordType, sublistId, fieldId, lineIndex, value
+                            rec = processSublistSubrecordOptions(rec, 
+                                recordType, sublistId, fieldId, 
+                                validateSublistLineIndex(rec, sublistId, lineIndex), 
+                                value // as SetSublistSubrecordOptions
                             );
                             continue;
                         }
                         rec = upsertSublistFieldValue(
-                            rec, recordType, sublistId, fieldId, lineIndex, value
+                            rec, recordType, sublistId, fieldId, 
+                            validateSublistLineIndex(rec, sublistId, lineIndex), 
+                            value // as FieldValue
                         );
                     }
                 }
@@ -840,27 +861,46 @@ function validateRecordType(recordType) {
 }
 
 /**
- * get all line indices with sublist[idProp] === idValue
- * @param {object} rec 
- * @param {string} sublistId 
- * @param {FieldValue} idValue 
- * @param {string} lineIdProp 
+ * @param {object} rec `object`
+ * @param {string} sublistId `string`
+ * @param {SublistLine} sublistLine {@link SublistLine} `object`
+ * @param {string | string[]} idFields - `fieldId` or `Array<fieldId>` to search for equality with `idValue`
  * @returns {number[]} **`lineIndices`**
  */
-function getSublistLineIndexByFieldValue(rec, sublistId, idValue, lineIdProp = idPropertyEnum.INTERNAL_ID) {
-    if (!rec || !sublistId || !idValue) {
+function getSublistLineIndexByFieldEquality(
+    rec, 
+    sublistId,
+    sublistLine,
+    idFields
+) {
+    if (!rec || !sublistId || !sublistLine || typeof sublistLine !== 'object' || typeof sublistId !== 'string') {
         writeLog(LogTypeEnum.ERROR, 
             `ERROR: getSublistLineIndexById() Invalid Parameters:`,
-            `rec, sublistId, and lineId are required parameters`,
+            `'rec' (object) 'sublistId' (string) 'sublistLine' (SublistLine) are required parameters`,
         );
         return [];
     }
+    if (!idFields || isEmptyArray(idFields)) { return []; }
+    if (typeof idFields !== 'string' && !isNonEmptyArray(idFields)) {
+        writeLog(LogTypeEnum.ERROR,
+            `ERROR: getSublistLineIndexById() Invalid idFields parameter:`,
+            `'idFields' must be a string or an array of strings, received '${typeof idFields}'`
+        );
+        return [];
+    }
+    if (idFields && typeof idFields === 'string') {
+        idFields = [idFields]; // convert to array if a single string is passed
+    }
+    const lineCount = rec.getLineCount({ sublistId });
+    if (lineCount === 0) { return []; }
     /**@type {number[]} */
     const lineIndices = [];
-    const lineCount = rec.getLineCount({ sublistId });
     for (let i = 0; i < lineCount; i++) {
-        const sublistValue = rec.getSublistValue({ sublistId, fieldId: lineIdProp, line: i });
-        if (sublistValue === idValue) {
+        const allIdFieldValuesEqual = idFields.every(fieldId => {
+            const sublistValue = rec.getSublistValue({ sublistId, fieldId, line: i });
+            return String(sublistValue).toLowerCase() === String(sublistLine[fieldId]).toLowerCase();
+        });
+        if (allIdFieldValuesEqual) {
             lineIndices.push(i);
         }
     }
@@ -908,10 +948,10 @@ const NOT_DYNAMIC = false;
 const SubrecordFieldEnum = {
     /**from the `'addressbook'` `sublist` on Relationship records */
     ADDRESS_BOOK_ADDRESS: 'addressbookaddress',
-    /**from the `'billaddress'` body `field` on Transaction records */
-    BILL_ADDRESS: 'billaddress',
-    /**from the `'shipaddress'` body `field` on Transaction records */
-    SHIP_ADDRESS: 'shipaddress',
+    /**from the `'billingaddress'` body `field` on Transaction records */
+    BILLING_ADDRESS: 'billingaddress',
+    /**from the `'shippingaddress'` body `field` on Transaction records */
+    SHIPPING_ADDRESS: 'shippingaddress',
 }
 
 /**Type: RecordRequest {@link RecordRequest} */
@@ -995,10 +1035,10 @@ const SubrecordFieldEnum = {
  * @typedef {{
  * [sublistFieldId: string]: FieldValue | SubrecordValue
  * line?: number;
- * lineIdProp?: string;
+ * idFields: string | string[];
  * }} SublistLine
  * @property {number} [line] `number` - the `lineIndex` of the list entry
- * @property {number} [lineIdProp] `string` - the `'sublistFieldId'` of the list entry 
+ * @property {number} [SublistLineIdOptions] {@link SublistLineIdOptions} - the `'sublistFieldId'` of the list entry 
  * with defined value at `SublistLine[sublistFieldId]` that you want to use to search for existing lines
  */
 
@@ -1170,10 +1210,11 @@ const SubrecordFieldEnum = {
 
 /**
  * @enum {string} **`idPropertyEnum`**
- * @property {string} INTERNAL_ID - The `'internalid'` (for all records).
- * @property {string} EXTERNAL_ID - The `'externalid'` (for all records).
- * @property {string} ENTITY_ID - The `'entityid'` (for relationship records)
- * @property {string} ITEM_ID - The `'itemid'` (for inventory records)
+ * @property {string} INTERNAL_ID - `'internalid'` (for all records).
+ * @property {string} EXTERNAL_ID - `'externalid'` (for all records).
+ * @property {string} ENTITY_ID - `'entityid'` (for relationship records)
+ * @property {string} ITEM_ID - `'itemid'` (for inventory records)
+ * @property {string} TRANSACTION_ID - `'tranid'` (for transaction records)
  * @readonly
  */
 const idPropertyEnum = {
@@ -1185,6 +1226,8 @@ const idPropertyEnum = {
     ENTITY_ID: 'entityid',
     /**`'itemid'` (for inventory records) */
     ITEM_ID: 'itemid',
+    /** `'tranid'` (for transaction records) */
+    TRANSACTION_ID: 'tranid',
 };
 
 /**

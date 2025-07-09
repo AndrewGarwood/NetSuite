@@ -27,7 +27,7 @@ export enum PostProcessingOperationEnum {
  * @property {CloneOptions} [cloneOptions] - {@link CloneOptions} - Options for cloning records.
  * @property {ComposeOptions} [composeOptions] - {@link ComposeOptions} - Options for composing additional fields or sublists for the record based on the ParseResults.
  * @property {function} [pruneFunc] - A function that takes a {@link RecordOptions} object and returns a modified version of it or `null` to remove the record from the results.
- * @property {PostProcessingOperationEnum[]} [operationOrder] - Array defining the order of operations to perform. Defaults to [CLONE, COMPOSE, PRUNE].
+ * @property {PostProcessingOperationEnum[]} [operationOrder] - Array defining the order of operations to perform. Defaults to `[CLONE, COMPOSE, PRUNE]`.
  */
 export type RecordPostProcessingOptions = {
     cloneOptions?: CloneOptions;
