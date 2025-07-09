@@ -5,7 +5,7 @@
 import { OUTPUT_DIR, CLOUD_LOG_DIR } from './env';
 import { Logger, ISettingsParam, ISettings, ILogObj, ILogObjMeta, IPrettyLogStyles, IMeta } from 'tslog';
 import path from 'node:path';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 
 /** LOCAL_LOG_DIR (in onedrive) or `OUTPUT_DIR/logs` */
 export const LOCAL_LOG_DIR = path.join(OUTPUT_DIR, "logs");  
@@ -166,7 +166,8 @@ function modifyLogObj(logObj: ILogObj): ILogObj {
     return logObj;
 }
 
-
+/**suppress logs by putting them here (do not print to console) */
+export const SUPPRESSED_LOGS: any[] = []
 export const INFO_LOGS: any[] = []
 export const DEBUG_LOGS: any[] = [];
 export { indentedStringify, trimFile, clearFile } from '../utils/io/writing';

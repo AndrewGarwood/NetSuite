@@ -13,8 +13,11 @@ export const SALES_ORDER_DIR = `${DATA_DIR}/salesorders` as string;
 export const SALES_ORDER_LOG_DIR = `${CLOUD_LOG_DIR}/salesorders` as string;
 /** `${DATA_DIR}/salesorders/small_subset.tsv` */
 export const SMALL_SUBSET_FILE = `${SALES_ORDER_DIR}/small_subset.tsv` as string;
+/** `${DATA_DIR}/salesorders/single_order.tsv` */
+export const SINGLE_ORDER_FILE = `${SALES_ORDER_DIR}/single_order.tsv` as string;
 /*
 Trans #	Type	Date	Num	Source Name	Name Address	Name Street1	Name Street2	Name City	Name State	Name Zip	Name Contact	Name Phone #	Name Fax #	Name E-Mail	Name Account #	P. O. #	Ship Date	Due Date	Item	Item Description	Memo	Account	Terms	Class	Rep	Billing Status	Qty	Sales Price	Amount	S. O. #	Lot Number	Paid Date	Ship To City	Ship To Address 1	Ship To Address 2	Ship To State	Ship Zip	Check #
+317505	Invoice	10/24/2024	24-30376	Aloha Aesthetics	Stacey Idica 673 Silver Bluff Road Aiken, SC 29803	Stacey Idica	673 Silver Bluff Road	Aiken	SC	29803		941-276-7001		stacey.bullfinch@gmail.com		15979	10/24/2024	10/24/2024	Miracu:3FX18101802GA (Miracu Thread Forte Fix 10 units  (18GX100mm))	Miracu Thread Forte Fix 10 units  (18GX100mm)	Miracu Thread Forte Fix 10 units  (18GX100mm)	PDO Thread	Credit Card	Benev:Domestic	CE		5	374.00	1870.00	334854	2026/04/29-X81441G		Aiken	Aloha Aesthetics	Attn: Stacey Idica	SC	29803	
 
 */
 const SALES_ORDER_CSV_COLUMNS = [
@@ -169,7 +172,7 @@ async function loadSkuDictionary(
         throw new Error(`[loadSkuDictionary()] No data in CSV file: ${csvPath}`); 
     }
 
-    const dictionary = getOneToOneDictionary(itemRows, skuColumn, internalIdColumn);
+    const dictionary = await getOneToOneDictionary(itemRows, skuColumn, internalIdColumn);
     if (!hasNonTrivialKeys(dictionary)) {
         throw new Error(`[loadSkuDictionary()] No valid data found in CSV file: ${csvPath}`);
     }

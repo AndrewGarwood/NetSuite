@@ -84,7 +84,6 @@ export const externalId = (
     }
     // Ensure the ID is in the format 'entity<recordType>'
     return `${id}<${recordType}>`;
-
 }
 
 /**

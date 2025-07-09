@@ -22,5 +22,5 @@ export type GetRecordResponse = {
     message: string;
     error?: string;
     logArray: LogStatement[];
-    record?: RecordResult;
+    records?: RecordResult[];
 };
