@@ -467,7 +467,7 @@ export async function getOneToOneDictionary(
 export async function getColumnValues(
     filePath: string,
     columnName: string,
-    allowDuplicates: boolean
+    allowDuplicates?: boolean
 ): Promise<Array<string>>
 
 export async function getColumnValues(

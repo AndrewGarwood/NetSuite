@@ -2,7 +2,7 @@
  * @file src/parse_configurations/salesorder/salesOrderConstants.ts
  */
 
-import { anyNull, hasNonTrivialKeys, isNullLike as isNull } from "src/utils/typeValidation";
+import { anyNull, hasNonTrivialKeys, isNullLike as isNull, isNonEmptyString as isString } from "src/utils/typeValidation";
 import { STOP_RUNNING, DATA_DIR, CLOUD_LOG_DIR, mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config";
 import { getCsvRows, getOneToOneDictionary, isValidCsv, readJsonFileAsObject as read } from "src/utils/io/reading";
 import { writeObjectToJson as write } from "src/utils/io/writing";
@@ -90,7 +90,9 @@ export enum SalesOrderColumnEnum {
     SHIP_TO_ZIP = 'Ship Zip',
     SHIP_TO_COUNTRY = 'Ship To Country',
 }
+/** `DATA_DIR/items/SKU_TO_INTERNAL_ID_DICT.json` */
 const SKU_DICTIONARY_FILE = path.join(DATA_DIR, 'items', 'SKU_TO_INTERNAL_ID_DICT.json');
+/** `DATA_DIR/uploaded/inventory_item.tsv` */
 const INVENTORY_ITEM_FILE = path.join(DATA_DIR, 'uploaded', 'inventory_item.tsv');
 
 // Cache for the SKU dictionary - will be populated lazily
@@ -100,8 +102,8 @@ let skuDictionaryPromise: Promise<Record<string, string>> | null = null;
  * Gets or initializes the SKU to Internal ID dictionary.
  * This function ensures the dictionary is loaded only once and cached for subsequent calls.
  * 
- * @param jsonPath - Path to the JSON file containing the cached dictionary
- * @param csvPath - Path to the CSV file to build the dictionary from if JSON doesn't exist
+ * @param jsonPath - Path to the JSON file containing the cached dictionary. `Default` = {@link SKU_DICTIONARY_FILE}
+ * @param csvPath - Path to the CSV file to build the dictionary from if JSON doesn't exist. `Default` = {@link INVENTORY_ITEM_FILE}
  * @param skuColumn - Column name for SKU in the CSV file
  * @param internalIdColumn - Column name for Internal ID in the CSV file
  * @returns Promise that resolves to the SKU dictionary
@@ -140,9 +142,9 @@ async function instantiateSkuDictionary(
  */
 async function loadSkuDictionary(
     jsonPath: string,
-    csvPath: string,
-    skuColumn: string,
-    internalIdColumn: string
+    csvPath?: string,
+    skuColumn?: string,
+    internalIdColumn?: string
 ): Promise<Record<string, string>> {
     if (isNull(jsonPath)) {
         mlog.error(`[loadSkuDictionary()] Unable to get or instantiate SkuDictionary: Invalid path(s).`,
@@ -161,9 +163,13 @@ async function loadSkuDictionary(
     } catch (error) {
         mlog.warn(`[loadSkuDictionary()] Could not read JSON file, will try CSV: ${error}`);
     }
-
+    
     // 2. Build dictionary from CSV file
-    if (anyNull(skuColumn, internalIdColumn) || !isValidCsv(csvPath, [skuColumn, internalIdColumn])) {
+    if (!isString(csvPath))  {
+        throw new Error(`[loadSkuDictionary()] No JSON data && Invalid CSV path: ${csvPath}`);
+    }
+    if (!isString(skuColumn) || !isString(internalIdColumn) 
+        || !isValidCsv(csvPath, [skuColumn, internalIdColumn])) {
         throw new Error(`[loadSkuDictionary()] No JSON data && Invalid CSV file: ${csvPath}`);
     }
 
@@ -189,8 +195,8 @@ async function loadSkuDictionary(
 }
 
 /**
- * Public API: Gets the SKU to Internal ID dictionary.
- * Initializes the dictionary if it hasn't been loaded yet.
+ * `Public API`: Gets the SKU to Internal ID dictionary from {@link SKU_DICTIONARY_FILE} = `DATA_DIR/items/SKU_TO_INTERNAL_ID_DICT.json`
+ * - Initializes the dictionary if it hasn't been loaded yet.
  * 
  * @returns Promise that resolves to the SKU dictionary
  */
@@ -199,8 +205,8 @@ export async function getSkuDictionary(): Promise<Record<string, string>> {
 }
 
 /**
- * Public API: Gets the internal ID for a given SKU.
- * Initializes the dictionary if it hasn't been loaded yet.
+ * `Public API`: Gets the internal ID for a given SKU.
+ * - Initializes the dictionary if it hasn't been loaded yet.
  * 
  * @param sku - The SKU to look up
  * @returns Promise that resolves to the internal ID, or undefined if not found
@@ -211,8 +217,8 @@ export async function getInternalIdForSku(sku: string): Promise<string | undefin
 }
 
 /**
- * Public API: Checks if a SKU exists in the dictionary.
- * Initializes the dictionary if it hasn't been loaded yet.
+ * `Public API`: Checks if a SKU exists in the dictionary.
+ * - Initializes the dictionary if it hasn't been loaded yet.
  * 
  * @param sku - The SKU to check
  * @returns Promise that resolves to true if the SKU exists, false otherwise
@@ -223,9 +229,9 @@ export async function hasSkuInDictionary(sku: string): Promise<boolean> {
 }
 
 /**
- * Public API: Gets a synchronous version of the SKU dictionary.
- * Returns null if the dictionary hasn't been loaded yet.
- * Use this only when you're sure the dictionary has already been initialized.
+ * `Public API`: Gets a synchronous version of the SKU dictionary.
+ * - Returns null if the dictionary hasn't been loaded yet.
+ * - Use this **only** when you're sure the dictionary has already been initialized.
  * 
  * @returns The SKU dictionary or null if not loaded
  */

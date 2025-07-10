@@ -155,8 +155,8 @@ const externalIdKeyOptions: CleanStringOptions = {
     case: { toUpper: true }
 }
 const EXTERNAL_ID_ARGS: any[] = [
-    externalIdKeyOptions, 
-    SO.TRAN_TYPE, SO.TRAN_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER
+    RecordTypeEnum.SALES_ORDER, SO.TRAN_TYPE, externalIdKeyOptions, 
+    SO.TRAN_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER
 ];
 
 /**@TODO decide what to assign to the `otherrefnum` property */
@@ -210,11 +210,6 @@ const SALES_ORDER_COMPOSE_OPTIONS: ComposeOptions = {
                     searchOperator: SearchOperatorEnum.TEXT.IS, 
                     idValue: encodedExternalId
                 }, 
-                // {
-                //     idProp: idPropertyEnum.EXTERNAL_ID, 
-                //     searchOperator: SearchOperatorEnum.RECORD.ANY_OF, 
-                //     idValue: options.fields.externalid
-                // }
             );
             return idOptions;
         }

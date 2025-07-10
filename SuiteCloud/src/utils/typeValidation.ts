@@ -183,6 +183,17 @@ export function isNumericString(value: any): boolean {
     return !isNaN(Number(value.trim()));
 }
 
+/**
+ * @param value `any`
+ * @returns **`isNonEmptyString`** `boolean`
+ * - `true` `if` `value` is a non-empty string (not just whitespace),
+ * - `false` `otherwise`.
+ */
+export function isNonEmptyString(value: any): value is string {
+    return typeof value === 'string' && value.trim() !== '';
+}
+
+
 export function isPrimitiveValue(
     value: any
 ): value is string | number | boolean | null | undefined {
