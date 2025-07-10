@@ -1,7 +1,8 @@
 /**
  * @file src/main.ts
  */
-import path from 'node:path';
+import * as fs from "fs";
+import path from "node:path";
 import {
     readJsonFileAsObject as read,
     writeObjectToJson as write,
@@ -11,11 +12,11 @@ import {
     SublistDictionaryParseOptions, SublistLineParseOptions,
     SublistLineIdOptions, SubrecordParseOptions, EvaluationContext, RowContext, 
     RecordKeyOptions, getCsvRows, HierarchyOptions, GroupReturnTypeEnum, 
-    RowDictionary,
-    trimFile,
+    RowDictionary, extractSku,
+    trimFile, validatePath,
 } from "./utils/io";
 import { 
-    STOP_RUNNING, CLOUD_LOG_DIR, 
+    STOP_RUNNING, CLOUD_LOG_DIR, DATA_DIR,
     SCRIPT_ENVIRONMENT as SE, DELAY, 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
     indentedStringify, DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, clearFile,
@@ -25,7 +26,6 @@ import {
 import { 
     EntityRecordTypeEnum, RecordOptions, RecordRequest, RecordResponse, RecordResult, idPropertyEnum,
     RecordResponseOptions, upsertRecordPayload, getRecordById, GetRecordResponse, GetRecordRequest,
-    SAMPLE_POST_CUSTOMER_OPTIONS as SAMPLE_CUSTOMER,
     RecordTypeEnum,
     FieldDictionary,
     idSearchOptions,
@@ -33,32 +33,53 @@ import {
 } from "./utils/api";
 import { SALES_ORDER_PARSE_OPTIONS as SO_PARSE_OPTIONS, 
     SALES_ORDER_POST_PROCESSING_OPTIONS as SALES_ORDER_POST_PROCESSING_OPTIONS 
-} from './parse_configurations/salesorder/salesOrderParseDefinition';
-import * as customerConstants from './parse_configurations/customer/customerConstants';
-import * as soConstants from './parse_configurations/salesorder/salesOrderConstants';
+} from "./parse_configurations/salesorder/salesOrderParseDefinition";
+import * as customerConstants from "./parse_configurations/customer/customerConstants";
+import * as soConstants from "./parse_configurations/salesorder/salesOrderConstants";
 import { 
     processEntityFiles, EntityProcessorOptions, EntityProcessorStageEnum
-} from './entityProcessor';
+} from "./entityProcessor";
 import { processTransactionFiles, 
     TransactionProcessorOptions, 
     TransactionProcessorStageEnum, TransactionEntityMatchOptions, MatchSourceEnum,
-} from './transactionProcessor';
-import { ParseManager } from './ParseManager';
+} from "./transactionProcessor";
+import { ParseManager } from "./ParseManager";
+import { validateFiles } from "./DataReconciler";
 
 async function main() {
     clearFile(DEFAULT_LOG_FILEPATH);
+    let dict: Record<string, string> = {};
     try {
-        await soConstants.getSkuDictionary();
+        dict = await soConstants.getSkuDictionary();
     } catch (error) {
         mlog.error('Failed to load SKU dictionary:', error);
         STOP_RUNNING(1);
     }
-
-    await callTransactionProcessor(
-        true, 
-        soConstants.SALES_ORDER_LOG_DIR, 
-        // TransactionProcessorStageEnum.VALIDATE
+    const ALL_SALES_ORDERS_DIR = path.join(soConstants.SALES_ORDER_DIR, 'all');
+    const sourcePath = ALL_SALES_ORDERS_DIR;
+    await validatePath(ALL_SALES_ORDERS_DIR);
+    const csvFiles = (fs.readdirSync(sourcePath)
+        .filter(file => file.toLowerCase().endsWith('.csv') 
+            || file.toLowerCase().endsWith('.tsv'))
+        .map(file => path.join(sourcePath, file))
     );
+    const missingItems = await validateFiles(csvFiles, 'Item', extractSku, dict);
+    const missingItemArray = Array.from(new Set(Object.values(missingItems).flat()));
+    mlog.info(`Found ${missingItemArray.length} missing items across ${csvFiles.length} files.`,
+        TAB + `sourcePath: '${sourcePath}'`,
+        // TAB + `missing items: ${indentedStringify(missingItemArray)}`
+    );
+    write({missingItemsArray: missingItemArray.sort()}, path.join(CLOUD_LOG_DIR, `missingItems.json`));
+
+
+
+
+
+    // await callTransactionProcessor(
+    //     true, 
+    //     soConstants.SALES_ORDER_LOG_DIR, 
+    //     // TransactionProcessorStageEnum.VALIDATE
+    // );
     trimFile(5, DEFAULT_LOG_FILEPATH);
     STOP_RUNNING(0);
 }

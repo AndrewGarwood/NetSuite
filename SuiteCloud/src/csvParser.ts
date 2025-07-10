@@ -17,7 +17,6 @@ import {
     areEquivalentObjects,
 } from "./utils/typeValidation";
 import { 
-    getDelimiterFromFilePath, DelimiterCharacterEnum,
     ValueMapping, ValueMappingEntry, getRows,
     clean, equivalentAlphanumericStrings as equivalentAlphanumeric,
     FieldDictionaryParseOptions,
@@ -34,7 +33,6 @@ import {
     SublistLineIdOptions,
     DATE_STRING_PATTERN,
 } from "./utils/io";
-import csv from 'csv-parser';
 import fs from 'fs';
 import { 
     FieldValue, FieldDictionary, SublistDictionary, SublistLine, 
@@ -101,7 +99,8 @@ export async function parseRecordCsv(
              * (e.g. recordType=salesorder and have already processed one of its rows) 
              * */
             DEBUG.push(
-                NL+ `recordType: '${recordType}', idColumn: '${keyColumn}', recordId: '${recordId}' -> isExistingRecord ? ${
+                NL+ `recordType: '${recordType}', idColumn: '${keyColumn}',`,
+                `recordId: '${recordId}' -> isExistingRecord ? ${
                     recordId in intermediate[recordType]
                 }`,
             );
@@ -265,14 +264,7 @@ async function processSublistLineParseOptions(
                 TAB+`sublistId: '${sublistId}', sublistFieldId: '${sublistFieldId}'`,
                 TAB+`sublistLines.length: ${sublistLines.length}`,
                 TAB+`valueOptions.keys(): ${Object.keys(valueOptions)}`,
-                // TAB+`'subrecordType' in valueOptions ? ${valueOptions && 'subrecordType' in valueOptions}`,
             );
-            // if (sublistFieldId === 'addressbookaddress') {
-            //     mlog.debug(`addressbookaddress - isFieldParseOptions(valueOptions) ? ${isFieldParseOptions(valueOptions)}`,
-            //         // TAB+`valueOptions: ${indentedStringify(valueOptions)}`,
-            //     );
-            //     STOP_RUNNING(1);
-            // }
             const value = (isFieldParseOptions(valueOptions)
                 ? await parseFieldValue(row, 
                     sublistFieldId, valueOptions as FieldParseOptions
@@ -370,9 +362,7 @@ async function parseFieldValue(
     fieldId: string,
     valueParseOptions: FieldParseOptions,
 ): Promise<FieldValue> {
-    SUP.push(
-        NL +`[START parseFieldValue()] - fieldId: '${fieldId}'`,
-    );
+    SUP.push(NL +`[START parseFieldValue()] - fieldId: '${fieldId}'`,);
     if (!fieldId || typeof fieldId !== 'string' || isNull(valueParseOptions)) {
         return null;
     }
@@ -402,10 +392,7 @@ async function parseFieldValue(
             );
             throw new Error(`[csvParser.parseFieldValue()] Invalid FieldParseOptions.colName`);
         }
-        value = await transformValue(
-            clean(row[colName]), 
-            colName, 
-            fieldId, 
+        value = await transformValue(clean(row[colName]), colName, fieldId, 
             isNonEmptyArray(args) ? args[0] as ValueMapping : undefined
         );
         SUP.push(NL+` -> value from transformValue(row[colName]) = '${value}'`);
@@ -476,12 +463,11 @@ export async function isDuplicateSublistLine(
     newLine: SublistLine,
     lineIdOptions?: SublistLineIdOptions
 ): Promise<boolean> {
-    if (!isNonEmptyArray(existingLines)) { // existingLines isEmptyArray === true, or it's undefined
+    if (!isNonEmptyArray(existingLines)) { 
+        // existingLines isEmptyArray === true, or it's undefined
         return false;
     }
-    SUP.push(
-        NL + `[START isDuplicateSublistLine()] - checking for duplicate sublist line.`,
-    );
+    SUP.push(NL + `[START isDuplicateSublistLine()]`,);
     const { lineIdProp, lineIdEvaluator, args } = lineIdOptions || {};
     const isDuplicateSublistLine = existingLines.some((existingLine, sublistLineIndex) => {
         if (lineIdEvaluator && typeof lineIdEvaluator === 'function') {
@@ -514,7 +500,7 @@ export async function isDuplicateSublistLine(
                 : areEquivalentObjects(valA as SubrecordValue, valB as SubrecordValue)
             );
             SUP.push(
-                TAB + `sublistLineIndex: ${sublistLineIndex}, fieldId: '${fieldId}',`,
+                TAB + `sublistLineIndex: ${sublistLineIndex}, fieldId: '${fieldId}'`,
                 TAB + `valA: '${valA}'`,
                 TAB + `valB: '${valB}'`,
                 TAB + `areFieldsEqual: ${areFieldsEqual}`,

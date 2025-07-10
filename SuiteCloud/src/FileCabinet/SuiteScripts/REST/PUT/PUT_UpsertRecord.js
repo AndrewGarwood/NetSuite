@@ -9,8 +9,6 @@
  */
 
 /**
- * @TODO decide whether to handle converting values for date fields from strings 
- * to date objects here or on client side.
  * @consideration could use rec.submitFields() instead of rec.setValue() and rec.setSublistValue(), but initially 
  * went with the latter because I wanted granular logging and thought I could wrap each setValue in a try catch to check for errors.
  * @consideration make an enum for subrecord fieldIds so don't have to use less robust {@link isSubrecord}`()`
@@ -24,7 +22,6 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
      * @description return logArray in response so can process in client
      * */
     const logArray = [];
-
     
     /**
      * @param {RecordRequest} reqBody **{@link RecordRequest}**
@@ -34,8 +31,8 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     const put = (reqBody) => {
         const { recordOptions, responseOptions } = reqBody;
         if (!recordOptions || !isNonEmptyArray(recordOptions)) {
-            writeLog(LogTypeEnum.ERROR, 'put() Invalid Request Parameter', 'non-empty recordOptions is required');
-            return { status: false, message: 'put() Invalid Request Parameter', error: 'non-empty recordOptions is required', logArray };
+            writeLog(LogTypeEnum.ERROR, '[put()] Invalid Request Parameter', 'non-empty recordOptions is required');
+            return { status: false, message: '[put()] Invalid Request Parameter', error: 'non-empty recordOptions is required', logArray };
         }
         if (!Array.isArray(recordOptions)) {
             recordOptions = [recordOptions];
@@ -44,7 +41,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         const results = [];
         /**@type {RecordOptions[]} */
         const rejects = [];
-        writeLog(LogTypeEnum.AUDIT, `put() received valid recordOptions of length: ${recordOptions.length}`);
+        writeLog(LogTypeEnum.AUDIT, `[put()] received valid recordOptions of length: ${recordOptions.length}`);
         try {
             for (let i = 0; i < recordOptions.length; i++) {
                 const options = recordOptions[i];
@@ -52,7 +49,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     const result = processRecordOptions(options, responseOptions);
                     if (!result) {
                         writeLog(LogTypeEnum.ERROR,
-                            `put() Invalid '${options.recordType}' RecordOptions at index ${i}:`,
+                            `[put()] Invalid '${options.recordType}' RecordOptions at index ${i}:`,
                         )
                         rejects.push(options);
                         continue;
@@ -107,7 +104,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     function processRecordOptions(options, responseOptions) {
         if (!options || typeof options !== 'object') {
             writeLog(LogTypeEnum.ERROR, 
-                `ERROR: processRecordOptions() Invalid Options:`, 
+                `[ERROR processRecordOptions()] Invalid Options:`, 
                 `options must be an object of type RecordOptions`,
                 `= { recordType: RecordTypeEnum, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
             );
@@ -117,7 +114,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         recordType = validateRecordType(recordType);
         if (!recordType) {
             writeLog(LogTypeEnum.ERROR,
-                `ERROR: processRecordOptions() Invalid Options:`,
+                `[ERROR processRecordOptions()] Invalid Options:`,
                 `options is Missing 'recordType' property`,
                 `= { recordType: RecordTypeEnum, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
             );
@@ -129,7 +126,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         );
         if (missingFieldsAndSublists) {
             writeLog(LogTypeEnum.ERROR, 
-                `ERROR: processRecordOptions() Invalid Options`,
+                `[ERROR processRecordOptions()] Invalid Options`,
                 `options is Missing 'fields' and 'sublists' property (must have at least one)`, 
                 `options must be an object of type RecordOptions`,
                 `= { recordType: RecordTypeEnum, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
@@ -158,8 +155,8 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             );
         } else {
             writeLog(LogTypeEnum.AUDIT, 
-                `processRecordOptions() creating new '${recordType}' record`, 
-                `processRecordOptions() No existing '${recordType}' record found.`,
+                `[processRecordOptions()] creating new '${recordType}' record`, 
+                `[processRecordOptions()] No existing '${recordType}' record found.`,
                 `-> Try Creating new '${recordType}' record...`
             );
             rec = record.create({type: recordType, isDynamic });
@@ -197,7 +194,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     function searchForRecordById(recordType, idOptions, fields) {
         if (!recordType || typeof recordType !== 'string' || (!idOptions && !fields)) {
             writeLog(LogTypeEnum.ERROR,
-                `ERROR: searchForRecordById() Invalid Parameters:`,
+                `[ERROR searchForRecordById()] Invalid Parameters:`,
                 `recordType must be a valid RecordTypeEnum or string, and idOptions or fields (with idProps) must be provided`,
             );
             return null;
@@ -323,14 +320,14 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     value = dateValue; // update value to be a Date object
                 } else {
                     writeLog(LogTypeEnum.WARN, 
-                        `WARNING: upsertFieldValue() Invalid date string for fieldId '${fieldId}' on recordType '${recordType}':`,
+                        `[WARNING upsertFieldValue()] Invalid date string for fieldId '${fieldId}' on recordType '${recordType}':`,
                         `value: '${value}' is not a valid date string, keeping value as string`
                     );
                     return rec; // keep value as string if date parsing fails
                 }
             } catch (e) {
                 writeLog(LogTypeEnum.ERROR,
-                    `ERROR: upsertFieldValue() Error parsing date string for fieldId '${fieldId}' on recordType '${recordType}':`,
+                    `[ERROR upsertFieldValue()] Error parsing date string for fieldId '${fieldId}' on recordType '${recordType}':`,
                     `value: '${value}' could not be parsed to a Date object, keeping value as string`,
                 );
                 return rec;
@@ -340,20 +337,20 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         const setOptions = { fieldId, value };
         try {
             const originalValue = rec.getValue({ fieldId });
-            if (originalValue === value) {
+            if (String(originalValue) === String(value)) {
                 return rec;
             }
             writeLog(LogTypeEnum.DEBUG, 
-                `upsertFieldValue() attempting <${recordType}>rec.setValue()`,
+                `[upsertFieldValue()] attempting <${recordType}>rec.setValue()`,
                 `<${recordType}>rec.setValue({ fieldId: '${fieldId}', value: '${value}' })`,
-                `originalValue === newValue ? ${originalValue === value}`,
+                `originalValue === newValue ? ${String(originalValue) === String(value)}`,
                 `originalValue: '${originalValue}'`, 
                 `     newValue: '${value}'`, 
             ); 
             rec.setValue(setOptions);
         } catch (e) {
             writeLog(LogTypeEnum.ERROR, 
-                `ERROR: upsertFieldValue() Error setting value for fieldId '${fieldId}' on recordType '${recordType}':`,
+                `[ERROR upsertFieldValue()] Error setting value for fieldId '${fieldId}' on recordType '${recordType}':`,
                 `<${recordType}>rec.setValue({ fieldId: '${fieldId}', value: '${value}' })`,
                 `originalValue: '${rec.getValue({ fieldId })}'`,
                 `        Error: ${JSON.stringify(e)}`,
@@ -374,7 +371,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     function upsertSublistFieldValue(rec, recordType, sublistId, fieldId, lineIndex, value) {
         if (!rec || !recordType || !sublistId || !fieldId ) {
             writeLog(LogTypeEnum.ERROR, 
-                `ERROR: upsertSublistFieldValue() Invalid Parameters:`,
+                `[ERROR upsertSublistFieldValue()] Invalid Parameters:`,
                 `rec, recordType, sublistId, fieldId, and value are required parameters`,
                 `received { recordType: ${recordType}, sublistId: ${sublistId}, fieldId: ${fieldId}, value: ${value} }`,
             );
@@ -384,20 +381,20 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         const setOptions = {sublistId, fieldId, value, line: lineIndex};
         try {
             const originalValue = rec.getSublistValue({ sublistId, fieldId, line: lineIndex });
-            if (originalValue === value) {
+            if (String(originalValue) === String(value)) {
                 return rec;
             }
             writeLog(LogTypeEnum.DEBUG, 
-                `upsertFieldValue() attempting <${recordType}>rec.setSublistValue();`,
+                `[upsertSublistFieldValue()] attempting <${recordType}>rec.setSublistValue();`,
                 `<${recordType}>rec.setSublistValue({ sublistId: '${sublistId}', fieldId: '${fieldId}', value: '${value}', line: ${lineIndex} });`,
-                `originalValue === newValue ? ${originalValue === value}`,
+                `originalValue === newValue ? ${String(originalValue) === String(value)}`,
                 `originalValue: '${originalValue}'`, 
                 `     newValue: '${value}'`, 
             );
             rec.setSublistValue(setOptions); 
         } catch (e) {
             writeLog(LogTypeEnum.ERROR, 
-                `ERROR: upsertSublistFieldValue() Error setting value for fieldId '${fieldId}' on sublistId '${sublistId}' of recordType '${recordType}':`,
+                `[ERROR upsertSublistFieldValue()] Error setting value for fieldId '${fieldId}' on sublistId '${sublistId}' of recordType '${recordType}':`,
                 `<${recordType}>rec.setSublistValue({ sublistId: '${sublistId}', fieldId: '${fieldId}', value: '${value}', line: ${lineIndex} })`,
                 `originalValue: '${rec.getSublistValue({ sublistId, fieldId, line: lineIndex })}'`,
                 `        Error: ${JSON.stringify(e)}`,
@@ -415,7 +412,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     function processFieldDictionary(rec, recordType, fields) {
         if (!rec || !recordType || !fields || isEmptyArray(Object.keys(fields))) {
             writeLog(LogTypeEnum.ERROR, 
-                `ERROR: processFieldDictionary() Invalid Parameters:`,
+                `[ERROR processFieldDictionary()] Invalid Parameters:`,
                 `rec, recordType, and fields are required parameters`,
             );
             return rec;
@@ -442,7 +439,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     function processSublistDictionary(rec, recordType, sublists) {
         if (!rec || !recordType || !sublists || isEmptyArray(Object.keys(sublists))) {
             writeLog(LogTypeEnum.ERROR, 
-                `ERROR: processSublistDictionary() Invalid Parameters:`,
+                `[ERROR processSublistDictionary()] Invalid Parameters:`,
                 `rec, recordType, and sublists are required parameters`,
             );
             return rec;
@@ -450,7 +447,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         for (const sublistId in sublists) {
             if (!sublistId || !rec.getSublist({sublistId})) {
                 writeLog(LogTypeEnum.ERROR, 
-                    `ERROR: processSublistDictionary() Invalid sublistId:`,
+                    `[ERROR processSublistDictionary()] Invalid sublistId:`,
                     `sublistId '${sublistId}' not found on record type '${recordType}'`
                 );
                 continue;

@@ -122,9 +122,7 @@ const SHIPPING_STREET_ARGS: evaluate.StreetArguments = {
  * fields belonging to both record types, or customer fields 
  * that are used in post processing for the contact's RecordOptions 
  * */
-export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions | {
-    [fieldId: string]: FieldParseOptions | SubrecordParseOptions;
-} = {
+export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions = {
     isperson: { evaluator: customerEval.customerIsPerson, args: [C.ENTITY_ID, C.COMPANY] },
     isinactive: { defaultValue: NOT_INACTIVE },
     email: { evaluator: evaluate.email, args: [C.EMAIL, C.ALT_EMAIL] },
@@ -248,6 +246,9 @@ const CUSTOMER_COMPOSE_OPTIONS: ComposeOptions = {
     recordType: RecordTypeEnum.CUSTOMER,
     idOptions: { 
         composer: (options: RecordOptions) => {
+            const encodeExternalId = (externalId: string): string => {
+                return externalId.replace(/</, '&lt;').replace(/>/, '&gt;')
+            }
             const fields = options.fields;
             if (!fields) {return []; }
             const idOptions: idSearchOptions[] = options.idOptions 
@@ -266,12 +267,12 @@ const CUSTOMER_COMPOSE_OPTIONS: ComposeOptions = {
                 {
                     idProp: idPropertyEnum.EXTERNAL_ID, 
                     searchOperator: SearchOperatorEnum.TEXT.IS, 
-                    idValue: fields.externalid as string  
+                    idValue: encodeExternalId(fields.externalid as string)
                 },
                 {
                     idProp: idPropertyEnum.EXTERNAL_ID, 
                     searchOperator: SearchOperatorEnum.TEXT.IS, 
-                    idValue: `${fields.companyname}<${RecordTypeEnum.CUSTOMER}>`
+                    idValue: encodeExternalId(`${fields.companyname}<${RecordTypeEnum.CUSTOMER}>`)
                 },
             );
             
@@ -284,7 +285,7 @@ const CUSTOMER_COMPOSE_OPTIONS: ComposeOptions = {
                 idOptions.push({
                     idProp: idPropertyEnum.EXTERNAL_ID, 
                     searchOperator: SearchOperatorEnum.TEXT.IS, 
-                    idValue: `${fields.firstname} ${fields.lastname}<${RecordTypeEnum.CUSTOMER}>`
+                    idValue: encodeExternalId(`${fields.firstname} ${fields.lastname}<${RecordTypeEnum.CUSTOMER}>`)
                 });
             }
             return idOptions;

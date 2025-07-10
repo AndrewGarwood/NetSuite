@@ -2,7 +2,7 @@
  * @file src/utils/io/regex/misc.ts
  */
 import { isNonEmptyArray } from "../../typeValidation";
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../../config";
+import { mainLogger as mlog, parseLogger as plog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../../config";
 
 /**
  * `re` = `/^\s*(\d{4}-\d{2}-\d{2}|\d{1,2}[\/-]\d{1,2}[\/-]\d{4})\s*$/`
@@ -19,14 +19,14 @@ export const KOREA_ADDRESS_LATIN_TEXT_PATTERN = new RegExp(
 );
 
 /**
- * - checks if matches `skuPattern = /(?<=^.*:)(\w|-)*(?= .*$)/`
+ * - checks if matches `skuPattern = /(?<=^.*:)([^: ])*(?= .*$)/`
  * - checks if included in `skuExceptions = ['DISCOUNT (Discount)', 'S&H (Shipping)']`
  * @param skuValue `string` - the initial column value to extract SKU from
- * @returns **`sku`**: `string` - the extracted SKU or empty string if no valid SKU found
+ * @returns **`sku`**: `string` - the extracted SKU or empty string
  */
 export function extractSku(skuValue: string): string {
     const skuExceptions = ['DISCOUNT (Discount)', 'S&H (Shipping)'];
-    const skuPattern = new RegExp(/(?<=^.*:)(\w|-)*(?= .*$)/);
+    const skuPattern = new RegExp(/(?<=^.*:)([^: ])*(?= .*$)/);
     // e.g. skuValue: string = 'Miracu:3FX18101802GA (Miracu Thread Forte Fix 10 units  (18GX100mm))';
     if (skuPattern.test(skuValue)) {
         const match = skuValue.match(skuPattern);
@@ -36,8 +36,8 @@ export function extractSku(skuValue: string): string {
     } else if (skuExceptions.includes(skuValue)) {
         return skuValue.split(' ')[0]; // return the skuValue as is if it is an exception
     }
-    mlog.warn(
-        'extractSku() - No valid SKU found in the provided value:', skuValue,
+    plog.warn(
+        `[extractSku()] Unable to extract sku from value: '${skuValue}'`,
     );
     return '';
 
