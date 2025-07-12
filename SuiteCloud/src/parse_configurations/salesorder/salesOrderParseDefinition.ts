@@ -167,7 +167,7 @@ export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
         location: { defaultValue: 1 },
         taxrate: { defaultValue: 0 },
         istaxable: { defaultValue: false },
-        orderstatus: { defaultValue: SalesOrderStatusEnum.PENDING_FULFILLMENT },
+        orderstatus: { defaultValue: SalesOrderStatusEnum.CLOSED },
         externalid: { evaluator: soEval.transactionExternalId, args: EXTERNAL_ID_ARGS},
         otherrefnum: { evaluator: soEval.otherReferenceNumber, 
             args: [SO.CHECK_NUMBER, SO.PO_NUMBER]

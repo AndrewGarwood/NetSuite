@@ -7,15 +7,12 @@ import {
     writeObjectToJson as write,
     ValidatedParseResults,
     ProcessParseResultsOptions, ParseOptions, ParseResults,
-    getCurrentPacificTime
+    getCurrentPacificTime,
+    indentedStringify, clearFile,
 } from "./utils/io";
 import { 
     STOP_RUNNING,  DELAY, 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
-    INFO_LOGS, DEBUG_LOGS, 
-    indentedStringify, DEFAULT_LOG_FILEPATH, 
-    PARSE_LOG_FILEPATH, clearFile,
-    ERROR_LOG_FILEPATH,
     ERROR_DIR
 } from "./config";
 import { 

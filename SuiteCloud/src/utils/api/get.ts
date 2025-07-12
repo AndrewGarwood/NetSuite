@@ -13,8 +13,9 @@ import {
     RecordResponseOptions, RecordOperatorEnum, RecordTypeEnum, EntityRecordTypeEnum,
     SearchOperatorEnum
 } from "./types";
-import { getAccessToken, NOT_DYNAMIC, SB_REST_SCRIPTS } from "./configureRequests";
+import { SB_REST_SCRIPTS } from "./configureRequests";
 import { anyNull } from "../typeValidation";
+import { getAccessToken } from "./configureAuth";
 
 
 export const GET_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.GET_Record.scriptId as number;
@@ -51,12 +52,12 @@ export async function getRecordById(
     arg3?: idPropertyEnum,
     arg4?: RecordResponseOptions
 ): Promise<GetRecordResponse> {
-    mlog.info(`[Start getRecordById()]`);
+    // mlog.info(`[Start getRecordById()]`);
     const request = {} as GetRecordRequest;
     if (typeof arg1 === 'string') {
         if (anyNull(arg2, arg3)) {
-            mlog.error('[get.ts getRecordById()] recordType or idValue is undefined. Cannot call RESTlet.');
-            throw new Error('[get.ts getRecordById()] recordType or idValue is undefined. Cannot call RESTlet.');
+            mlog.error('[get.getRecordById()] recordType or idValue is undefined. Cannot call RESTlet.');
+            throw new Error('[get.getRecordById()] recordType or idValue is undefined. Cannot call RESTlet.');
         }
         const recordType = arg1;
         const recordId = arg2;
@@ -88,9 +89,9 @@ export async function getRecordById(
         );
         return response.data as GetRecordResponse;
     } catch (error) {
-        mlog.error('[Error in get.ts getRecordById()]:', error);
+        mlog.error('[ERROR get.getRecordById()]:', (error as any).data || error);
         write({error: error}, ERROR_DIR, 'ERROR_getRecordById.json');
-        throw new Error('Failed to call RESTlet with request params: ' + JSON.stringify(request, null, 4));
+        throw new Error('Failed to call GET_Record RESTlet');
     }
 }
 

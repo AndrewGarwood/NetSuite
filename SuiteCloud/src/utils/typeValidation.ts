@@ -3,26 +3,25 @@
  */
 export * from "./api/types/typeGuards";
 export * from "./io/types/typeGuards";
-export { isValidCsv } from "./io/reading";
-export { isTransactionEntityMatchOptions } from "../transactionProcessor";
-import { FieldValue } from "src/utils/api/types";
 import { mainLogger as mlog } from "src/config/setupLog";
 import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "./io/regex/index";
 
 /**
  * @param value the value to check
- * @returns **`isNullLike`** `boolean` = `value is null | undefined | '' | [] | Record<string, never>`
+ * @returns **`isNullLike`** `boolean` = `value is '' | [] | null | undefined | Record<string, never>`
  * - `true` `if` the `value` is null, undefined, empty object (no keys), empty array, or empty string
  * - `false` `otherwise`
  */
-export function isNullLike(value: any): value is null | undefined | '' | [] | Record<string, never> {
+export function isNullLike(
+    value: any
+): value is '' | [] | null | undefined | Record<string, never> {
     if (value === null || value === undefined) {
         return true;
     }
     if (typeof value === 'boolean' || typeof value === 'number') {
         return false;
     }
-    // Check for empty object or array... !hasNonTrivialKeys(value)
+    // Check for empty object or array
     if (typeof value === 'object' && isEmptyArray(Object.keys(value))) {
         return true;
     }
@@ -52,22 +51,22 @@ export function anyNull(...values: any[]): boolean {
 }
 
 /**
- * @param arr 
- * @returns **`isNonEmptyArray`** `boolean` = `arr is Array<any> & { length: number }`
- * - `true` if `arr` is an array and has at least one element, 
+ * @param value 
+ * @returns **`isNonEmptyArray`** `boolean` = `value is Array<any> & { length: number }`
+ * - `true` if `value` is an array and has at least one element, 
  * - `false` otherwise.
  */
-export function isNonEmptyArray(arr: any): arr is Array<any> & { length: number } {
-    return Array.isArray(arr) && arr.length > 0;
+export function isNonEmptyArray(value: any): value is Array<any> & { length: number } {
+    return Array.isArray(value) && value.length > 0;
 }
 /**
- * @param arr 
- * @returns **`isEmptyArray`** `boolean` = `arr is Array<any> & { length: 0 }`
- * - `true` if `arr` is an array and has no elements,
+ * @param value 
+ * @returns **`isEmptyArray`** `boolean` = `value is Array<any> & { length: 0 }`
+ * - `true` if `value` is an array and has no elements,
  * - `false` otherwise.
  */
-export function isEmptyArray(arr: any): arr is Array<any> & { length: 0 } {
-    return Array.isArray(arr) && arr.length === 0; 
+export function isEmptyArray(value: any): value is Array<any> & { length: 0 } {
+    return Array.isArray(value) && value.length === 0; 
 }
 /**
  * @TODO add param that indicates whether all values must be nontrivial or not
@@ -189,7 +188,9 @@ export function isNumericString(value: any): boolean {
  * - `true` `if` `value` is a non-empty string (not just whitespace),
  * - `false` `otherwise`.
  */
-export function isNonEmptyString(value: any): value is string {
+export function isNonEmptyString(
+    value: any
+): value is string & { length: number } {
     return typeof value === 'string' && value.trim() !== '';
 }
 
@@ -205,6 +206,25 @@ export function isPrimitiveValue(
     }
     return false;
 }
+
+
+
+/**
+ * @enum {string} **`TypeOfEnum`**
+ * @property **`STRING`** = `'string'`
+ * @property **`NUMBER`** = `'number'`
+ * @property **`BOOLEAN`** = `'boolean'`
+ * @property **`OBJECT`** = `'object'`
+ * @property **`FUNCTION`** = `'function'`
+ */
+export enum TypeOfEnum {
+    STRING = 'string',
+    NUMBER = 'number',
+    BOOLEAN = 'boolean',
+    OBJECT = 'object',
+    FUNCTION = 'function',
+}
+
 
 /**
  * @param fieldId `string`

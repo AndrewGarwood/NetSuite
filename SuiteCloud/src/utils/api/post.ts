@@ -11,7 +11,7 @@ import {
     RecordRequest, RecordResponse, RecordOptions, RecordResponseOptions,
     RecordResult,
 } from "./types";
-import { getAccessToken, BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "./configureRequests";
+import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "./configureRequests";
 
 
 /**

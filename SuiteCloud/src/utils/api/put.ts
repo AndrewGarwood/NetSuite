@@ -11,7 +11,8 @@ import {
     RecordRequest, RecordResponse, RecordOptions, RecordResponseOptions,
     RecordResult,
 } from "./types";
-import { getAccessToken, BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "./configureRequests";
+import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "./configureRequests";
+import { getAccessToken } from "./configureAuth";
 
 
 const UPSERT_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.PUT_UpsertRecord.scriptId as number;

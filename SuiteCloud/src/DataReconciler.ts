@@ -2,12 +2,14 @@
  * @file src/DataReconciler.ts
  */
 import * as fs from 'fs';
-import { getSkuDictionary } from './parse_configurations/salesorder/salesOrderConstants';
 import { RecordTypeEnum } from "./utils/ns";
-import { isNonEmptyArray, isEmptyArray, hasKeys, isNullLike as isNull, anyNull, isNonEmptyString as isString } from './utils/typeValidation';
+import { isNonEmptyArray, isEmptyArray, hasKeys, isNullLike as isNull, anyNull, isNonEmptyString, TypeOfEnum } from './utils/typeValidation';
 import { extractSku, DelimitedFileTypeEnum, DelimiterCharacterEnum, isValidCsv } from "./utils/io";
 import { DATA_DIR, mainLogger as mlog, parseLogger as plog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING } from "./config";
-import { getColumnValues, getRows, writeObjectToJson as write, getDelimiterFromFilePath } from "./utils/io";
+import { getColumnValues, getRows, writeObjectToJson as write, 
+    getIndexedColumnValues, handleFilePathOrRowsArgument 
+} from "./utils/io";
+import * as validate from "./utils/argumentValidation";
 import path from "node:path";
 /**
  * @goal for each source csv file, make sure specified RecordReference field has
@@ -52,6 +54,10 @@ export async function validateFiles(
     extractor: (columnValue: string) => string, 
     validationDict: Record<string, string>
 ): Promise<{ [filePath: string]: string[] }> {
+    validate.arrayArgument(`validateFiles`, `csvFiles`, csvFiles, TypeOfEnum.STRING);
+    validate.stringArgument(`validateFiles`, `column`, column);
+    validate.functionArgument(`validateFiles`, `extractor`, extractor);
+    validate.objectArgument(`validateFiles`, `validationDict`, validationDict);
     const missingValues = {} as { [filePath: string]: string[] };
     for (const csvPath of csvFiles) {
         if (!isValidCsv(csvPath)) {
@@ -62,9 +68,9 @@ export async function validateFiles(
         const columnValues = await getColumnValues(csvPath, column, false);
         for (const originalValue of columnValues) {
             const extractedValue = extractor(originalValue);
-            if (!isString(extractedValue)) {
-                plog.warn(`[validateFiles()] extractor(value) returned null, `,
-                    `undefined, or empty string`,
+            if (!isNonEmptyString(extractedValue)) {
+                plog.warn(`[validateFiles()] extractor(value) returned null,`,
+                    `undefined, or empty string, or is not a string`,
                     TAB+`originalValue: '${originalValue}'`, 
                     TAB+`     filePath: '${csvPath}'`
                 );
@@ -82,3 +88,59 @@ export async function validateFiles(
     return missingValues;
 }
 
+/**
+ * @param rowSource `string | Record<string, any>[]`
+ * @param targetColumn `string`
+ * @param extractor `function (columnValue: string) => string`
+ * @param targetValues `string[]`
+ * @returns **`targetRows`** `Promise<Record<string, any>[]>` 
+ * - array of all rows where `extractor(row[targetColumn])` is in `targetValues`
+ */
+export async function extractTargetRows(
+    /** 
+     * - `string` -> filePath to a csv file
+     * - `Record<string, any>[]` -> array of rows
+     * */
+    rowSource: string | Record<string, any>[],
+    targetColumn: string, 
+    extractor: (columnValue: string) => string, 
+    targetValues: string[],
+): Promise<Record<string, any>[]> {
+    if(!isNonEmptyString(rowSource) && !isNonEmptyArray(rowSource)) {
+        throw new Error([`[DataReconciler.extractTargetRows()] Invalid param 'rowSource'`,
+            `Expected rowSource: string | Record<string, any>[]`,
+            `Received rowSource: '${typeof rowSource}'`
+        ].join(TAB));
+    }
+    validate.stringArgument(`DataReconciler.extractTargetRows`, `targetColumn`, targetColumn);
+    validate.functionArgument(`DataReconciler.extractTargetRows`, `extractor`, extractor);
+    validate.arrayArgument(`DataReconciler.extractTargetRows`, `targetValues`, targetValues, TypeOfEnum.STRING);
+    const rows = await handleFilePathOrRowsArgument(
+        rowSource, extractTargetRows.name, [targetColumn]
+    );
+    const targetRows: Record<string, any>[] = [];
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (!hasKeys(row, targetColumn)) {
+            mlog.warn(`[DataReconciler.extractTargetRows()] row does not have provided targetColumn`,
+                TAB+`    targetColumn: '${targetColumn}'`,
+                TAB+`Object.keys(row):  ${JSON.stringify(Object.keys(row))}`,
+            );
+            continue;
+        }
+        const originalValue = String(row[targetColumn]);
+        const extractedValue = extractor(originalValue);
+        if (!isNonEmptyString(extractedValue)) {
+            plog.warn(`[DataReconciler.extractTargetRows()] extractor(value) returned null,`,
+                `undefined, or empty string, or is not a string`,
+                TAB+` originalValue: '${originalValue}'`, 
+                TAB+`rowSource type: '${typeof rowSource}'`
+            );
+            continue;
+        }
+        if (targetValues.includes(extractedValue)) {
+            targetRows.push(row);
+        }
+    }
+    return targetRows;
+}

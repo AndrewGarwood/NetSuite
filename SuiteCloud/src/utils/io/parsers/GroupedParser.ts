@@ -39,7 +39,6 @@ import {
     parseLogger as plog, 
     INDENT_LOG_LINE as TAB, 
     NEW_LINE as NL,
-    indentedStringify
 } from "../../../config";
 import { clean } from "../regex/index";
 

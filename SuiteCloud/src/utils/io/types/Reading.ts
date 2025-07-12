@@ -8,6 +8,7 @@ import { parseExcelForOneToMany } from "../reading"
 
 
 /**
+ * @deprecated
  * @typedefn **`ParseOneToManyOptions`**
  * @property {StringStripOptions} [keyStripOptions] - options for stripping characters from the key
  * @property {StringStripOptions} [valueStripOptions] - options for stripping characters from the value

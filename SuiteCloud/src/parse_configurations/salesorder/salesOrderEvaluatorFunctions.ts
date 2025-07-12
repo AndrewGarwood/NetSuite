@@ -13,8 +13,9 @@ import {
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
     equivalentAlphanumericStrings as equivalentAlphanumeric, 
 } from "../../utils/io/regex/index";
-import { SalesOrderColumnEnum as SO, getSkuDictionary, getSkuDictionarySync, hasSkuInDictionary } from "./salesOrderConstants";
+import { SalesOrderColumnEnum as SO, } from "./salesOrderConstants";
 import { isNullLike as isNull, anyNull, isCleanStringOptions, hasKeys, hasNonTrivialKeys } from "src/utils/typeValidation";
+import { getSkuDictionary, hasSkuInDictionary } from "src/config/dataLoader";
 
 /**
  * @example

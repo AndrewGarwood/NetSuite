@@ -6,30 +6,23 @@ import path from "node:path";
 import {
     readJsonFileAsObject as read,
     writeObjectToJson as write,
-    ValidatedParseResults,
+    writeRowsToCsv,
     ProcessParseResultsOptions, ParseOptions, ParseResults,
-    getCurrentPacificTime, FieldParseOptions, FieldDictionaryParseOptions, FieldEvaluator,
-    SublistDictionaryParseOptions, SublistLineParseOptions,
-    SublistLineIdOptions, SubrecordParseOptions, EvaluationContext, RowContext, 
-    RecordKeyOptions, getCsvRows, HierarchyOptions, GroupReturnTypeEnum, 
     RowDictionary, extractSku,
-    trimFile, validatePath,
+    trimFile, clearFile,
 } from "./utils/io";
 import { 
     STOP_RUNNING, CLOUD_LOG_DIR, DATA_DIR,
     SCRIPT_ENVIRONMENT as SE, DELAY, 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
-    indentedStringify, DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, clearFile,
+    DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH,
     ERROR_LOG_FILEPATH,
     ERROR_DIR
 } from "./config";
+import { instantiateAuthManager } from "./utils/api";
 import { 
-    EntityRecordTypeEnum, RecordOptions, RecordRequest, RecordResponse, RecordResult, idPropertyEnum,
-    RecordResponseOptions, upsertRecordPayload, getRecordById, GetRecordResponse, GetRecordRequest,
-    RecordTypeEnum,
-    FieldDictionary,
-    idSearchOptions,
-    SearchOperatorEnum, 
+    EntityRecordTypeEnum, 
+    RecordTypeEnum, 
 } from "./utils/api";
 import { SALES_ORDER_PARSE_OPTIONS as SO_PARSE_OPTIONS, 
     SALES_ORDER_POST_PROCESSING_OPTIONS as SALES_ORDER_POST_PROCESSING_OPTIONS 
@@ -43,37 +36,83 @@ import { processTransactionFiles,
     TransactionProcessorOptions, 
     TransactionProcessorStageEnum, TransactionEntityMatchOptions, MatchSourceEnum,
 } from "./transactionProcessor";
-import { ParseManager } from "./ParseManager";
-import { validateFiles } from "./DataReconciler";
+import { validateFiles, extractTargetRows } from "./DataReconciler";
+import { isEmptyArray } from "./utils/typeValidation";
+import * as validate from './utils/argumentValidation'
+import { getSkuDictionary, initializeData } from "./config/dataLoader";
 
 async function main() {
-    clearFile(DEFAULT_LOG_FILEPATH);
-    let dict: Record<string, string> = {};
+    clearFile(DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH);
+
+    // Initialize application data first
+    await initializeData();
+    // await instantiateAuthManager();
+    let validationDict: Record<string, string> = {};
     try {
-        dict = await soConstants.getSkuDictionary();
+        validationDict = await getSkuDictionary();
     } catch (error) {
         mlog.error('Failed to load SKU dictionary:', error);
         STOP_RUNNING(1);
     }
+    const ITEM_COLUMN = 'Item';
     const ALL_SALES_ORDERS_DIR = path.join(soConstants.SALES_ORDER_DIR, 'all');
     const sourcePath = ALL_SALES_ORDERS_DIR;
-    await validatePath(ALL_SALES_ORDERS_DIR);
     const csvFiles = (fs.readdirSync(sourcePath)
         .filter(file => file.toLowerCase().endsWith('.csv') 
             || file.toLowerCase().endsWith('.tsv'))
         .map(file => path.join(sourcePath, file))
     );
-    const missingItems = await validateFiles(csvFiles, 'Item', extractSku, dict);
-    const missingItemArray = Array.from(new Set(Object.values(missingItems).flat()));
-    mlog.info(`Found ${missingItemArray.length} missing items across ${csvFiles.length} files.`,
-        TAB + `sourcePath: '${sourcePath}'`,
-        // TAB + `missing items: ${indentedStringify(missingItemArray)}`
-    );
-    write({missingItemsArray: missingItemArray.sort()}, path.join(CLOUD_LOG_DIR, `missingItems.json`));
-
-
-
-
+    const missingItemsPath = path.join(DATA_DIR, 'items', 'missingItems.json');
+    
+    // const missingItems = await validateFiles(csvFiles, 'Item', extractSku, validationDict);
+    // const missingItemArray = Array.from(new Set(Object.values(missingItems).flat()));
+    
+    // mlog.info(`Found ${missingItemArray.length} missing items across ${csvFiles.length} files.`,
+    //     TAB + `sourcePath: '${sourcePath}'`,
+    // );
+    // write({missingItemsArray: missingItemArray.sort()}, missingItemsPath);
+    const missingItemArray = read(missingItemsPath).missingItemsArray || [];
+    if (isEmptyArray(missingItemArray)) {
+        STOP_RUNNING(1, 'array is emptyyyy')
+    }
+    const missingSkuRowDict: { 
+        [sku: string]: {
+            filePath: string;
+            row: Record<string, any>;
+        } 
+    } = {};
+    // get first occurrence of 
+    for (const file of csvFiles) {
+        const targetRows = await extractTargetRows(file, ITEM_COLUMN, extractSku, missingItemArray);
+        if (isEmptyArray(targetRows)) { continue; }
+        for (const row of targetRows) {
+            let sku = extractSku(String(row[ITEM_COLUMN]));
+            if (!missingSkuRowDict[sku]) {
+                missingSkuRowDict[sku] = {
+                    filePath: file,
+                    row: row
+                }
+            }
+        }
+    }
+    mlog.debug(`key length: ${Object.keys(missingSkuRowDict).length}`)
+    const outputPath = path.join(DATA_DIR, 'items', 'missingSkuRowDict.json');
+    write({dict: missingSkuRowDict}, outputPath);
+    /**  
+     * missingItems[i] = f'{sku} ({description})' | f'{sku}' 
+     * */
+    // const missingItems = (read(missingItemsPath).missingItemsArray || []) as string[];
+    // if (isEmptyArray(missingItems)) {STOP_RUNNING(1, `missingItems was empty`)}
+    // const targetItems = missingItems.map(s => s.includes(' (') ? s.split(' (')[0] : s);
+    // const tsvFilePath = path.join(DATA_DIR, 'items', '2025_07_09_ALL_ITEMS.tsv');
+    // const targetRows = await extractTargetRows(tsvFilePath, 'Item', extractSku, targetItems);
+    // if (isEmptyArray(targetRows)) {
+    //     mlog.error(`No target rows found in ${tsvFilePath} for targetItems: ${targetItems}`);
+    //     STOP_RUNNING(0);
+    // }
+    // mlog.info(`Found ${targetRows.length} target rows in ${tsvFilePath} for targetItems.length: ${targetItems.length}`);
+    // const outputPath = path.join(DATA_DIR, 'items', 'missingItems.tsv');
+    // writeRowsToCsv(targetRows, outputPath);
 
     // await callTransactionProcessor(
     //     true, 
@@ -85,7 +124,7 @@ async function main() {
 }
 
 main().catch(error => {
-    mlog.error('Error executing main() function', Object.keys(error));
+    mlog.error('Error executing main() function', JSON.stringify(error));
     STOP_RUNNING(1);
 });
 // const request: GetRecordRequest = {
@@ -154,33 +193,6 @@ async function callEntityProcessor(
         stopAfter
     }
     await processEntityFiles(entityType, customerFilePaths, options);
-}
-
-
-
-/*
-
-*/
-
-const entityId: FieldEvaluator = (
-    row: Record<string, any>, 
-    context: EvaluationContext, 
-    entityIdColumn: string
-): string => {
-        return '';
-}
-const testParseOptions: ParseOptions = {
-    [RecordTypeEnum.CUSTOMER]: {
-        keyColumn: 'Customer',
-        fieldOptions: {
-            // isperson: {
-            //     dependencies: [], priority: 1, cache: true, evaluator: (row, context}}
-            entityid: {
-                dependencies: [], priority: 1, cache: true, evaluator: entityId 
-            } as FieldParseOptions
-        },
-        sublistOptions: {}
-    },
 }
 
 export { callEntityProcessor, callTransactionProcessor}

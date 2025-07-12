@@ -1,7 +1,10 @@
 /**
  * @file src/utils/api/types/GetRequests.ts
  */
-import { idPropertyEnum, idSearchOptions, LogStatement, RecordResponseOptions, RecordResult, RecordTypeEnum } from ".";
+import { 
+    idPropertyEnum, idSearchOptions, LogStatement, RecordResponseOptions, 
+    RecordResult, RecordTypeEnum 
+} from ".";
 
 /**
  * @typedefn **`GetRecordRequest`**

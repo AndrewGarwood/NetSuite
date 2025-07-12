@@ -26,19 +26,25 @@ export const KOREA_ADDRESS_LATIN_TEXT_PATTERN = new RegExp(
  */
 export function extractSku(skuValue: string): string {
     const skuExceptions = ['DISCOUNT (Discount)', 'S&H (Shipping)'];
-    const skuPattern = new RegExp(/(?<=^.*:)([^: ])*(?= .*$)/);
-    // e.g. skuValue: string = 'Miracu:3FX18101802GA (Miracu Thread Forte Fix 10 units  (18GX100mm))';
-    if (skuPattern.test(skuValue)) {
-        const match = skuValue.match(skuPattern);
-        if (isNonEmptyArray(match)) {
-            return match[0].trim();
-        } 
-    } else if (skuExceptions.includes(skuValue)) {
+    const skuPattern = new RegExp(/(?<=^.*:)([^: ])*(?= ?.*$)/);
+    if (skuExceptions.includes(skuValue)) {
         return skuValue.split(' ')[0]; // return the skuValue as is if it is an exception
     }
-    plog.warn(
-        `[extractSku()] Unable to extract sku from value: '${skuValue}'`,
-    );
-    return '';
+    let result = '';
+    if (skuValue.includes(' (')) {
+        result = skuValue.split(' (')[0];
+        // const match = skuValue.match(skuPattern);
+        // if (isNonEmptyArray(match)) {
+        //     return match[0].trim();
+        // } 
+    }
+    if (result.includes(':')) { 
+        let classifierSplit = result.split(':');
+        return classifierSplit[classifierSplit.length-1]
+    } // else it's an item class and not an actual item sku ?
+    // mlog.warn(
+    //     `[extractSku()] Unable to extract sku from value: '${skuValue}'`, `current result: '${result}'`
+    // );
+    return result;
 
 }

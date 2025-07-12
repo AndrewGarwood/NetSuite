@@ -28,13 +28,13 @@ import {
     parseLogger as plog, 
     INDENT_LOG_LINE as TAB, 
     NEW_LINE as NL,
-    indentedStringify
 } from "../../../config";
 import { 
     clean, 
     equivalentAlphanumericStrings as equivalentAlphanumeric, 
     DATE_STRING_PATTERN 
 } from "../regex/index";
+import { indentedStringify } from "../writing";
 
 /**
  * @abstract

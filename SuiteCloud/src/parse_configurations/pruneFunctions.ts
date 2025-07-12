@@ -2,7 +2,7 @@
  * @file src/parse_configurations/pruneFunctions.ts
  */
 
-import { pruneLogger as plog, mainLogger as mlog, INDENT_LOG_LINE as TAB, indentedStringify } from '../config';
+import { pruneLogger as plog, mainLogger as mlog, INDENT_LOG_LINE as TAB } from '../config';
 import { 
     EntityRecordTypeEnum,
     FieldDictionary,
