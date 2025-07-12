@@ -10,7 +10,8 @@ import { AxiosContentTypeEnum } from "../../server";
 import { 
     DeleteRecordByTypeRequest, DeleteExcludeOptions, DeleteRecordByTypeResponse,
 } from "./types";
-import { getAccessToken, SB_REST_SCRIPTS } from "./configureRequests";
+import { SB_REST_SCRIPTS } from "./configureRequests";
+import { getAccessToken } from "./configureAuth";
 
 const DELETE_RECORD_BY_TYPE_SCRIPT_ID = 
     SB_REST_SCRIPTS.DELETE_DeleteRecordByType.scriptId as number;

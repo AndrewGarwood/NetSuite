@@ -6,7 +6,7 @@ import {
     parseLogger as plog, 
     INDENT_LOG_LINE as TAB, 
     NEW_LINE as NL, DEBUG_LOGS as DEBUG, INFO_LOGS as INFO,
-    indentedStringify, SUPPRESSED_LOGS as SUP,
+    SUPPRESSED_LOGS as SUP,
     STOP_RUNNING
 } from "./config";
 import {
@@ -14,8 +14,9 @@ import {
     BOOLEAN_TRUE_VALUES,
     BOOLEAN_FALSE_VALUES,
     isBooleanFieldId,
-    areEquivalentObjects,
+    areEquivalentObjects
 } from "./utils/typeValidation";
+import * as validate from "./utils/argumentValidation";
 import { 
     ValueMapping, ValueMappingEntry, getRows,
     clean, equivalentAlphanumericStrings as equivalentAlphanumeric,
@@ -31,7 +32,7 @@ import {
     isFieldParseOptions,
     isValueMappingEntry,
     SublistLineIdOptions,
-    DATE_STRING_PATTERN,
+    DATE_STRING_PATTERN, indentedStringify, 
 } from "./utils/io";
 import fs from 'fs';
 import { 
@@ -52,13 +53,6 @@ export async function parseRecordCsv(
     filePath: string,
     parseOptions: ParseOptions
 ): Promise<ParseResults> {
-    if (!filePath || typeof filePath !== 'string' || !fs.existsSync(filePath)) {
-        mlog.error(`ERROR parseRecords(): Invalid 'filePath' parameter:`,
-            TAB+`expected param 'filePath' of type 'string'`,
-            TAB+`received '${typeof filePath}' = '${filePath}'`,
-        );
-        return {};
-    }
     if (!isValidCsv(filePath)) {
         mlog.error(`ERROR parseRecords(): Invalid CSV file: isValidCsv() returned false`,
             TAB+` filePath: '${filePath}'`,
@@ -66,13 +60,7 @@ export async function parseRecordCsv(
         );
         return {};
     }
-    if (isNull(parseOptions)) {
-        mlog.error(`ERROR parseRecords(): Invalid 'options' parameter:`,
-            TAB+`expected param 'options' object of type 'ParseOptions'`,
-            TAB+`received '${typeof parseOptions}' = '${parseOptions}'`,
-        );
-        return {};
-    }
+    validate.objectArgument(`csvParser.parseRecordCsv`, `parseOptions`, parseOptions);
     INFO.push(`[START parseRecordCsv()]`,
         TAB+`recordTypes: ${JSON.stringify(Object.keys(parseOptions))}`,
         TAB+`   filePath: '${filePath}'`,
@@ -251,6 +239,10 @@ async function processSublistLineParseOptions(
         || !Array.isArray(sublistLines)) {
         return sublistLines;
     }
+    validate.stringArgument(`csvParser.processSublistLineParseOptions`, `sublistId`, sublistId);
+    validate.objectArgument(`csvParser.processSublistLineParseOptions`, `row`, row);
+    validate.arrayArgument(`csvParser.processSublistLineParseOptions`, `sublistLines`, sublistLines);
+    validate.arrayArgument(`csvParser.processSublistLineParseOptions`, `lineOptionsArray`, lineOptionsArray);
     for (const lineOptions of lineOptionsArray) {
         const newSublistLine: SublistLine = {};
         const lineIdOptions = lineOptions.lineIdOptions || {} as SublistLineIdOptions;
@@ -296,9 +288,12 @@ async function generateSublistSubrecordOptions(
     parentFieldId: string,
     subrecordOptions: SubrecordParseOptions,
 ): Promise<SetSublistSubrecordOptions> {
-    if (!row || !parentSublistId || !parentFieldId || isNull(subrecordOptions)) {
-        return {} as SetSublistSubrecordOptions;
-    }
+    validate.stringArgument(`csvParser.generateSublistSubrecordOptions`, `parentSublistId`, parentSublistId);
+    validate.stringArgument(`csvParser.generateSublistSubrecordOptions`, `parentFieldId`, parentFieldId);
+    validate.objectArgument(`csvParser.generateSublistSubrecordOptions`, `row`, row);
+    validate.objectArgument(`csvParser.generateSublistSubrecordOptions`, `subrecordOptions`, 
+        subrecordOptions, 'SubrecordParseOptions', isSubrecordValue
+    );
     SUP.push(
         NL + `[START generateSublistSubrecordOptions()]`, 
         TAB+`parentSublistId: '${parentSublistId}'`,
@@ -363,9 +358,10 @@ async function parseFieldValue(
     valueParseOptions: FieldParseOptions,
 ): Promise<FieldValue> {
     SUP.push(NL +`[START parseFieldValue()] - fieldId: '${fieldId}'`,);
-    if (!fieldId || typeof fieldId !== 'string' || isNull(valueParseOptions)) {
-        return null;
-    }
+    validate.stringArgument(`csvParser.parseFieldValue`, `fieldId`, fieldId);
+    validate.objectArgument(`csvParser.parseFieldValue`, `valueParseOptions`, 
+        valueParseOptions, 'FieldParseOptions', isFieldParseOptions
+    );
     let value: FieldValue | undefined = undefined;
     const { defaultValue, colName, evaluator, args } = valueParseOptions;
     SUP.push(
@@ -374,13 +370,12 @@ async function parseFieldValue(
         TAB+`   evlauator: '${evaluator ? evaluator.name+'()': undefined}'`,
         // TAB+` args.length:  ${args ? args.length : 0}`,
     );
-    if (evaluator) {
+    if (typeof evaluator === 'function') {
         try {
             value = await evaluator(row, ...(args || []));
             SUP.push(NL+` -> value from evaluator(row) = '${value}'`);
         } catch (error) {
             mlog.error(`[csvParser.parseFieldValue()] Error in evaluator for field '${fieldId}':`, error);
-            // Use defaultValue if available, otherwise null
             value = defaultValue !== undefined ? defaultValue : null;
             SUP.push(NL+` -> error in evaluator, using fallback value: '${value}'`);
         }
@@ -434,7 +429,6 @@ export async function transformValue(
         }
     }
     try {
-        // try to parse as boolean
         if (BOOLEAN_TRUE_VALUES.includes(trimmedValue.toLowerCase()) && isBooleanFieldId(newKey)) {
             return true
         } else if (BOOLEAN_FALSE_VALUES.includes(trimmedValue.toLowerCase()) && isBooleanFieldId(newKey)) {

@@ -1,11 +1,13 @@
 /**
- * @file src/utils/api/types/PostRequests.ts
+ * @file src/utils/api/types/RecordApi.ts
  */
 import { 
     EntityRecordTypeEnum, FieldDictionary, FieldValue, idPropertyEnum, 
     idSearchOptions, 
-    LogStatement, NumericOperatorEnum, RecordOperatorEnum, RecordResponseOptions, RecordResult, RecordTypeEnum, 
-    SearchOperatorEnum, SublistDictionary, SublistLine, SubrecordValue, TextOperatorEnum 
+    LogStatement, NumericOperatorEnum, RecordOperatorEnum, RecordResponseOptions, 
+    RecordResult, RecordTypeEnum, 
+    SearchOperatorEnum, SublistDictionary, SublistLine, 
+    SubrecordValue, TextOperatorEnum 
 } from '.';
 
 /**

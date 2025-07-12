@@ -8,8 +8,7 @@ import {
     parseLogger as plog,
     INDENT_LOG_LINE as TAB, 
     NEW_LINE as NL, 
-    DEBUG_LOGS,
-    indentedStringify,
+    SUPPRESSED_LOGS as SUP,
     STOP_RUNNING,
 } from "./config";
 import {
@@ -21,12 +20,14 @@ import {
     FieldValue, FieldDictionary, SublistDictionary, SublistLine, 
     SubrecordValue, SetFieldSubrecordOptions, SetSublistSubrecordOptions, 
     RecordOptions, RecordTypeEnum,
-    EntityRecordTypeEnum, 
+    EntityRecordTypeEnum,
+    idSearchOptions, 
 } from "./utils/api";
 import { 
     ParseResults, RecordPostProcessingOptions, CloneOptions, ComposeOptions,
     isRecordOptions, isCloneOptions, isComposeOptions,
     ValidatedParseResults,
+    indentedStringify,
     ProcessParseResultsOptions,
 } from "./utils/io";
 import { PostProcessingOperationEnum as OperationEnum } from "./utils/io/types/PostProcessing";
@@ -127,6 +128,12 @@ export async function processParseResults(
                         initialResults[recordType][i] = processComposeOptions(
                             initialResults[recordType][i], processes.composeOptions
                         );
+                        SUP.push(`[processParseResults()] Composed recordOptions for recordType '${recordType}' at index ${i}`,
+                            TAB+`record.idOptions.length: ${isNonEmptyArray(initialResults[recordType][i].idOptions) 
+                                ? (initialResults[recordType][i].idOptions as idSearchOptions[]).length 
+                                : 0
+                            }`,
+                        )
                     }
                     break;
                 case OperationEnum.PRUNE:
@@ -193,8 +200,7 @@ function processCloneOptions(
     } = cloneOptions;
     if (!idProp || !donorType || !recipientType || recordType !== recipientType
         || !hasKeys(parseResults, [donorType, recipientType])
-        || (!isNonEmptyArray(fieldIds) && !isNonEmptyArray(sublistIds))
-    ) {
+        || (!isNonEmptyArray(fieldIds) && !isNonEmptyArray(sublistIds))) {
         mlog.error(`processCloneOptions() Invalid CloneOptions - returning postOptions unchanged:`,);
         return recipientOptions;
     }
@@ -296,8 +302,7 @@ function processComposeOptions(
         }
     }
     if (composeOptions.idOptions 
-        && typeof composeOptions.idOptions.composer === 'function'
-    ) {
+        && typeof composeOptions.idOptions.composer === 'function') {
         record.idOptions = composeOptions.idOptions.composer(record);
     }
     if (composeOptions.sublists && hasNonTrivialKeys(composeOptions.sublists)) {

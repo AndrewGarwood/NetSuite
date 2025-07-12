@@ -19,7 +19,7 @@ import {
     NOT_DYNAMIC
 } from "../../api";
 import {
-    isNonEmptyArray, anyNull
+    isNonEmptyArray,
 } from "../../typeValidation";
 import { 
     getDelimiterFromFilePath, 
@@ -30,7 +30,6 @@ import {
     parseLogger as plog, 
     INDENT_LOG_LINE as TAB, 
     NEW_LINE as NL,
-    indentedStringify
 } from "../../../config";
 import { clean } from "../regex/index";
 

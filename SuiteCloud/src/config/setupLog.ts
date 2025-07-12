@@ -170,4 +170,3 @@ function modifyLogObj(logObj: ILogObj): ILogObj {
 export const SUPPRESSED_LOGS: any[] = []
 export const INFO_LOGS: any[] = []
 export const DEBUG_LOGS: any[] = [];
-export { indentedStringify, trimFile, clearFile } from '../utils/io/writing';

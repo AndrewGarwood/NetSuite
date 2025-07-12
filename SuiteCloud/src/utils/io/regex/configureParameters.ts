@@ -1,39 +1,10 @@
 /**
  * @file src/utils/io/regex/configureParameters.ts
  */
-import { DATA_DIR, DEBUG_LOGS as DEBUG, 
-    parseLogger as log, 
-    mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
-    STOP_RUNNING
-} from '../../../config';
-import { readJsonFileAsObject as read, validatePath } from '../reading';
 import { StringCaseOptions, StringPadOptions, StringStripOptions, StringReplaceParams, 
     StringReplaceOptions, CleanStringOptions } from ".";
-import { hasKeys, isNonEmptyArray, isCleanStringOptions } from '../../typeValidation';
 import { distance as levenshteinDistance } from 'fastest-levenshtein';
-import path from 'path';
-
-const filePath = path.join(DATA_DIR, '.constants', 'regex_constants.json');
-validatePath(filePath);
-
-const REGEX_CONSTANTS = read(filePath) as Record<string, any>;
-if (!REGEX_CONSTANTS 
-    || !hasKeys(REGEX_CONSTANTS, ['COMPANY_KEYWORD_LIST', 'JOB_TITLE_SUFFIX_LIST'])
-) {
-    throw new Error(`[regex.configureParameters.ts] Invalid REGEX_CONSTANTS file at '${filePath}'`
-        +` - Expected json object to have 'COMPANY_KEYWORD_LIST' key.`
-    );
-}
-
-export const COMPANY_KEYWORD_LIST: string[] = REGEX_CONSTANTS.COMPANY_KEYWORD_LIST || [];
-if (!isNonEmptyArray(COMPANY_KEYWORD_LIST)) {
-    throw new Error(`[regex.configureParameters.ts] Invalid COMPANY_KEYWORD_LIST in REGEX_CONSTANTS file at '${filePath}'`);
-}
-
-export const JOB_TITLE_SUFFIX_LIST: string[] = REGEX_CONSTANTS.JOB_TITLE_SUFFIX_LIST || [];
-if (!isNonEmptyArray(JOB_TITLE_SUFFIX_LIST)) {
-    throw new Error(`[regex.configureParameters.ts] Invalid JOB_TITLE_SUFFIX_LIST in REGEX_CONSTANTS file at '${filePath}'`);
-}
+import { getCompanyKeywordList, getJobTitleSuffixList } from '../../../config/dataLoader';
 
 /**
  * @reference {@link https://javascript.info/regexp-introduction}
