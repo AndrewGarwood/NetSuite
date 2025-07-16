@@ -1,4 +1,8 @@
-import { parseLogger as plog, mainLogger as mlog, 
+/**
+ * @file src/parse_configurations/evaluators/entity.ts
+ */
+import { 
+    parseLogger as plog, mainLogger as mlog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG 
 } from '../../config';
 import { HUMAN_VENDORS_TRIMMED } from '../vendor/vendorConstants';

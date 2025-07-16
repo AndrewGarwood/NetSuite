@@ -189,7 +189,7 @@ export async function putEntities(
     } catch (error) {
         mlog.error(`putEntities() Error putting entities.`);
         write({timestamp: getCurrentPacificTime(), caught: error as any}, 
-            ERROR_DIR, 'ERROR_puttEntities.json'
+            path.join(ERROR_DIR, 'ERROR_putEntities.json')
         );
     }
     return [];
@@ -215,7 +215,7 @@ export async function putContacts(
     } catch (error) {
         mlog.error(`putContacts() Error putting contacts.`);
         write({timestamp: getCurrentPacificTime(), caught: error as any}, 
-            ERROR_DIR, 'ERROR_putContacts.json'
+            path.join(ERROR_DIR, 'ERROR_putContacts.json')
         );
     }
     return [] as RecordResponse[];

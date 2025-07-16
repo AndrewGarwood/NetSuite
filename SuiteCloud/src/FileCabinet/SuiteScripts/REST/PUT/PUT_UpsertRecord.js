@@ -150,8 +150,8 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             rec = record.load({type: recordType, id: recId, isDynamic });
             writeLog(LogTypeEnum.AUDIT, 
                 `Loading Existing ${recordType} record with internalid: '${recId}'`,
-                `id fields deleted from fields: ${JSON.stringify(deletions)}`,
-                `remaining fields: ${JSON.stringify(fields)}`, 
+                `deleted ${deletions.length} idPropField(s) from fields: ${JSON.stringify(deletions)}`,
+                `${Object.keys(fields).length} remaining field(s): ${JSON.stringify(Object.keys(fields))}`, 
             );
         } else {
             writeLog(LogTypeEnum.AUDIT, 

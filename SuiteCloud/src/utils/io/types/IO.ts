@@ -1,11 +1,16 @@
 /**
- * @file src/utils/io/Reading.ts
+ * @file src/utils/io/IO.ts
  */
 import {
     StringCaseOptions, StringPadOptions, StringStripOptions
 } from "../regex/index"
-import { parseExcelForOneToMany } from "../reading"
 
+export type WriteJsonOptions = {
+    data: Record<string, any> | string;
+    filePath: string;
+    indent?: number;
+    enableOverwrite?: boolean;
+}
 
 /**
  * @deprecated
@@ -20,7 +25,6 @@ import { parseExcelForOneToMany } from "../reading"
  * - {@link StringStripOptions} = `{ char: string, escape?: boolean, stripLeftCondition?: (s: string, ...args: any[]) => boolean, leftArgs?: any[], stripRightCondition?: (s: string, ...args: any[]) => boolean, rightArgs?: any[] }`
  * - {@link StringCaseOptions}  = `{ toUpper: boolean, toLower: boolean, toTitle: boolean }`
  * - {@link StringPadOptions} = `{ padLength: number, padChar: string, padLeft: boolean, padRight: boolean }`
- * @see {@link parseExcelForOneToMany}
  */
 export type ParseOneToManyOptions = {
     keyStripOptions?: StringStripOptions,

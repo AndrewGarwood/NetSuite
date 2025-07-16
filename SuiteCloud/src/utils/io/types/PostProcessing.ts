@@ -1,6 +1,7 @@
 /**
  * @file src/utils/io/types/PostProcessing.ts
  */
+import { FieldDictionary, idSearchOptions, SublistLine } from "src/utils/api/types/Requests";
 import { FieldValue } from "src/utils/api/types/InternalApi";
 import { RecordOptions } from "src/utils/api/types/RecordEndpoint";
 
@@ -25,15 +26,16 @@ export enum PostProcessingOperationEnum {
  * - {@link ParseResults}
  * @typedefn **`RecordPostProcessingOptions`**
  * @property {CloneOptions} [cloneOptions] - {@link CloneOptions} - Options for cloning records.
+ * @property {PostProcessingOperationEnum[]} [operationOrder] - Array defining the order of operations to perform. Defaults to `[CLONE, COMPOSE, PRUNE]`.
  * @property {ComposeOptions} [composeOptions] - {@link ComposeOptions} - Options for composing additional fields or sublists for the record based on the ParseResults.
  * @property {function} [pruneFunc] - A function that takes a {@link RecordOptions} object and returns a modified version of it or `null` to remove the record from the results.
- * @property {PostProcessingOperationEnum[]} [operationOrder] - Array defining the order of operations to perform. Defaults to `[CLONE, COMPOSE, PRUNE]`.
  */
 export type RecordPostProcessingOptions = {
+    operationOrder?: PostProcessingOperationEnum[];
     cloneOptions?: CloneOptions;
     composeOptions?: ComposeOptions;
-    pruneFunc?: (options: RecordOptions) => RecordOptions | null;
-    operationOrder?: PostProcessingOperationEnum[];
+    pruneFunc?: (options: RecordOptions, ...args: any[]) => RecordOptions | null | Promise<RecordOptions | null>;
+    pruneArgs?: any[];
 }
 
 
@@ -67,25 +69,13 @@ export type CloneOptions = {
  */
 export type ComposeOptions = {
     recordType: string,
-    idOptions?: { composer: (options: RecordOptions) => any[] },
+    idOptions?: { composer: (record: RecordOptions, idOptions: idSearchOptions[]) => idSearchOptions[] | Promise<idSearchOptions[]> },
     fields?: {
-        [fieldId: string]: {
-            composer: (options: RecordOptions) => FieldValue;
-        };
+        composer: (record: RecordOptions, fields: FieldDictionary) => FieldDictionary | Promise<FieldDictionary>
     },
     sublists?: {
         [sublistId: string]: {
-            [sublistFieldId: string]: {
-                composer: (options: RecordOptions) => FieldValue;
-            };
+            composer: (record: RecordOptions, sublistLines: SublistLine[]) => SublistLine[] | Promise<SublistLine[]>
         };
     }
 };
-
-export type FieldCompositionDictionary = {
-    [fieldId: string]: {
-        composer: CompositionFunction | ((options: RecordOptions) => FieldValue);
-    };
-};
-
-export type CompositionFunction = (options: RecordOptions) => any;

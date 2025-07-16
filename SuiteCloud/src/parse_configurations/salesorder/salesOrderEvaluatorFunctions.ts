@@ -9,7 +9,7 @@ import { parseLogger as plog,
     mainLogger as mlog, DEBUG_LOGS, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
 } from "../../config";
 import { 
-    clean as clean, extractSku, CleanStringOptions,
+    clean as clean, extractLeaf, CleanStringOptions,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
     equivalentAlphanumericStrings as equivalentAlphanumeric, 
 } from "../../utils/io/regex/index";
@@ -77,7 +77,9 @@ export const otherReferenceNumber = (
 
 
 /**
- * @TODO handle hasSkuExists logic in post processing instead of here.
+ * @deprecated
+ * @TODO **handle hasSkuExists logic in post processing instead of here.**
+ * 
  * Gets the internal ID for an item SKU (asynchronous version).
  * Automatically loads the SKU dictionary if not already loaded.
  * 
@@ -85,14 +87,14 @@ export const otherReferenceNumber = (
  * @param itemColumn `string`
  * @returns Promise that resolves to the **`internalId`** `string` of the item in the row, or an empty string if the item is null.
  */
-export const itemSkuAsync = async (
+const itemSkuAsync = async (
     row: Record<string, any>,
     itemColumn: string = SO.ITEM
 ): Promise<string> => {
     if (anyNull(row, itemColumn, row[itemColumn])) {
         return '';
     }
-    const sku = extractSku(clean(row[itemColumn]));
+    const sku = extractLeaf(clean(row[itemColumn]));
     if (!sku) {
         throw new Error(`[itemSkuAsync()] Could not extract SKU from: '${row[itemColumn]}'`);
     }

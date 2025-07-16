@@ -1,7 +1,7 @@
 /**
  * @file src/utils/io/types/index.ts
  */
-export * from "./Reading";
+export * from "./IO";
 export * from "./Csv";
 export * from "./ParseOptions";
 export * from "./PostProcessing";

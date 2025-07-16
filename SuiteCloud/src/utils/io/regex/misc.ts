@@ -19,32 +19,44 @@ export const KOREA_ADDRESS_LATIN_TEXT_PATTERN = new RegExp(
 );
 
 /**
- * - checks if matches `skuPattern = /(?<=^.*:)([^: ])*(?= .*$)/`
- * - checks if included in `skuExceptions = ['DISCOUNT (Discount)', 'S&H (Shipping)']`
- * @param skuValue `string` - the initial column value to extract SKU from
- * @returns **`sku`**: `string` - the extracted SKU or empty string
+ * @param value `string` - the string value from which to extract `leaf`
+ * @param removeClasses `boolean` - remove string prefixes from result `leaf`
+ * - `Default` = `true` 
+ * - e.g. `'CLASSA:SKU-1'` -> `sku` with classes removed = `'SKU-1'`
+ * @param classDelimiter `string` - the character used to delimit the item's classes
+ * - `Default` = `':'` (colon character) 
+ * - e.g. `classDelimiter` of `'CLASSA:SKU-1'` = `':'`
+ * @returns **`leaf`**: `string` - the extracted `leaf` or the original value if no extraction performed
  */
-export function extractSku(skuValue: string): string {
-    const skuExceptions = ['DISCOUNT (Discount)', 'S&H (Shipping)'];
-    const skuPattern = new RegExp(/(?<=^.*:)([^: ])*(?= ?.*$)/);
-    if (skuExceptions.includes(skuValue)) {
-        return skuValue.split(' ')[0]; // return the skuValue as is if it is an exception
-    }
+export function extractLeaf(
+    value: string, 
+    removeClasses: boolean = true, 
+    classDelimiter: string = ':',
+): string {
+    // const skuExceptions: Record<string, string> = {
+    //     'DISCOUNT (Discount)': 'DISCOUNT', 
+    //     'S&H (Shipping)': 'S&H',
+    //     'SHOW DISCOUNT': 'SHOW DISCOUNT'
+    // };
+    // const skuPattern = new RegExp(/(?<=^.*:)([^: ])*(?= ?.*$)/);
+    // if (Object.keys(skuExceptions).includes(value)) {
+    //     return skuExceptions[value];
+    // }
     let result = '';
-    if (skuValue.includes(' (')) {
-        result = skuValue.split(' (')[0];
+    if (value.includes(' (')) {
+        result = value.split(' (')[0];
         // const match = skuValue.match(skuPattern);
         // if (isNonEmptyArray(match)) {
         //     return match[0].trim();
         // } 
     }
-    if (result.includes(':')) { 
-        let classifierSplit = result.split(':');
+    if (removeClasses && result.includes(classDelimiter)) { 
+        let classifierSplit = result.split(classDelimiter);
         return classifierSplit[classifierSplit.length-1]
     } // else it's an item class and not an actual item sku ?
     // mlog.warn(
     //     `[extractSku()] Unable to extract sku from value: '${skuValue}'`, `current result: '${result}'`
     // );
-    return result;
+    return result || value;
 
 }

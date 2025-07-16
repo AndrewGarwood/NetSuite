@@ -115,13 +115,16 @@ async function done(
     stageData: Record<string, any>,
 ): Promise<boolean> {
     const { stopAfter, outputDir } = options;
+    fileName = fileName.trim().replace(/(\.([a-z]+))$/i, '');
     if (outputDir && fs.existsSync(outputDir)) {
         const now = new Date();
         const MM = String(now.getMonth() + 1).padStart(2, '0');
         const DD = String(now.getDate()).padStart(2, '0');
         const HH = String(now.getHours()).padStart(2, '0');
         const mm = String(now.getMinutes()).padStart(2, '0');
-        const outputPath = path.join(outputDir, `(${MM}-${DD})-(${HH}-${mm})_${fileName}_${stage}.json`);
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        const ms = String(now.getMilliseconds()).padStart(3, '0');
+        const outputPath = path.join(outputDir, `(${MM}-${DD})-(${HH}-${mm}.${ss}.${ms})_${fileName}_${stage}.json`);
         write(stageData, outputPath);
     }
     if (stopAfter && stopAfter === stage) {
@@ -148,12 +151,12 @@ export async function processTransactionFiles(
     filePaths: string | string[],
     options: TransactionProcessorOptions
 ): Promise<void> {
-    validate.stringArgument('transactionProcessor.processTransactionFiles', 'transactionType', transactionType);
-    validate.objectArgument('transactionProcessor.processTransactionFiles', 'options', options);
+    validate.stringArgument('transactionProcessor.processTransactionFiles', {transactionType});
+    validate.objectArgument('transactionProcessor.processTransactionFiles', {options});
     const {
         clearLogFiles, parseOptions, postProcessingOptions, responseOptions 
     } = options as TransactionProcessorOptions;
-    if (anyNull(parseOptions, postProcessingOptions)) {
+    if (!parseOptions || !postProcessingOptions) {
         throw new Error(`[transactionProcessor.processTransactionFiles()] Invalid ProcessorOptions`
             +`(missing parseOptions or postProcessingOptions).`
         );
@@ -423,7 +426,7 @@ async function handleMatchError(
         (response ? TAB+`response: ${indentedStringify(response)}`:''),
     );
     write({entityValue, reason, request, response}, 
-        ERROR_DIR, `ERROR_matchUsingApi_${entityValue}.json`
+        path.join(ERROR_DIR, `ERROR_matchUsingApi_${entityValue}.json`)
     );
 }
 /**
@@ -436,7 +439,10 @@ async function putTransactions(
     responseOptions: RecordResponseOptions = SO_RESPONSE_OPTIONS
 ): Promise<RecordResponse[]> {
     try {
-        validate.arrayArgument('transactionProcessor.putTransactions', 'transactions', transactions, 'RecordOptions', isRecordOptions);
+        validate.arrayArgument(
+            'transactionProcessor.putTransactions', 
+            'transactions', transactions, 'RecordOptions', isRecordOptions
+        );
         validate.objectArgument('transactionProcessor.putTransactions', 'responseOptions', responseOptions, 'RecordResponseOptions', isRecordResponseOptions);
     } catch (e) {
         mlog.error(`[putTransactions()] Invalid parameters`, e);
@@ -451,7 +457,7 @@ async function putTransactions(
     } catch (error) {
         mlog.error(`[putTransactions()] Error putting transactions:`, error);
         write({timestamp: getCurrentPacificTime(), caught: error}, 
-            ERROR_DIR, `ERROR_putTransactions.json`
+            path.join(ERROR_DIR, `ERROR_putTransactions.json`)
         );
     }
     return [];

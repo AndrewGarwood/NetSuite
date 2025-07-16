@@ -5,7 +5,7 @@ import fs from "fs";
 import csv from "csv-parser";
 import xlsx from "xlsx";
 import { StringCaseOptions, StringPadOptions, StringReplaceOptions, StringStripOptions } from "./regex/index";
-import { ParseOneToManyOptions,} from "./types/Reading";
+import { ParseOneToManyOptions,} from "./types/IO";
 import { applyStripOptions, clean, UNCONDITIONAL_STRIP_DOT_OPTIONS } from "./regex/index"
 import { STOP_RUNNING } from "src/config/env";
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
@@ -29,7 +29,7 @@ export function isValidCsv(
     filePath: string,
     requiredHeaders?: string[]
 ): boolean {
-    validate.existingFileArgument(`reading.isValidCsv`, `filePath`, filePath);
+    validate.existingFileArgument(`reading.isValidCsv`, {filePath});
     const delimiter = getDelimiterFromFilePath(filePath);
     const data = fs.readFileSync(filePath, 'utf8');
     const lines = data.split('\n');
@@ -65,7 +65,18 @@ export function isValidCsv(
     }
     // Check if all rows have the same number of columns as the header
     for (let i = 1; i < lines.length; i++) {
-        const rowValues: string[] = lines[i].split(delimiter).map(col => col.trim());
+        // this is a naive way to check nested delims, 
+        // should instead do it by iterating through string and identifying 
+        // quotation mark start and end pairs
+        // const nestedDelimiterPattern = new RegExp(
+        //     `(?<=(^|${delimiter})".+)` + delimiter + `(?=.+"(${delimiter}|$))`, 
+        //     "ig"
+        // );
+        const rowValues: string[] = (lines[i]
+            // .replace(nestedDelimiterPattern, '_')
+            .split(delimiter)
+            .map(val => val.trim())
+        );
         if (headerRow.length !== rowValues.length 
             && i !== lines.length-1 // allow for empty last row in files.
         ) {
@@ -85,7 +96,7 @@ export function isValidCsv(
     return true;
 }
 
-
+/** paths to folders or files */
 export async function validatePath(...paths: string[]): Promise<void> {
     for (const path of paths) {
         if (!fs.existsSync(path)) {
@@ -302,15 +313,11 @@ export function readJsonFileAsObject(filePath: string): Record<string, any> {
 export function validateFileExtension(filePath: string, expectedExtension: string): string {
     validate.stringArgument(`reading.validateFileExtension`, `filePath`, filePath);
     validate.stringArgument(`reading.validateFileExtension`, `expectedExtension`, expectedExtension);
-    if (filePath.endsWith(`.${expectedExtension}`) && fs.existsSync(filePath)) {
+    expectedExtension = expectedExtension.replace(/\./, '');
+    if (filePath.endsWith(`.${expectedExtension}`)) {
         return filePath
-    } else if (fs.existsSync(filePath + '.' + expectedExtension)) {
-        return filePath + '.' + expectedExtension;
-    }
-    throw new Error([`[reading.validateFileExtension()] File does not exist`,
-        `         filePath: '${filePath}'`,
-        `expectedExtension: '${expectedExtension}'`
-    ].join(TAB));
+    } 
+    return filePath + '.' + expectedExtension;
 }
 
 /**
@@ -349,11 +356,7 @@ export async function getRows(
     filePath: string,
     sheetName: string = 'Sheet1'
 ): Promise<Record<string, any>[]> {
-    validate.stringArgument(`reading.getRows`, `filePath`, filePath);
-    if (!fs.existsSync(filePath)) {
-        mlog.error(`[reading.getRows()] Invalid file path: '${filePath}'`);
-        return [];
-    }
+    validate.existingFileArgument(`reading.getRows`, {filePath});
     if (filePath.endsWith('.xlsx') || filePath.endsWith('.xls')) {
         return getExcelRows(filePath, sheetName);
     }
@@ -365,10 +368,7 @@ export async function getExcelRows(
     filePath: string,
     sheetName: string = 'Sheet1'
 ): Promise<Record<string, any>[]> {
-    if (!isNonEmptyString(filePath) || !fs.existsSync(filePath)) {
-        mlog.error(`[getExcelRows()] Invalid file path: '${filePath}'`);
-        return [];
-    }
+    validate.existingFileArgument(`reading.getExcelRows`, {filePath});
     const validatedFilePath = validateFileExtension(filePath, 'xlsx');
     try {
         const workbook = xlsx.readFile(validatedFilePath);
@@ -394,9 +394,9 @@ export async function getExcelRows(
 export async function getCsvRows(
     filePath: string
 ): Promise<Record<string, any>[]> {
-    validate.stringArgument(`reading.getCsvRows`, `filePath`, filePath);
+    validate.existingFileArgument(`reading.getCsvRows`, {filePath});
     const delimiter = getDelimiterFromFilePath(filePath);
-    if (!delimiter || !isValidCsv(filePath)) {
+    if (!delimiter) {
         return []
     }
     const rows: Record<string, any>[] = []; 

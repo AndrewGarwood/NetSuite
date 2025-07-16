@@ -4,7 +4,7 @@
  */
 import { parseLogger as plog, mainLogger as mlog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG 
-} from '../../config';
+} from '../../config/setupLog';
 import { 
     FieldValue, 
     TermBase as Term,
@@ -15,6 +15,7 @@ import {
     clean,
 } from "../../utils/io/regex/index";
 import { ColumnSliceOptions } from '../../utils/io';
+import * as validate from "../../utils/argumentValidation";
 
 export const SUPPRESS: any[] = [];
 /**
@@ -67,19 +68,18 @@ export const field = (
     return result
 }
 
-export const externalId = (
+export const externalId = async (
     row: Record<string, any>, 
     recordType: RecordTypeEnum,
-    idEvaluator: (row: Record<string, any>, ...args: string[]) => string,
-    ...args: string[]
-): string => {
-    if (!row || !recordType || !idEvaluator) {
-        mlog.error('[externalId()]: Invalid params. Cannot evaluate externalId.');
-        return '';
-    }
-    let id = idEvaluator(row, ...args);
+    idEvaluator: (row: Record<string, any>, ...args: string[]) => string | Promise<string>,
+    ...idEvaluatorArgs: string[]
+): Promise<string> => {
+    validate.objectArgument(`evaluators.common.externalId`, `row`, row);
+    validate.stringArgument(`evaluators.common.externalId`, `recordType`, recordType);
+    validate.functionArgument(`evaluators.common.externalId`, `idEvaluator`, idEvaluator);
+    let id = await idEvaluator(row, ...idEvaluatorArgs);
     if (!id) {
-        mlog.warn(`[externalId()]: No ID found for recordType '${recordType}' with args: ${JSON.stringify(args)}`);
+        mlog.warn(`[externalId()]: idEvaluator returned falsey value for recordType '${recordType}' with args: ${JSON.stringify(idEvaluatorArgs)}`);
         return '';
     }
     // Ensure the ID is in the format 'entity<recordType>'

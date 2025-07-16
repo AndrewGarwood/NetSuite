@@ -30,6 +30,7 @@ import {
     indentedStringify,
     ProcessParseResultsOptions,
 } from "./utils/io";
+import * as validate from "./utils/argumentValidation";
 import { PostProcessingOperationEnum as OperationEnum } from "./utils/io/types/PostProcessing";
 import { cloneDeep } from "lodash";
 
@@ -60,13 +61,12 @@ export async function processParseResults(
     initialResults: ParseResults,
     options: ProcessParseResultsOptions,
 ): Promise<ValidatedParseResults> {
-    if (!initialResults || !hasNonTrivialKeys(initialResults) || !options) {
-        mlog.error(`processParseResults() Invalid arguments:`,
-            TAB+`expected: 'initialResults' (ParseResults object) and 'options' (array of ProcessParseResultsOptions).`,
-            TAB+`received: initialResults=${indentedStringify(initialResults)}, options=${indentedStringify(options)}`
-        )
-        return {};
-    }
+    validate.objectArgument(
+        `parseResultsProcessor.processParseResults`, {initialResults}, `ParseResults`
+    );
+    validate.objectArgument(
+        `parseResultsProcessor.processParseResults`, {options}, `ProcessParseResultsOptions`
+    );
     // Initialize results structure
     const results: ValidatedParseResults = {};
     for (const recordType of Object.keys(initialResults)) {
@@ -117,7 +117,7 @@ export async function processParseResults(
                 case OperationEnum.CLONE:
                     if (!isCloneOptions(processes.cloneOptions)) { break; }
                     for (let i = 0; i < initialResults[recordType].length; i++) {
-                        initialResults[recordType][i] = processCloneOptions(
+                        initialResults[recordType][i] = await processCloneOptions(
                             initialResults, recordType, i, processes.cloneOptions
                         );
                     }
@@ -125,7 +125,7 @@ export async function processParseResults(
                 case OperationEnum.COMPOSE:
                     if (!isComposeOptions(processes.composeOptions)) { break; }
                     for (let i = 0; i < initialResults[recordType].length; i++) {
-                        initialResults[recordType][i] = processComposeOptions(
+                        initialResults[recordType][i] = await processComposeOptions(
                             initialResults[recordType][i], processes.composeOptions
                         );
                         SUP.push(`[processParseResults()] Composed recordOptions for recordType '${recordType}' at index ${i}`,
@@ -138,12 +138,16 @@ export async function processParseResults(
                     break;
                 case OperationEnum.PRUNE:
                     if (!processes.pruneFunc || typeof processes.pruneFunc !== 'function') {
+                        // mlog.debug(`no pruneFunc found`)
                         // If no prune function, all records are considered valid 
                         results[recordType].valid.push(...initialResults[recordType]);
                         break;
                     }
+                    // mlog.debug(`pruneFunc is defined, starting iteration over initialResults[${recordType}]`)
                     for (const record of initialResults[recordType]) {
-                        const pruneResult = processes.pruneFunc(record);
+                        const pruneResult = await processes.pruneFunc(
+                            record, ...(processes.pruneArgs || [])
+                        );
                         if (!pruneResult) {
                             results[recordType].invalid.push(record);
                             continue;
@@ -181,12 +185,12 @@ export async function processParseResults(
  * @param cloneOptions {@link CloneOptions}
  * @returns **`recipientOptions`** {@link RecordOptions}
  */
-function processCloneOptions(
+async function processCloneOptions(
     parseResults: ParseResults,
     recordType: RecordTypeEnum | EntityRecordTypeEnum | string,
     index: number,
     cloneOptions: CloneOptions
-): RecordOptions {
+): Promise<RecordOptions> {
     const recipientOptions = parseResults[recordType][index];
     if (!isRecordOptions(recipientOptions)) {
         mlog.error(`processCloneOptions() Invalid recipientOptions at index ${index} for recordType '${recordType}':`,
@@ -271,10 +275,10 @@ function processCloneOptions(
  * @param composeOptions {@link ComposeOptions} - options for composing fields and sublists
  * @returns **`recordOptions`** {@link RecordOptions} - the modified record options
  */
-function processComposeOptions(
+async function processComposeOptions(
     record: RecordOptions,
     composeOptions: ComposeOptions
-): RecordOptions {
+): Promise<RecordOptions> {
     if (!isRecordOptions(record)) {
         mlog.error(`[processComposeOptions()] Invalid RecordOptions:`,
             TAB+`expected: RecordOptions object, received: ${typeof record} = '${indentedStringify(record)}'`,
@@ -286,24 +290,11 @@ function processComposeOptions(
         if (!record.fields) {
             record.fields = {};
         }
-        
-        for (const [fieldId, fieldConfig] of Object.entries(composeOptions.fields)) {
-            try {
-                if (fieldConfig.composer && typeof fieldConfig.composer === 'function') {
-                    const composedValue = fieldConfig.composer(record);
-                    record.fields[fieldId] = composedValue;
-                }
-            } catch (error) {
-                mlog.error(`[processComposeOptions()] Error composing field '${fieldId}':`,
-                    TAB+`Error: ${error}`,
-                    TAB+`Skipping field composition...`
-                );
-            }
-        }
+        record.fields = await composeOptions.fields.composer(record, record.fields);
     }
     if (composeOptions.idOptions 
         && typeof composeOptions.idOptions.composer === 'function') {
-        record.idOptions = composeOptions.idOptions.composer(record);
+        record.idOptions = await composeOptions.idOptions.composer(record, record.idOptions || []);
     }
     if (composeOptions.sublists && hasNonTrivialKeys(composeOptions.sublists)) {
         if (!record.sublists) {
@@ -313,22 +304,8 @@ function processComposeOptions(
             if (!record.sublists[sublistId] || isEmptyArray(record.sublists[sublistId])) {
                 record.sublists[sublistId] = [{} as SublistLine];
             }
-            // compose fields for each line
-            for (let i = 0; i < record.sublists[sublistId].length; i++) {
-                for (const [sublistFieldId, fieldConfig] of Object.entries(sublistConfig)) {
-                    try {
-                        if (fieldConfig.composer && typeof fieldConfig.composer === 'function') {
-                            const composedValue = fieldConfig.composer(record);
-                            record.sublists[sublistId][i][sublistFieldId] = composedValue;
-                        }
-                    } catch (error) {
-                        mlog.error(`[processComposeOptions()] Error composing sublist field '${sublistId}.${sublistFieldId}':`,
-                            TAB+`Error: ${error}`,
-                            TAB+`Skipping sublist field composition...`
-                        );
-                    }
-                }
-            }
+            // let composer handle each line, just pass in the sublist lines
+            record.sublists[sublistId] = await sublistConfig.composer(record, record.sublists[sublistId])
         }
     }
     return record;

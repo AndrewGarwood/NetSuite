@@ -2,9 +2,9 @@
  * @file src/utils/io/types/typeGuards.ts
  */
 
-import { hasKeys } from "src/utils/typeValidation";
+import { hasKeys, isNonEmptyString } from "src/utils/typeValidation";
 import { FieldParseOptions, ValueMappingEntry, CloneOptions, 
-    ComposeOptions, } from ".";
+    ComposeOptions, WriteJsonOptions} from ".";
 import { RecordOptions } from "src/utils/api";
 import { CleanStringOptions, NodeLeaves, NodeStructure, RowDictionary } from "..";
 
@@ -44,7 +44,11 @@ export function isValueMappingEntry(value: any): value is ValueMappingEntry {
 export function isRecordOptions(value: any): value is RecordOptions {
     return (value && typeof value === 'object' 
         && hasKeys(value, 'recordType') 
-        && hasKeys(value, ['fields', 'sublists'], false)
+        && hasKeys(value, 
+            ['fields', 'sublists', 'recordType', 'isDynamic', 'idOptions'], 
+            false, 
+            true
+        )
     );
 }
 
@@ -62,11 +66,11 @@ export function isCloneOptions(value: any): value is CloneOptions {
     );
 }
 
-export function isComposeOptions(val: any): val is ComposeOptions {
-    return (val && typeof val === 'object' 
-        && typeof val.recordType === 'string' 
-        && (val.fields === undefined || typeof val.fields === 'object') 
-        && (val.sublists === undefined || typeof val.sublists === 'object')
+export function isComposeOptions(value: any): value is ComposeOptions {
+    return (value && typeof value === 'object' 
+        && typeof value.recordType === 'string' 
+        && (value.fields === undefined || typeof value.fields === 'object') 
+        && (value.sublists === undefined || typeof value.sublists === 'object')
     );
 }
 
@@ -77,44 +81,59 @@ export function isComposeOptions(val: any): val is ComposeOptions {
  * - **`true`** if the `value` is an object with at least one key in `['strip', 'case', 'pad', 'replace']` and no other keys,
  * - **`false`** `otherwise`.
  */
-export function isCleanStringOptions(val: any): val is CleanStringOptions {
-    return (val && typeof val === 'object'
-        && hasKeys(val, ['strip', 'case', 'pad', 'replace'], false, true)
+export function isCleanStringOptions(value: any): value is CleanStringOptions {
+    return (value && typeof value === 'object'
+        && hasKeys(value, ['strip', 'case', 'pad', 'replace'], false, true)
     );
 }
 
 /**
  * - {@link RowDictionary} = `{ [rowIndex: number]: Record<string, any>; }`
- * @param val 
+ * @param value 
  * @returns 
  */
-export function isRowDictionary(val: any): val is RowDictionary {
-    return (val && typeof val === 'object'
-        && !Array.isArray(val)
-        && Object.keys(val).length > 0
-        && Object.keys(val).every(key => 
+export function isRowDictionary(value: any): value is RowDictionary {
+    return (value && typeof value === 'object'
+        && !Array.isArray(value)
+        && Object.keys(value).length > 0
+        && Object.keys(value).every(key => 
             !isNaN(Number(key))
-            && Boolean(val[key]) 
+            && Boolean(value[key]) 
             // is Record<string, any>
-            && typeof val[key] === 'object' && !Array.isArray(val[key])
+            && typeof value[key] === 'object' && !Array.isArray(value[key])
         )
     )
 }
 
 
-export function isNodeStucture(val: any): val is NodeStructure {
-    return (val && typeof val === 'object'
-        && !Array.isArray(val)
-        && Object.keys(val).length > 0
-        && Object.entries(val).every(([key, value]) => 
+export function isNodeStucture(value: any): value is NodeStructure {
+    return (value && typeof value === 'object'
+        && !Array.isArray(value)
+        && Object.keys(value).length > 0
+        && Object.entries(value).every(([key, value]) => 
             typeof key === 'string' 
             && (isNodeStucture(value) || isNodeLeaves(value))
         )
     );
 }
 
-export function isNodeLeaves(val: any): val is NodeLeaves | number[] | RowDictionary {
-    return ((Array.isArray(val) && val.every(v => typeof v === 'number')) 
-        || isRowDictionary(val)
+export function isNodeLeaves(value: any): value is NodeLeaves | number[] | RowDictionary {
+    return ((Array.isArray(value) && value.every(v => typeof v === 'number')) 
+        || isRowDictionary(value)
+    );
+}
+
+export function isWriteJsonOptions(value: any): value is WriteJsonOptions {
+    return (value && typeof value === 'object'
+        && !Array.isArray(value)
+        && value.data !== undefined
+        && (typeof value.data === 'object' || typeof value.data === 'string')
+        && isNonEmptyString(value.filePath)
+        && (value.indent === undefined 
+            || (typeof value.indent === 'number' && value.indent >= 0)
+        )
+        && (value.enableOverwrite === undefined 
+            || typeof value.enableOverwrite === 'boolean'
+        )
     );
 }

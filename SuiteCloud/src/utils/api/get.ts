@@ -16,6 +16,7 @@ import {
 import { SB_REST_SCRIPTS } from "./configureRequests";
 import { anyNull } from "../typeValidation";
 import { getAccessToken } from "./configureAuth";
+import path from "node:path";
 
 
 export const GET_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.GET_Record.scriptId as number;
@@ -90,7 +91,10 @@ export async function getRecordById(
         return response.data as GetRecordResponse;
     } catch (error) {
         mlog.error('[ERROR get.getRecordById()]:', (error as any).data || error);
-        write({error: error}, ERROR_DIR, 'ERROR_getRecordById.json');
+        write(
+            {timestamp: getCurrentPacificTime(), caught: error}, 
+            path.join(ERROR_DIR, 'ERROR_getRecordById.json')
+        );
         throw new Error('Failed to call GET_Record RESTlet');
     }
 }
@@ -109,16 +113,16 @@ export async function GET(
     params: Record<string, any>,
 ): Promise<any> {
     if (!params) {
-        mlog.error('[get.ts GET()] params is undefined. Cannot call RESTlet.');
-        throw new Error('[get.ts GET()] params is undefined. Cannot call RESTlet.');
+        mlog.error('[get.GET()] params is undefined. Cannot call RESTlet.');
+        throw new Error('[get.GET()] params is undefined. Cannot call RESTlet.');
     }
     if (!scriptId || !deployId) {
-        mlog.error('[get.ts GET()] scriptId or deployId is undefined. Cannot call RESTlet.');
-        throw new Error('[get.ts GET()] scriptId or deployId is undefined. Cannot call RESTlet.');
+        mlog.error('[get.GET()] scriptId or deployId is undefined. Cannot call RESTlet.');
+        throw new Error('[get.GET()] scriptId or deployId is undefined. Cannot call RESTlet.');
     }
     if (!accessToken) {
-        mlog.error('[get.ts GET()] getAccessToken() is undefined. Cannot call RESTlet.');
-        throw new Error('[get.ts GET()] getAccessToken() is undefined. Cannot call RESTlet.');
+        mlog.error('[get.GET()] getAccessToken() is undefined. Cannot call RESTlet.');
+        throw new Error('[get.GET()] getAccessToken() is undefined. Cannot call RESTlet.');
     }
     const restletUrl = createUrlWithParams(RESTLET_URL_STEM, {
         script: scriptId,
@@ -134,8 +138,11 @@ export async function GET(
         });
         return response;
     } catch (error) {
-        mlog.error('[Error in get.ts GET()]:', error);
-        write({error: error}, ERROR_DIR, 'ERROR_GET.json');
-        throw new Error('Failed to call RESTlet with params');
+        mlog.error('[Error in get.GET()]:', error);
+        write(
+            {timestamp: getCurrentPacificTime(), caught: error}, 
+            path.join(ERROR_DIR, 'ERROR_GET.json')
+        );
+        throw new Error('[get.GET()] Failed to call RESTlet with params');
     }
 }

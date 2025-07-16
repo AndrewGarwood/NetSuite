@@ -36,6 +36,11 @@ export type ValidatedParseResults = {
 
 /**
  * @typedefn **`FieldDictionaryParseOptions`**
+ * @keys `fieldId` `string`
+ * @values 
+ * - {@link FieldParseOptions} = `{ defaultValue?: FieldValue, colName?: string, evaluator?: function, args?: any[] }`
+ * - {@link SubrecordParseOptions} 
+ * = `{ subrecordType: string, fieldOptions: FieldDictionaryParseOptions, sublistOptions`: {@link SublistDictionaryParseOptions}` }`
  */
 export type FieldDictionaryParseOptions = {
     [fieldId: string]: FieldParseOptions | SubrecordParseOptions;

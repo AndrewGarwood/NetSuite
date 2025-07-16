@@ -2,25 +2,18 @@
  * @file src/utils/io/writing.ts
  */
 import fs from 'fs';
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB } from 'src/config/setupLog';
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
 import { OUTPUT_DIR } from '../../config/env';
 import { getCurrentPacificTime } from './dateTime';
 import { validateFileExtension, getDelimiterFromFilePath } from './reading';
-import { DelimitedFileTypeEnum, DelimiterCharacterEnum } from './types/Csv';
-import { hasKeys, isEmptyArray, isNonEmptyString, TypeOfEnum } from '../typeValidation';
+import { DelimitedFileTypeEnum, DelimiterCharacterEnum, WriteJsonOptions } from './types';
+import { hasKeys, isEmptyArray, isNonEmptyString, TypeOfEnum, isWriteJsonOptions, } from '../typeValidation';
 import * as validate from '../argumentValidation';
 import path from 'node:path';
 import { existsSync, writeFileSync } from 'node:fs';
 
 
 
-export type WriteJsonOptions = {
-    data: Record<string, any> | string;
-    filePath: string;
-    fileName?: string;
-    indent?: number;
-    enableOverwrite?: boolean;
-}
 
 /**
  * Output JSON data to a file with `fs.writeFileSync` or `fs.appendFileSync`.
@@ -28,7 +21,6 @@ export type WriteJsonOptions = {
  * @param options.data `Record<string, any> | string` - JSON data to write to file.
  * - If `data` is a string, it will be parsed to JSON. If `data` is an object, it will be converted to JSON.
  * @param options.filePath `string` - the complete path or the path to the directory where the file will be saved. If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
- * @param options.fileName `string` - `optional`, 'name.ext', default=`''` If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
  * @param options.indent `number` - `optional`, default=`4`
  * @param options.enableOverwrite `boolean` - `optional`, default=`true` If `enableOverwrite` is `true`, the file will be overwritten. If `false`, the `data` will be appended to the file.
  * @returns {void}
@@ -40,7 +32,6 @@ export function writeObjectToJson(options: WriteJsonOptions): void
  * @param data `Record<string, any> | string` - JSON data to write to file
  * - If `data` is a string, it will be parsed to JSON. If `data` is an object, it will be converted to JSON.
  * @param filePath `string` - the complete path or the path to the directory where the file will be saved. If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
- * @param fileName `string` - `optional`, 'name.ext', default=`''` If `fileName` is not provided, it will be assumed the `filePath` contains the name and extension.
  * @param indent `number` - `optional`, default=`4`
  * @param enableOverwrite `boolean` - `optional`, default=`true` If `enableOverwrite` is `true`, the file will be overwritten. If `false`, the `data` will be appended to the file.
  * @returns {void}
@@ -48,7 +39,6 @@ export function writeObjectToJson(options: WriteJsonOptions): void
 export function writeObjectToJson(
     data: Record<string, any> | string, 
     filePath: string,
-    fileName?: string,
     indent?: number,
     enableOverwrite?: boolean
 ): void
@@ -57,48 +47,63 @@ export function writeObjectToJson(
     /** {@link WriteJsonOptions} `| Record<string, any> | string`, */
     arg1: WriteJsonOptions | Record<string, any> | string, 
     filePath?: string,
-    fileName: string='',
     indent: number=4,
     enableOverwrite: boolean=true
 ): void {
     if (!arg1) {
-        mlog.error('No data to write to JSON file');
+        mlog.error('[writing.writeObjectToJson()] No data to write to JSON file');
         return;
     }
-    let data: Record<string, any> | string | undefined = arg1;
-    if (typeof arg1 === 'string') {
-        try {
-            data = JSON.parse(arg1) as Record<string, any>;
-        } catch (e) {
-            mlog.error('Error parsing string to JSON', e);
+    let data: Record<string, any> | string;
+    let outputFilePath: string;
+    let outputIndent: number = indent;
+    let outputEnableOverwrite: boolean = enableOverwrite;
+    // Handle options object overload
+    if (isWriteJsonOptions(arg1)) {
+        data = arg1.data;
+        outputFilePath = arg1.filePath;
+        outputIndent = arg1.indent ?? indent;
+        outputEnableOverwrite = arg1.enableOverwrite ?? enableOverwrite;
+    } else {
+        if (!isNonEmptyString(filePath)) {
+            mlog.error('[writing.writeObjectToJson()] filePath is required when not using WriteJsonOptions object');
             return;
         }
+        data = arg1;
+        outputFilePath = filePath;
     }
-    if (typeof arg1 === 'object' && hasKeys<Record<string, any>>(arg1 as WriteJsonOptions, ['data', 'filePath'])) {
-        data = typeof arg1.data === 'string' ? JSON.parse(arg1.data) : arg1.data;
-        filePath = arg1.filePath;
-        fileName = arg1?.fileName || fileName;
-        indent = arg1?.indent || indent;
-        enableOverwrite = arg1?.enableOverwrite || enableOverwrite;
-    } else if (typeof arg1 === 'object'&& filePath) {
-        data = arg1 as Record<string, any>;
+    
+    // Convert data to object if it's a string (should be valid JSON)
+    let objectData: Record<string, any>;
+    if (typeof data === 'string') {
+        try {
+            objectData = JSON.parse(data) as Record<string, any>;
+        } catch (error) {
+            mlog.error(
+                '[writing.writeObjectToJson()] Error parsing string to JSON',
+                error
+            );
+            return;
+        }
+    } else { // is already an object
+        objectData = data;
     }
-    const outputPath = validateFileExtension(
-        (fileName ? path.join(filePath || '', fileName): filePath || ''), 
-        'json'
-    );
+    
+    const outputPath = validateFileExtension(outputFilePath, 'json');
     try {
-        const jsonData = JSON.stringify(data, null, indent);
-        if (enableOverwrite) {
+        const jsonData = JSON.stringify(objectData, null, outputIndent);
+        if (outputEnableOverwrite) {
             fs.writeFileSync(outputPath, jsonData, { flag: 'w' });
         } else {
             fs.appendFileSync(outputPath, jsonData, { flag: 'a' });
-        };
-    } catch (e) {
-        mlog.error('Error writing to JSON file', e);
-        throw e;
+        }
+        // mlog.info(`[writing.writeObjectToJson()] file saved to '${outputPath}'`)
+    } catch (error) {
+        mlog.error('[writing.writeObjectToJson()] Error writing to JSON file',
+            error
+        );
+        throw error;
     }
-
 }
 
 /**

@@ -1,10 +1,12 @@
 /**
  * @file src/parse_configurations/salesorder/salesOrderParseDefinition.ts
  */
+import { mainLogger as mlog, pruneLogger as plog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config";
 import { 
     SB_TERM_DICTIONARY as TERM_DICT,
     SublistLine,
     RecordOptions, idSearchOptions, idPropertyEnum,
+    FieldValue,
 } from "../../utils/api/types";
 import { 
     CleanStringOptions, 
@@ -15,7 +17,7 @@ import {
     SublistDictionaryParseOptions,
     SublistLineParseOptions,
     SubrecordParseOptions, RecordPostProcessingOptions, CloneOptions,
-    ProcessParseResultsOptions, ComposeOptions,
+    ProcessParseResultsOptions, ComposeOptions, PostProcessingOperationEnum as PostOp,
     SublistLineIdOptions,
 } from "../../utils/io";
 import * as prune from "../pruneFunctions";
@@ -24,6 +26,14 @@ import * as customerEval from "../customer/customerEvaluatorFunctions";
 import * as soEval from "./salesOrderEvaluatorFunctions";
 import { SalesOrderColumnEnum as SO } from "./salesOrderConstants";
 import { RecordTypeEnum, SalesOrderStatusEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
+import { getSkuDictionary } from "src/config";
+import { isNonEmptyString } from "src/utils/typeValidation";
+
+/** 
+ * @TODO decide if it is better to move value assignment of 
+ * fields with only defaultValue in their FieldParseOptions to Post Processing
+ * */
+
 /**
  * if `'First Name'` and `Columns.LAST_NAME` not filled, 
  * then look for name to extract from these columns
@@ -128,12 +138,13 @@ const lineItemIdEvaluator = (sublistLine: SublistLine, ...args: string[]): strin
 const LINE_ITEM_SUBLIST_OPTIONS: SublistDictionaryParseOptions = {
     item: [{
         lineIdOptions: {lineIdEvaluator: lineItemIdEvaluator},
-        item: { evaluator: soEval.itemSkuAsync, args: [SO.ITEM] },
+        item: { evaluator: evaluate.itemId, args: [SO.ITEM] },
         quantity: { colName: SO.QUANTITY },
         rate: { colName: SO.RATE },
         amount: { colName: SO.AMOUNT },
         description: { colName: SO.ITEM_MEMO },
-        istaxable: { defaultValue: false }
+        istaxable: { defaultValue: false },
+        isclosed: { defaultValue: true },
     }] as SublistLineParseOptions[],
 };
 
@@ -164,10 +175,11 @@ export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: SO.TRAN_ID,
     fieldOptions: {
         // ...INTERMEDIATE_ENTRIES,
+        custbody_ava_disable_tax_calculation: { defaultValue: true },
         location: { defaultValue: 1 },
-        taxrate: { defaultValue: 0 },
         istaxable: { defaultValue: false },
-        orderstatus: { defaultValue: SalesOrderStatusEnum.CLOSED },
+        taxrate: { defaultValue: 0 },
+        // orderstatus: { defaultValue: SalesOrderStatusEnum.CLOSED },
         externalid: { evaluator: soEval.transactionExternalId, args: EXTERNAL_ID_ARGS},
         otherrefnum: { evaluator: soEval.otherReferenceNumber, 
             args: [SO.CHECK_NUMBER, SO.PO_NUMBER]
@@ -187,35 +199,72 @@ export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
         ...LINE_ITEM_SUBLIST_OPTIONS,
     }
 }
+
+const assignItemInternalIds = async (
+    sublistLines: SublistLine[]
+): Promise<SublistLine[]> => {
+    const skuDict = await getSkuDictionary();
+    for (let i = 0; i < sublistLines.length; i++) {
+        let sku = sublistLines[i].item as string;
+        if (skuDict[sku]) {
+            sublistLines[i].item = skuDict[sku];
+            continue;
+        }
+    }
+    return sublistLines;
+}
+
+/** for sublistId = `'item'`
+ * - assign internalids, then set quantity fields to order quantity  */
+const lineItemComposer = async (
+    record: RecordOptions, 
+    sublistLines: SublistLine[]
+): Promise<SublistLine[]> => {
+    sublistLines = await assignItemInternalIds(sublistLines);
+    for (let i = 0; i < sublistLines.length; i++) {
+        const qty = sublistLines[i].quantity;
+        sublistLines[i].quantityavailable = qty;
+        sublistLines[i].quantitycommitted = qty;
+        sublistLines[i].quantityfulfilled = qty;
+        sublistLines[i].quantitybilled = qty;
+    }
+    return sublistLines;
+}
+
+
+
+function encodeExternalId(externalId: string): string {
+    return externalId.replace(/</, '&lt;').replace(/>/, '&gt;')
+}
+const addEncodedExternalIdSearchOption = (
+    options: RecordOptions, 
+    idOptions: idSearchOptions[]
+): idSearchOptions[] => {
+    if (!options || !options.fields || !isNonEmptyString(options.fields.externalid)) {
+        throw new Error(
+            `[salesOrderParseDefinition.ComposeOptions] Unable to compose idOptions from externalid field.`
+        );
+    }
+    const encodedExternalId = encodeExternalId(options.fields.externalid);
+    idOptions.push(
+        {
+            idProp: idPropertyEnum.EXTERNAL_ID, 
+            searchOperator: SearchOperatorEnum.TEXT.IS, 
+            idValue: encodedExternalId
+        }, 
+    );
+    return idOptions;
+}
+
 const SALES_ORDER_COMPOSE_OPTIONS: ComposeOptions = {
     recordType: RecordTypeEnum.SALES_ORDER,
-    idOptions: { 
-        composer: (options: RecordOptions) => {
-            if (!options || !options.fields 
-                || !options.fields.externalid || typeof options.fields.externalid !== 'string') {
-                throw new Error(
-                    `[salesOrderParseDefinition.ComposeOptions] Unable to compose idOptions from externalid field.`
-                );
-            }
-            const idOptions: idSearchOptions[] = (options.idOptions 
-                ? options.idOptions : []
-            );
-            const encodeExternalId = (externalId: string): string => {
-                return externalId.replace(/</, '&lt;').replace(/>/, '&gt;')
-            }
-            const encodedExternalId = encodeExternalId(options.fields.externalid);
-            idOptions.push(
-                {
-                    idProp: idPropertyEnum.EXTERNAL_ID, 
-                    searchOperator: SearchOperatorEnum.TEXT.IS, 
-                    idValue: encodedExternalId
-                }, 
-            );
-            return idOptions;
-        }
+    idOptions: { composer: addEncodedExternalIdSearchOption },
+    sublists: {
+        item: { composer: lineItemComposer }
     }
 }
 export const SALES_ORDER_POST_PROCESSING_OPTIONS: RecordPostProcessingOptions = {
+    operationOrder: [PostOp.CLONE, PostOp.COMPOSE, PostOp.PRUNE],
     composeOptions: SALES_ORDER_COMPOSE_OPTIONS,
     pruneFunc: prune.salesOrder,
 }

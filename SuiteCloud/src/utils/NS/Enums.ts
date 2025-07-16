@@ -2,7 +2,7 @@
  * @file src/utils/ns/Enums.ts
  */
 export { 
-    VendorCategoryEnum, CustomerStatusEnum, 
+    VendorCategoryEnum, CustomerStatusEnum, AccountTypeEnum,
     CustomerTaxItemEnum, ContactRoleEnum, SubrecordTypeEnum, 
     EntityRecordTypeEnum, NetSuiteRecordTypeEnum, RecordTypeEnum, 
     LeadSourceEnum, LeadStatusEnum, SalesOrderStatusEnum 

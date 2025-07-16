@@ -8,16 +8,19 @@ import {
     writeObjectToJson as write,
     writeRowsToCsv,
     ProcessParseResultsOptions, ParseOptions, ParseResults,
-    RowDictionary, extractSku,
-    trimFile, clearFile,
+    RowDictionary, extractLeaf,
+    trimFile, clearFile, getCurrentPacificTime,
+    getRows,
+    getIndexedColumnValues,
+    getColumnValues
 } from "./utils/io";
 import { 
     STOP_RUNNING, CLOUD_LOG_DIR, DATA_DIR,
     SCRIPT_ENVIRONMENT as SE, DELAY, 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
     DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH,
-    ERROR_LOG_FILEPATH,
-    ERROR_DIR
+    ERROR_LOG_FILEPATH, DataDomainEnum,
+    ERROR_DIR, DEBUG_LOGS as DEBUG, SUPPRESSED_LOGS as SUP
 } from "./config";
 import { instantiateAuthManager } from "./utils/api";
 import { 
@@ -43,83 +46,87 @@ import { getSkuDictionary, initializeData } from "./config/dataLoader";
 
 async function main() {
     clearFile(DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH);
-
+    mlog.info(`[START main()] at ${getCurrentPacificTime()}`)
+    await instantiateAuthManager();
     // Initialize application data first
     await initializeData();
-    // await instantiateAuthManager();
-    let validationDict: Record<string, string> = {};
-    try {
-        validationDict = await getSkuDictionary();
-    } catch (error) {
-        mlog.error('Failed to load SKU dictionary:', error);
-        STOP_RUNNING(1);
-    }
-    const ITEM_COLUMN = 'Item';
-    const ALL_SALES_ORDERS_DIR = path.join(soConstants.SALES_ORDER_DIR, 'all');
-    const sourcePath = ALL_SALES_ORDERS_DIR;
-    const csvFiles = (fs.readdirSync(sourcePath)
-        .filter(file => file.toLowerCase().endsWith('.csv') 
-            || file.toLowerCase().endsWith('.tsv'))
-        .map(file => path.join(sourcePath, file))
+    await callTransactionProcessor(
+        false, 
+        soConstants.SALES_ORDER_LOG_DIR, 
+        // TransactionProcessorStageEnum.VALIDATE
     );
-    const missingItemsPath = path.join(DATA_DIR, 'items', 'missingItems.json');
-    
-    // const missingItems = await validateFiles(csvFiles, 'Item', extractSku, validationDict);
-    // const missingItemArray = Array.from(new Set(Object.values(missingItems).flat()));
-    
-    // mlog.info(`Found ${missingItemArray.length} missing items across ${csvFiles.length} files.`,
-    //     TAB + `sourcePath: '${sourcePath}'`,
-    // );
-    // write({missingItemsArray: missingItemArray.sort()}, missingItemsPath);
-    const missingItemArray = read(missingItemsPath).missingItemsArray || [];
-    if (isEmptyArray(missingItemArray)) {
-        STOP_RUNNING(1, 'array is emptyyyy')
-    }
-    const missingSkuRowDict: { 
-        [sku: string]: {
-            filePath: string;
-            row: Record<string, any>;
-        } 
-    } = {};
-    // get first occurrence of 
-    for (const file of csvFiles) {
-        const targetRows = await extractTargetRows(file, ITEM_COLUMN, extractSku, missingItemArray);
-        if (isEmptyArray(targetRows)) { continue; }
-        for (const row of targetRows) {
-            let sku = extractSku(String(row[ITEM_COLUMN]));
-            if (!missingSkuRowDict[sku]) {
-                missingSkuRowDict[sku] = {
-                    filePath: file,
-                    row: row
-                }
-            }
-        }
-    }
-    mlog.debug(`key length: ${Object.keys(missingSkuRowDict).length}`)
-    const outputPath = path.join(DATA_DIR, 'items', 'missingSkuRowDict.json');
-    write({dict: missingSkuRowDict}, outputPath);
-    /**  
-     * missingItems[i] = f'{sku} ({description})' | f'{sku}' 
-     * */
-    // const missingItems = (read(missingItemsPath).missingItemsArray || []) as string[];
-    // if (isEmptyArray(missingItems)) {STOP_RUNNING(1, `missingItems was empty`)}
-    // const targetItems = missingItems.map(s => s.includes(' (') ? s.split(' (')[0] : s);
-    // const tsvFilePath = path.join(DATA_DIR, 'items', '2025_07_09_ALL_ITEMS.tsv');
-    // const targetRows = await extractTargetRows(tsvFilePath, 'Item', extractSku, targetItems);
-    // if (isEmptyArray(targetRows)) {
-    //     mlog.error(`No target rows found in ${tsvFilePath} for targetItems: ${targetItems}`);
-    //     STOP_RUNNING(0);
-    // }
-    // mlog.info(`Found ${targetRows.length} target rows in ${tsvFilePath} for targetItems.length: ${targetItems.length}`);
-    // const outputPath = path.join(DATA_DIR, 'items', 'missingItems.tsv');
-    // writeRowsToCsv(targetRows, outputPath);
 
-    // await callTransactionProcessor(
-    //     true, 
-    //     soConstants.SALES_ORDER_LOG_DIR, 
-    //     // TransactionProcessorStageEnum.VALIDATE
+    // ---- Was Isolating Missing Items ----
+    // let validationDict: Record<string, string> = {};
+    // try {
+    //     validationDict = await getSkuDictionary();
+    // } catch (error) {
+    //     mlog.error('Failed to load SKU dictionary:', error);
+    //     STOP_RUNNING(1);
+    // }
+    // const ITEM_ID_COLUMN = 'Item';
+    // const TRAN_ID_COLUMN = 'Trans #';
+    // const ALL_SALES_ORDERS_DIR = path.join(soConstants.SALES_ORDER_DIR, 'all');
+    // const sourcePath = ALL_SALES_ORDERS_DIR;
+    // const csvFiles = (fs.readdirSync(sourcePath)
+    //     .filter(file => file.toLowerCase().endsWith('.csv') 
+    //         || file.toLowerCase().endsWith('.tsv'))
+    //     .map(file => path.join(sourcePath, file))
     // );
-    trimFile(5, DEFAULT_LOG_FILEPATH);
+    // const missingItems = Array.from(new Set(
+    //     Object.values(await validateFiles(
+    //         csvFiles, ITEM_ID_COLUMN, extractLeaf, validationDict
+    //     )).flat()
+    // ));
+    // mlog.debug(`[main()] identified ${missingItems.length} missing item(s) with validateFiles()`)
+    
+    // if (isEmptyArray(missingItems)) {
+    //     STOP_RUNNING(1, `missingItems array is empty`)
+    // }
+    // const fileProblemCounts: Record<string, number> = {}
+    // const problematicTransactions: string[] = []
+    // let i = 0;
+    // let numTransactions = 0;
+    // for (const file of csvFiles) {
+    //     const rows = await getRows(file);
+    //     numTransactions += (await getColumnValues(rows, TRAN_ID_COLUMN)).length
+    //     const targetRows = await extractTargetRows(
+    //         rows, ITEM_ID_COLUMN, missingItems, extractLeaf
+    //     );
+    //     if (isEmptyArray(targetRows)) continue;
+    //     const tranIds = await getColumnValues(targetRows, TRAN_ID_COLUMN);
+    //     if (DEBUG.length > 0) mlog.debug(...DEBUG);
+    //     DEBUG.length = 0;
+    //     i++;
+    //     if (isEmptyArray(tranIds)) continue;
+    //     fileProblemCounts[file] = tranIds.length
+    //     problematicTransactions.push(...tranIds)
+    // }
+    // if (isEmptyArray(Object.keys(fileProblemCounts))) {
+    //     throw new Error(`fileProblemCounts keys.length === 0 but should be greater than zero `)
+    // }
+    // mlog.debug(`[main()] Finished isolating problems after processing ${csvFiles.length} file(s)`,
+    //     TAB+`  number of missing items: ${missingItems.length}`,
+    //     TAB+`       problem file count: ${Object.keys(fileProblemCounts).length}`,
+    //     TAB+`problem transaction count: ${problematicTransactions.length}`,
+    //     TAB+`  total transaction count: ${numTransactions}`
+    // );
+    // write({missingItems}, path.join(DATA_DIR, 'items', 'missingItems.json'));
+    // write({fileProblemCounts}, 
+    //     path.join(soConstants.SALES_ORDER_DIR, 'fileProblemCounts.json')
+    // );
+    // write({problematicTransactions}, 
+    //     path.join(soConstants.SALES_ORDER_DIR, 'problematicTransactions.json')
+    // );
+    /*
+    map filePath : List of transaction numbers where the transaction has 
+    a corresponding row with extractLeaf(row[Item]) in missingItems
+    */
+
+
+    
+    trimFile(5, DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH);
+    mlog.info(`[END main()] at ${getCurrentPacificTime()}`)
     STOP_RUNNING(0);
 }
 
@@ -127,6 +134,9 @@ main().catch(error => {
     mlog.error('Error executing main() function', JSON.stringify(error));
     STOP_RUNNING(1);
 });
+    // const missingItemsTsvPath = path.join(DATA_DIR, 'items', 'missingItems.tsv');
+    // const missingItems = await getColumnValues(missingItemsTsvPath, ITEM_ID_COLUMN);
+
 // const request: GetRecordRequest = {
 //     recordType: RecordTypeEnum.SALES_ORDER,
 //     idOptions:[{idProp: idPropertyEnum.EXTERNAL_ID, searchOperator: SearchOperatorEnum.TEXT.IS, idValue: 'SO:335745_NUM:24-31127_PO:16835(INVOICE)&lt;salesorder&gt;'}],
@@ -141,6 +151,7 @@ async function callTransactionProcessor(
     outputDir?: string,
     stopAfter?: TransactionProcessorStageEnum
 ): Promise<void> {
+    mlog.debug(`[START main.callTransactionProcessor()] defining variables...`)
     const transactionFilePaths = (useSubset 
         ? [soConstants.SINGLE_ORDER_FILE]
         : [soConstants.SMALL_SUBSET_FILE]
@@ -167,6 +178,7 @@ async function callTransactionProcessor(
         outputDir, 
         stopAfter
     }
+    mlog.debug(`[main.callTransactionProcessor()] calling processTransactionFiles...`)
     await processTransactionFiles(tranType, transactionFilePaths, options);
 }
 

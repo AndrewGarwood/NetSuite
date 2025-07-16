@@ -12,6 +12,7 @@ import {
 } from "./types";
 import { SB_REST_SCRIPTS } from "./configureRequests";
 import { getAccessToken } from "./configureAuth";
+import path from "node:path";
 
 const DELETE_RECORD_BY_TYPE_SCRIPT_ID = 
     SB_REST_SCRIPTS.DELETE_DeleteRecordByType.scriptId as number;
@@ -32,16 +33,16 @@ export async function DELETE(
     params: Record<string, any>,
 ): Promise<any> {
     if (!scriptId || !deployId) {
-        mlog.error('delete.ts DELETE() scriptId or deployId is undefined. Cannot call RESTlet.');
-        throw new Error('delete.ts DELETE() scriptId or deployId is undefined. Cannot call RESTlet.');
+        mlog.error('delete.DELETE() scriptId or deployId is undefined. Cannot call RESTlet.');
+        throw new Error('delete.DELETE() scriptId or deployId is undefined. Cannot call RESTlet.');
     }
     if (!accessToken) {
-        mlog.error('delete.ts DELETE() getAccessToken() is undefined. Cannot call RESTlet.');
-        throw new Error('delete.ts DELETE() getAccessToken() is undefined. Cannot call RESTlet.');
+        mlog.error('delete.DELETE() getAccessToken() is undefined. Cannot call RESTlet.');
+        throw new Error('delete.DELETE() getAccessToken() is undefined. Cannot call RESTlet.');
     }
     if (!params) {
-        mlog.error('delete.ts DELETE() params is undefined. Cannot call RESTlet.');
-        throw new Error('delete.ts DELETE() params is undefined. Cannot call RESTlet.');
+        mlog.error('delete.DELETE() params is undefined. Cannot call RESTlet.');
+        throw new Error('delete.DELETE() params is undefined. Cannot call RESTlet.');
     }
     const restletUrl = createUrlWithParams(RESTLET_URL_STEM, {
         script: scriptId,
@@ -57,8 +58,11 @@ export async function DELETE(
         });
         return response;
     } catch (error) {
-        mlog.error('Error in delete.ts DELETE():', error);
-        write({error: error}, ERROR_DIR, 'ERROR_DELETE.json');
+        mlog.error('Error in delete.DELETE():', error);
+        write(
+            {timestamp: getCurrentPacificTime(), error: error}, 
+            path.join(ERROR_DIR, 'ERROR_DELETE.json')
+        );
         throw new Error('Failed to call RESTlet with params: ' + JSON.stringify(params, null, 4));
     }
 }
@@ -75,12 +79,12 @@ export async function deleteRecordByType(
     deployId: number=DELETE_RECORD_BY_TYPE_DEPLOY_ID
 ): Promise<DeleteRecordByTypeResponse> {
     if (!payload || Object.keys(payload).length === 0) {
-        mlog.error('deleteRecordByType() payload is undefined or empty. Cannot call RESTlet. Exiting...');
+        mlog.error('[deleteRecordByType()] payload is undefined or empty. Cannot call RESTlet. Exiting...');
         return {} as DeleteRecordByTypeResponse;
     }
     const accessToken = await getAccessToken();
     if (!accessToken) {
-        mlog.error('deleteRecordByType() getAccessToken() is undefined. Cannot call RESTlet. Exiting...');
+        mlog.error('[deleteRecordByType()] getAccessToken() is undefined. Cannot call RESTlet. Exiting...');
         return {} as DeleteRecordByTypeResponse;
     }
     try {
@@ -92,8 +96,11 @@ export async function deleteRecordByType(
         );
         return res.data as DeleteRecordByTypeResponse;
     } catch (error) {
-        mlog.error('Error in delete.ts deleteRecordByType()', error);
-        write({error: error}, ERROR_DIR, 'ERROR_deleteRecordByType.json');
+        mlog.error('Error in delete.deleteRecordByType()', error);
+        write(
+            {timestamp: getCurrentPacificTime(), error: error}, 
+            path.join(ERROR_DIR, 'ERROR_deleteRecordByType.json')
+        );
         throw error;
     }
 }

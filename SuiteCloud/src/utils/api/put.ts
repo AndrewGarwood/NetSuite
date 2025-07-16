@@ -13,7 +13,7 @@ import {
 } from "./types";
 import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "./configureRequests";
 import { getAccessToken } from "./configureAuth";
-
+import path from "node:path";
 
 const UPSERT_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.PUT_UpsertRecord.scriptId as number;
 const UPSERT_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.PUT_UpsertRecord.deployId as number;
@@ -79,7 +79,10 @@ export async function upsertRecordPayload(
             continue;
         } catch (error) {
             mlog.error(`[Error in put.upsertRecordPayload()] (batchIndex=${i}):`);
-            write({timestamp: getCurrentPacificTime(), caught: error}, ERROR_DIR, `ERROR_upsertRecordPayload_batch_${i}.json`);
+            write(
+                {timestamp: getCurrentPacificTime(), caught: error}, 
+                path.join(ERROR_DIR, `ERROR_upsertRecordPayload_batch_${i}.json`)
+            );
             continue;
         }
     }
@@ -102,16 +105,16 @@ export async function PUT(
     contentType: AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN_TEXT = AxiosContentTypeEnum.JSON,
 ): Promise<any> {
     if (!scriptId || !deployId) {
-        mlog.error('[put.ts PUT()] scriptId or deployId is undefined. Cannot call RESTlet.');
-        throw new Error('[put.ts PUT()] scriptId or deployId is undefined. Cannot call RESTlet.');
+        mlog.error('[put.PUT()] scriptId or deployId is undefined. Cannot call RESTlet.');
+        throw new Error('[put.PUT()] scriptId or deployId is undefined. Cannot call RESTlet.');
     }
     if (!accessToken) {
-        mlog.error('[put.ts PUT()] accessToken is undefined. Cannot call RESTlet.');
-        throw new Error('[put.ts PUT()] accessToken is undefined. Cannot call RESTlet.');
+        mlog.error('[put.PUT()] accessToken is undefined. Cannot call RESTlet.');
+        throw new Error('[put.PUT()] accessToken is undefined. Cannot call RESTlet.');
     }
     if (!payload) {
-        mlog.error('[put.ts PUT()] payload is undefined. Cannot call RESTlet.');
-        throw new Error('[put.ts PUT()] payload is undefined. Cannot call RESTlet.');
+        mlog.error('[put.PUT()] payload is undefined. Cannot call RESTlet.');
+        throw new Error('[put.PUT()] payload is undefined. Cannot call RESTlet.');
     }
     /** = `'${`{@link RESTLET_URL_STEM}`}?script=${scriptId}&deploy=${deployId}'` */
     const restletUrl = createUrlWithParams(RESTLET_URL_STEM, {
@@ -127,8 +130,11 @@ export async function PUT(
         });
         return response;
     } catch (error) {
-        mlog.error('Error in put.ts PUT():');//, error);
-        write({timestamp: getCurrentPacificTime(), caught: error}, ERROR_DIR, 'ERROR_PUT.json');
-        throw new Error('Failed to call RESTlet with payload');
+        mlog.error('[Error in put.PUT()]');//, error);
+        write(
+            {timestamp: getCurrentPacificTime(), caught: error}, 
+            path.join(ERROR_DIR, 'ERROR_PUT.json')
+        );
+        throw new Error('[put.PUT(] Failed to call RESTlet with payload');
     }
 }

@@ -239,10 +239,17 @@ async function processSublistLineParseOptions(
         || !Array.isArray(sublistLines)) {
         return sublistLines;
     }
-    validate.stringArgument(`csvParser.processSublistLineParseOptions`, `sublistId`, sublistId);
-    validate.objectArgument(`csvParser.processSublistLineParseOptions`, `row`, row);
-    validate.arrayArgument(`csvParser.processSublistLineParseOptions`, `sublistLines`, sublistLines);
-    validate.arrayArgument(`csvParser.processSublistLineParseOptions`, `lineOptionsArray`, lineOptionsArray);
+    try {
+        validate.stringArgument(`csvParser.processSublistLineParseOptions`, {sublistId});
+        validate.objectArgument(`csvParser.processSublistLineParseOptions`, {row});
+        validate.arrayArgument(`csvParser.processSublistLineParseOptions`, {lineOptionsArray});
+    } catch (error) {
+        mlog.error(`[csvParser.processSublistLineParseOptions()] caught arg validation error`,
+            TAB+`gonna throw it for now`, error
+        );
+        throw error;
+        // return sublistLines;
+    }
     for (const lineOptions of lineOptionsArray) {
         const newSublistLine: SublistLine = {};
         const lineIdOptions = lineOptions.lineIdOptions || {} as SublistLineIdOptions;
@@ -288,8 +295,9 @@ async function generateSublistSubrecordOptions(
     parentFieldId: string,
     subrecordOptions: SubrecordParseOptions,
 ): Promise<SetSublistSubrecordOptions> {
-    validate.stringArgument(`csvParser.generateSublistSubrecordOptions`, `parentSublistId`, parentSublistId);
-    validate.stringArgument(`csvParser.generateSublistSubrecordOptions`, `parentFieldId`, parentFieldId);
+    validate.multipleStringArguments(`csvParser.generateSublistSubrecordOptions`, 
+        { parentSublistId, parentFieldId }
+    );
     validate.objectArgument(`csvParser.generateSublistSubrecordOptions`, `row`, row);
     validate.objectArgument(`csvParser.generateSublistSubrecordOptions`, `subrecordOptions`, 
         subrecordOptions, 'SubrecordParseOptions', isSubrecordValue

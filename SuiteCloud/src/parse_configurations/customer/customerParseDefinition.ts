@@ -245,14 +245,12 @@ export const CLONE_CUSTOMER_FIELDS_TO_CONTACT_OPTIONS: CloneOptions = {
 const CUSTOMER_COMPOSE_OPTIONS: ComposeOptions = {
     recordType: RecordTypeEnum.CUSTOMER,
     idOptions: { 
-        composer: (options: RecordOptions) => {
+        composer: (options: RecordOptions, idOptions: idSearchOptions[]=[]) => {
             const encodeExternalId = (externalId: string): string => {
                 return externalId.replace(/</, '&lt;').replace(/>/, '&gt;')
             }
             const fields = options.fields;
             if (!fields) {return []; }
-            const idOptions: idSearchOptions[] = options.idOptions 
-                ? options.idOptions : [];
             idOptions.push(
                 { 
                     idProp: idPropertyEnum.ENTITY_ID, 

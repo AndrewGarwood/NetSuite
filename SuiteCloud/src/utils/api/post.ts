@@ -12,6 +12,7 @@ import {
     RecordResult,
 } from "./types";
 import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "./configureRequests";
+import path from "node:path";
 
 
 /**
@@ -56,7 +57,7 @@ export async function POST(
         return response;
     } catch (error) {
         mlog.error('Error in post.ts POST():');//, error);
-        write({timestamp: getCurrentPacificTime(), caught: error}, ERROR_DIR, 'ERROR_POST.json');
+        write({timestamp: getCurrentPacificTime(), caught: error}, path.join(ERROR_DIR, `ERROR_POST.json`));
         throw new Error('Failed to call RESTlet with payload');
     }
 }

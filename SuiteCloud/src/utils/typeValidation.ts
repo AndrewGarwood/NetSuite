@@ -93,6 +93,7 @@ export function hasNonTrivialKeys(
     return hasKeyWithNonTrivialValue;
 }
 /**
+ * @TODO add overload on param `keys` where keys = `{ required: string[], optional: string[] }`
  * @note maybe redundant with the syntax `key in obj` ? but able to check more than one
  * @param obj `T extends Object` the object to check
  * @param keys `Array<keyof T> | string[] | string` the list of keys that obj must have
