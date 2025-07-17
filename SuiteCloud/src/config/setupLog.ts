@@ -5,7 +5,7 @@
 import { OUTPUT_DIR, CLOUD_LOG_DIR } from './env';
 import { Logger, ISettingsParam, ISettings, ILogObj, ILogObjMeta, IPrettyLogStyles, IMeta } from 'tslog';
 import path from 'node:path';
-import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
+import { appendFileSync, WriteFileOptions } from 'node:fs';
 
 /** LOCAL_LOG_DIR (in onedrive) or `OUTPUT_DIR/logs` */
 export const LOCAL_LOG_DIR = path.join(OUTPUT_DIR, "logs");  
@@ -32,7 +32,8 @@ const timestampTemplate = `(${dateTemplate} ${timeTemplate})`;
 /**not included for now */
 const logNameTemplate = "[{{name}}]"; //"[{{nameWithDelimiterPrefix}}{{name}}{{nameWithDelimiterSuffix}}]";
 const logLevelTemplate = "[{{logLevelName}}]";
-const fileInfoTemplate = "{{filePathWithLine}}";
+const fileInfoTemplate = "{{filePathWithLine}}"; 
+    // "{{fullFilePath}}\n{{fileNameWithLine}}";
     //:{{fileColumn}} {{method}}";
     // "{{fileName}}:{{fileLine}}";
 /** 
@@ -91,7 +92,7 @@ const PRETTY_LOG_STYLES: IPrettyLogStyles = {
         errorName: ["red", "bold"],
         errorMessage: "redBright",
 };   
-
+/** `type: "pretty"` */
 const MAIN_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
     type: "pretty", // "pretty" | "hidden" | "json"
     name: "NS_Main",
@@ -115,24 +116,23 @@ const PARSE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
     prettyLogTimeZone: "local",
     prettyLogStyles: PRETTY_LOG_STYLES,
 }
+
 /** `type: "pretty", name: "mainLogger"` */
 export const mainLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
 mainLogger.attachTransport((logObj: ILogObj) => {
     appendFileSync(
-        DEFAULT_LOG_FILEPATH, 
-        JSON.stringify(modifyLogObj(logObj), null, 4) + "\n", 
-        { encoding: "utf-8" }
+        DEFAULT_LOG_FILEPATH, formatLogObj(logObj), 
+        { encoding: "utf-8" } as WriteFileOptions
     );
 });
 
 
-/** `type: "pretty", name: "errorLogger"` */
+/** `type: "pretty", name: "errorLogger"` */ //logObj: ILogObj & ILogObjMeta
 export const errorLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
-errorLogger.attachTransport((logObj: ILogObj) => { //logObj: ILogObj & ILogObjMeta
+errorLogger.attachTransport((logObj: ILogObj) => {
     appendFileSync(
-        ERROR_LOG_FILEPATH, 
-        JSON.stringify(modifyLogObj(logObj), null, 4) + "\n", 
-        { encoding: "utf-8" }
+        ERROR_LOG_FILEPATH, formatLogObj(logObj), 
+        { encoding: "utf-8" } as WriteFileOptions
     );
 });
 
@@ -140,19 +140,23 @@ errorLogger.attachTransport((logObj: ILogObj) => { //logObj: ILogObj & ILogObjMe
 export const parseLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
 parseLogger.attachTransport((logObj: ILogObj) => {
     appendFileSync(
-        PARSE_LOG_FILEPATH, 
-        JSON.stringify(modifyLogObj(logObj), null, 4) + "\n", 
-        { encoding: "utf-8" }
+        PARSE_LOG_FILEPATH, formatLogObj(logObj), 
+        { encoding: "utf-8" } as WriteFileOptions
     );
 });
+
 
 /** `type: "hidden", name: "pruneLogger"` */
 export const pruneLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
 /** `type: "hidden", name: "authLogger"` */
 export const authLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
 
-
-function modifyLogObj(logObj: ILogObj): ILogObj {
+/**
+ * compress metadata into `logObj['-1']` then return stringified `logObj`
+ * @param logObj {@link ILogObj}
+ * @returns `string`
+ */
+function formatLogObj(logObj: ILogObj | (ILogObj & ILogObjMeta)): string {
     const meta = logObj['_meta'] as IMeta;
     const { logLevelName, date, path } = meta;
     const timestamp = date ? date.toLocaleString() : '';
@@ -163,7 +167,7 @@ function modifyLogObj(logObj: ILogObj): ILogObj {
     if (timestamp) compositeInfo += `(${timestamp}) `;
     if (pathString) compositeInfo += `${pathString}`;
     logObj['-1'] = compositeInfo.trim();
-    return logObj;
+    return JSON.stringify(logObj, null, 4) + "\n" 
 }
 
 /**suppress logs by putting them here (do not print to console) */

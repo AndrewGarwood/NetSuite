@@ -78,9 +78,11 @@ export async function upsertRecordPayload(
             );
             continue;
         } catch (error) {
-            mlog.error(`[Error in put.upsertRecordPayload()] (batchIndex=${i}):`);
+            mlog.error(`[Error in put.upsertRecordPayload()] (batchIndex=${i}):`, 
+                (error as any)
+            );
             write(
-                {timestamp: getCurrentPacificTime(), caught: error}, 
+                {timestamp: getCurrentPacificTime(), batchIndex: i, caught: (error as any)}, 
                 path.join(ERROR_DIR, `ERROR_upsertRecordPayload_batch_${i}.json`)
             );
             continue;
@@ -132,9 +134,9 @@ export async function PUT(
     } catch (error) {
         mlog.error('[Error in put.PUT()]');//, error);
         write(
-            {timestamp: getCurrentPacificTime(), caught: error}, 
+            {timestamp: getCurrentPacificTime(), caught: (error as any)}, 
             path.join(ERROR_DIR, 'ERROR_PUT.json')
         );
-        throw new Error('[put.PUT(] Failed to call RESTlet with payload');
+        throw new Error('[put.PUT()] Failed to call RESTlet with payload');
     }
 }

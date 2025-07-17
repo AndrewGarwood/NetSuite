@@ -3,7 +3,8 @@
  */
 import { 
     parseLogger as plog, mainLogger as mlog, 
-    INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG 
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG, 
+    DATA_DIR
 } from '../../config';
 import { HUMAN_VENDORS_TRIMMED } from '../vendor/vendorConstants';
 import { 
@@ -26,10 +27,16 @@ import {
 } from "../../utils/io/regex/index";
 import { checkForOverride, CLEAN_NAME_REPLACE_OPTIONS, ColumnSliceOptions, ValueMapping } from '../../utils/io';
 import { field, SUPPRESS } from './common';
+import { readJsonFileAsObject as read } from '../../utils/io';
+import path from 'node:path';
 
-export const ENTITY_VALUE_OVERRIDES: ValueMapping = {
-} 
-
+export const ENTITY_VALUE_OVERRIDES = {} as ValueMapping;
+Object.assign(ENTITY_VALUE_OVERRIDES, read(
+    path.join(DATA_DIR, 'customers', 'entity_value_overrides.json')
+));
+mlog.debug(`[evaluators.entity()]`,
+    `num override keys: ${Object.keys(ENTITY_VALUE_OVERRIDES).length}`
+);
 /** 
  * @param row `Record<string, any>` - the `row` of data
  * @param entityIdColumn `string`
@@ -41,8 +48,17 @@ export const entityId = (
 ): string => {
     let entity = clean(row[entityIdColumn], {
         strip: STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
-        replace: [REPLACE_EM_HYPHEN, ENSURE_SPACE_AROUND_HYPHEN]
+        replace: [
+            { searchValue: /\^$/g, replaceValue: '' },
+            REPLACE_EM_HYPHEN, 
+            ENSURE_SPACE_AROUND_HYPHEN,
+        ]
     });
+    if (Object.keys(ENTITY_VALUE_OVERRIDES).length === 0) {
+        Object.assign(ENTITY_VALUE_OVERRIDES, read(
+            path.join(DATA_DIR, 'customers', 'entity_value_overrides.json')
+        ));
+    }
     return checkForOverride(
         entity, entityIdColumn, ENTITY_VALUE_OVERRIDES
     ) as string;

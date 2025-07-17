@@ -2,25 +2,37 @@
  * @file src/parse_configurations/salesorder/salesOrderConstants.ts
  */
 
-import { anyNull, hasNonTrivialKeys, isNullLike as isNull, isNonEmptyString as isString } from "src/utils/typeValidation";
-import { STOP_RUNNING, DATA_DIR, CLOUD_LOG_DIR, mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config";
-import { getCsvRows, getOneToOneDictionary, isValidCsv, readJsonFileAsObject as read } from "src/utils/io/reading";
-import { writeObjectToJson as write } from "src/utils/io/writing";
+import { STOP_RUNNING, 
+    DATA_DIR, CLOUD_LOG_DIR,
+    mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL 
+} from "../../config";
 import path from "node:path";
 /** `${DATA_DIR}/salesorders` */
-export const SALES_ORDER_DIR = `${DATA_DIR}/salesorders` as string;
+export const SALES_ORDER_DIR = path.join(DATA_DIR, 'salesorders');
 /** `${CLOUD_LOG_DIR}/salesorders` */
-export const SALES_ORDER_LOG_DIR = `${CLOUD_LOG_DIR}/salesorders` as string;
+export const SALES_ORDER_LOG_DIR = path.join(CLOUD_LOG_DIR, 'salesorders');
 /** `${DATA_DIR}/salesorders/small_subset.tsv` */
-export const SMALL_SUBSET_FILE = `${SALES_ORDER_DIR}/small_subset.tsv` as string;
+export const SUBSET_FILE = path.join(SALES_ORDER_DIR, 'subset.tsv');
+/** `${DATA_DIR}/salesorders/small_subset.tsv` */
+export const SMALL_SUBSET_FILE = path.join(SALES_ORDER_DIR, 'small_subset.tsv');
 /** `${DATA_DIR}/salesorders/single_order.tsv` */
-export const SINGLE_ORDER_FILE = `${SALES_ORDER_DIR}/single_order.tsv` as string;
+export const SINGLE_ORDER_FILE = path.join(SALES_ORDER_DIR, 'single_order.tsv');
+
+/** `${DATA_DIR}/salesorders/viable` */
+export const VIABLE_SO_DIR = path.join(SALES_ORDER_DIR, 'viable');
+/** `${DATA_DIR}/salesorders/unviable` */
+export const UNVIABLE_SO_DIR = path.join(SALES_ORDER_DIR, 'unviable');
+
 /*
+"""
+-   Total viable transactions: 67979
+- Total unviable transactions: 15016
+"""
 Trans #	Type	Date	Num	Source Name	Name Address	Name Street1	Name Street2	Name City	Name State	Name Zip	Name Contact	Name Phone #	Name Fax #	Name E-Mail	Name Account #	P. O. #	Ship Date	Due Date	Item	Item Description	Memo	Account	Terms	Class	Rep	Billing Status	Qty	Sales Price	Amount	S. O. #	Lot Number	Paid Date	Ship To City	Ship To Address 1	Ship To Address 2	Ship To State	Ship Zip	Check #
 317505	Invoice	10/24/2024	24-30376	Aloha Aesthetics	Stacey Idica 673 Silver Bluff Road Aiken, SC 29803	Stacey Idica	673 Silver Bluff Road	Aiken	SC	29803		941-276-7001		stacey.bullfinch@gmail.com		15979	10/24/2024	10/24/2024	Miracu:3FX18101802GA (Miracu Thread Forte Fix 10 units  (18GX100mm))	Miracu Thread Forte Fix 10 units  (18GX100mm)	Miracu Thread Forte Fix 10 units  (18GX100mm)	PDO Thread	Credit Card	Benev:Domestic	CE		5	374.00	1870.00	334854	2026/04/29-X81441G		Aiken	Aloha Aesthetics	Attn: Stacey Idica	SC	29803	
 
 */
-const SALES_ORDER_CSV_COLUMNS = [
+const SALES_ORDER_COLUMNS = [
     'Trans #', 'S. O. #', 'P. O. #', 'Num',
     'Type', 
     'Date', 

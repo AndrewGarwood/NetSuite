@@ -10,7 +10,6 @@ import {
 } from "../../utils/api/types";
 import { 
     CleanStringOptions, 
-    ColumnSliceOptions,
     FieldDictionaryParseOptions,
     FieldParseOptions,
     RecordParseOptions,
@@ -55,19 +54,11 @@ export const SHIPPING_NAME_COLUMNS = [
 
 const BILLING_ATTENTION_ARGS: evaluate.AttentionArguments = {
     entityIdColumn: SO.ENTITY_ID, 
-    salutationColumn: undefined,
-    firstNameColumn: undefined,
-    middleNameColumn: undefined,
-    lastNameColumn: undefined, 
     nameColumns: BILLING_NAME_COLUMNS
 }
 
 const SHIPPING_ATTENTION_ARGS: evaluate.AttentionArguments = {
     entityIdColumn: SO.ENTITY_ID, 
-    salutationColumn: undefined,
-    firstNameColumn: undefined,
-    middleNameColumn: undefined,
-    lastNameColumn: undefined, 
     nameColumns: SHIPPING_NAME_COLUMNS
 }
 
@@ -89,7 +80,7 @@ const SHIPPING_STREET_ARGS: evaluate.StreetArguments = {
 
 /** 
  * (body subrecord) 
- * - `fieldId`: `'billaddress'` 
+ * - `fieldId`: `'billingaddress'` 
  * */
 const BILLING_ADDRESS_OPTIONS: SubrecordParseOptions = {
     subrecordType: 'address',
@@ -107,22 +98,21 @@ const BILLING_ADDRESS_OPTIONS: SubrecordParseOptions = {
 
 /** 
  * (body subrecord) 
- * - `fieldId`: `'shipaddress'` 
+ * - `fieldId`: `'shippingaddress'` 
  * */
 const SHIPPING_ADDRESS_OPTIONS: SubrecordParseOptions = {
     subrecordType: 'address',
     fieldOptions: { 
-        country: { evaluator: evaluate.country, args: [SO.SHIP_TO_COUNTRY, SO.SHIP_TO_STATE]},
+        country: { evaluator: evaluate.country, args: [SO.SHIP_TO_COUNTRY, SO.SHIP_TO_STATE] },
         addressee: { evaluator: customerEval.customerCompany, args: [SO.ENTITY_ID] },
         attention: { evaluator: evaluate.attention, args: [SHIPPING_ATTENTION_ARGS] },
         addr1: { evaluator: evaluate.street, args: [1, SHIPPING_STREET_ARGS] },
         addr2: { evaluator: evaluate.street, args: [2, SHIPPING_STREET_ARGS] },
         city: { colName: SO.SHIP_TO_CITY },
-        state: { evaluator: evaluate.state, args: [SO.SHIP_TO_STATE]},
+        state: { evaluator: evaluate.state, args: [SO.SHIP_TO_STATE] },
         zip: { colName: SO.SHIP_TO_ZIP },
     } as FieldDictionaryParseOptions,
 };
-//        addrphone: { evaluator: evaluate.phone, args: [SO.PHONE] },
 
 const lineItemIdEvaluator = (sublistLine: SublistLine, ...args: string[]): string => {
     let idString = `{`+ [
@@ -141,18 +131,12 @@ const LINE_ITEM_SUBLIST_OPTIONS: SublistDictionaryParseOptions = {
         item: { evaluator: evaluate.itemId, args: [SO.ITEM] },
         quantity: { colName: SO.QUANTITY },
         rate: { colName: SO.RATE },
-        amount: { colName: SO.AMOUNT },
+        // amount: { colName: SO.AMOUNT },
         description: { colName: SO.ITEM_MEMO },
         istaxable: { defaultValue: false },
         isclosed: { defaultValue: true },
     }] as SublistLineParseOptions[],
 };
-
-/** use then remove these entries in post processing */
-export const INTERMEDIATE_ENTRIES: FieldDictionaryParseOptions = {
-    transactiontype: { colName: SO.TRAN_TYPE }, 
-
-}
 
 /**
  * - `'S. O. #'` -> `'SO'`
@@ -174,16 +158,13 @@ const EXTERNAL_ID_ARGS: any[] = [
 export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: SO.TRAN_ID,
     fieldOptions: {
-        // ...INTERMEDIATE_ENTRIES,
         custbody_ava_disable_tax_calculation: { defaultValue: true },
         location: { defaultValue: 1 },
         istaxable: { defaultValue: false },
         taxrate: { defaultValue: 0 },
         // orderstatus: { defaultValue: SalesOrderStatusEnum.CLOSED },
-        externalid: { evaluator: soEval.transactionExternalId, args: EXTERNAL_ID_ARGS},
-        otherrefnum: { evaluator: soEval.otherReferenceNumber, 
-            args: [SO.CHECK_NUMBER, SO.PO_NUMBER]
-        },
+        externalid: { evaluator: soEval.transactionExternalId, args: EXTERNAL_ID_ARGS },
+        otherrefnum: { evaluator: soEval.otherReferenceNumber, args: [SO.CHECK_NUMBER, SO.PO_NUMBER] },
         entity: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
         terms: { evaluator: evaluate.terms, args: [SO.TERMS, TERM_DICT] },
         checknumber: { colName: SO.CHECK_NUMBER },
@@ -194,10 +175,10 @@ export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
         shipdate: { colName: SO.SHIP_DATE },
         billingaddress: BILLING_ADDRESS_OPTIONS,
         shippingaddress: SHIPPING_ADDRESS_OPTIONS,
-    },
+    } as FieldDictionaryParseOptions,
     sublistOptions: {
         ...LINE_ITEM_SUBLIST_OPTIONS,
-    }
+    } as SublistDictionaryParseOptions
 }
 
 const assignItemInternalIds = async (
@@ -214,19 +195,37 @@ const assignItemInternalIds = async (
     return sublistLines;
 }
 
-/** for sublistId = `'item'`
- * - assign internalids, then set quantity fields to order quantity  */
+/** 
+ * for sublistId = `'item'`
+ * - assign internalids, then set quantity fields to order quantity  
+ * @TODO decide if should parse strings as numbers in csvParser.transformValue(), 
+ * or if should just do number conversion in post processing.
+ * the latter offers more control. I think NetSuite handles both anyway.
+ * */
 const lineItemComposer = async (
     record: RecordOptions, 
     sublistLines: SublistLine[]
 ): Promise<SublistLine[]> => {
     sublistLines = await assignItemInternalIds(sublistLines);
     for (let i = 0; i < sublistLines.length; i++) {
-        const qty = sublistLines[i].quantity;
-        sublistLines[i].quantityavailable = qty;
-        sublistLines[i].quantitycommitted = qty;
-        sublistLines[i].quantityfulfilled = qty;
-        sublistLines[i].quantitybilled = qty;
+        const numericFields = [
+            'quantity', 'rate', // 'amount'
+        ];
+        for (const fieldId of numericFields) { 
+            // force positive values bc :"error.SuiteScriptError","name":"USER_ERROR", 
+            // "Inventory items must have a positive amount."
+            if (isNonEmptyString(sublistLines[i][fieldId])) {
+                sublistLines[i][fieldId] = Math.abs(Number(sublistLines[i][fieldId]));
+            }
+        }
+        const qty = sublistLines[i].quantity as number;
+        const quantityFields = [
+            // 'quantityavailable', 'quantitycommitted', 'quantityfulfilled', 
+            'quantitybilled' // label(quantitybilled) = "Invoiced"
+        ];
+        for (const fieldId of quantityFields) {
+            sublistLines[i][fieldId] = qty
+        }
     }
     return sublistLines;
 }
@@ -246,13 +245,11 @@ const addEncodedExternalIdSearchOption = (
         );
     }
     const encodedExternalId = encodeExternalId(options.fields.externalid);
-    idOptions.push(
-        {
-            idProp: idPropertyEnum.EXTERNAL_ID, 
-            searchOperator: SearchOperatorEnum.TEXT.IS, 
-            idValue: encodedExternalId
-        }, 
-    );
+    idOptions.push({
+        idProp: idPropertyEnum.EXTERNAL_ID, 
+        searchOperator: SearchOperatorEnum.TEXT.IS, 
+        idValue: encodedExternalId
+    });
     return idOptions;
 }
 

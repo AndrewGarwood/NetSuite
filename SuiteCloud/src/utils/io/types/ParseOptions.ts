@@ -50,7 +50,8 @@ export type FieldDictionaryParseOptions = {
  * @typedefn **`SublistDictionaryParseOptions`**
  * - dictionary mapping sublistIds to `Array<`{@link SublistLineParseOptions}`>`
  * - {@link SublistLineParseOptions} = 
- * - `{ [sublistFieldId: string]: `{@link FieldParseOptions} | {@link SubrecordParseOptions}` } & { lineIdProp?: string }`
+ * - `{ [sublistFieldId: string]: `{@link FieldParseOptions} | {@link SubrecordParseOptions}` }` 
+ * `& { lineIdOptions?:` {@link SublistLineIdOptions}` }`
  */
 export type SublistDictionaryParseOptions = {
     [sublistId: string] : Array<SublistLineParseOptions>;

@@ -12,8 +12,9 @@ import {
     indentedStringify, clearFile,
 } from "./utils/io";
 import { 
-    STOP_RUNNING, 
-    mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, INFO_LOGS, DEBUG_LOGS, 
+    STOP_RUNNING, DELAY,
+    mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
+    INFO_LOGS, DEBUG_LOGS as DEBUG, SUPPRESSED_LOGS as SUP, 
     ERROR_DIR,
     CLOUD_LOG_DIR
 } from "./config";
@@ -26,7 +27,8 @@ import {
     FieldDictionary,
     idSearchOptions,
     SearchOperatorEnum,
-    FieldValue, 
+    FieldValue,
+    SetFieldSubrecordOptions, 
 } from "./utils/api";
 import { parseRecordCsv } from "./csvParser";
 import { processParseResults } from "./parseResultsProcessor";
@@ -62,6 +64,7 @@ export enum TransactionProcessorStageEnum {
     VALIDATE = 'VALIDATE',
     MATCH_ENTITY = 'MATCH_ENTITY',
     PUT_SALES_ORDERS = 'PUT_SALES_ORDERS',
+    END = 'END'
 }
 
 export enum MatchSourceEnum {
@@ -70,10 +73,10 @@ export enum MatchSourceEnum {
 }
 
 export type TransactionEntityMatchOptions = {
-    entityType: EntityRecordTypeEnum | string,
-    entityFieldId: string,
-    matchMethod: MatchSourceEnum
-    localFileOptions?: LocalFileMatchOptions 
+    entityType: EntityRecordTypeEnum | string;
+    entityFieldId: string;
+    matchMethod: MatchSourceEnum;
+    localFileOptions?: LocalFileMatchOptions; 
 }
 
 export type LocalFileMatchOptions = {
@@ -83,23 +86,32 @@ export type LocalFileMatchOptions = {
 }
 
 export type TransactionProcessorOptions = {
-    parseOptions: ParseOptions,
-    postProcessingOptions: ProcessParseResultsOptions,
-    /** {@link TransactionEntityMatchOptions} */
-    matchOptions?: TransactionEntityMatchOptions,
-    /** responseOptions for the transaction put request */
-    responseOptions?: RecordResponseOptions,
-    clearLogFiles?: string[],
-    /**
-     * if outputDir is a valid directory, 
-     * entityProcessor will write output to files here. 
+    parseOptions: ParseOptions;
+    postProcessingOptions: ProcessParseResultsOptions;
+    /** 
+     * {@link TransactionEntityMatchOptions} = `{ 
+     * entityType: EntityRecordTypeEnum | string; 
+     * entityFieldId: string; 
+     * matchMethod: MatchSourceEnum; 
+     * localFileOptions?: LocalFileMatchOptions; 
+     * }` 
      * */
-    outputDir?: string,
+    matchOptions?: TransactionEntityMatchOptions;
+    /** `RecordResponseOptions` for the transaction put request */
+    responseOptions?: RecordResponseOptions;
+    clearLogFiles?: string[];
+    /**
+     * if `outputDir` is a valid directory, 
+     * `entityProcessor` will write output data from stages in `stagesToWrite` here. 
+     * */
+    outputDir?: string;
+    /** specify at which stage(s) that data being processed should be written to `outputDir` */
+    stagesToWrite?: TransactionProcessorStageEnum[];
     /**
      * - stop after specific stage for the first file in filePaths. 
      * - leave undefined to process all files in filePaths 
      * */
-    stopAfter?: TransactionProcessorStageEnum,
+    stopAfter?: TransactionProcessorStageEnum;
 }
 /**
  * @param options 
@@ -114,26 +126,23 @@ async function done(
     stage: TransactionProcessorStageEnum,
     stageData: Record<string, any>,
 ): Promise<boolean> {
+    let stagesToWrite = (isNonEmptyArray(options.stagesToWrite) 
+        ? options.stagesToWrite
+        : []
+    );
     const { stopAfter, outputDir } = options;
     fileName = fileName.trim().replace(/(\.([a-z]+))$/i, '');
-    if (outputDir && fs.existsSync(outputDir)) {
-        const now = new Date();
-        const MM = String(now.getMonth() + 1).padStart(2, '0');
-        const DD = String(now.getDate()).padStart(2, '0');
-        const HH = String(now.getHours()).padStart(2, '0');
-        const mm = String(now.getMinutes()).padStart(2, '0');
-        const ss = String(now.getSeconds()).padStart(2, '0');
-        const ms = String(now.getMilliseconds()).padStart(3, '0');
-        const outputPath = path.join(outputDir, `(${MM}-${DD})-(${HH}-${mm}.${ss}.${ms})_${fileName}_${stage}.json`);
+    if (outputDir && fs.existsSync(outputDir) 
+        && Object.values(stagesToWrite).includes(stage)) {
+        const outputPath = path.join(
+            outputDir, `${getFileNameTimestamp()}_${fileName}_${stage}.json`
+        );
         write(stageData, outputPath);
     }
     if (stopAfter && stopAfter === stage) {
         mlog.info(`[END processEntityFiles()] - done(options...) returned true`,
             TAB+`fileName: '${fileName}'`,
             TAB+`   stage: '${stage}'`,
-            outputDir 
-                ? TAB+`saved to: '`+path.join(outputDir, `${fileName}_${stage}.json`)+`'` 
-                : '',
         );
         return true;
     }
@@ -142,7 +151,7 @@ async function done(
 
 /**
  * @param transactionType {@link RecordTypeEnum} 
- * @param filePaths `string | string[]`
+ * @param filePaths `string | string[]` - csv file(s)
  * @param options {@link TransactionProcessorOptions}
  * @returns **`void`**
  */
@@ -157,13 +166,15 @@ export async function processTransactionFiles(
         clearLogFiles, parseOptions, postProcessingOptions, responseOptions 
     } = options as TransactionProcessorOptions;
     if (!parseOptions || !postProcessingOptions) {
-        throw new Error(`[transactionProcessor.processTransactionFiles()] Invalid ProcessorOptions`
+        throw new Error(`[processTransactionFiles()] Invalid ProcessorOptions`
             +`(missing parseOptions or postProcessingOptions).`
         );
     }
     if (isNonEmptyArray(clearLogFiles)) clearFile(...clearLogFiles);
     filePaths = isNonEmptyArray(filePaths) ? filePaths : [filePaths];
-    validate.arrayArgument('processTransactionFiles', 'filePaths', filePaths, TypeOfEnum.STRING, isNonEmptyString);
+    validate.arrayArgument('processTransactionFiles', 'filePaths', 
+        filePaths, TypeOfEnum.STRING, isNonEmptyString
+    );
     // mlog.info(`[START processTransactionFiles()]`);
     for (let i = 0; i < filePaths.length; i++) {
         const csvFilePath = filePaths[i];
@@ -171,17 +182,22 @@ export async function processTransactionFiles(
         const parseResults: ParseResults = await parseRecordCsv(
             csvFilePath, parseOptions
         );
-        if (await done(options, fileName, TransactionProcessorStageEnum.PARSE, parseResults)) return;
-        
+        if (await done(
+            options, fileName, 
+            TransactionProcessorStageEnum.PARSE, parseResults
+        )) return;
         const validatedResults: ValidatedParseResults = await processParseResults(
             parseResults, postProcessingOptions
         );
-        if (await done(options, fileName, TransactionProcessorStageEnum.VALIDATE, validatedResults)) return
+        if (await done(
+            options, fileName, 
+            TransactionProcessorStageEnum.VALIDATE, validatedResults
+        )) return;
         if (!options.matchOptions) {
-            mlog.warn(`[transactionProcessor.processTransactionFiles()] Aborting Process.`,
+            mlog.warn(`[processTransactionFiles()] Aborting Process.`,
                 TAB+`No matchOptions provided && stopAfter stage !== PARSE or VALIDATE`,
                 TAB+`If want to continue past PARSE or VALIDATE, provide valid matchOptions`,
-                TAB+`stopAfter received: '${options.stopAfter}'`,
+                TAB+`stopAfter stage: '${options.stopAfter}'`,
             );
             return;
         }
@@ -189,45 +205,82 @@ export async function processTransactionFiles(
             acc[key] = validatedResults[key].invalid;
             return acc;
         }, {} as { [recordType: string]: RecordOptions[] });
-        write(invalidDict, path.join(CLOUD_LOG_DIR, `${fileName}_invalidOptions.json`));
+        if (Object.keys(invalidDict).some(recordType => invalidDict[recordType].length > 0)) {
+            write(invalidDict, path.join(CLOUD_LOG_DIR, `salesorders`, 
+                `${getFileNameTimestamp()}_${fileName}_invalidOptions.json`)
+            );
+        }
         const validDict = Object.keys(validatedResults).reduce((acc, key) => {
             acc[key] = validatedResults[key].valid;
             return acc;
         }, {} as { [recordType: string]: RecordOptions[] });
-
         const validTransactions = Object.values(validDict).flat();
+        mlog.info(`[processTransactionFiles()] calling matchTransactionsToEntity()...`);
         const matchResults = await matchTransactionsToEntity(
             validTransactions, options.matchOptions
         );
-        if (await done(options, fileName, TransactionProcessorStageEnum.MATCH_ENTITY, matchResults)) return;
-
+        if (isNonEmptyArray(matchResults.errors)) {
+            mlog.debug(`[processTransactionFiles()]`,
+                `${matchResults.errors.length} transaction(s) did not match to entities.`,
+                TAB+`   current file: '${fileName}'`,
+                TAB+`processor stage: '${TransactionProcessorStageEnum.MATCH_ENTITY}'`,
+                TAB+` error quotient: (${matchResults.errors.length}/${matchResults.matches.length+matchResults.errors.length})`,
+            );
+            write(
+                {timestamp: getCurrentPacificTime(), errors: matchResults.errors}, 
+                path.join(CLOUD_LOG_DIR, `salesorders`, `${getFileNameTimestamp()}_${fileName}_matchErrors.json`)
+            );
+        }
+        if (await done(
+            options, fileName, 
+            TransactionProcessorStageEnum.MATCH_ENTITY, matchResults
+        )) return;
         if (isEmptyArray(matchResults.matches)) {
-            mlog.warn(`[transactionProcessor.processTransactionFiles()] No valid transactions matched to entities.`,
+            mlog.warn(`[processTransactionFiles()]`,
+                `No valid transactions matched to entities.`,
                 TAB+`fileName: '${fileName}'`,
                 TAB+`   stage: '${TransactionProcessorStageEnum.MATCH_ENTITY}'`,
-                TAB+`   continuing to next file...`
+                TAB+`continuing to next file...`
             );
             continue;
         }
-        if (isNonEmptyArray(matchResults.errors)) {
-            mlog.debug(`[transactionProcessor.processTransactionFiles()] Some transactions did not match to entities.`,
-                TAB+`  fileName: '${fileName}'`,
-                TAB+`     stage: '${TransactionProcessorStageEnum.MATCH_ENTITY}'`,
-                TAB+`num errors: ${matchResults.errors.length}`,
-            );
-            write(matchResults.errors, 
-                path.join(CLOUD_LOG_DIR, `${fileName}_matchErrors.json`)
-            );
-        }
         const transactionResponses = await putTransactions(
             matchResults.matches, responseOptions || SO_RESPONSE_OPTIONS
+        ) as RecordResponse[];
+        let successCount = 0;
+        const rejects: RecordOptions[] = [];
+        for (const res of transactionResponses) {
+            if (isNonEmptyArray(res.rejects)) rejects.push(...res.rejects);
+            if (isNonEmptyArray(res.results)) successCount += res.results.length;
+        }
+        write(
+            {rejects}, 
+            path.join(CLOUD_LOG_DIR, 'salesorders', 
+                `${getFileNameTimestamp()}_${fileName}_putRejects.json`
+            )
         );
-        if (await done(options, fileName, TransactionProcessorStageEnum.PUT_SALES_ORDERS, transactionResponses)) return;
+        /**
+         * @TODO sort responses by success and failure, write failures to output
+         */
+        if (await done(
+            options, fileName, 
+            TransactionProcessorStageEnum.PUT_SALES_ORDERS, 
+            {successCount, failureCount: rejects.length}// transactionResponses
+        )) return;
     }
     return;
 }
 
-
+/**
+ * @TODO could also use getRecordById(recordType === contct) for contact.company text is entityValue... 
+ * - then getRecordById(recordType===customer, contact.company??
+ * 
+ * - or could make a function "generateCustomerFromOrder" and make a new customer record... 
+ * - - would have to transform so fields to corresponding customer fields...
+ * - > but then have to handle any duplicates bc maybe the customer already exists with a
+ * slightly different name
+ * 
+ *  */
 
 /**
  * - {@link matchUsingApi}
@@ -301,8 +354,8 @@ async function matchUsingLocalFile(
             'transactionProcessor.matchUsingLocalFile', 'options', options, 
             'TransactionEntityMatchOptions', isTransactionEntityMatchOptions
         );
-    } catch (e) {
-        mlog.error(`[matchUsingLocalFile()] Invalid parameters`, e);
+    } catch (error) {
+        mlog.error(`[matchUsingLocalFile()] Invalid parameters`, (error as any));
         return { matches: [], errors: [] };
     }
     const { entityType, entityFieldId, localFileOptions } = options;
@@ -374,7 +427,7 @@ async function matchUsingApi(
     const result: { matches: RecordOptions[], errors: RecordOptions[] } = { 
         matches: [], errors: [] 
     };
-    
+    const entityHistory: { [entityId: string]: number } = {}
     for (const txn of transactions) {
         if (!txn.fields || !isNonEmptyString(txn.fields[entityFieldId])) {
             mlog.warn(`[matchTransactionToEntity()] Invalid RecordOptions:`,
@@ -386,32 +439,73 @@ async function matchUsingApi(
             continue; 
         }
         const entityValue = txn.fields[entityFieldId];
+        if (typeof entityHistory[entityValue] === 'number') {
+            txn.fields[entityFieldId] = entityHistory[entityValue];
+            result.matches.push(txn);
+            continue;
+        }
         const getReq: GetRecordRequest = {
             recordType: entityType,
-            idOptions: [{
-                idProp: idPropertyEnum.ENTITY_ID,
-                searchOperator: SearchOperatorEnum.TEXT.IS,
-                idValue: entityValue as string
-            }] as idSearchOptions[]
+            idOptions: generateIdOptions(txn, entityType, entityFieldId)
         }
         const getRes = await getRecordById(getReq) as GetRecordResponse;
-        if (!getRes) {
+        if (!getRes || !isNonEmptyArray(getRes.records)) {
             await handleMatchError(entityValue, getReq, getRes, 
-                `getRecordById() returned null or undefined`
+                `getRecordById() Invalid response: undefined or has no records`
             );
             result.errors.push(txn);
-            continue; 
-        } else if (!getRes.records || !isNonEmptyArray(getRes.records)) {
-            await handleMatchError(entityValue, getReq, getRes, 
-                `getRecordById() response has no records (property is missing or is empty array)`
-            );
-            result.errors.push(txn);
-            continue; 
+        } else {
+            txn.fields[entityFieldId] = getRes.records[0].internalid;
+            entityHistory[entityValue] = getRes.records[0].internalid;
+            result.matches.push(txn);
         }
-        txn.fields[entityFieldId] = getRes.records[0].internalid;
-        result.matches.push(txn);
+        await DELAY(1000, null);
+        continue;
     }
     return result
+}
+
+/**
+ * @param transaction 
+ * @param entityType 
+ * @param entityFieldId 
+ * @returns **`idOptions`** = {@link idSearchOptions}`[]`
+ */
+function generateIdOptions(
+    transaction: RecordOptions,
+    entityType: string,
+    entityFieldId: string
+): idSearchOptions[] {
+    if (!transaction.fields) {
+        return []
+    }
+    const entityValue = transaction.fields[entityFieldId] as string;
+    const idOptions: idSearchOptions[] = [
+        idSearchOptions(idPropertyEnum.ENTITY_ID, entityValue),
+        idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
+            encodeExternalId(`${entityValue}<${entityType}>`)
+        ),
+    ];
+    for (const addrFieldId of ['billingaddress', 'shippingaddress']) {
+        if (!transaction.fields[addrFieldId]) continue;
+        const addr = transaction.fields[addrFieldId] as SetFieldSubrecordOptions;
+        if (!addr.fields) continue;
+        const addressee = addr.fields.addressee as string;
+        const attention = addr.fields.attention as string;
+        if (addressee) {
+            idOptions.push(idSearchOptions(idPropertyEnum.ENTITY_ID, addressee));
+            idOptions.push(idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
+                encodeExternalId(`${addressee}<${entityType}>`))
+            );
+        }
+        if (attention) {
+            idOptions.push(idSearchOptions(idPropertyEnum.ENTITY_ID, attention));
+            idOptions.push(idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
+                encodeExternalId(`${attention}<${entityType}>`))
+            );
+        }
+    }
+    return idOptions;
 }
 
 async function handleMatchError(
@@ -420,15 +514,16 @@ async function handleMatchError(
     response?: any, 
     reason?: string
 ): Promise<void> {
-    mlog.error(`[matchUsingApi()] Error matching entity '${entityValue}'`,
-        (reason ? TAB + `reason: ${reason}` : ''),
+    SUP.push(`[matchUsingApi()] Error matching entity '${entityValue}'`,
+        (reason ? TAB + `  reason: ${reason}` : ''),
         (request ? TAB+`request object keys: ${JSON.stringify(Object.keys(request))}`:''),
         (response ? TAB+`response: ${indentedStringify(response)}`:''),
     );
-    write({entityValue, reason, request, response}, 
-        path.join(ERROR_DIR, `ERROR_matchUsingApi_${entityValue}.json`)
-    );
+    // write({entityValue, reason, request, response}, 
+    //     path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_matchUsingApi_${entityValue}.json`)
+    // );
 }
+
 /**
  * @param transactions {@link RecordOptions}`[]` 
  * @param responseOptions {@link RecordResponseOptions}
@@ -444,8 +539,8 @@ async function putTransactions(
             'transactions', transactions, 'RecordOptions', isRecordOptions
         );
         validate.objectArgument('transactionProcessor.putTransactions', 'responseOptions', responseOptions, 'RecordResponseOptions', isRecordResponseOptions);
-    } catch (e) {
-        mlog.error(`[putTransactions()] Invalid parameters`, e);
+    } catch (error) {
+        mlog.error(`[putTransactions()] Invalid parameters`, (error as any));
         return [];
     }
     try {
@@ -455,8 +550,8 @@ async function putTransactions(
         };
         return await upsertRecordPayload(transactionRequest) as RecordResponse[];
     } catch (error) {
-        mlog.error(`[putTransactions()] Error putting transactions:`, error);
-        write({timestamp: getCurrentPacificTime(), caught: error}, 
+        mlog.error(`[putTransactions()] Error putting transactions:`, (error as any));
+        write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 
             path.join(ERROR_DIR, `ERROR_putTransactions.json`)
         );
     }
@@ -468,8 +563,8 @@ async function putTransactions(
  * - {@link LocalFileMatchOptions}
  * @param value the value to check
  * @returns **`isTransactionEntityMatchOptions`** `boolean` = `value is TransactionEntityMatchOptions`
- * - `true` if the value is a valid TransactionEntityMatchOptions object
- * - `false` otherwise
+ * - `true` `if` the value is a valid `TransactionEntityMatchOptions` object
+ * - `false` `otherwise`
  */
 export function isTransactionEntityMatchOptions(
     value: any
@@ -486,4 +581,36 @@ export function isTransactionEntityMatchOptions(
             ))
         )
     );
+}
+/**
+ * @returns **`timestamp`** `string` = `(${MM}-${DD})-(${HH}-${mm}.${ss}.${ms})`
+ */
+function getFileNameTimestamp(): string {
+    const now = new Date();
+    const MM = String(now.getMonth() + 1).padStart(2, '0');
+    const DD = String(now.getDate()).padStart(2, '0');
+    const HH = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const ms = String(now.getMilliseconds()).padStart(3, '0');
+    return `(${MM}-${DD})-(${HH}-${mm}.${ss}.${ms})`
+}
+
+function encodeExternalId(externalId: string): string {
+    return externalId.replace(/</, '&lt;').replace(/>/, '&gt;')
+}
+
+/**
+ * @factory {@link idSearchOptions}
+ * @param idProp 
+ * @param idValue 
+ * @param searchOperator `string` - `Default` = {@link SearchOperatorEnum.TEXT.IS} = `'is'`
+ * @returns **`idSearchOptions`** {@link idSearchOptions}
+ */
+function idSearchOptions(
+    idProp: string, 
+    idValue: string | number, 
+    searchOperator: string = SearchOperatorEnum.TEXT.IS
+): idSearchOptions {
+    return { idProp, idValue, searchOperator} as idSearchOptions
 }

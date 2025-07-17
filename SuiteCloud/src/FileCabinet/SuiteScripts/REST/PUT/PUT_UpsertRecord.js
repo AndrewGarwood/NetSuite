@@ -150,8 +150,8 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             rec = record.load({type: recordType, id: recId, isDynamic });
             writeLog(LogTypeEnum.AUDIT, 
                 `Loading Existing ${recordType} record with internalid: '${recId}'`,
-                `deleted ${deletions.length} idPropField(s) from fields: ${JSON.stringify(deletions)}`,
-                `${Object.keys(fields).length} remaining field(s): ${JSON.stringify(Object.keys(fields))}`, 
+                // `deleted ${deletions.length} idPropField(s) from fields: ${JSON.stringify(deletions)}`,
+                // `${Object.keys(fields).length} remaining field(s): ${JSON.stringify(Object.keys(fields))}`, 
             );
         } else {
             writeLog(LogTypeEnum.AUDIT, 
@@ -269,7 +269,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                  * store recordIds = resultRange.map(result => result.id) 
                  */
                 if (resultRange.length > 1 && expectSingleResult) {
-                    writeLog(LogTypeEnum.ERROR,
+                    writeLog(LogTypeEnum.DEBUG,
                         'WARNING: searchForRecordById() Multiple records found.',
                         `${resultRange.length} '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                         `tentatively storing id of first record found,'${recordId}' then continuing to next idOptions element`

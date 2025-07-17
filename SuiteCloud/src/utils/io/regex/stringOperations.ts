@@ -35,7 +35,7 @@ export function stringEndsWithAnyOf(
         suffixes = [suffixes]; // Convert string to array of suffixes
     }
     if (Array.isArray(suffixes)) {   
-        /** Escape special regex characters in suffixes and join them with '|' (OR) */
+        /** Escape special regex characters in suffixes, then join them with '|' (OR) */
         const escapedSuffixes = suffixes.map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
         const pattern = `(${escapedSuffixes.join('|')})\\s*$`;
         regex = new RegExp(pattern, flags?.join('') || undefined);

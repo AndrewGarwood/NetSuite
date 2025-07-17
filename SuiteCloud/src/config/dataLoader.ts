@@ -17,13 +17,12 @@ let dataInitialized = false;
 
 /**
  * @enum {string} **`DataDomainEnum`**
- * @property **`REGEX`** = `'REGEX'` - want to load regex constants
- * @property **`INVENTORY`** = `'INVENTORY'` - want to load inventory data
+ * @property **`REGEX`** = `'REGEX'`
+ * @property **`INVENTORY`** = `'INVENTORY'`
  */
 export enum DataDomainEnum {
     REGEX = 'REGEX',
     INVENTORY = 'INVENTORY',
-    TRANSACTION = 'TRANSACTION'
 }
 /* ----------------------- LOAD INVENTORY CONFIG --------------------------- */
 /** `DATA_DIR/items/SKU_TO_INTERNAL_ID_DICT.json` */
@@ -41,13 +40,7 @@ let accountDictionary: Record<string, any> | null = null;
 const CLASSES_FILE = path.join(DATA_DIR, '.constants', 'classes.tsv');
 /** map `class` to `'internalid'` */
 let classDictionary: Record<string, string> | null = null;
-/* ---------------------- LOAD TRANSACTION CONFIG -------------------------- */
 
-/** `DATA_DIR/salesorders/problematicTransactions.json` */
-const PROBLEMATIC_TRANSACTIONS_PATH = path.join(
-    DATA_DIR, 'salesorders', 'problematicTransactions.json'
-);
-let problematicTransactions: string[] | null = null;
 
 /* ------------------------- LOAD REGEX CONFIG ----------------------------- */
 /** `DATA_DIR/.constants/regex_constants.json` */
@@ -67,8 +60,7 @@ export interface RegexConstants {
 const DEFAULT_INTERNAL_ID_COLUMN = 'Internal ID';
 const DEFAULT_DOMAINS_TO_LOAD = [
     DataDomainEnum.REGEX, 
-    DataDomainEnum.INVENTORY, 
-    DataDomainEnum.TRANSACTION
+    DataDomainEnum.INVENTORY,
 ];
 /**
  * Initialize all data required by the application.
@@ -96,9 +88,6 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
                     accountDictionary = await loadAccountDictionary();
                     classDictionary = await loadClassDictionary();
                     break;
-                case DataDomainEnum.TRANSACTION:
-                    problematicTransactions = await loadProblematicTransactions();
-                    break;
                 default:
                     mlog.warn(
                         `[initializeData()] Unrecognized data domain: '${d}'. Skipping...`
@@ -114,25 +103,6 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
     }
 }
 
-/** 
- * temporary func used to isolate issues before fixing them 
- * @returns **`problematicTransactions`** `Promise<string[]>`
- * */
-async function loadProblematicTransactions(
-    jsonPath: string=PROBLEMATIC_TRANSACTIONS_PATH
-): Promise<string[]> {
-    validate.existingFileArgument(`dataLoader.loadProblematicTransactions`, {jsonPath});
-    const jsonData = read(jsonPath);
-    if (!jsonData || !isNonEmptyArray(jsonData.problematicTransactions)) {
-        throw new Error([
-            `[dataLoader.loadProblematicTransactions()] Invalid jsonData`,
-            `jsonData is undefined, null, or missing required key`,
-            `Expected jsonData to have key 'problematicTransactions' that maps to non-empty string[]`,
-            `json file path received: '${jsonPath}'`
-        ].join(TAB)) 
-    }
-    return jsonData.problematicTransactions as string[];
-}
 /**
  * Load regex constants
  * @param filePath `string` - Path to the regex constants JSON file (default: `REGEX_FILE`)
@@ -305,13 +275,6 @@ export async function getAccountDictionary(): Promise<Record<string, string>> {
         accountDictionary = await loadAccountDictionary();
     }
     return accountDictionary;
-}
-
-export async function getProblematicTransactions(): Promise<string[]> {
-    if (!problematicTransactions) {
-        problematicTransactions = await loadProblematicTransactions();
-    }
-    return problematicTransactions;
 }
 
 /**

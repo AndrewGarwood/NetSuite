@@ -107,7 +107,7 @@ export async function parseRecordCsv(
                 sublistOptions as SublistDictionaryParseOptions
             );
         }
-        mlog.debug(...DEBUG, NL+`[END ROW] rowIndex: ${rowIndex}:`,);
+        // mlog.debug(...DEBUG, NL+`[END ROW] rowIndex: ${rowIndex}:`,);
         DEBUG.length = 0;
         SUP.length = 0;
         rowIndex++;
@@ -121,9 +121,10 @@ export async function parseRecordCsv(
         return acc;
     }, {} as Record<string, number>);
     INFO.push(NL+`[END parseRecordCsv()]`,
-        TAB + `  recordTypes: ${JSON.stringify(Object.keys(parseOptions))}`,
-        TAB + `Last rowIndex: ${rowIndex}`,
-        TAB + `Parse Summary: ${indentedStringify(parseSummary)}`
+        TAB + `     filePath: '${filePath}'`,
+        TAB + `  recordTypes:  ${JSON.stringify(Object.keys(parseOptions))}`,
+        TAB + `Last rowIndex:  ${rowIndex}`,
+        TAB + `Parse Summary:  ${indentedStringify(parseSummary)}`
     );
     mlog.info(...INFO);
     INFO.length = 0;
@@ -409,6 +410,11 @@ async function parseFieldValue(
 }
 
 /**
+ * @TODO could add a param called transformers (or something similar) 
+ * that is a list of functions to apply to trimmedValue that returns a FieldValue (the transformed value to return)
+ * if the transformation is applicable (i.e. can parse as a date string or a number), 
+ * otherwise returns `undefined`.
+ * if all transformations not applicable (all return undefined), just return `trimmedValue`
  * @param originalValue - The original value to be transformed with valueMapping or default operaitons
  * @param originalKey  - The original column header (key) of the value being transformed
  * @param newKey - The new column header (`fieldId`) (key) of the value being transformed
@@ -437,15 +443,30 @@ export async function transformValue(
         }
     }
     try {
-        if (BOOLEAN_TRUE_VALUES.includes(trimmedValue.toLowerCase()) && isBooleanFieldId(newKey)) {
+        if (BOOLEAN_TRUE_VALUES.includes(trimmedValue.toLowerCase()) 
+            && isBooleanFieldId(newKey)) {
             return true
-        } else if (BOOLEAN_FALSE_VALUES.includes(trimmedValue.toLowerCase()) && isBooleanFieldId(newKey)) {
+        } else if (BOOLEAN_FALSE_VALUES.includes(trimmedValue.toLowerCase()) 
+            && isBooleanFieldId(newKey)) {
             return false
         };
-        
+        // @example "11/15/2024" becomes "2024-11-15T08:00:00.000Z"
         if (DATE_STRING_PATTERN.test(trimmedValue)) {
             return new Date(trimmedValue);
-        } // @example "11/15/2024" becomes "2024-11-15T08:00:00.000Z"
+        } 
+        
+        // Check if trimmedValue matches a number pattern (integer or float, with optional commas)
+        // Pattern: matches numbers like "1,234", "1234", "1,234.56", "1234.56"
+        // temp assumption: strings with leading zeros are zip codes and should not be converted to number
+        // const NUMBER_PATTERN = /^-?\d{1,3}(?:,\d{3})*(?:\.\d+)?$|^-?\d+(\.\d+)?$/;
+        // if (!trimmedValue.startsWith('0') 
+        //     && NUMBER_PATTERN.test(trimmedValue.replace(/(\s|\$)/g, ''))) {
+        //     // Remove commas before converting to number
+        //     const numericValue = Number(trimmedValue.replace(/(,|\$)/g, ''));
+        //     if (!isNaN(numericValue)) {
+        //         return numericValue;
+        //     }
+        // }
         return trimmedValue;
     } catch (error) {
         mlog.error(`ERROR transformValue(): at row ${rowIndex} could not parse value: ${trimmedValue}`);

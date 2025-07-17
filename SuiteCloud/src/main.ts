@@ -48,83 +48,27 @@ async function main() {
     clearFile(DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH);
     mlog.info(`[START main()] at ${getCurrentPacificTime()}`)
     await instantiateAuthManager();
-    // Initialize application data first
     await initializeData();
+
+    const stagesToWrite: TransactionProcessorStageEnum[] = [
+        TransactionProcessorStageEnum.PUT_SALES_ORDERS
+    ]
+    const viableFiles = (fs.readdirSync(soConstants.VIABLE_SO_DIR)
+        .filter(file => 
+            file.toLowerCase().endsWith('.csv') 
+            || file.toLowerCase().endsWith('.tsv')
+        )
+        .map(file => path.join(soConstants.VIABLE_SO_DIR, file))
+    );
+    mlog.info(`viableFiles.length ${viableFiles.length}`);
+    let filePaths = viableFiles.slice(0, 4); // handle subset for now
     await callTransactionProcessor(
-        false, 
+        filePaths,
         soConstants.SALES_ORDER_LOG_DIR, 
-        // TransactionProcessorStageEnum.VALIDATE
+        TransactionProcessorStageEnum.END,
+        stagesToWrite
     );
 
-    // ---- Was Isolating Missing Items ----
-    // let validationDict: Record<string, string> = {};
-    // try {
-    //     validationDict = await getSkuDictionary();
-    // } catch (error) {
-    //     mlog.error('Failed to load SKU dictionary:', error);
-    //     STOP_RUNNING(1);
-    // }
-    // const ITEM_ID_COLUMN = 'Item';
-    // const TRAN_ID_COLUMN = 'Trans #';
-    // const ALL_SALES_ORDERS_DIR = path.join(soConstants.SALES_ORDER_DIR, 'all');
-    // const sourcePath = ALL_SALES_ORDERS_DIR;
-    // const csvFiles = (fs.readdirSync(sourcePath)
-    //     .filter(file => file.toLowerCase().endsWith('.csv') 
-    //         || file.toLowerCase().endsWith('.tsv'))
-    //     .map(file => path.join(sourcePath, file))
-    // );
-    // const missingItems = Array.from(new Set(
-    //     Object.values(await validateFiles(
-    //         csvFiles, ITEM_ID_COLUMN, extractLeaf, validationDict
-    //     )).flat()
-    // ));
-    // mlog.debug(`[main()] identified ${missingItems.length} missing item(s) with validateFiles()`)
-    
-    // if (isEmptyArray(missingItems)) {
-    //     STOP_RUNNING(1, `missingItems array is empty`)
-    // }
-    // const fileProblemCounts: Record<string, number> = {}
-    // const problematicTransactions: string[] = []
-    // let i = 0;
-    // let numTransactions = 0;
-    // for (const file of csvFiles) {
-    //     const rows = await getRows(file);
-    //     numTransactions += (await getColumnValues(rows, TRAN_ID_COLUMN)).length
-    //     const targetRows = await extractTargetRows(
-    //         rows, ITEM_ID_COLUMN, missingItems, extractLeaf
-    //     );
-    //     if (isEmptyArray(targetRows)) continue;
-    //     const tranIds = await getColumnValues(targetRows, TRAN_ID_COLUMN);
-    //     if (DEBUG.length > 0) mlog.debug(...DEBUG);
-    //     DEBUG.length = 0;
-    //     i++;
-    //     if (isEmptyArray(tranIds)) continue;
-    //     fileProblemCounts[file] = tranIds.length
-    //     problematicTransactions.push(...tranIds)
-    // }
-    // if (isEmptyArray(Object.keys(fileProblemCounts))) {
-    //     throw new Error(`fileProblemCounts keys.length === 0 but should be greater than zero `)
-    // }
-    // mlog.debug(`[main()] Finished isolating problems after processing ${csvFiles.length} file(s)`,
-    //     TAB+`  number of missing items: ${missingItems.length}`,
-    //     TAB+`       problem file count: ${Object.keys(fileProblemCounts).length}`,
-    //     TAB+`problem transaction count: ${problematicTransactions.length}`,
-    //     TAB+`  total transaction count: ${numTransactions}`
-    // );
-    // write({missingItems}, path.join(DATA_DIR, 'items', 'missingItems.json'));
-    // write({fileProblemCounts}, 
-    //     path.join(soConstants.SALES_ORDER_DIR, 'fileProblemCounts.json')
-    // );
-    // write({problematicTransactions}, 
-    //     path.join(soConstants.SALES_ORDER_DIR, 'problematicTransactions.json')
-    // );
-    /*
-    map filePath : List of transaction numbers where the transaction has 
-    a corresponding row with extractLeaf(row[Item]) in missingItems
-    */
-
-
-    
     trimFile(5, DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH);
     mlog.info(`[END main()] at ${getCurrentPacificTime()}`)
     STOP_RUNNING(0);
@@ -134,28 +78,25 @@ main().catch(error => {
     mlog.error('Error executing main() function', JSON.stringify(error));
     STOP_RUNNING(1);
 });
-    // const missingItemsTsvPath = path.join(DATA_DIR, 'items', 'missingItems.tsv');
-    // const missingItems = await getColumnValues(missingItemsTsvPath, ITEM_ID_COLUMN);
 
-// const request: GetRecordRequest = {
-//     recordType: RecordTypeEnum.SALES_ORDER,
-//     idOptions:[{idProp: idPropertyEnum.EXTERNAL_ID, searchOperator: SearchOperatorEnum.TEXT.IS, idValue: 'SO:335745_NUM:24-31127_PO:16835(INVOICE)&lt;salesorder&gt;'}],
-//     responseOptions: {
-//         responseFields: ['externalid', 'tranid', 'entity', 'trandate', 'orderstatus'],
-//     }
-// }
-// const response: GetRecordResponse = await getRecordById(request);
-// mlog.debug(`GetRecordResponse: ${indentedStringify(response)}`);
+/**
+ * @TODO in python pre processing, 
+ * set aside transactions with negative qty/price/amount to handle later?
+ * or just take absolute value in post processing?
+ */
+
 async function callTransactionProcessor(
-    useSubset: boolean = true,
+    transactionFilePaths: string | string[],
     outputDir?: string,
-    stopAfter?: TransactionProcessorStageEnum
+    stopAfter: TransactionProcessorStageEnum = TransactionProcessorStageEnum.END,
+    stagesToWrite: TransactionProcessorStageEnum[] = [
+        TransactionProcessorStageEnum.PUT_SALES_ORDERS
+    ]
 ): Promise<void> {
-    mlog.debug(`[START main.callTransactionProcessor()] defining variables...`)
-    const transactionFilePaths = (useSubset 
-        ? [soConstants.SINGLE_ORDER_FILE]
-        : [soConstants.SMALL_SUBSET_FILE]
-    );
+    if (typeof transactionFilePaths === 'string') { // assume single file path given
+        transactionFilePaths = [transactionFilePaths]
+    }
+    // mlog.debug(`[START main.callTransactionProcessor()] defining variables...`)
     const parseOptions: ParseOptions = { 
         [RecordTypeEnum.SALES_ORDER]: SO_PARSE_OPTIONS 
     };
@@ -172,10 +113,9 @@ async function callTransactionProcessor(
         parseOptions,
         postProcessingOptions,
         matchOptions,
-        clearLogFiles: [
-            DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH
-        ],
-        outputDir, 
+        clearLogFiles: [DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH],
+        outputDir,
+        stagesToWrite, 
         stopAfter
     }
     mlog.debug(`[main.callTransactionProcessor()] calling processTransactionFiles...`)

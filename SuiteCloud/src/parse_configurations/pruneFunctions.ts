@@ -21,7 +21,6 @@ import { hasKeys, isNullLike, RADIO_FIELD_FALSE, RADIO_FIELD_TRUE, anyNull, isNo
 import { equivalentAlphanumericStrings as equivalentAlphanumeric } from '../utils/io/regex/index';
 import * as validate from "../utils/argumentValidation";
 import { isRecordOptions } from '../utils/typeValidation';
-import { getProblematicTransactions } from '../config';
 /** `['entity', 'trandate']` */
 const SALES_ORDER_REQUIRED_FIELDS = ['entity', 'trandate'];
 
@@ -221,23 +220,23 @@ export const salesOrder = async (
             `[prune.salesOrder()] RecordOptions.fields.externalid is null or undefined`
         );
     }
-    /** should be something like `'SO:9999_NUM:0000_PO:1111(TRAN_TYPE)<salesorder>'` */
-    const externalIdValue = options.fields.externalid as string;
-    const soNum = externalIdValue.split('_')[0].split(':')[1];
-    if (!soNum) {
-        throw new Error(
-            `[prune.salesOrder()] sales order number from externalid is null or undefined`
-        );
-    }
-    /** getProblematicTransactions should already be loaded from initializeData() call at start of main.main()*/
-    const soNumbersToIgnore = new Set(await getProblematicTransactions());
-    if (soNumbersToIgnore.has(soNum)) {
-        plog.debug(`[prune.salesOrder()] pruning problematic transaction`,
-            TAB+`filtering out this RecordOptions because it has a line item with a sku not yet defined in netsuite account; will handle later`,
-            TAB+`options.fields.externalid: '${externalIdValue}'`
-        );
-        return null;
-    }
+    // /** should be something like `'SO:9999_NUM:0000_PO:1111(TRAN_TYPE)<salesorder>'` */
+    // const externalIdValue = options.fields.externalid as string;
+    // const soNum = externalIdValue.split('_')[0].split(':')[1];
+    // if (!soNum) {
+    //     throw new Error(
+    //         `[prune.salesOrder()] sales order number from externalid is null or undefined`
+    //     );
+    // }
+    // /** getProblematicTransactions should already be loaded from initializeData() call at start of main.main()*/
+    // const soNumbersToIgnore = new Set(await getProblematicTransactions());
+    // if (soNumbersToIgnore.has(soNum)) {
+    //     plog.debug(`[prune.salesOrder()] pruning problematic transaction`,
+    //         TAB+`filtering out this RecordOptions because it has a line item with a sku not yet defined in netsuite account; will handle later`,
+    //         TAB+`options.fields.externalid: '${externalIdValue}'`
+    //     );
+    //     return null;
+    // }
 
     if (options.fields.billingaddress) {
         let validatedAddress = address(
@@ -263,7 +262,7 @@ export const salesOrder = async (
         mlog.warn(`[prune.salesOrder()]: options.fields does not have any address fields.`,
             TAB+`options.fields.externalid: '${options.fields.externalid}'`,
         );
-        return null;
+        // return null;
     }
     if (!isNonEmptyArray(options.sublists.item)) {
         mlog.warn(`[prune.salesOrder()]: options.sublists.item is empty or not an array.`,

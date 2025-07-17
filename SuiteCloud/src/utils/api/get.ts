@@ -92,7 +92,7 @@ export async function getRecordById(
     } catch (error) {
         mlog.error('[ERROR get.getRecordById()]:', (error as any).data || error);
         write(
-            {timestamp: getCurrentPacificTime(), caught: error}, 
+            {timestamp: getCurrentPacificTime(), caught: (error as any)}, 
             path.join(ERROR_DIR, 'ERROR_getRecordById.json')
         );
         throw new Error('Failed to call GET_Record RESTlet');

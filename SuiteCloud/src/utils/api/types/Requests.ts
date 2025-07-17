@@ -106,13 +106,13 @@ export type RecordResult = {
 /**
  * @typedefn **`idSearchOptions`**
  * @property {idPropertyEnum} idProp - The property to search for. See {@link idPropertyEnum}
- * @property {RecordOperatorEnum} searchOperator - The operator to use for the search. See {@link RecordOperatorEnum}
  * @property {string | number | string[] | number[]} idValue - The value(s) of the property to search for.
+ * @property {RecordOperatorEnum} searchOperator - The operator to use for the search. See {@link RecordOperatorEnum}
  */
 export type idSearchOptions = {
     idProp: idPropertyEnum;
-    searchOperator: RecordOperatorEnum | SearchOperatorEnum | TextOperatorEnum | NumericOperatorEnum;
     idValue: string | number | string[] | number[];
+    searchOperator: RecordOperatorEnum | SearchOperatorEnum | TextOperatorEnum | NumericOperatorEnum;
 }
 
 /**
