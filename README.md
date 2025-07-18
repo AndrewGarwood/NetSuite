@@ -5,7 +5,7 @@
 
 
 ### My current approach is as follows:
-1. Write API endpoints (e.g. [PUT_UpsertRecord.js][upsert_file] for creating/updating records)
+1. Write API endpoints (e.g. [PUT_Record.js][upsert_file] for creating/updating records)
 2. I wanted to use TypeScript in VSCode, so I set up an Oauth2.0 flow to communicate with these endpoints (see [AuthManager.ts][oauth_file])
 3. In my use case, the goal is to read data from csv files and store them into [payloads][sample_payloads_file]
 4. Determine proper mapping by using aforementioned [Record Browser][record_browser] and write [ParseOptions][parse_options_file] objects.
@@ -20,12 +20,12 @@
 [suitescript_docs]: https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/article_4140956840.html
 [restlet_docs]: https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4387799403.html
 [record_browser]: https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/account.html
-[requests_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/types/Requests.ts
+[requests_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/api/requests/types/Requests.ts
 [parse_options_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/io/types/ParseOptions.ts
-[upsert_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/FileCabinet/SuiteScripts/REST/PUT/PUT_UpsertRecord.js
-[ouath_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/server/AuthManager.ts
+[upsert_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/api/endpoints/record/PUT_Record.js
+[ouath_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/api/server/AuthManager.ts
 [parser_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/csvParser.ts
 [post_process_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parseResultsProcessor.ts
-[sample_payloads_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/samplePayloads.ts
-[put_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/api/put.ts
+[sample_payloads_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/api/samplePayloads.ts
+[put_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/api/requests/put.ts
 
