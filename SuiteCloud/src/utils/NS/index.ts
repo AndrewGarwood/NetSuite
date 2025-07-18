@@ -2,8 +2,8 @@
  * @file src/utils/ns/index.ts
  */
 
-export * from './File';
-export * from './SuiteScriptEnvironment';
-export * from './Enums';
-export * from './record';
-export * from './search';
+export * from "./record";
+export * from "./Enums";
+export * from "./File";
+export * from "./search";
+export * from "./SuiteScriptEnvironment";

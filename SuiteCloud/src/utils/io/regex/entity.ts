@@ -137,9 +137,17 @@ export function extractName(
     } 
     const firstName = nameSplit[0].replace(/(,|\.)$/g, '');
     if (nameSplit.length == 2) {
-        const lastName = (jobTitleSuffix && includeJobTitleSuffix
-            ? nameSplit[1].replace(/,$/g, '') + `, ${jobTitleSuffix}`
-            : nameSplit[1].replace(/,$/g, '')
+        let initialLastName = nameSplit[1];
+        let alreadyHasJobTitleSuffix = (
+            stringEndsWithAnyOf(initialLastName, new RegExp(`,? ?${jobTitleSuffix}`))
+            || 
+            stringEndsWithAnyOf(initialLastName.replace(/\./, ''), new RegExp(`,? ?${jobTitleSuffix}`))
+        )
+        const lastName = (
+            jobTitleSuffix && includeJobTitleSuffix 
+            && !alreadyHasJobTitleSuffix
+            ? initialLastName.replace(/,$/g, '') + `, ${jobTitleSuffix}`
+            : initialLastName.replace(/,$/g, '')
         ).replace(/,\s*$/g, '');
         return { 
             first: firstName, 
@@ -148,9 +156,16 @@ export function extractName(
         };
     } else if (nameSplit.length > 2) {
         const middleName = nameSplit[1].replace(/,$/g, '');
+        let initialLastName = nameSplit.slice(2).join(' ');
+        let alreadyHasJobTitleSuffix = (
+            stringEndsWithAnyOf(initialLastName, new RegExp(`,? ?${jobTitleSuffix}`))
+            || 
+            stringEndsWithAnyOf(initialLastName.replace(/\./, ''), new RegExp(`,? ?${jobTitleSuffix}`))
+        )
         const lastName = (jobTitleSuffix && includeJobTitleSuffix 
-            ? nameSplit.slice(2).join(' ') + `, ${jobTitleSuffix}`
-            : nameSplit.slice(2).join(' ')
+            && !alreadyHasJobTitleSuffix
+            ? initialLastName + `, ${jobTitleSuffix}`
+            : initialLastName
         ).replace(/,\s*$/g, '');
         return { 
             first: firstName, 

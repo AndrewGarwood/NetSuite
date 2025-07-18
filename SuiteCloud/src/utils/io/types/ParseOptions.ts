@@ -7,7 +7,7 @@ import {
 } from "../../ns";
 import { FieldDictionary, FieldValue, RecordOptions, SublistDictionary, 
     SublistLine, idPropertyEnum 
-} from '../../api/types';
+} from '../../../api/types';
 
 export type ParseOptions = {
     [recordType: RecordTypeEnum | string]: RecordParseOptions;

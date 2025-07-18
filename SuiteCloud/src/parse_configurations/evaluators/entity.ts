@@ -9,12 +9,7 @@ import {
 import { HUMAN_VENDORS_TRIMMED } from '../vendor/vendorConstants';
 import { 
     FieldValue, 
-    StateAbbreviationEnum as STATES, 
-    CountryAbbreviationEnum as COUNTRIES, 
-    TermBase as Term,
-    RecordTypeEnum,
-    SB_TERM_DICTIONARY as TERM_DICT,
-} from "../../utils/api/types";
+} from "../../api/types";
 import { 
     extractPhone, clean, extractEmail, extractName, stringEndsWithAnyOf, RegExpFlagsEnum,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, COMPANY_KEYWORDS_PATTERN, COMPANY_ABBREVIATION_PATTERN,
@@ -29,6 +24,7 @@ import { checkForOverride, CLEAN_NAME_REPLACE_OPTIONS, ColumnSliceOptions, Value
 import { field, SUPPRESS } from './common';
 import { readJsonFileAsObject as read } from '../../utils/io';
 import path from 'node:path';
+import { RecordTypeEnum } from 'src/utils/ns/Enums';
 
 export const ENTITY_VALUE_OVERRIDES = {} as ValueMapping;
 Object.assign(ENTITY_VALUE_OVERRIDES, read(
@@ -49,7 +45,9 @@ export const entityId = (
     let entity = clean(row[entityIdColumn], {
         strip: STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
         replace: [
-            { searchValue: /\^$/g, replaceValue: '' },
+            { searchValue: /(\^|\*)$/g, replaceValue: '' },
+            { searchValue: /Scienc$/g, replaceValue: 'Science' },
+            { searchValue: /Ctr(\.)?$/g, replaceValue: 'Center' },
             REPLACE_EM_HYPHEN, 
             ENSURE_SPACE_AROUND_HYPHEN,
         ]
@@ -191,7 +189,7 @@ export const salutation = (
     if (salutationValue) return salutationValue;
     if (!nameColumns) return '';
     SUPPRESS.push(
-        NL+`evaluate.salutation() cleanString(row['${salutationColumn}']) = '${salutationValue}'`,
+        NL+`evaluate.salutation() clean(row['${salutationColumn}']) = '${salutationValue}'`,
     );
     for (const col of nameColumns) {
         let initialVal = clean(
@@ -270,7 +268,7 @@ export const firstName = (
         ? clean(row[firstNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
         : ''
     );
-    SUPPRESS.push(NL + `cleanString(row[firstNameColumn]): '${first}'`);
+    SUPPRESS.push(NL + `clean(row[firstNameColumn]): '${first}'`);
     if (!first || first.split(' ').length > 1) {
         first = name(row, 
             ...(firstNameColumn ? [firstNameColumn] : []) //if data entry error when someone put whole name in firstNameColumn,
@@ -293,7 +291,7 @@ export const middleName = (
     if (!middle || middle.split(' ').length > 1) {
         middle = name(row, ...nameColumns).middle;
     }
-    SUPPRESS.push(NL + `[evaluators/entity.middleName()] after evaluate nameColumns: '${middle}'`);
+    SUPPRESS.push(NL + `[evaluators.entity.middleName()] after evaluate nameColumns: '${middle}'`);
     return middle.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');
 }
 
@@ -309,7 +307,7 @@ export const lastName = (
         })
         : ''
     );
-    // mlog.debug(`cleanString(row[lastNameColumn]): '${last}'`);
+    // mlog.debug(`clean(row[lastNameColumn]): '${last}'`);
     if (!last) {
         last = name(row, ...nameColumns).last;
     }
@@ -372,8 +370,8 @@ export const website = (
         for (const colOption of emailColumnOptions) {
             let emailValue = email(row, colOption);
             if (!emailValue 
-                || stringEndsWithAnyOf(emailValue, commonEmailDomains, RegExpFlagsEnum.IGNORE_CASE)
-            ) {
+                || stringEndsWithAnyOf(emailValue, commonEmailDomains, 
+                    RegExpFlagsEnum.IGNORE_CASE)) {
                 continue; // skip common email domains
             }
             websiteValue = emailValue.split('@')[1] // get the domain part of the email

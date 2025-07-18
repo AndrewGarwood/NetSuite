@@ -5,7 +5,7 @@
 import { hasKeys, isNonEmptyString } from "src/utils/typeValidation";
 import { FieldParseOptions, ValueMappingEntry, CloneOptions, 
     ComposeOptions, WriteJsonOptions} from ".";
-import { RecordOptions } from "src/utils/api";
+import { RecordOptions } from "src/api";
 import { CleanStringOptions, NodeLeaves, NodeStructure, RowDictionary } from "..";
 
 /**

@@ -1,20 +1,20 @@
 /**
  * @file src/utils/io/reading.ts
  */
+import path from "node:path";
 import fs from "fs";
 import csv from "csv-parser";
 import xlsx from "xlsx";
-import { StringCaseOptions, StringPadOptions, StringReplaceOptions, StringStripOptions } from "./regex/index";
+import { RegExpFlagsEnum, StringCaseOptions, stringEndsWithAnyOf, StringPadOptions, StringReplaceOptions, StringStripOptions } from "./regex/index";
 import { ParseOneToManyOptions,} from "./types/IO";
 import { applyStripOptions, clean, UNCONDITIONAL_STRIP_DOT_OPTIONS } from "./regex/index"
 import { STOP_RUNNING } from "src/config/env";
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
 import { DelimiterCharacterEnum, ValueMapping, DelimitedFileTypeEnum } from "./types";
-import { FieldValue } from "../api/types/InternalApi";
 import { isNonEmptyArray, isValueMappingEntry, anyNull, isNullLike as isNull, hasKeys, isNonEmptyString, isEmptyArray } from "../typeValidation";
 import * as validate from "../argumentValidation";
 
-
+type FieldValue = Date | number | number[] | string | string[] | boolean | null;
 /**
  * @consideration make requiredHeaders a rest parameter i.e. `...string[]`
  * @TODO handle csv where a value contains the delimiter character
@@ -29,7 +29,7 @@ export function isValidCsv(
     filePath: string,
     requiredHeaders?: string[]
 ): boolean {
-    validate.existingFileArgument(`reading.isValidCsv`, {filePath});
+    validate.existingPathArgument(`reading.isValidCsv`, {filePath});
     const delimiter = getDelimiterFromFilePath(filePath);
     const data = fs.readFileSync(filePath, 'utf8');
     const lines = data.split('\n');
@@ -356,7 +356,7 @@ export async function getRows(
     filePath: string,
     sheetName: string = 'Sheet1'
 ): Promise<Record<string, any>[]> {
-    validate.existingFileArgument(`reading.getRows`, {filePath});
+    validate.existingPathArgument(`reading.getRows`, {filePath});
     if (filePath.endsWith('.xlsx') || filePath.endsWith('.xls')) {
         return getExcelRows(filePath, sheetName);
     }
@@ -368,7 +368,7 @@ export async function getExcelRows(
     filePath: string,
     sheetName: string = 'Sheet1'
 ): Promise<Record<string, any>[]> {
-    validate.existingFileArgument(`reading.getExcelRows`, {filePath});
+    validate.existingPathArgument(`reading.getExcelRows`, {filePath});
     const validatedFilePath = validateFileExtension(filePath, 'xlsx');
     try {
         const workbook = xlsx.readFile(validatedFilePath);
@@ -394,7 +394,7 @@ export async function getExcelRows(
 export async function getCsvRows(
     filePath: string
 ): Promise<Record<string, any>[]> {
-    validate.existingFileArgument(`reading.getCsvRows`, {filePath});
+    validate.existingPathArgument(`reading.getCsvRows`, {filePath});
     const delimiter = getDelimiterFromFilePath(filePath);
     if (!delimiter) {
         return []
@@ -516,7 +516,7 @@ export async function handleFilePathOrRowsArgument(
     let rows: Record<string, any>[] = [];
     if (isNonEmptyString(arg1) && !isValidCsv(arg1, requiredHeaders)) {
         throw new Error([
-            `[reading.handleFilesOrRowsArgument()] Invalid CSV filePath provided: '${arg1}'`,
+            `[reading.handleFilePathOrRowsArgument()] Invalid CSV filePath provided: '${arg1}'`,
             `        Source:   ${invocationSource}`,
             `requiredHeaders ? ${isNonEmptyArray(requiredHeaders) 
                 ? JSON.stringify(requiredHeaders) 
@@ -531,7 +531,7 @@ export async function handleFilePathOrRowsArgument(
     } else if (isNonEmptyArray(arg1)) {
         if (arg1.some(v => typeof v !== 'object')) {
             throw new Error([
-                `[reading.handleFilesOrRowsArgument()] Error: Invalid 'arg1' (Record<string, any>[]) param:`,
+                `[reading.handleFilePathOrRowsArgument()] Error: Invalid 'arg1' (Record<string, any>[]) param:`,
                 `There exists an element in the param array that is not an object.`,
                 `Source: ${invocationSource}`,
             ].join(TAB))
@@ -539,10 +539,42 @@ export async function handleFilePathOrRowsArgument(
         rows = arg1 as Record<string, any>[];
     } else {
         throw new Error([
-            `[reading.handleFilesOrRowsArgument()] Invalid parameter: 'arg1' (string | Record<string, any>[])`,
+            `[reading.handleFilePathOrRowsArgument()] Invalid parameter: 'arg1' (string | Record<string, any>[])`,
             `arg1 must be a string or an array of rows.`,
             `Source: ${invocationSource}`,
         ].join(TAB));
     }
     return rows;
+}
+
+
+/**
+ * @param dir `string` path to target directory
+ * @param targetExtensions `string[] optional` - array of file extensions to filter files by.
+ * - If not provided, all files in the directory will be returned.
+ * - If provided, only files with extensions matching the array will be returned.
+ * @returns **`targetFiles`** `string[]` array of full file paths
+ */
+export function getDirectoryFiles(
+    dir: string,
+    ...targetExtensions: string[]
+): string[] {
+    validate.existingPathArgument(`reading.getDirectoryFiles`, {dir});
+    validate.arrayArgument(`reading.getDirectoryFiles`, 
+        {targetExtensions}, 'string', isNonEmptyString, true
+    );
+    // ensure all target extensions start with period
+    for (let i = 0; i < targetExtensions.length; i++) {
+        const ext = targetExtensions[i];
+        if (!ext.startsWith('.')) { 
+            targetExtensions[i] = `.${ext}`;
+        }
+    }
+    const targetFiles: string[] = fs.readdirSync(dir).filter(
+        f => isNonEmptyArray(targetExtensions) 
+            ? true // get all files in dir, regardless of extension
+            : stringEndsWithAnyOf(f, targetExtensions, RegExpFlagsEnum.IGNORE_CASE)
+        
+    ).map(file => path.join(dir, file));
+    return targetFiles;
 }

@@ -3,14 +3,10 @@
  */
 import { mainLogger as mlog } from "../../config";
 import { 
-    RecordTypeEnum,
-    ContactRoleEnum,
     idPropertyEnum,
-    SB_TERM_DICTIONARY as TERM_DICT,
     RecordOptions,
-    idSearchOptions, SearchOperatorEnum
-} from "../../utils/api/types";
-import { CustomerTaxItemEnum } from "../../utils/api/types";
+    idSearchOptions, 
+} from "../../api/types";
 import { 
     ColumnSliceOptions,
     FieldDictionaryParseOptions,
@@ -26,6 +22,8 @@ import { CustomerColumnEnum as C, CUSTOMER_CATEGORY_MAPPING as CATEGORY_DICT } f
 import * as evaluate from "../evaluatorFunctions";
 import * as prune from "../pruneFunctions";
 import * as customerEval from "./customerEvaluatorFunctions";
+import { ContactRoleEnum, CustomerTaxItemEnum, RecordTypeEnum, SearchOperatorEnum } from "src/utils/ns/Enums";
+import { SB_TERM_DICTIONARY } from "src/utils/ns/record/accounting/Term";
 
 /** use to set the field `"isinactive"` to false */
 const NOT_INACTIVE = false;
@@ -205,7 +203,7 @@ export const CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
         category: { evaluator: customerEval.customerCategory, args: [C.CATEGORY, CATEGORY_DICT] },
         companyname: { evaluator: customerEval.customerCompany, args: [C.ENTITY_ID, C.COMPANY] },
         accountnumber: { colName: C.ACCOUNT_NUMBER },
-        terms: { evaluator: evaluate.terms, args: [C.TERMS, TERM_DICT] },
+        terms: { evaluator: evaluate.terms, args: [C.TERMS, SB_TERM_DICTIONARY] },
         taxable: {defaultValue: true },
         taxitem: {defaultValue: CustomerTaxItemEnum.YOUR_TAX_ITEM },
         url: { evaluator: evaluate.website, args: [C.WEBSITE, C.EMAIL] },

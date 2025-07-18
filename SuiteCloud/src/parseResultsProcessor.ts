@@ -22,7 +22,7 @@ import {
     RecordOptions, RecordTypeEnum,
     EntityRecordTypeEnum,
     idSearchOptions, 
-} from "./utils/api";
+} from "./api";
 import { 
     ParseResults, RecordPostProcessingOptions, CloneOptions, ComposeOptions,
     isRecordOptions, isCloneOptions, isComposeOptions,
@@ -185,7 +185,7 @@ export async function processParseResults(
  * @param cloneOptions {@link CloneOptions}
  * @returns **`recipientOptions`** {@link RecordOptions}
  */
-async function processCloneOptions(
+export async function processCloneOptions(
     parseResults: ParseResults,
     recordType: RecordTypeEnum | EntityRecordTypeEnum | string,
     index: number,
@@ -275,7 +275,7 @@ async function processCloneOptions(
  * @param composeOptions {@link ComposeOptions} - options for composing fields and sublists
  * @returns **`recordOptions`** {@link RecordOptions} - the modified record options
  */
-async function processComposeOptions(
+export async function processComposeOptions(
     record: RecordOptions,
     composeOptions: ComposeOptions
 ): Promise<RecordOptions> {

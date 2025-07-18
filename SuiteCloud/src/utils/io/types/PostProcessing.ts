@@ -1,9 +1,8 @@
 /**
  * @file src/utils/io/types/PostProcessing.ts
  */
-import { FieldDictionary, idSearchOptions, SublistLine } from "src/utils/api/types/Requests";
-import { FieldValue } from "src/utils/api/types/InternalApi";
-import { RecordOptions } from "src/utils/api/types/RecordEndpoint";
+import { FieldDictionary, idSearchOptions, SublistLine } from "src/api";
+import { RecordOptions } from "../../../api/types/RecordEndpoint";
 
 /**
  * Defines the order of operations for post-processing

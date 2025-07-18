@@ -32,7 +32,8 @@ const timestampTemplate = `(${dateTemplate} ${timeTemplate})`;
 /**not included for now */
 const logNameTemplate = "[{{name}}]"; //"[{{nameWithDelimiterPrefix}}{{name}}{{nameWithDelimiterSuffix}}]";
 const logLevelTemplate = "[{{logLevelName}}]";
-const fileInfoTemplate = "{{filePathWithLine}}"; 
+const fileInfoTemplate = 
+    "{{filePathWithLine}}"; 
     // "{{fullFilePath}}\n{{fileNameWithLine}}";
     //:{{fileColumn}} {{method}}";
     // "{{fileName}}:{{fileLine}}";
@@ -160,13 +161,13 @@ function formatLogObj(logObj: ILogObj | (ILogObj & ILogObjMeta)): string {
     const meta = logObj['_meta'] as IMeta;
     const { logLevelName, date, path } = meta;
     const timestamp = date ? date.toLocaleString() : '';
-    const pathString = `${path?.filePathWithLine}:${path?.fileColumn} ${path?.method ? path.method + '()' : ''}`;
+    const fileInfo = `${path?.filePathWithLine}:${path?.fileColumn}`;
+    const methodInfo = `${path?.method ? path.method + '()' : ''}`;
     delete logObj['_meta'];
-    let compositeInfo = '';
-    if (logLevelName) compositeInfo += `[${logLevelName}] `;
-    if (timestamp) compositeInfo += `(${timestamp}) `;
-    if (pathString) compositeInfo += `${pathString}`;
-    logObj['-1'] = compositeInfo.trim();
+    logObj['meta0'] = `[${logLevelName}] (${timestamp})`;
+    logObj['meta1'] = `${fileInfo} @ ${methodInfo}`;
+    // logObj['-1'] = `[${logLevelName}] (${timestamp})`;
+    // logObj['-2'] = `${fileInfo} @ ${methodInfo}`;
     return JSON.stringify(logObj, null, 4) + "\n" 
 }
 

@@ -111,7 +111,7 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
 async function loadRegexConstants(
     filePath: string=REGEX_FILE
 ): Promise<RegexConstants> {
-    validate.existingFileArgument('loadRegexConstants','filePath', filePath);
+    validate.existingPathArgument('loadRegexConstants','filePath', filePath);
     const REGEX_CONSTANTS = read(filePath) as Record<string, any>;
     if (!REGEX_CONSTANTS || !REGEX_CONSTANTS.hasOwnProperty('COMPANY_KEYWORD_LIST') || !REGEX_CONSTANTS.hasOwnProperty('JOB_TITLE_SUFFIX_LIST')) {
         throw new Error(`[loadRegexConstants()] Invalid REGEX_CONSTANTS file at '${filePath}'. Expected json object to have 'COMPANY_KEYWORD_LIST' and 'JOB_TITLE_SUFFIX_LIST' keys.`);
@@ -187,7 +187,7 @@ async function loadSkuDictionary(
 async function loadAccountDictionary(
     jsonPath: string=ACCOUNT_DICTIONARY_FILE,
 ): Promise<AccountDictionary> {
-    validate.existingFileArgument(`dataLoader.loadAccountDictionary`, {jsonPath});
+    validate.existingPathArgument(`dataLoader.loadAccountDictionary`, {jsonPath});
     const jsonData = read(jsonPath);
     if (isNull(jsonData)) {
         throw new Error([

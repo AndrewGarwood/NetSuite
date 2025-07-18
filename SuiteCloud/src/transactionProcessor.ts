@@ -4,11 +4,12 @@
 import path from 'node:path';
 import * as fs from 'fs';
 import {
+    readJsonFileAsObject as read,
     writeObjectToJson as write,
     getCsvRows, getOneToOneDictionary,
     ValidatedParseResults,
     ProcessParseResultsOptions, ParseOptions, ParseResults,
-    getCurrentPacificTime, 
+    getCurrentPacificTime, extractLeaf,
     indentedStringify, clearFile,
 } from "./utils/io";
 import { 
@@ -19,26 +20,29 @@ import {
     CLOUD_LOG_DIR
 } from "./config";
 import { 
-    EntityRecordTypeEnum, RecordOptions, RecordRequest, RecordResponse, 
+    RecordOptions, RecordRequest, RecordResponse, 
     RecordResult, idPropertyEnum,
     RecordResponseOptions, upsertRecordPayload,
     GetRecordRequest, getRecordById, GetRecordResponse,
-    RecordTypeEnum,
     FieldDictionary,
     idSearchOptions,
-    SearchOperatorEnum,
     FieldValue,
     SetFieldSubrecordOptions, 
-} from "./utils/api";
+} from "./api";
 import { parseRecordCsv } from "./csvParser";
 import { processParseResults } from "./parseResultsProcessor";
 import { 
     isNonEmptyArray, anyNull, isNullLike as isNull, isEmptyArray, hasKeys, 
     TypeOfEnum, isRecordOptions, isNonEmptyString, isRecordResponseOptions
 } from './utils/typeValidation';
-import { isValidCsv } from './utils/io/reading';
+import { getColumnValues, getRows, isValidCsv } from './utils/io/reading';
 import * as validate from './utils/argumentValidation';
-
+import { EntityRecordTypeEnum, RecordTypeEnum, SearchOperatorEnum } from './utils/ns/Enums';
+import { extractTargetRows } from './DataReconciler';
+import { entityId } from './parse_configurations/evaluators';
+import { SalesOrderColumnEnum } from './parse_configurations/salesorder/salesOrderConstants';
+import { SO_CUSTOMER_PARSE_OPTIONS, SO_CUSTOMER_POST_PROCESSING_OPTIONS } from './parse_configurations/salesorder/salesOrderParseDefinition';
+import { putEntities } from './entityProcessor';
 /** 
  * `responseFields`: `[
  * 'tranid', 'trandate', 'entity', 'externalid', 
@@ -62,6 +66,7 @@ export const SO_RESPONSE_OPTIONS: RecordResponseOptions = {
 export enum TransactionProcessorStageEnum {
     PARSE = 'PARSE',
     VALIDATE = 'VALIDATE',
+    /** use this as value for `stopAfter` to see output of `matchTransactionsToEntity()` */
     MATCH_ENTITY = 'MATCH_ENTITY',
     PUT_SALES_ORDERS = 'PUT_SALES_ORDERS',
     END = 'END'
@@ -76,7 +81,7 @@ export type TransactionEntityMatchOptions = {
     entityType: EntityRecordTypeEnum | string;
     entityFieldId: string;
     matchMethod: MatchSourceEnum;
-    localFileOptions?: LocalFileMatchOptions; 
+    localFileOptions?: LocalFileMatchOptions;
 }
 
 export type LocalFileMatchOptions = {
@@ -90,13 +95,11 @@ export type TransactionProcessorOptions = {
     postProcessingOptions: ProcessParseResultsOptions;
     /** 
      * {@link TransactionEntityMatchOptions} = `{ 
-     * entityType: EntityRecordTypeEnum | string; 
-     * entityFieldId: string; 
-     * matchMethod: MatchSourceEnum; 
-     * localFileOptions?: LocalFileMatchOptions; 
-     * }` 
+     * entityType: EntityRecordTypeEnum | string; entityFieldId: string; 
+     * matchMethod: MatchSourceEnum; localFileOptions?: LocalFileMatchOptions; }` 
      * */
     matchOptions?: TransactionEntityMatchOptions;
+    generateMissingEntities?: boolean;
     /** `RecordResponseOptions` for the transaction put request */
     responseOptions?: RecordResponseOptions;
     clearLogFiles?: string[];
@@ -113,6 +116,16 @@ export type TransactionProcessorOptions = {
      * */
     stopAfter?: TransactionProcessorStageEnum;
 }
+
+type MatchErrorDetails = {
+    timestamp: string;
+    sourceFile: string;
+    numMatchErrors: number; 
+    errors: RecordOptions[];
+}
+
+
+
 /**
  * @param options 
  * @param fileName 
@@ -160,8 +173,8 @@ export async function processTransactionFiles(
     filePaths: string | string[],
     options: TransactionProcessorOptions
 ): Promise<void> {
-    validate.stringArgument('transactionProcessor.processTransactionFiles', {transactionType});
-    validate.objectArgument('transactionProcessor.processTransactionFiles', {options});
+    validate.stringArgument(`${__filename}.processTransactionFiles`, {transactionType});
+    validate.objectArgument(`${__filename}.processTransactionFiles`, {options});
     const {
         clearLogFiles, parseOptions, postProcessingOptions, responseOptions 
     } = options as TransactionProcessorOptions;
@@ -186,9 +199,9 @@ export async function processTransactionFiles(
             options, fileName, 
             TransactionProcessorStageEnum.PARSE, parseResults
         )) return;
-        const validatedResults: ValidatedParseResults = await processParseResults(
+        const validatedResults = await processParseResults(
             parseResults, postProcessingOptions
-        );
+        ) as ValidatedParseResults;
         if (await done(
             options, fileName, 
             TransactionProcessorStageEnum.VALIDATE, validatedResults
@@ -220,14 +233,19 @@ export async function processTransactionFiles(
             validTransactions, options.matchOptions
         );
         if (isNonEmptyArray(matchResults.errors)) {
-            mlog.debug(`[processTransactionFiles()]`,
-                `${matchResults.errors.length} transaction(s) did not match to entities.`,
-                TAB+`   current file: '${fileName}'`,
-                TAB+`processor stage: '${TransactionProcessorStageEnum.MATCH_ENTITY}'`,
-                TAB+` error quotient: (${matchResults.errors.length}/${matchResults.matches.length+matchResults.errors.length})`,
-            );
+            mlog.debug([`[processTransactionFiles()]`,
+                `${matchResults.errors.length} transaction(s) did not have a matching ${options.matchOptions.entityType}.`,
+                `   current file: '${fileName}'`,
+                `processor stage: '${TransactionProcessorStageEnum.MATCH_ENTITY}'`,
+                ` error quotient: (${matchResults.errors.length}/${matchResults.matches.length+matchResults.errors.length})`,
+            ].join(TAB));
             write(
-                {timestamp: getCurrentPacificTime(), errors: matchResults.errors}, 
+                {
+                    timestamp: getCurrentPacificTime(),
+                    sourceFile: csvFilePath,
+                    numMatchErrors: matchResults.errors.length, 
+                    errors: matchResults.errors
+                } as MatchErrorDetails, 
                 path.join(CLOUD_LOG_DIR, `salesorders`, `${getFileNameTimestamp()}_${fileName}_matchErrors.json`)
             );
         }
@@ -253,15 +271,19 @@ export async function processTransactionFiles(
             if (isNonEmptyArray(res.rejects)) rejects.push(...res.rejects);
             if (isNonEmptyArray(res.results)) successCount += res.results.length;
         }
-        write(
-            {rejects}, 
-            path.join(CLOUD_LOG_DIR, 'salesorders', 
-                `${getFileNameTimestamp()}_${fileName}_putRejects.json`
-            )
-        );
-        /**
-         * @TODO sort responses by success and failure, write failures to output
-         */
+        if (isNonEmptyArray(rejects)){
+            write(
+                {
+                    timestamp: getCurrentPacificTime(),
+                    sourceFile: csvFilePath,
+                    numRejects: rejects.length,
+                    rejects,
+                }, 
+                path.join(CLOUD_LOG_DIR, 'salesorders', 
+                    `${getFileNameTimestamp()}_${fileName}_putRejects.json`
+                )
+            );
+        }
         if (await done(
             options, fileName, 
             TransactionProcessorStageEnum.PUT_SALES_ORDERS, 
@@ -270,7 +292,6 @@ export async function processTransactionFiles(
     }
     return;
 }
-
 /**
  * @TODO could also use getRecordById(recordType === contct) for contact.company text is entityValue... 
  * - then getRecordById(recordType===customer, contact.company??
@@ -299,15 +320,15 @@ export async function matchTransactionsToEntity(
 }> {
     try {
         validate.arrayArgument(
-            'transactionProcessor.matchTransactionsToEntity', 'transactions', 
-            transactions, TypeOfEnum.OBJECT
+            `${__filename}.matchTransactionsToEntity`, {transactions}, 
+            'RecordOptions', isRecordOptions
         );
         validate.objectArgument(
-            'transactionProcessor.matchTransactionsToEntity', 'options', options, 
+            `${__filename}.matchTransactionsToEntity`, {options}, 
             'TransactionEntityMatchOptions', isTransactionEntityMatchOptions
         );
     } catch(e) {
-        mlog.error(`[matchTransactionsToEntity()] Invalid parameters`, e);
+        mlog.error(`[matchTransactionsToEntity()] Invalid parameters`, (e as any));
         return { matches: [], errors: [] }
     }
     switch (options.matchMethod) {
@@ -364,7 +385,7 @@ async function matchUsingLocalFile(
     } = localFileOptions as LocalFileMatchOptions;
     if (!isValidCsv(filePath, [entityIdColumn, internalIdColumn])) {
         throw new Error([
-            `[matchTransactionsToEntity.useLocalFile()] Invalid parameter: 'filePath' (isValidCsv returned false)`,
+            `[matchUsingLocalFile()] Invalid parameter: 'filePath' (isValidCsv returned false)`,
             `Expected: string representing path to valid csv file containing columns: '${entityIdColumn}', '${internalIdColumn}'`,
         ].join(TAB));
     }
@@ -377,7 +398,7 @@ async function matchUsingLocalFile(
     );
     for (const txn of transactions) {
         if (!txn.fields || !isNonEmptyString(txn.fields[entityFieldId])) {
-            mlog.warn(`[matchTransactionToEntity()] Invalid RecordOptions:`,
+            mlog.warn(`[matchUsingLocalFile()] Invalid RecordOptions:`,
                 TAB+`entityType: '${entityType}'`,
                 TAB+`RecordOptions in transactions has missing or invalid FieldDictionary`,
                 TAB+`needed string value for txn.fields['${entityFieldId}']`,
@@ -388,7 +409,7 @@ async function matchUsingLocalFile(
         }
         const entityValue = String(txn.fields[entityFieldId] as FieldValue).trim();
         if (!entityInternalIdDict[entityValue]) {
-            mlog.warn(`[matchTransactionToEntity()] No match found for entity '${entityValue}'`,
+            mlog.warn(`[matchUsingLocalFile()] No match found for entity '${entityValue}'`,
                 TAB+`continuing to next transaction...`
             ); 
             result.errors.push(txn);
@@ -430,7 +451,7 @@ async function matchUsingApi(
     const entityHistory: { [entityId: string]: number } = {}
     for (const txn of transactions) {
         if (!txn.fields || !isNonEmptyString(txn.fields[entityFieldId])) {
-            mlog.warn(`[matchTransactionToEntity()] Invalid RecordOptions:`,
+            mlog.warn(`[matchUsingApi()] Invalid RecordOptions:`,
                 TAB+`RecordOptions in transactions has missing or invalid FieldDictionary`,
                 TAB+`needed string value for txn.fields['${entityFieldId}']`,
                 TAB+`continuing to next transaction...`
@@ -450,7 +471,7 @@ async function matchUsingApi(
         }
         const getRes = await getRecordById(getReq) as GetRecordResponse;
         if (!getRes || !isNonEmptyArray(getRes.records)) {
-            await handleMatchError(entityValue, getReq, getRes, 
+            await logMatchError(entityValue, getReq, getRes, 
                 `getRecordById() Invalid response: undefined or has no records`
             );
             result.errors.push(txn);
@@ -508,7 +529,7 @@ function generateIdOptions(
     return idOptions;
 }
 
-async function handleMatchError(
+async function logMatchError(
     entityValue: string, 
     request?: any, 
     response?: any, 
@@ -529,7 +550,7 @@ async function handleMatchError(
  * @param responseOptions {@link RecordResponseOptions}
  * @returns **`responses`** {@link RecordResponse}`[]`
  */
-async function putTransactions(
+export async function putTransactions(
     transactions: RecordOptions[],
     responseOptions: RecordResponseOptions = SO_RESPONSE_OPTIONS
 ): Promise<RecordResponse[]> {
@@ -572,7 +593,7 @@ export function isTransactionEntityMatchOptions(
     return (value 
         && typeof value === 'object'
         && hasKeys(value, 
-            ['entityType', 'entityFieldId', 'matchMethod'], true, true
+            ['entityType', 'entityFieldId', 'matchMethod'], true, false
         )
         && Object.values(MatchSourceEnum).includes(value.matchMethod)
         && (!value.localFileOptions 
@@ -596,6 +617,13 @@ function getFileNameTimestamp(): string {
     return `(${MM}-${DD})-(${HH}-${mm}.${ss}.${ms})`
 }
 
+
+
+
+// eventually move this stuff to another file.
+
+
+
 function encodeExternalId(externalId: string): string {
     return externalId.replace(/</, '&lt;').replace(/>/, '&gt;')
 }
@@ -613,4 +641,78 @@ function idSearchOptions(
     searchOperator: string = SearchOperatorEnum.TEXT.IS
 ): idSearchOptions {
     return { idProp, idValue, searchOperator} as idSearchOptions
+}
+
+/**
+ * - this is ineffecient and could likely be improved by having better way to retrieve source rows.
+ * - GroupedParser might help if I ever have time to finish it
+ */
+export async function resolveUnmatchedTransactions(
+    filePath: string,
+    transactions: RecordOptions[],
+    entityType: EntityRecordTypeEnum = EntityRecordTypeEnum.CUSTOMER
+): Promise<any> {
+    validate.stringArgument(`${__filename}.resolveUnmatchedTransactions`, 
+        {entityType}
+    );
+    validate.arrayArgument(`${__filename}.resolveUnmatchedTransactions`, 
+        {transactions}, 'RecordOptions', isRecordOptions
+    );
+    /** */
+    let missingEntities: Set<string> = new Set([])
+    const targetValues: string[] = [];
+    // for (const txn of transactions) {
+    //     if (!txn.fields || !isNonEmptyString(txn.fields.entity)) { continue }
+    //     targetValues.push(txn.fields.entity as string);
+    // }
+    for (let i = 0; i < transactions.length; i++) {
+        const txn = transactions[i];
+        if (!txn.fields 
+            || !isNonEmptyString(txn.fields.externalid) 
+            || !isNonEmptyString(txn.fields.entity)) { 
+            throw new Error([`${__filename}.resolveUnmatchedTransactions()]`,
+                `Invalid transaction: RecordOptions.fields is missing externalid`
+            ].join(TAB)) 
+        }
+        if (!missingEntities.has(txn.fields.entity)) missingEntities.add(txn.fields.entity)
+        /** should look something like `'SO:9999_NUM:0000_PO:1111(TRAN_TYPE)<salesorder>'` */
+        const externalId = txn.fields.externalid;
+        const invoiceNumberSubstringPattern = /(?<=NUM:).*(?=_|\()/i;
+        if (!invoiceNumberSubstringPattern.test(externalId)) {
+            throw new Error([`${__filename}.resolveUnmatchedTransactions()]`,
+                `Invalid transaction: RecordOptions.fields.externalid is missing invoice number`
+            ].join(TAB)) 
+        }
+        const invoiceNumber = (
+            externalId.match(invoiceNumberSubstringPattern) as RegExpMatchArray
+        )[0];
+        targetValues.push(invoiceNumber);
+    }
+    const invoiceColumn = SalesOrderColumnEnum.INVOICE_NUMBER
+    const targetRows = await extractTargetRows(filePath, invoiceColumn, targetValues);
+    const numEntsFromExtraction = (await getColumnValues(targetRows, SalesOrderColumnEnum.ENTITY_ID)).length;
+    mlog.debug([`Sanity Check / Testing`,
+        `number of entities from transactions: ${missingEntities.size}`,
+        `  number of entities from targetRows: ${numEntsFromExtraction}`,
+        `abs diff = ${Math.abs(missingEntities.size - numEntsFromExtraction)}`
+    ].join(TAB))
+    const parseOptions: ParseOptions = {
+        [entityType]: SO_CUSTOMER_PARSE_OPTIONS
+    }
+    const parseResults: ParseResults = await parseRecordCsv(targetRows, parseOptions);
+    const postProcessingOptions: ProcessParseResultsOptions = { 
+        [entityType]: SO_CUSTOMER_POST_PROCESSING_OPTIONS 
+    }
+    const validatedResults = await processParseResults(
+        parseResults, postProcessingOptions
+    ) as ValidatedParseResults;
+    if (isNonEmptyArray(validatedResults[entityType].invalid)) {
+        throw new Error([`${__filename}.resolveUnmatchedTransactions()]`,
+            `wtf there's an invalid customer RecordOptions....`,
+            `invalid.length: ${validatedResults[entityType].invalid.length}`,
+            `check salesOrderParseDefinition and prune functions...`
+        ].join(TAB))
+    }
+    const entities: RecordOptions[] = validatedResults[entityType].valid;
+    const entityResponses: RecordResponse[] = await putEntities(entities)
 }

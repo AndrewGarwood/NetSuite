@@ -2,19 +2,12 @@ import { parseLogger as plog, mainLogger as mlog,
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG, 
     STOP_RUNNING
 } from '../../config';
-import { HUMAN_VENDORS_TRIMMED } from '../vendor/vendorConstants';
 import { 
     FieldValue, 
-    StateAbbreviationEnum as STATES, 
-    CountryAbbreviationEnum as COUNTRIES, 
-    TermBase as Term,
-    RecordTypeEnum,
-    SB_TERM_DICTIONARY as TERM_DICT,
-} from "../../utils/api/types";
+} from "../../api/types";
 import { 
     extractPhone, clean, extractEmail, extractName, stringEndsWithAnyOf, RegExpFlagsEnum,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, COMPANY_KEYWORDS_PATTERN, COMPANY_ABBREVIATION_PATTERN,
-    isValidEmail,
     SALUTATION_REGEX, ATTN_SALUTATION_PREFIX_PATTERN, LAST_NAME_COMMA_FIRST_NAME_PATTERN,
     REMOVE_ATTN_SALUTATION_PREFIX, ENSURE_SPACE_AROUND_HYPHEN, REPLACE_EM_HYPHEN,
     equivalentAlphanumericStrings as equivalentAlphanumeric,
@@ -24,6 +17,7 @@ import {
 import { checkForOverride, CLEAN_NAME_REPLACE_OPTIONS, ColumnSliceOptions, ValueMapping } from '../../utils/io';
 import { ENTITY_VALUE_OVERRIDES, entityId, firstName, lastName, middleName, salutation, jobTitleSuffix } from './entity';
 import { SUPPRESS } from './common';
+import { CountryAbbreviationEnum, StateAbbreviationEnum } from 'src/utils/ns/Enums';
 
 
 
@@ -71,10 +65,15 @@ export const attention = (
         TAB+ `  last: '${last}'`,
         TAB+ ` title: '${title}'`,
     );
+    let alreadyHasJobTitleSuffix = (
+        stringEndsWithAnyOf(last, new RegExp(`,? ?${title}`))
+        || stringEndsWithAnyOf(last.replace(/\./, ''), new RegExp(`,? ?${title}`))
+    );
     let fullName = ((
         salutationValue
         .replace(/\.\s*$/, '') 
-        + `. ${first} ${middle} ${last}, ${title}`
+        + `. ${first} ${middle} ${last}` 
+        + (alreadyHasJobTitleSuffix ? '' : `, ${title}`)
         )
         .replace(/^\.\s(?=[A-Za-z])/, '') // removes the leading dot+space if no salutation value
         .replace(/\s+/g, ' ')
@@ -234,29 +233,6 @@ export const street = (
             break;
         }
     }
-
-    // if (streetLineNumber === 1 && lineOneIsRedundant && !lineTwoIsRedundant) {
-    //     SUPPRESS.push(NL + `streetLineNumber === 1 && lineOneIsRedundant is true!`,
-    //         NL + `streetLineOneValue: '${streetLineOneValue}' is redundant...`,
-    //         NL + `attentionValue: '${attentionValue}'`,
-    //         TAB + `               streetLineOneValue.includes(attentionValue) ? ${Boolean(attentionValue) && streetLineOneValue.includes(attentionValue)}`,
-    //         TAB + `equivalentAlphanumeric(streetLineOneValue, attentionValue) ? ${equivalentAlphanumeric(streetLineOneValue, attentionValue)}`,
-    //         NL + `addresseeValue: '${addresseeValue}'`,
-    //         TAB + `               streetLineOneValue.includes(addresseeValue) ? ${Boolean(addresseeValue) && streetLineOneValue.includes(addresseeValue)}`,
-    //         TAB + `equivalentAlphanumeric(streetLineOneValue, addresseeValue) ? ${equivalentAlphanumeric(streetLineOneValue, addresseeValue)}`,
-    //         NL + ` -> return streetLineTwoValue: '${streetLineTwoValue}'`
-    //     );
-    //     return streetLineTwoValue;
-    // } else if (streetLineNumber === 1) {
-    //     return streetLineOneValue;
-    // } else if (streetLineNumber === 2 && (lineOneIsRedundant || lineTwoIsRedundant)) {
-    //     return ''; 
-    //     // return empty string because already set value of addr1 to streetLineTwoValue
-    // } else if (streetLineNumber === 2) {
-    //     return streetLineTwoValue;
-    // } else {
-    //     return '';
-    // }
     return '';
 }
 
@@ -265,9 +241,9 @@ export const state = (
     stateColumn: string
 ): FieldValue => {
     let state = clean(row[stateColumn], undefined, { toUpper: true});
-    if (Object.keys(STATES).includes(state)) {
-        return STATES[state as keyof typeof STATES];
-    } else if (Object.values(STATES).includes(state as STATES)) {
+    if (Object.keys(StateAbbreviationEnum).includes(state)) {
+        return StateAbbreviationEnum[state as keyof typeof StateAbbreviationEnum];
+    } else if (Object.values(StateAbbreviationEnum).includes(state as StateAbbreviationEnum)) {
         return state;
     } else {
         plog.warn(`Invalid state: '${state}'`);
@@ -282,13 +258,13 @@ export const country = (
 ): FieldValue => {
     let country = clean(row[countryColumn], undefined, { toUpper: true});
     let state = clean(row[stateColumn], undefined, { toUpper: true});
-    if (Object.keys(COUNTRIES).includes(country)) {
-        return COUNTRIES[country as keyof typeof COUNTRIES];
-    } else if (Object.values(COUNTRIES).includes(country as COUNTRIES)) {
+    if (Object.keys(CountryAbbreviationEnum).includes(country)) {
+        return CountryAbbreviationEnum[country as keyof typeof CountryAbbreviationEnum];
+    } else if (Object.values(CountryAbbreviationEnum).includes(country as CountryAbbreviationEnum)) {
         return country;
-    } else if (Object.keys(STATES).includes(state) || Object.values(STATES).includes(state as STATES)) {
-        return COUNTRIES.UNITED_STATES; 
-        // Default to United States if state is valid but country is not
+    } else if (Object.keys(StateAbbreviationEnum).includes(state) || Object.values(StateAbbreviationEnum).includes(state as StateAbbreviationEnum)) {
+        return CountryAbbreviationEnum.UNITED_STATES; 
+        // Default to United StateAbbreviationEnum if state is valid but country is not
     } else {
         plog.warn(`Invalid country: '${country}' or state: '${state}'`);
         return '';

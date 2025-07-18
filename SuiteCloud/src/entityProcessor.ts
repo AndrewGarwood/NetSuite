@@ -1,8 +1,8 @@
 /**
  * @file src/entityProcessor.ts
  */
-import path from 'node:path';
-import * as fs from 'fs';
+import path from "node:path";
+import * as fs from "fs";
 import {
     writeObjectToJson as write,
     ValidatedParseResults,
@@ -25,14 +25,14 @@ import {
     FieldDictionary,
     idSearchOptions,
     SearchOperatorEnum, 
-} from "./utils/api";
+} from "./api";
 import { CUSTOMER_PARSE_OPTIONS, CONTACT_PARSE_OPTIONS, 
     CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS as POST_PROCESSING_OPTIONS 
 } from "./parse_configurations/customer/customerParseDefinition";
-import * as customerConstants from './parse_configurations/customer/customerConstants';
+import * as customerConstants from "./parse_configurations/customer/customerConstants";
 import { parseRecordCsv } from "./csvParser";
 import { processParseResults } from "./parseResultsProcessor";
-import { RadioFieldBoolean, RADIO_FIELD_TRUE, isNonEmptyArray } from './utils/typeValidation';
+import { RadioFieldBoolean, RADIO_FIELD_TRUE, isNonEmptyArray } from "./utils/typeValidation";
 
 /** 
  * {@link RecordResponseOptions}
@@ -170,8 +170,10 @@ export async function processEntityFiles(
 
 
 /**
+ * - payload normalization handled by {@link upsertRecordPayload}`()`
  * @param entities `Array<`{@link RecordOptions}`>`
  * @param responseOptions {@link RecordResponseOptions} - properties to return in the response.
+ * - `default` = {@link ENTITY_RESPONSE_OPTIONS}
  * @returns **`entityResponses`** `Promise<`{@link RecordResponse}`[]`
  */
 export async function putEntities(

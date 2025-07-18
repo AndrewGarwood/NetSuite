@@ -175,8 +175,8 @@ export const NODE_HOME_DIR = process.cwd() as string;
  * */
 export const SRC_DIR = path.join(NODE_HOME_DIR, 'src') as string;
 
-/** = `'`{@link SRC_DIR}`/server/tokens'` */
-export const TOKEN_DIR = path.join(SRC_DIR, 'server', 'tokens') as string;
+/** = `'`{@link SRC_DIR}`/api/server/tokens'` */
+export const TOKEN_DIR = path.join(SRC_DIR, 'api', 'server', 'tokens') as string;
 
 /** `'C:/Users/${USER}/OneDrive - ${ORGANIZATION}'` */ 
 export const ONE_DRIVE_DIR = path.join('C:', 'Users', USER, `OneDrive - ${ORGANIZATION}`);

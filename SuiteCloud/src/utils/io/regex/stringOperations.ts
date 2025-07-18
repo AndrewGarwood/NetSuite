@@ -2,7 +2,7 @@
  * @file src/utils/io/regex/stringOperations.ts
  */
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL} from "../../../config";
-import { StringCaseOptions, StringReplaceOptions } from ".";
+import { CleanStringOptions, StringCaseOptions, StringReplaceOptions } from ".";
 import { clean } from "./cleaning";
 import { distance as levenshteinDistance } from "fastest-levenshtein";
 import { RegExpFlagsEnum } from "./configureParameters";
@@ -152,18 +152,14 @@ export function equivalentAlphanumericStrings(
     tolerance: number = 0.90,
 ): boolean {
     if (!s1 || !s2) return false;
-    let s1Alphabetical = clean(s1,
-        undefined, 
-        { toLower: true } as StringCaseOptions, 
-        undefined, 
-        [{searchValue: /[^A-Za-z0-9]/g, replaceValue: '' }] as StringReplaceOptions
-    ).split('').sort().join('');
-    let s2Alphabetical = clean(s2, 
-        undefined, 
-        { toLower: true } as StringCaseOptions, 
-        undefined, 
-        [{searchValue: /[^A-Za-z0-9]/g, replaceValue: '' }] as StringReplaceOptions
-    ).split('').sort().join('');
+    const cleanOptions = {
+        case: { toLower: true } as StringCaseOptions, 
+        replace: [
+            {searchValue: /[^A-Za-z0-9]/g, replaceValue: '' }
+        ] as StringReplaceOptions
+    } as CleanStringOptions;
+    let s1Alphabetical = clean(s1, cleanOptions).split('').sort().join('');
+    let s2Alphabetical = clean(s2, cleanOptions).split('').sort().join('');
     if (s1Alphabetical.length === 0 || s2Alphabetical.length === 0) {
         return false;
     }

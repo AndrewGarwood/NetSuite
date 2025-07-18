@@ -1,7 +1,7 @@
 /**
  * @file src/utils/typeValidation.ts
  */
-export * from "./api/types/typeGuards";
+export * from "../api/types/typeGuards";
 export * from "./io/types/typeGuards";
 import { mainLogger as mlog } from "src/config/setupLog";
 import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "./io/regex/index";

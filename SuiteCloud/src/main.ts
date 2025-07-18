@@ -12,7 +12,7 @@ import {
     trimFile, clearFile, getCurrentPacificTime,
     getRows,
     getIndexedColumnValues,
-    getColumnValues
+    getColumnValues, formatDebugLogFile, getDirectoryFiles,
 } from "./utils/io";
 import { 
     STOP_RUNNING, CLOUD_LOG_DIR, DATA_DIR,
@@ -22,11 +22,7 @@ import {
     ERROR_LOG_FILEPATH, DataDomainEnum,
     ERROR_DIR, DEBUG_LOGS as DEBUG, SUPPRESSED_LOGS as SUP
 } from "./config";
-import { instantiateAuthManager } from "./utils/api";
-import { 
-    EntityRecordTypeEnum, 
-    RecordTypeEnum, 
-} from "./utils/api";
+import { instantiateAuthManager } from "./api";
 import { SALES_ORDER_PARSE_OPTIONS as SO_PARSE_OPTIONS, 
     SALES_ORDER_POST_PROCESSING_OPTIONS as SALES_ORDER_POST_PROCESSING_OPTIONS 
 } from "./parse_configurations/salesorder/salesOrderParseDefinition";
@@ -40,28 +36,29 @@ import { processTransactionFiles,
     TransactionProcessorStageEnum, TransactionEntityMatchOptions, MatchSourceEnum,
 } from "./transactionProcessor";
 import { validateFiles, extractTargetRows } from "./DataReconciler";
-import { isEmptyArray } from "./utils/typeValidation";
+import { isEmptyArray, isNonEmptyString } from "./utils/typeValidation";
 import * as validate from './utils/argumentValidation'
 import { getSkuDictionary, initializeData } from "./config/dataLoader";
+import { EntityRecordTypeEnum, RecordTypeEnum } from "./utils/ns/Enums";
 
+const LOG_FILES = [DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH];
 async function main() {
-    clearFile(DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH);
+    clearFile(...LOG_FILES);
     mlog.info(`[START main()] at ${getCurrentPacificTime()}`)
     await instantiateAuthManager();
     await initializeData();
-
+    STOP_RUNNING(0);
+    const viableFiles = getDirectoryFiles(
+        soConstants.VIABLE_SO_DIR, '.csv', '.tsv'
+    );
+    let filePaths = viableFiles.slice(1, 2); // handle subset for now
+    mlog.info([
+        `viableFiles.length: ${viableFiles.length}`,
+        `operating on: ${filePaths.length} file(s)`
+    ].join(TAB));
     const stagesToWrite: TransactionProcessorStageEnum[] = [
         TransactionProcessorStageEnum.PUT_SALES_ORDERS
     ]
-    const viableFiles = (fs.readdirSync(soConstants.VIABLE_SO_DIR)
-        .filter(file => 
-            file.toLowerCase().endsWith('.csv') 
-            || file.toLowerCase().endsWith('.tsv')
-        )
-        .map(file => path.join(soConstants.VIABLE_SO_DIR, file))
-    );
-    mlog.info(`viableFiles.length ${viableFiles.length}`);
-    let filePaths = viableFiles.slice(0, 4); // handle subset for now
     await callTransactionProcessor(
         filePaths,
         soConstants.SALES_ORDER_LOG_DIR, 
@@ -69,8 +66,9 @@ async function main() {
         stagesToWrite
     );
 
-    trimFile(5, DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH);
-    mlog.info(`[END main()] at ${getCurrentPacificTime()}`)
+    mlog.info(`[END main()] at ${getCurrentPacificTime()}`);
+    trimFile(5, ...LOG_FILES);
+    for (const filePath of LOG_FILES) { formatDebugLogFile(filePath) }
     STOP_RUNNING(0);
 }
 
@@ -93,7 +91,7 @@ async function callTransactionProcessor(
         TransactionProcessorStageEnum.PUT_SALES_ORDERS
     ]
 ): Promise<void> {
-    if (typeof transactionFilePaths === 'string') { // assume single file path given
+    if (isNonEmptyString(transactionFilePaths)) { // assume single file path given
         transactionFilePaths = [transactionFilePaths]
     }
     // mlog.debug(`[START main.callTransactionProcessor()] defining variables...`)
@@ -113,7 +111,7 @@ async function callTransactionProcessor(
         parseOptions,
         postProcessingOptions,
         matchOptions,
-        clearLogFiles: [DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH],
+        clearLogFiles: LOG_FILES,
         outputDir,
         stagesToWrite, 
         stopAfter

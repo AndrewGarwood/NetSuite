@@ -2,12 +2,12 @@
  * @file src/parse_configurations/salesorder/salesOrderParseDefinition.ts
  */
 import { mainLogger as mlog, pruneLogger as plog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config";
-import { 
-    SB_TERM_DICTIONARY as TERM_DICT,
+import {
     SublistLine,
     RecordOptions, idSearchOptions, idPropertyEnum,
     FieldValue,
-} from "../../utils/api/types";
+    FieldDictionary,
+} from "../../api/types";
 import { 
     CleanStringOptions, 
     FieldDictionaryParseOptions,
@@ -18,15 +18,17 @@ import {
     SubrecordParseOptions, RecordPostProcessingOptions, CloneOptions,
     ProcessParseResultsOptions, ComposeOptions, PostProcessingOperationEnum as PostOp,
     SublistLineIdOptions,
+    ColumnSliceOptions,
 } from "../../utils/io";
 import * as prune from "../pruneFunctions";
 import * as evaluate from "../evaluatorFunctions";
 import * as customerEval from "../customer/customerEvaluatorFunctions";
 import * as soEval from "./salesOrderEvaluatorFunctions";
 import { SalesOrderColumnEnum as SO } from "./salesOrderConstants";
-import { RecordTypeEnum, SalesOrderStatusEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
+import { CustomerStatusEnum, CustomerTaxItemEnum, RecordTypeEnum, SalesOrderStatusEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
 import { getSkuDictionary } from "src/config";
 import { isNonEmptyString } from "src/utils/typeValidation";
+import { SB_TERM_DICTIONARY } from "src/utils/ns";
 
 /** 
  * @TODO decide if it is better to move value assignment of 
@@ -166,7 +168,7 @@ export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
         externalid: { evaluator: soEval.transactionExternalId, args: EXTERNAL_ID_ARGS },
         otherrefnum: { evaluator: soEval.otherReferenceNumber, args: [SO.CHECK_NUMBER, SO.PO_NUMBER] },
         entity: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
-        terms: { evaluator: evaluate.terms, args: [SO.TERMS, TERM_DICT] },
+        terms: { evaluator: evaluate.terms, args: [SO.TERMS, SB_TERM_DICTIONARY] },
         checknumber: { colName: SO.CHECK_NUMBER },
         trandate: { colName: SO.TRAN_DATE },
         saleseffectivedate: { colName: SO.TRAN_DATE },
@@ -264,4 +266,46 @@ export const SALES_ORDER_POST_PROCESSING_OPTIONS: RecordPostProcessingOptions = 
     operationOrder: [PostOp.CLONE, PostOp.COMPOSE, PostOp.PRUNE],
     composeOptions: SALES_ORDER_COMPOSE_OPTIONS,
     pruneFunc: prune.salesOrder,
+}
+
+
+export const SO_CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
+    keyColumn: SO.ENTITY_ID,
+    fieldOptions: {
+        entityid: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
+        externalid: { evaluator: evaluate.entityExternalId, args: [RecordTypeEnum.CUSTOMER, SO.ENTITY_ID] }, // could do this in ComposeOptions instead
+        companyname: { evaluator: customerEval.customerCompany, args: [SO.ENTITY_ID] },
+        phone: { evaluator: evaluate.phone, args: [SO.PHONE] },
+        altphone: { evaluator: evaluate.phone, args: [{ colName: SO.PHONE, minIndex: 1}] as Array<string | ColumnSliceOptions>  },
+        email: { evaluator: evaluate.email, args: [SO.EMAIL] },
+        altemail: { evaluator: evaluate.email, 
+            args: [{ colName: SO.EMAIL, minIndex: 1}] as Array<string | ColumnSliceOptions>
+        },
+        fax: { evaluator: evaluate.phone, args: [SO.FAX] },
+        salutation: { evaluator: evaluate.salutation, args: [undefined, ...NAME_COLUMNS] },
+        firstname: { evaluator: evaluate.firstName, args: [undefined, ...NAME_COLUMNS] },
+        middlename: { evaluator: evaluate.middleName, args: [undefined, ...NAME_COLUMNS] },
+        lastname: { evaluator: evaluate.lastName, args: [undefined, ...NAME_COLUMNS] },
+        taxable: { defaultValue: true },
+        taxitem: { defaultValue: CustomerTaxItemEnum.YOUR_TAX_ITEM },
+        entitystatus: { defaultValue: CustomerStatusEnum.CLOSED_WON }
+    },
+    sublistOptions: {
+        addressbook: [
+            { 
+                lineIdOptions: {lineIdProp: 'label'} as SublistLineIdOptions, 
+                label: { evaluator: evaluate.street, args: [1, BILLING_STREET_ARGS] },
+                addressbookaddress: BILLING_ADDRESS_OPTIONS, 
+            },
+            { 
+                lineIdOptions: {lineIdProp: 'label'} as SublistLineIdOptions, 
+                label: { evaluator: evaluate.street, args: [1, SHIPPING_STREET_ARGS] },
+                addressbookaddress: SHIPPING_ADDRESS_OPTIONS, 
+            },  
+        ] as SublistLineParseOptions[],
+    }
+}
+
+export const SO_CUSTOMER_POST_PROCESSING_OPTIONS: RecordPostProcessingOptions = {
+    pruneFunc: prune.entity
 }

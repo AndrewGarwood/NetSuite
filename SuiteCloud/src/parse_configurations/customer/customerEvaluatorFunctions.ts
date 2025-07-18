@@ -1,10 +1,9 @@
 /**
  * @file src/parse_configurations/customer/customerEvaluatorFunctions.ts
  */
-import { 
-    CustomerStatusEnum,
+import {
     FieldValue,
-} from "../../utils/api/types";
+} from "../../api/types";
 import { mainLogger as mlog, parseLogger as plog, DEBUG_LOGS as DEBUG, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config";
 import { RADIO_FIELD_TRUE, RADIO_FIELD_FALSE, anyNull } from "../../utils/typeValidation";
 import {

@@ -1,16 +1,16 @@
 /**
  * @file src/utils/io/writing.ts
  */
-import fs from 'fs';
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from 'src/config/setupLog';
-import { OUTPUT_DIR } from '../../config/env';
-import { getCurrentPacificTime } from './dateTime';
-import { validateFileExtension, getDelimiterFromFilePath } from './reading';
-import { DelimitedFileTypeEnum, DelimiterCharacterEnum, WriteJsonOptions } from './types';
-import { hasKeys, isEmptyArray, isNonEmptyString, TypeOfEnum, isWriteJsonOptions, } from '../typeValidation';
-import * as validate from '../argumentValidation';
-import path from 'node:path';
-import { existsSync, writeFileSync } from 'node:fs';
+import * as fs from "fs";
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
+import { OUTPUT_DIR } from "../../config/env";
+import { getCurrentPacificTime } from "./dateTime";
+import { validateFileExtension, getDelimiterFromFilePath } from "./reading";
+import { DelimitedFileTypeEnum, DelimiterCharacterEnum, WriteJsonOptions } from "./types";
+import { hasKeys, isEmptyArray, isNonEmptyString, TypeOfEnum, isWriteJsonOptions, } from "../typeValidation";
+import * as validate from "../argumentValidation";
+import * as path from "path";
+import { existsSync, writeFileSync } from "fs";
 
 
 
@@ -129,7 +129,6 @@ export function indentedStringify(
         .replace(/^\n\t. /, '').replace(/•/g, '');
     return jsonString;
 }
-
 
 
 /**

@@ -5,7 +5,7 @@
 
 import { ParseResults, RowContext, ParseOptions, CleanStringOptions } from "../..";
 import type { ParseMetaData, ParseError } from "../../../../ParseManager";
-import { EntityRecordTypeEnum, RecordTypeEnum } from "src/utils/api";
+import { EntityRecordTypeEnum, RecordTypeEnum } from "src/api";
 
 /**
  * @TODO 

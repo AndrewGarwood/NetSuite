@@ -23,7 +23,7 @@ import {
     EntityRecordTypeEnum,
     SetFieldSubrecordOptions,
     NOT_DYNAMIC
-} from "../../api";
+} from "../../../api";
 import {
     isNonEmptyArray, isEmptyArray, anyNull, isNullLike as isNull, isSubrecordValue,
     isFieldParseOptions, isNodeLeaves, isNodeStucture, isRowDictionary

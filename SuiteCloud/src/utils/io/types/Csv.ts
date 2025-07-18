@@ -7,7 +7,7 @@
  * @enum {string} **`DelimitedFileTypeEnum`**
  * @property {string} CSV - Comma-separated values (CSV) file type.
  * @property {string} TSV - Tab-separated values (TSV) file type.
- * @property {string} AUTO - call {@link getDelimiterFromFilePath}(filePath, fileType) to detect file type based on file extension.
+ * @property {string} AUTO - call {@link getDelimiterFromFilePath}`(filePath, fileType)` to detect file type based on file extension.
  */
 export enum DelimitedFileTypeEnum {
     CSV = 'csv',

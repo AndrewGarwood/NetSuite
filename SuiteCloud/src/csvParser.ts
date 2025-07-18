@@ -32,39 +32,41 @@ import {
     isFieldParseOptions,
     isValueMappingEntry,
     SublistLineIdOptions,
-    DATE_STRING_PATTERN, indentedStringify, 
+    DATE_STRING_PATTERN, indentedStringify, handleFilePathOrRowsArgument
 } from "./utils/io";
 import fs from 'fs';
 import { 
     FieldValue, FieldDictionary, SublistDictionary, SublistLine, 
     SubrecordValue, SetFieldSubrecordOptions, SetSublistSubrecordOptions, 
-    RecordOptions, RecordTypeEnum, isFieldValue, isSubrecordValue
-} from "./utils/api";
+    RecordOptions, isFieldValue, isSubrecordValue
+} from "./api";
+import { RecordTypeEnum } from "./utils/ns/Enums";
 /** use to set the field `"isinactive"` to false */
 const NOT_DYNAMIC = false;
 let rowIndex = 0;
 
 /**
- * @param filePath `string` 
+ * @param arg1 `string | Record<string, any>[]` {@link handleFilePathOrRowsArgument}
  * @param parseOptions {@link ParseOptions}
  * @returns **`results`** `Promise<`{@link ParseResults}`>`
  */
 export async function parseRecordCsv(
-    filePath: string,
+    arg1: string | Record<string, any>[],
     parseOptions: ParseOptions
 ): Promise<ParseResults> {
-    if (!isValidCsv(filePath)) {
-        mlog.error(`ERROR parseRecords(): Invalid CSV file: isValidCsv() returned false`,
-            TAB+` filePath: '${filePath}'`,
-            TAB+`Please check the file and try again.`,
-        );
-        return {};
+    if (isNull(arg1)) {
+        throw new Error([
+            `[csvParser.parseRecordCsv()] Invalid argument: 'arg1'`,
+            `expected 'arg1' to be string | Record<string, any>[]`,
+            `received: ${arg1}`
+        ].join(TAB))
     }
     validate.objectArgument(`csvParser.parseRecordCsv`, `parseOptions`, parseOptions);
     INFO.push(`[START parseRecordCsv()]`,
         TAB+`recordTypes: ${JSON.stringify(Object.keys(parseOptions))}`,
-        TAB+`   filePath: '${filePath}'`,
+        typeof arg1 === 'string' ? TAB+`   filePath: '${arg1}'` : '',
     );           
+    const rows = await handleFilePathOrRowsArgument(arg1, 'csvParser.parseRecordCsv');
     const results: ParseResults = {};
     const intermediate: IntermediateParseResults = {};
     for (const recordType of Object.keys(parseOptions)) {
@@ -72,7 +74,6 @@ export async function parseRecordCsv(
         intermediate[recordType] = {};
     }
     let rowIndex = 0;
-    const rows = await getRows(filePath);
     for (const row of rows) {
         DEBUG.push(
             (DEBUG.length > 0 ? NL : '')+`[START ROW] rowIndex: ${rowIndex}:`,
@@ -87,7 +88,7 @@ export async function parseRecordCsv(
              * (e.g. recordType=salesorder and have already processed one of its rows) 
              * */
             DEBUG.push(
-                NL+ `recordType: '${recordType}', idColumn: '${keyColumn}',`,
+                NL+`recordType: '${recordType}', idColumn: '${keyColumn}',`,
                 `recordId: '${recordId}' -> isExistingRecord ? ${
                     recordId in intermediate[recordType]
                 }`,
@@ -121,7 +122,7 @@ export async function parseRecordCsv(
         return acc;
     }, {} as Record<string, number>);
     INFO.push(NL+`[END parseRecordCsv()]`,
-        TAB + `     filePath: '${filePath}'`,
+        typeof arg1 === 'string' ? TAB+`   filePath: '${arg1}'` : '',
         TAB + `  recordTypes:  ${JSON.stringify(Object.keys(parseOptions))}`,
         TAB + `Last rowIndex:  ${rowIndex}`,
         TAB + `Parse Summary:  ${indentedStringify(parseSummary)}`

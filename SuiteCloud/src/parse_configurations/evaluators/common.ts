@@ -6,16 +6,12 @@ import { parseLogger as plog, mainLogger as mlog,
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG 
 } from '../../config/setupLog';
 import { 
-    FieldValue, 
-    TermBase as Term,
-    RecordTypeEnum,
-    SB_TERM_DICTIONARY as TERM_DICT,
-} from "../../utils/api/types";
-import { 
     clean,
 } from "../../utils/io/regex/index";
 import { ColumnSliceOptions } from '../../utils/io';
 import * as validate from "../../utils/argumentValidation";
+import { RecordTypeEnum } from 'src/utils/ns/Enums';
+import { SB_TERM_DICTIONARY, TermBase } from 'src/utils/ns/record/accounting/Term';
 
 export const SUPPRESS: any[] = [];
 /**
@@ -95,7 +91,7 @@ export const externalId = async (
 export const terms = (
     row: Record<string, any>,
     termsColumn: string,
-    termsDict: Record<string, Term>=TERM_DICT
+    termsDict: Record<string, TermBase>=SB_TERM_DICTIONARY
 ): number | null => {
     if (!row || !termsColumn || !termsDict) {
         mlog.error('[terms()]: Invalid params. Cannot evaluate terms.');

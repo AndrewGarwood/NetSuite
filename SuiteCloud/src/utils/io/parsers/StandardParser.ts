@@ -17,7 +17,7 @@ import {
     FieldDictionary, SublistDictionary, RecordOptions,
     RecordTypeEnum,
     NOT_DYNAMIC
-} from "../../api";
+} from "../../../api";
 import {
     isNonEmptyArray,
 } from "../../typeValidation";

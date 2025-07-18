@@ -1,10 +1,6 @@
 /**
  * @file src/parse_configurations/salesorder/salesOrderEvaluatorFunctions.ts
  */
-import { 
-    FieldValue,
-    RecordTypeEnum,
-} from "../../utils/api/types";
 import { parseLogger as plog, 
     mainLogger as mlog, DEBUG_LOGS, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
 } from "../../config";
@@ -16,6 +12,7 @@ import {
 import { SalesOrderColumnEnum as SO, } from "./salesOrderConstants";
 import { isNullLike as isNull, anyNull, isCleanStringOptions, hasKeys, hasNonTrivialKeys } from "src/utils/typeValidation";
 import { getSkuDictionary, hasSkuInDictionary } from "src/config/dataLoader";
+import { RecordTypeEnum } from "src/utils/ns/Enums";
 
 /**
  * @example

@@ -6,21 +6,20 @@ import {
     pruneLogger as plog, mainLogger as mlog, INDENT_LOG_LINE as TAB 
 } from '../config';
 import { 
-    EntityRecordTypeEnum,
     FieldDictionary,
     RecordOptions,
-    RecordTypeEnum,
     SetFieldSubrecordOptions,
     SetFieldValueOptions,
     SetSublistSubrecordOptions,
     SetSublistValueOptions,
     SublistLine,
     SubrecordValue,
-} from "../utils/api/types";
+} from "../api/types";
 import { hasKeys, isNullLike, RADIO_FIELD_FALSE, RADIO_FIELD_TRUE, anyNull, isNonEmptyArray } from "../utils/typeValidation";
 import { equivalentAlphanumericStrings as equivalentAlphanumeric } from '../utils/io/regex/index';
 import * as validate from "../utils/argumentValidation";
-import { isRecordOptions } from '../utils/typeValidation';
+import { isRecordOptions, isNonEmptyString } from '../utils/typeValidation';
+import { EntityRecordTypeEnum, RecordTypeEnum } from 'src/utils/ns/Enums';
 /** `['entity', 'trandate']` */
 const SALES_ORDER_REQUIRED_FIELDS = ['entity', 'trandate'];
 
@@ -186,7 +185,7 @@ export const contact = (
 /**
  * *`async`*
  * - {@link SALES_ORDER_REQUIRED_FIELDS} = `['entity', 'trandate']`
- * - validate address in `options.fields.billingaddress` and `options.fields.shippingaddress`
+ * - (not requiring addresses right now) validate address in `options.fields.billingaddress` and `options.fields.shippingaddress`
  * - make sure `options.sublists.item.length > 1`
  * @param options {@link RecordOptions}
  * @returns **`options`** or **`null`** `Promise<`{@link RecordOptions}` | null>` 
@@ -259,7 +258,7 @@ export const salesOrder = async (
         }
     }
     if (!options.fields.billingaddress && !options.fields.shippingaddress) {
-        mlog.warn(`[prune.salesOrder()]: options.fields does not have any address fields.`,
+        plog.warn(`[prune.salesOrder()]: options.fields does not have any address fields.`,
             TAB+`options.fields.externalid: '${options.fields.externalid}'`,
         );
         // return null;

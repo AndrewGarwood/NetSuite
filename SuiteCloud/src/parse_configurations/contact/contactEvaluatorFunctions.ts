@@ -1,13 +1,10 @@
 /**
  * @file src/parses/contact/contactEvaluatorFunctions.ts
  */
-import { 
-    FieldValue,
-} from "../../utils/api/types";
 import { mainLogger as log } from '../../config/setupLog';
 import { 
-    STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, cleanString, extractName, formatPhone,
-} from "../../utils/io";
+    STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, clean, extractName, formatPhone,
+} from "../../utils/io/regex/index";
 import { HUMAN_VENDOR_LIST as HUMAN_VENDORS_ORIGINAL_TEXT } from '../vendor/vendorConstants';
 import { RecordTypeEnum, 
     CountryAbbreviationEnum as COUNTRIES, 
@@ -15,14 +12,13 @@ import { RecordTypeEnum,
     TermBase as Term, VendorCategoryEnum 
 } from "../../utils/ns";
 import { entityId, isPerson } from "../evaluatorFunctions";
-// import { name as evaluateName} from "../generalEvaluatorFunctions";
 
-export const HUMAN_VENDORS_TRIMMED = HUMAN_VENDORS_ORIGINAL_TEXT.map(
-    (name) => cleanString(name, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
-);
-
-
-
+/**
+ * @deprecated
+ * @param row 
+ * @param entityIdColumn 
+ * @returns 
+ */
 export const contactCompany = (
     row: Record<string, any>,
     entityIdColumn: string,
