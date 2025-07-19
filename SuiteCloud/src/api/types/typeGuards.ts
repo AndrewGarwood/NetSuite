@@ -1,5 +1,5 @@
 /**
- * @file src/utils/api/types/typeGuards.ts
+ * @file src/api/types/typeGuards.ts
  */
 
 import { hasKeys, isPrimitiveValue } from "../../utils/typeValidation";

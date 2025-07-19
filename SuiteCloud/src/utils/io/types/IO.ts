@@ -13,7 +13,7 @@ export type WriteJsonOptions = {
 }
 
 /**
- * @deprecated
+ * @deprecated use `CleanStringOptions` instead
  * @typedefn **`ParseOneToManyOptions`**
  * @property {StringStripOptions} [keyStripOptions] - options for stripping characters from the key
  * @property {StringStripOptions} [valueStripOptions] - options for stripping characters from the value
@@ -34,4 +34,3 @@ export type ParseOneToManyOptions = {
     keyPadOptions?: StringPadOptions,
     valuePadOptions?: StringPadOptions
 }
-

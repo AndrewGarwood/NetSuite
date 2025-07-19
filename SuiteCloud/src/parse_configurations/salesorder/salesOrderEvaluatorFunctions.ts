@@ -10,9 +10,10 @@ import {
     equivalentAlphanumericStrings as equivalentAlphanumeric, 
 } from "../../utils/io/regex/index";
 import { SalesOrderColumnEnum as SO, } from "./salesOrderConstants";
-import { isNullLike as isNull, anyNull, isCleanStringOptions, hasKeys, hasNonTrivialKeys } from "src/utils/typeValidation";
+import { isNullLike as isNull, anyNull, hasKeys, hasNonTrivialKeys } from "src/utils/typeValidation";
 import { getSkuDictionary, hasSkuInDictionary } from "src/config/dataLoader";
 import { RecordTypeEnum } from "src/utils/ns/Enums";
+import { isCleanStringOptions } from "src/utils/typeGuards";
 
 /**
  * @example

@@ -6,12 +6,12 @@ import fs from "fs";
 import csv from "csv-parser";
 import xlsx from "xlsx";
 import { RegExpFlagsEnum, StringCaseOptions, stringEndsWithAnyOf, StringPadOptions, StringReplaceOptions, StringStripOptions } from "./regex/index";
-import { ParseOneToManyOptions,} from "./types/IO";
+import { ParseOneToManyOptions,} from "./types/Io";
 import { applyStripOptions, clean, UNCONDITIONAL_STRIP_DOT_OPTIONS } from "./regex/index"
 import { STOP_RUNNING } from "src/config/env";
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
-import { DelimiterCharacterEnum, ValueMapping, DelimitedFileTypeEnum } from "./types";
-import { isNonEmptyArray, isValueMappingEntry, anyNull, isNullLike as isNull, hasKeys, isNonEmptyString, isEmptyArray } from "../typeValidation";
+import { DelimiterCharacterEnum, ValueMapping, DelimitedFileTypeEnum, isValueMappingEntry } from "./types";
+import { isNonEmptyArray, anyNull, isNullLike as isNull, hasKeys, isNonEmptyString, isEmptyArray } from "../typeValidation";
 import * as validate from "../argumentValidation";
 
 type FieldValue = Date | number | number[] | string | string[] | boolean | null;

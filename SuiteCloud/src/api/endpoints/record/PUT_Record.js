@@ -176,6 +176,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         };
         if (responseOptions && responseOptions.responseFields) {
             result.fields = getResponseFields(rec, responseOptions.responseFields);
+            result.fields.recordType = recordType;
         }
         if (responseOptions && responseOptions.responseSublists) {
             result.sublists = getResponseSublists(rec, responseOptions.responseSublists);

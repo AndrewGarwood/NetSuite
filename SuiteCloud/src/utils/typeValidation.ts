@@ -1,20 +1,19 @@
 /**
  * @file src/utils/typeValidation.ts
  */
-export * from "../api/types/typeGuards";
-export * from "./io/types/typeGuards";
+
 import { mainLogger as mlog } from "src/config/setupLog";
 import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "./io/regex/index";
 
 /**
- * @param value the value to check
- * @returns **`isNullLike`** `boolean` = `value is '' | [] | null | undefined | Record<string, never>`
+ * @param value `any` the value to check
+ * @returns **`isNullLike`** `boolean` = `value is '' | (Array<any> & { length: 0 }) | null | undefined | Record<string, never>`
  * - `true` `if` the `value` is null, undefined, empty object (no keys), empty array, or empty string
  * - `false` `otherwise`
  */
 export function isNullLike(
     value: any
-): value is '' | [] | null | undefined | Record<string, never> {
+): value is '' | (Array<any> & { length: 0 }) | null | undefined | Record<string, never> {
     if (value === null || value === undefined) {
         return true;
     }
@@ -37,7 +36,7 @@ export function isNullLike(
     return false;
 }
 /**
- * 
+ * @deprecated no type predicate b/c "A type predicate cannot reference a rest parameter.ts(1229)" 
  * @param values `any[]`
  * @returns `values.some(v => `{@link isNullLike}`(v))`
  * - **`true`** `if` any of the values are null, undefined, empty object (no keys), empty array, or empty string
@@ -60,14 +59,33 @@ export function isNonEmptyArray(value: any): value is Array<any> & { length: num
     return Array.isArray(value) && value.length > 0;
 }
 /**
- * @param value 
+ * @param value `any`
  * @returns **`isEmptyArray`** `boolean` = `value is Array<any> & { length: 0 }`
- * - `true` if `value` is an array and has no elements,
- * - `false` otherwise.
+ * - **`true`** if `value` is an array and has no elements,
+ * - `false` `otherwise`
  */
 export function isEmptyArray(value: any): value is Array<any> & { length: 0 } {
     return Array.isArray(value) && value.length === 0; 
 }
+
+/**
+ * @param value `any`
+ * @returns **`isIntegerArray`** `boolean` = `value is Array<number> & { length: number }`
+ * - **`true`** if `value` is an array with `length > 0` and each of its elements is an integer
+ * - **`false`** `otherwise`
+ */
+export function isIntegerArray(
+    value: any
+): value is Array<number> & { length: number } {
+    return (value 
+        && isNonEmptyArray(value) 
+        && value.every(arrElement => 
+            typeof arrElement === 'number'
+            && Number.isInteger(arrElement)
+            && arrElement >= 0
+    ))
+}
+
 /**
  * @TODO add param that indicates whether all values must be nontrivial or not
  * @description Check if an `object` has at least 1 key with value that is non-empty (not `undefined`, `null`, or empty string). 

@@ -10,12 +10,14 @@ import {
     STOP_RUNNING
 } from "./config";
 import {
-    isNonEmptyArray, isEmptyArray, isNullLike as isNull, anyNull,
+    isNonEmptyArray, isEmptyArray, isNullLike as isNull,
     BOOLEAN_TRUE_VALUES,
     BOOLEAN_FALSE_VALUES,
     isBooleanFieldId,
-    areEquivalentObjects
+    areEquivalentObjects,
+    isIntegerArray
 } from "./utils/typeValidation";
+import { isRowSourceMetaData, RowSourceMetaData } from "./utils/io";
 import * as validate from "./utils/argumentValidation";
 import { 
     ValueMapping, ValueMappingEntry, getRows,
@@ -38,42 +40,45 @@ import fs from 'fs';
 import { 
     FieldValue, FieldDictionary, SublistDictionary, SublistLine, 
     SubrecordValue, SetFieldSubrecordOptions, SetSublistSubrecordOptions, 
-    RecordOptions, isFieldValue, isSubrecordValue
+    RecordOptions, isFieldValue, isSubrecordValue,
+    SourceTypeEnum
 } from "./api";
 import { RecordTypeEnum } from "./utils/ns/Enums";
 /** use to set the field `"isinactive"` to false */
 const NOT_DYNAMIC = false;
-let rowIndex = 0;
+let rowIndex: number = 0;
 
 /**
- * @param arg1 `string | Record<string, any>[]` {@link handleFilePathOrRowsArgument}
+ * @param source `string | Record<string, any>[]` {@link handleFilePathOrRowsArgument}
  * @param parseOptions {@link ParseOptions}
- * @returns **`results`** `Promise<`{@link ParseResults}`>`
+ * @returns **`results`** `Promise<`{@link ParseResults}`>` 
+ * = `{ [recordType: string]:` {@link RecordOptions}`[] }`
  */
 export async function parseRecordCsv(
-    arg1: string | Record<string, any>[],
-    parseOptions: ParseOptions
+    source: string | Record<string, any>[],
+    parseOptions: ParseOptions,
+    sourceType?: SourceTypeEnum
 ): Promise<ParseResults> {
-    if (isNull(arg1)) {
+    if (isNull(source)) {
         throw new Error([
             `[csvParser.parseRecordCsv()] Invalid argument: 'arg1'`,
             `expected 'arg1' to be string | Record<string, any>[]`,
-            `received: ${arg1}`
+            `received: ${source}`
         ].join(TAB))
     }
-    validate.objectArgument(`csvParser.parseRecordCsv`, `parseOptions`, parseOptions);
+    validate.objectArgument(`csvParser.parseRecordCsv`, {parseOptions});
     INFO.push(`[START parseRecordCsv()]`,
         TAB+`recordTypes: ${JSON.stringify(Object.keys(parseOptions))}`,
-        typeof arg1 === 'string' ? TAB+`   filePath: '${arg1}'` : '',
+        typeof source === 'string' ? TAB+`   filePath: '${source}'` : '',
     );           
-    const rows = await handleFilePathOrRowsArgument(arg1, 'csvParser.parseRecordCsv');
+    const rows = await handleFilePathOrRowsArgument(source, 'csvParser.parseRecordCsv');
     const results: ParseResults = {};
     const intermediate: IntermediateParseResults = {};
     for (const recordType of Object.keys(parseOptions)) {
         results[recordType] = [];
         intermediate[recordType] = {};
     }
-    let rowIndex = 0;
+    rowIndex = 0;
     for (const row of rows) {
         DEBUG.push(
             (DEBUG.length > 0 ? NL : '')+`[START ROW] rowIndex: ${rowIndex}:`,
@@ -93,7 +98,7 @@ export async function parseRecordCsv(
                     recordId in intermediate[recordType]
                 }`,
             );
-            let postOptions = (intermediate[recordType][recordId]  
+            let record = (intermediate[recordType][recordId]  
                 ? intermediate[recordType][recordId] 
                 : {
                     recordType: recordType as RecordTypeEnum,
@@ -102,8 +107,9 @@ export async function parseRecordCsv(
                     sublists: {} as SublistDictionary,
                 }
             ) as RecordOptions;
+            await updateRecordMeta(record, rowIndex, source, sourceType);
             intermediate[recordType][recordId] = await processRow(row,
-                postOptions, 
+                record, 
                 fieldOptions as FieldDictionaryParseOptions, 
                 sublistOptions as SublistDictionaryParseOptions
             );
@@ -115,14 +121,14 @@ export async function parseRecordCsv(
     }
     
     for (const recordType of Object.keys(intermediate)) {
-        results[recordType] = Object.values(intermediate[recordType]);
+        results[recordType] = Object.values(intermediate[recordType]) as RecordOptions[];
     }
     const parseSummary = Object.keys(results).reduce((acc, recordType) => {
         acc[recordType] = results[recordType].length;
         return acc;
     }, {} as Record<string, number>);
     INFO.push(NL+`[END parseRecordCsv()]`,
-        typeof arg1 === 'string' ? TAB+`   filePath: '${arg1}'` : '',
+        typeof source === 'string' ? TAB+`   filePath: '${source}'` : '',
         TAB + `  recordTypes:  ${JSON.stringify(Object.keys(parseOptions))}`,
         TAB + `Last rowIndex:  ${rowIndex}`,
         TAB + `Parse Summary:  ${indentedStringify(parseSummary)}`
@@ -132,6 +138,53 @@ export async function parseRecordCsv(
     return results;
 }
 
+async function updateRecordMeta(
+    record: RecordOptions, 
+    rowIndex: number,
+    source: string | Record<string, any>[],
+    sourceType?: SourceTypeEnum
+): Promise<void> {
+    if (typeof source === 'string') {
+        // mlog.debug([`[updateRecordMeta()]`,
+        //     `      sourceType: ${sourceType}  <-> typeof source === 'string' (filePath)`,
+        //     `current rowIndex: ${rowIndex}`,
+        //     `current record.meta: ${indentedStringify(record.meta || {})}`,
+        //     `isRowSourceMetaData(record.meta.dataSource) ? ${
+        //         record.meta && isRowSourceMetaData(record.meta.dataSource)
+        //     }`
+        // ].join(TAB));
+        if (!record.meta || !isRowSourceMetaData(record.meta.dataSource)) {
+            record.meta = {
+                dataSource: { [source]: [rowIndex] } as RowSourceMetaData,
+                sourceType: SourceTypeEnum.FILE
+            };
+        } else if (!record.meta.dataSource[source].includes(rowIndex)) {
+            record.meta.dataSource[source].push(rowIndex);
+        } else {
+            throw new Error([
+                `[csvParser.updateRecordMeta()] Invalid RecordOptions.meta.dataSource`,
+            ].join(TAB));
+        }
+    } else if (isNonEmptyArray(source)) { // source is array of rows
+        if (!record.meta || !isIntegerArray(record.meta.dataSource)) {
+            record.meta = {
+                dataSource: [rowIndex],
+                sourceType: sourceType ? sourceType : SourceTypeEnum.ROW_SUBSET_ARRAY
+            };
+        } else if (!record.meta.dataSource.includes(rowIndex)) {
+            record.meta.dataSource.push(rowIndex);
+        } else {
+            throw new Error([
+                `[csvParser.updateRecordMeta()] Invalid RecordOptions.meta.dataSource`,
+            ].join(TAB));
+        }
+    } else {
+        throw new Error([
+            `[csvParser.updateRecordMeta()] Invalid type for param 'source'`,
+            `I didn't think we would ever end up here...`
+        ].join(TAB));
+    }
+}
 /**
  * - for fields, if want to allow override for fields and if files parsed in chrono order (ascending), 
  * then most recent value will be assigned to field. 
@@ -140,7 +193,7 @@ export async function parseRecordCsv(
  * @param record {@link RecordOptions}
  * @param fieldOptions {@link FieldDictionaryParseOptions}
  * @param sublistOptions {@link SublistDictionaryParseOptions}
- * @returns **`postOptions`** — {@link RecordOptions}
+ * @returns **`record`** — {@link RecordOptions}
  */
 async function processRow(
     row: Record<string, any>,
@@ -373,7 +426,7 @@ async function parseFieldValue(
         valueParseOptions, 'FieldParseOptions', isFieldParseOptions
     );
     let value: FieldValue | undefined = undefined;
-    const { defaultValue, colName, evaluator, args } = valueParseOptions;
+    const { defaultValue: defaultValue, colName, evaluator, args } = valueParseOptions;
     SUP.push(
         TAB+`defaultValue: '${defaultValue}'`,
         TAB+`     colName: '${colName}'`,

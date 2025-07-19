@@ -2,18 +2,35 @@
  * @file src/utils/io/types/typeGuards.ts
  */
 
-import { hasKeys, isNonEmptyString } from "src/utils/typeValidation";
+import { hasKeys, isIntegerArray, isNonEmptyString } from "src/utils/typeValidation";
 import { FieldParseOptions, ValueMappingEntry, CloneOptions, 
-    ComposeOptions, WriteJsonOptions} from ".";
+    ComposeOptions, WriteJsonOptions, RowSourceMetaData } from ".";
 import { RecordOptions } from "src/api";
 import { CleanStringOptions, NodeLeaves, NodeStructure, RowDictionary } from "..";
+
+
+/**
+ * 
+ * @param value `any`
+ * @returns **`isRowSourceMetaData`** `boolean`
+ * - **`true`** `if` `value` is an object such that 
+ * each of its keys is a string that maps to an integer array
+ * - **`false`** `otherwise`
+ */
+export function isRowSourceMetaData(value: any): value is RowSourceMetaData {
+    return (value && typeof value === 'object'
+        && Object.keys(value).every(key => 
+            isNonEmptyString(key) && isIntegerArray(value[key])
+        )
+    );
+}
 
 /**
  * @param value `any`
  * @returns **`isFieldParseOptions`** `boolean`
  * - **`true`** if the `value` is an object and has any of the following keys: 
  * `['defaultValue', 'colName', 'evaluator', 'args']`,
- * - **`false`** `otherwise`.
+ * - **`false`** `otherwise`
  */
 export function isFieldParseOptions(value: any): value is FieldParseOptions {
     return (value && typeof value === 'object' 
@@ -21,18 +38,6 @@ export function isFieldParseOptions(value: any): value is FieldParseOptions {
     );
 }
 
-/**
- * @description Checks if the given value is a {@link ValueMappingEntry} = `{ newValue`: {@link FieldValue}, `validColumns`: `string | string[] }`.
- * @param value `any`
- * @returns **`isValueMappingEntry`** `boolean`
- * - **`true`** if the `value` is an object with keys `newValue` and `validColumns`,
- * - **`false`** `otherwise`.
- */
-export function isValueMappingEntry(value: any): value is ValueMappingEntry {
-    return (value && typeof value === 'object' 
-        && hasKeys(value, ['newValue', 'validColumns'])
-    );
-}
 
 /**
  * @param value `any`
@@ -45,9 +50,9 @@ export function isRecordOptions(value: any): value is RecordOptions {
     return (value && typeof value === 'object' 
         && hasKeys(value, 'recordType') 
         && hasKeys(value, 
-            ['fields', 'sublists', 'recordType', 'isDynamic', 'idOptions'], 
+            ['fields', 'sublists', 'recordType', 'isDynamic', 'idOptions', 'meta'], 
             false, 
-            true
+            false
         )
     );
 }
@@ -67,7 +72,8 @@ export function isCloneOptions(value: any): value is CloneOptions {
 }
 
 export function isComposeOptions(value: any): value is ComposeOptions {
-    return (value && typeof value === 'object' 
+    return (value && typeof value === 'object'
+        && hasKeys(value, ['recordType', 'fields', 'sublists', 'idOptions'], false) 
         && typeof value.recordType === 'string' 
         && (value.fields === undefined || typeof value.fields === 'object') 
         && (value.sublists === undefined || typeof value.sublists === 'object')
@@ -135,5 +141,18 @@ export function isWriteJsonOptions(value: any): value is WriteJsonOptions {
         && (value.enableOverwrite === undefined 
             || typeof value.enableOverwrite === 'boolean'
         )
+    );
+}
+
+/**
+ * @description Checks if the given value is a {@link ValueMappingEntry} = `{ newValue`: {@link FieldValue}, `validColumns`: `string | string[] }`.
+ * @param value `any`
+ * @returns **`isValueMappingEntry`** `boolean`
+ * - **`true`** if the `value` is an object with keys `newValue` and `validColumns`,
+ * - **`false`** `otherwise`.
+ */
+export function isValueMappingEntry(value: any): value is ValueMappingEntry {
+    return (value && typeof value === 'object' 
+        && hasKeys(value, ['newValue', 'validColumns'])
     );
 }

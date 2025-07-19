@@ -1,5 +1,5 @@
 /**
- * @file src/utils/api/types/Api.ts
+ * @file src/api/types/Api.ts
  * @description Types specific to NetSuite's internal API (copies, analogs, or extensions of NetSuite's `N/record` module types).
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  */

@@ -6,8 +6,8 @@ import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/
 import { OUTPUT_DIR } from "../../config/env";
 import { getCurrentPacificTime } from "./dateTime";
 import { validateFileExtension, getDelimiterFromFilePath } from "./reading";
-import { DelimitedFileTypeEnum, DelimiterCharacterEnum, WriteJsonOptions } from "./types";
-import { hasKeys, isEmptyArray, isNonEmptyString, TypeOfEnum, isWriteJsonOptions, } from "../typeValidation";
+import { DelimitedFileTypeEnum, DelimiterCharacterEnum, isWriteJsonOptions, WriteJsonOptions } from "./types";
+import { hasKeys, isEmptyArray, isNonEmptyString, TypeOfEnum, } from "../typeValidation";
 import * as validate from "../argumentValidation";
 import * as path from "path";
 import { existsSync, writeFileSync } from "fs";

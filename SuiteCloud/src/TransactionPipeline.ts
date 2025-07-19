@@ -1,5 +1,5 @@
 /**
- * @file src/transactionProcessor.ts
+ * @file src/TransactionPipeline.ts
  */
 import path from 'node:path';
 import * as fs from 'fs';
@@ -27,13 +27,15 @@ import {
     FieldDictionary,
     idSearchOptions,
     FieldValue,
-    SetFieldSubrecordOptions, 
+    SetFieldSubrecordOptions,
+    SourceTypeEnum,
+    LogTypeEnum, 
 } from "./api";
 import { parseRecordCsv } from "./csvParser";
 import { processParseResults } from "./parseResultsProcessor";
 import { 
     isNonEmptyArray, anyNull, isNullLike as isNull, isEmptyArray, hasKeys, 
-    TypeOfEnum, isRecordOptions, isNonEmptyString, isRecordResponseOptions
+    TypeOfEnum, isNonEmptyString, isIntegerArray,
 } from './utils/typeValidation';
 import { getColumnValues, getRows, isValidCsv } from './utils/io/reading';
 import * as validate from './utils/argumentValidation';
@@ -42,7 +44,9 @@ import { extractTargetRows } from './DataReconciler';
 import { entityId } from './parse_configurations/evaluators';
 import { SalesOrderColumnEnum } from './parse_configurations/salesorder/salesOrderConstants';
 import { SO_CUSTOMER_PARSE_OPTIONS, SO_CUSTOMER_POST_PROCESSING_OPTIONS } from './parse_configurations/salesorder/salesOrderParseDefinition';
-import { putEntities } from './entityProcessor';
+import { putEntities } from './EntityPipeline';
+import { isRecordOptions, isRecordResponseOptions, isRowSourceMetaData } from './utils/typeGuards';
+import { RowSourceMetaData } from './utils/io';
 /** 
  * `responseFields`: `[
  * 'tranid', 'trandate', 'entity', 'externalid', 
@@ -63,10 +67,10 @@ export const SO_RESPONSE_OPTIONS: RecordResponseOptions = {
  * @property **`MATCH_ENTITY`** = `'MATCH_ENTITY'`
  * @property **`PUT_SALES_ORDERS`** = `'PUT_SALES_ORDERS'`
  */
-export enum TransactionProcessorStageEnum {
+export enum TransactionPipelineStageEnum {
     PARSE = 'PARSE',
     VALIDATE = 'VALIDATE',
-    /** use this as value for `stopAfter` to see output of `matchTransactionsToEntity()` */
+    /** use this as value for `stopAfter` to see output of `matchTransactionEntity()` */
     MATCH_ENTITY = 'MATCH_ENTITY',
     PUT_SALES_ORDERS = 'PUT_SALES_ORDERS',
     END = 'END'
@@ -90,7 +94,7 @@ export type LocalFileMatchOptions = {
     internalIdColumn: string;
 }
 
-export type TransactionProcessorOptions = {
+export type TransactionPipelineOptions = {
     parseOptions: ParseOptions;
     postProcessingOptions: ProcessParseResultsOptions;
     /** 
@@ -109,12 +113,12 @@ export type TransactionProcessorOptions = {
      * */
     outputDir?: string;
     /** specify at which stage(s) that data being processed should be written to `outputDir` */
-    stagesToWrite?: TransactionProcessorStageEnum[];
+    stagesToWrite?: TransactionPipelineStageEnum[];
     /**
      * - stop after specific stage for the first file in filePaths. 
      * - leave undefined to process all files in filePaths 
      * */
-    stopAfter?: TransactionProcessorStageEnum;
+    stopAfter?: TransactionPipelineStageEnum;
 }
 
 type MatchErrorDetails = {
@@ -134,9 +138,9 @@ type MatchErrorDetails = {
  * @returns **`boolean`**
  */
 async function done(
-    options: TransactionProcessorOptions, 
+    options: TransactionPipelineOptions, 
     fileName: string,
-    stage: TransactionProcessorStageEnum,
+    stage: TransactionPipelineStageEnum,
     stageData: Record<string, any>,
 ): Promise<boolean> {
     let stagesToWrite = (isNonEmptyArray(options.stagesToWrite) 
@@ -153,10 +157,11 @@ async function done(
         write(stageData, outputPath);
     }
     if (stopAfter && stopAfter === stage) {
-        mlog.info(`[END processEntityFiles()] - done(options...) returned true`,
-            TAB+`fileName: '${fileName}'`,
-            TAB+`   stage: '${stage}'`,
-        );
+        mlog.info([
+            `[END processEntityFiles()] - done(options...) returned true`,
+            `fileName: '${fileName}'`,
+            `   stage: '${stage}'`,
+        ].join(TAB));
         return true;
     }
     return false;
@@ -165,49 +170,56 @@ async function done(
 /**
  * @param transactionType {@link RecordTypeEnum} 
  * @param filePaths `string | string[]` - csv file(s)
- * @param options {@link TransactionProcessorOptions}
+ * @param options {@link TransactionPipelineOptions}
  * @returns **`void`**
  */
-export async function processTransactionFiles(
+export async function runTransactionPipeline(
     transactionType: RecordTypeEnum | string,
     filePaths: string | string[],
-    options: TransactionProcessorOptions
+    options: TransactionPipelineOptions
 ): Promise<void> {
-    validate.stringArgument(`${__filename}.processTransactionFiles`, {transactionType});
-    validate.objectArgument(`${__filename}.processTransactionFiles`, {options});
+    validate.stringArgument(`${__filename}.runTransactionPipeline`, {transactionType});
+    validate.objectArgument(`${__filename}.runTransactionPipeline`, {options});
     const {
         clearLogFiles, parseOptions, postProcessingOptions, responseOptions 
-    } = options as TransactionProcessorOptions;
+    } = options as TransactionPipelineOptions;
     if (!parseOptions || !postProcessingOptions) {
-        throw new Error(`[processTransactionFiles()] Invalid ProcessorOptions`
-            +`(missing parseOptions or postProcessingOptions).`
-        );
+        throw new Error([`[runTransactionPipeline()] Invalid ProcessorOptions`,
+            `(missing parseOptions or postProcessingOptions)`,
+        ].join(TAB));
     }
     if (isNonEmptyArray(clearLogFiles)) clearFile(...clearLogFiles);
     filePaths = isNonEmptyArray(filePaths) ? filePaths : [filePaths];
-    validate.arrayArgument('processTransactionFiles', 'filePaths', 
-        filePaths, TypeOfEnum.STRING, isNonEmptyString
+    validate.arrayArgument('runTransactionPipeline', {filePaths}, 
+        TypeOfEnum.STRING, isNonEmptyString
     );
-    // mlog.info(`[START processTransactionFiles()]`);
+    // mlog.info(`[START runTransactionPipeline()]`);
     for (let i = 0; i < filePaths.length; i++) {
         const csvFilePath = filePaths[i];
         let fileName = path.basename(csvFilePath);
+        // ====================================================================
+        // TransactionPipelineStageEnum.PARSE
+        // ====================================================================
         const parseResults: ParseResults = await parseRecordCsv(
-            csvFilePath, parseOptions
+            csvFilePath, parseOptions, SourceTypeEnum.FILE
         );
         if (await done(
             options, fileName, 
-            TransactionProcessorStageEnum.PARSE, parseResults
+            TransactionPipelineStageEnum.PARSE, parseResults
         )) return;
+        
+        // ====================================================================
+        // TransactionPipelineStageEnum.VALIDATE
+        // ====================================================================
         const validatedResults = await processParseResults(
             parseResults, postProcessingOptions
         ) as ValidatedParseResults;
         if (await done(
             options, fileName, 
-            TransactionProcessorStageEnum.VALIDATE, validatedResults
+            TransactionPipelineStageEnum.VALIDATE, validatedResults
         )) return;
         if (!options.matchOptions) {
-            mlog.warn(`[processTransactionFiles()] Aborting Process.`,
+            mlog.warn(`[runTransactionPipeline()] Aborting Process.`,
                 TAB+`No matchOptions provided && stopAfter stage !== PARSE or VALIDATE`,
                 TAB+`If want to continue past PARSE or VALIDATE, provide valid matchOptions`,
                 TAB+`stopAfter stage: '${options.stopAfter}'`,
@@ -218,6 +230,7 @@ export async function processTransactionFiles(
             acc[key] = validatedResults[key].invalid;
             return acc;
         }, {} as { [recordType: string]: RecordOptions[] });
+        const invalidTransactions = Object.values(invalidDict).flat();
         if (Object.keys(invalidDict).some(recordType => invalidDict[recordType].length > 0)) {
             write(invalidDict, path.join(CLOUD_LOG_DIR, `salesorders`, 
                 `${getFileNameTimestamp()}_${fileName}_invalidOptions.json`)
@@ -228,56 +241,96 @@ export async function processTransactionFiles(
             return acc;
         }, {} as { [recordType: string]: RecordOptions[] });
         const validTransactions = Object.values(validDict).flat();
-        mlog.info(`[processTransactionFiles()] calling matchTransactionsToEntity()...`);
-        const matchResults = await matchTransactionsToEntity(
+        mlog.info(`[runTransactionPipeline()] calling matchTransactionEntity()...`);
+        // ====================================================================
+        // TransactionPipelineStageEnum.MATCH_ENTITIES
+        // ====================================================================
+        const matchResults = await matchTransactionEntity(
             validTransactions, options.matchOptions
-        );
+        ) as { matches: RecordOptions[]; errors: RecordOptions[]; };
+        let resolvedTransactions: RecordOptions[] = [];
         if (isNonEmptyArray(matchResults.errors)) {
-            mlog.debug([`[processTransactionFiles()]`,
+            mlog.debug([`[runTransactionPipeline()]`,
                 `${matchResults.errors.length} transaction(s) did not have a matching ${options.matchOptions.entityType}.`,
                 `   current file: '${fileName}'`,
-                `processor stage: '${TransactionProcessorStageEnum.MATCH_ENTITY}'`,
+                `processor stage: '${TransactionPipelineStageEnum.MATCH_ENTITY}'`,
                 ` error quotient: (${matchResults.errors.length}/${matchResults.matches.length+matchResults.errors.length})`,
             ].join(TAB));
-            write(
-                {
-                    timestamp: getCurrentPacificTime(),
-                    sourceFile: csvFilePath,
-                    numMatchErrors: matchResults.errors.length, 
-                    errors: matchResults.errors
-                } as MatchErrorDetails, 
-                path.join(CLOUD_LOG_DIR, `salesorders`, `${getFileNameTimestamp()}_${fileName}_matchErrors.json`)
-            );
+            if (options.generateMissingEntities === true) {
+                resolvedTransactions.push(...await resolveUnmatchedTransactions(
+                    csvFilePath, matchResults.errors, 
+                    options.matchOptions.entityType as EntityRecordTypeEnum
+                ))
+                mlog.debug([`back in pipeline func after calling resolveUnmatched func...`,
+                    ` matchResults.errors.length: ${matchResults.errors.length}`,
+                    `resolvedTransactions.length: ${resolvedTransactions.length}`
+                ].join(TAB))
+            } else {
+                write(
+                    {
+                        timestamp: getCurrentPacificTime(),
+                        sourceFile: csvFilePath,
+                        numMatchErrors: matchResults.errors.length, 
+                        errors: matchResults.errors
+                    } as MatchErrorDetails, 
+                    path.join(CLOUD_LOG_DIR, `salesorders`, `${getFileNameTimestamp()}_${fileName}_matchErrors.json`)
+                );
+            }
         }
         if (await done(
             options, fileName, 
-            TransactionProcessorStageEnum.MATCH_ENTITY, matchResults
+            TransactionPipelineStageEnum.MATCH_ENTITY, matchResults
         )) return;
         if (isEmptyArray(matchResults.matches)) {
-            mlog.warn(`[processTransactionFiles()]`,
+            mlog.warn(`[runTransactionPipeline()]`,
                 `No valid transactions matched to entities.`,
                 TAB+`fileName: '${fileName}'`,
-                TAB+`   stage: '${TransactionProcessorStageEnum.MATCH_ENTITY}'`,
+                TAB+`   stage: '${TransactionPipelineStageEnum.MATCH_ENTITY}'`,
                 TAB+`continuing to next file...`
             );
-            continue;
+            if (isEmptyArray(resolvedTransactions)) continue;
         }
+        // ====================================================================
+        // TransactionPipelineStageEnum.PUT_TRANSACTIONS
+        // ====================================================================
+        let payload = resolvedTransactions.concat(matchResults.matches);
+        mlog.info([`[runTransactionPipeline()] finished MATCH_ENTITIES, starting PUT_TRANSACTIONS`,
+            `    num transactions parsed: ${Object.values(parseResults).flat().length}`,
+            `  valid transactions length: ${validTransactions.length}`,
+            `invalid transactions length: ${invalidTransactions.length}`,
+            `matchResults.matches.length: ${matchResults.matches.length}`,
+            ` matchResults.errors.length: ${matchResults.errors.length}`,
+            `resolvedTransactions.length: ${resolvedTransactions.length}`,        
+        ].join(TAB), 
+            NL+` -> final payload length: ${payload.length}`
+        );
         const transactionResponses = await putTransactions(
-            matchResults.matches, responseOptions || SO_RESPONSE_OPTIONS
+            (matchResults.matches).concat(resolvedTransactions), 
+            responseOptions || SO_RESPONSE_OPTIONS
         ) as RecordResponse[];
         let successCount = 0;
-        const rejects: RecordOptions[] = [];
+        const rejectResponses: any[] = [];
+        let numRejects = 0;
         for (const res of transactionResponses) {
-            if (isNonEmptyArray(res.rejects)) rejects.push(...res.rejects);
+            if (isNonEmptyArray(res.rejects)) {
+                numRejects += res.rejects.length;
+                rejectResponses.push({
+                    status: res.status,
+                    message: res.message,
+                    error: res.error,
+                    rejects: res.rejects,
+                    logs: res.logArray.filter(l => l.type === LogTypeEnum.ERROR)
+                })
+            }
             if (isNonEmptyArray(res.results)) successCount += res.results.length;
         }
-        if (isNonEmptyArray(rejects)){
+        if (numRejects > 0){
             write(
                 {
                     timestamp: getCurrentPacificTime(),
                     sourceFile: csvFilePath,
-                    numRejects: rejects.length,
-                    rejects,
+                    numRejects,
+                    rejectResponses,
                 }, 
                 path.join(CLOUD_LOG_DIR, 'salesorders', 
                     `${getFileNameTimestamp()}_${fileName}_putRejects.json`
@@ -286,8 +339,8 @@ export async function processTransactionFiles(
         }
         if (await done(
             options, fileName, 
-            TransactionProcessorStageEnum.PUT_SALES_ORDERS, 
-            {successCount, failureCount: rejects.length}// transactionResponses
+            TransactionPipelineStageEnum.PUT_SALES_ORDERS, 
+            {successCount, failureCount: numRejects}// transactionResponses
         )) return;
     }
     return;
@@ -311,7 +364,7 @@ export async function processTransactionFiles(
  * @returns **`result`** - `{ matches: `{@link RecordOptions}`[], errors: RecordOptions[] }`
  * - **`result.matches`** - the elements from `transactions` that were successfully matched to an entity.
  */
-export async function matchTransactionsToEntity(
+export async function matchTransactionEntity(
     transactions: RecordOptions[],
     options: TransactionEntityMatchOptions,
 ): Promise<{
@@ -320,15 +373,15 @@ export async function matchTransactionsToEntity(
 }> {
     try {
         validate.arrayArgument(
-            `${__filename}.matchTransactionsToEntity`, {transactions}, 
+            `${__filename}.matchTransactionEntity`, {transactions}, 
             'RecordOptions', isRecordOptions
         );
         validate.objectArgument(
-            `${__filename}.matchTransactionsToEntity`, {options}, 
+            `${__filename}.matchTransactionEntity`, {options}, 
             'TransactionEntityMatchOptions', isTransactionEntityMatchOptions
         );
     } catch(e) {
-        mlog.error(`[matchTransactionsToEntity()] Invalid parameters`, (e as any));
+        mlog.error(`[matchTransactionEntity()] Invalid parameters`, (e as any));
         return { matches: [], errors: [] }
     }
     switch (options.matchMethod) {
@@ -341,7 +394,7 @@ export async function matchTransactionsToEntity(
             return matchUsingLocalFile(transactions, options);
         default: // options.matchMethod not in MatchSourceEnum
             throw new Error(
-                `[matchTransactionsToEntity()] Invalid options.matchMethod:`
+                `[matchTransactionEntity()] Invalid options.matchMethod:`
                 +`'${options.matchMethod}'`
             );
     }
@@ -646,6 +699,9 @@ function idSearchOptions(
 /**
  * - this is ineffecient and could likely be improved by having better way to retrieve source rows.
  * - GroupedParser might help if I ever have time to finish it
+ * - still testing, so there are some unnecessary actions/variables used just for debugging
+ * @TODO export customers and can run equivalentAlphanumeric pairwise on entity id from transactions
+ * ... slow, but might get the job done...
  */
 export async function resolveUnmatchedTransactions(
     filePath: string,
@@ -659,60 +715,106 @@ export async function resolveUnmatchedTransactions(
         {transactions}, 'RecordOptions', isRecordOptions
     );
     /** */
-    let missingEntities: Set<string> = new Set([])
-    const targetValues: string[] = [];
-    // for (const txn of transactions) {
-    //     if (!txn.fields || !isNonEmptyString(txn.fields.entity)) { continue }
-    //     targetValues.push(txn.fields.entity as string);
-    // }
-    for (let i = 0; i < transactions.length; i++) {
-        const txn = transactions[i];
-        if (!txn.fields 
-            || !isNonEmptyString(txn.fields.externalid) 
-            || !isNonEmptyString(txn.fields.entity)) { 
-            throw new Error([`${__filename}.resolveUnmatchedTransactions()]`,
-                `Invalid transaction: RecordOptions.fields is missing externalid`
-            ].join(TAB)) 
+    const sourceRows = await getRows(filePath);
+    let targetRowIndices: number[] = [];
+    const targetRows: Record<string, any>[] = [];
+    let missingEntities: Set<string> = new Set([]);
+    let entDict: Record<string, RecordOptions[]> = {}
+    for (const txn of transactions) {
+        if (!txn.fields || !isNonEmptyString(txn.fields.entity)) { continue }
+        missingEntities.add(txn.fields.entity);
+        const ent = txn.fields.entity;
+        if (!entDict[ent]) {
+            entDict[ent] = [txn]
+        } else {
+            entDict[ent].push(txn)
         }
-        if (!missingEntities.has(txn.fields.entity)) missingEntities.add(txn.fields.entity)
-        /** should look something like `'SO:9999_NUM:0000_PO:1111(TRAN_TYPE)<salesorder>'` */
-        const externalId = txn.fields.externalid;
-        const invoiceNumberSubstringPattern = /(?<=NUM:).*(?=_|\()/i;
-        if (!invoiceNumberSubstringPattern.test(externalId)) {
-            throw new Error([`${__filename}.resolveUnmatchedTransactions()]`,
-                `Invalid transaction: RecordOptions.fields.externalid is missing invoice number`
-            ].join(TAB)) 
+        
+        if (!txn.meta) {
+            throw new Error(`[${__filename}.resolveUnmatchedTransactions()] ayo where da meta at`)
         }
-        const invoiceNumber = (
-            externalId.match(invoiceNumberSubstringPattern) as RegExpMatchArray
-        )[0];
-        targetValues.push(invoiceNumber);
+        if (isRowSourceMetaData(txn.meta.dataSource)) {
+            if (!txn.meta.dataSource[filePath]) {
+                throw new Error(`yo da filePath from TransactionPipeline should've been added as a sourceData after running csvParser`)
+            }
+            targetRowIndices.push(...txn.meta.dataSource[filePath])
+        } else if (isIntegerArray(txn.meta.dataSource)
+            && txn.meta.sourceType === SourceTypeEnum.ROW_ARRAY) {
+            targetRowIndices.push(...txn.meta.dataSource)
+        }
     }
-    const invoiceColumn = SalesOrderColumnEnum.INVOICE_NUMBER
-    const targetRows = await extractTargetRows(filePath, invoiceColumn, targetValues);
-    const numEntsFromExtraction = (await getColumnValues(targetRows, SalesOrderColumnEnum.ENTITY_ID)).length;
-    mlog.debug([`Sanity Check / Testing`,
+    for (let index of Array.from(new Set(targetRowIndices))) {
+        targetRows.push(sourceRows[index])
+    }
+    let numEntsFromExtraction = (await getColumnValues(
+        targetRows, SalesOrderColumnEnum.ENTITY_ID)
+    ).length;
+    let diff = Math.abs(missingEntities.size - numEntsFromExtraction);
+    mlog.debug([`[resolveUnmatchedTransactions()] Sanity Check 1`,
         `number of entities from transactions: ${missingEntities.size}`,
         `  number of entities from targetRows: ${numEntsFromExtraction}`,
-        `abs diff = ${Math.abs(missingEntities.size - numEntsFromExtraction)}`
-    ].join(TAB))
-    const parseOptions: ParseOptions = {
-        [entityType]: SO_CUSTOMER_PARSE_OPTIONS
+        `abs diff = ${diff}`
+    ].join(TAB));
+    if (diff !== 0) {
+        throw new Error(`ayo the diff should be 0`)
     }
-    const parseResults: ParseResults = await parseRecordCsv(targetRows, parseOptions);
-    const postProcessingOptions: ProcessParseResultsOptions = { 
-        [entityType]: SO_CUSTOMER_POST_PROCESSING_OPTIONS 
-    }
+    const parseResults: ParseResults = await parseRecordCsv(
+        targetRows, { [entityType]: SO_CUSTOMER_PARSE_OPTIONS } as ParseOptions
+    );
     const validatedResults = await processParseResults(
-        parseResults, postProcessingOptions
+        parseResults, 
+        { [entityType]: SO_CUSTOMER_POST_PROCESSING_OPTIONS } as ProcessParseResultsOptions
     ) as ValidatedParseResults;
     if (isNonEmptyArray(validatedResults[entityType].invalid)) {
         throw new Error([`${__filename}.resolveUnmatchedTransactions()]`,
-            `wtf there's an invalid customer RecordOptions....`,
+            `invalid customer RecordOptions....`,
             `invalid.length: ${validatedResults[entityType].invalid.length}`,
             `check salesOrderParseDefinition and prune functions...`
         ].join(TAB))
     }
     const entities: RecordOptions[] = validatedResults[entityType].valid;
-    const entityResponses: RecordResponse[] = await putEntities(entities)
+    mlog.debug([`[resolveUnmatchedTransactions()] Sanity Check 2`,
+        `number of entities from transactions: ${missingEntities.size}`,
+        `  number of entities from targetRows: ${numEntsFromExtraction}`,
+        `number of entities in validatedParse: ${validatedResults[entityType].valid.length}`
+    ].join(TAB))
+    if (missingEntities.size !== validatedResults[entityType].valid.length) {
+        throw new Error(`bad news mate, something's off with the amount of entities.`)
+    }
+
+    const resolved: RecordOptions[] = [];
+    const unresolved: RecordOptions[] = [];
+    const entityRejects: RecordOptions[] = [];
+    const responseOptions: RecordResponseOptions = {
+        responseFields: ['entityid', 'externalid', 'isperson', 'companyname', 'email'],
+    }
+    const entityResponses = await putEntities(entities, responseOptions);
+    let generatedEntities: Record<string, any> = {};
+    for (const res of entityResponses) {
+        if (!res.results) { continue };
+        for (const r of res.results) {
+            if (!r.fields || !isNonEmptyString(r.fields.entityid)) { continue }
+            let ent = r.fields.entityid
+            if (/^\d{4,} .+/.test(ent)) { // if they put the number id in front of entity text
+                ent = ent.split(' ')[1];
+            }
+            generatedEntities[ent] = r.internalid;  
+        }
+        if (isNonEmptyArray(res.rejects)) entityRejects.push(...res.rejects)
+    }
+    mlog.debug([`[resolveUnmatchedTransactions()] Sanity Check 3`,
+        `number of entities from transactions: ${missingEntities.size}`,
+        `  number of entities from targetRows: ${numEntsFromExtraction}`,
+        `   number of entities from responses: ${Object.keys(generatedEntities).length}`,
+    ].join(TAB));
+    if (!Object.keys(generatedEntities).every(ent => ent in entDict)) {
+        throw new Error(`wait a dang minute, some generated ents not in entDict`)
+    }
+    for (const ent of Object.keys(entDict)) {
+        for (const txn of entDict[ent]) {
+            txn.fields!.entity = generatedEntities[ent] as number;
+        }
+        resolved.push(...entDict[ent]);
+    }
+    return resolved;
 }

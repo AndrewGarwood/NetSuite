@@ -1,5 +1,5 @@
 /**
- * @file src/entityProcessor.ts
+ * @file src/EntityPipeline.ts
  */
 import path from "node:path";
 import * as fs from "fs";
@@ -32,7 +32,7 @@ import { CUSTOMER_PARSE_OPTIONS, CONTACT_PARSE_OPTIONS,
 import * as customerConstants from "./parse_configurations/customer/customerConstants";
 import { parseRecordCsv } from "./csvParser";
 import { processParseResults } from "./parseResultsProcessor";
-import { RadioFieldBoolean, RADIO_FIELD_TRUE, isNonEmptyArray } from "./utils/typeValidation";
+import { RadioFieldBoolean, RADIO_FIELD_TRUE, isNonEmptyArray, isNonEmptyString } from "./utils/typeValidation";
 
 /** 
  * {@link RecordResponseOptions}
@@ -51,7 +51,7 @@ export const CONTACT_RESPONSE_OPTIONS: RecordResponseOptions = {
 
 const TWO_SECONDS = 2000;
 
-export enum EntityProcessorStageEnum {
+export enum EntityPipelineStageEnum {
     PARSE = 'PARSE',
     VALIDATE = 'VALIDATE',
     ENTITIES = 'PUT_ENTITIES',
@@ -59,7 +59,7 @@ export enum EntityProcessorStageEnum {
     GENERATE = 'GENERATE_UPDATES',
     UPDATE = 'PUT_ENTITY_UPDATES',
 }
-export type EntityProcessorOptions = {
+export type EntityPipelineOptions = {
     clearLogFiles?: string[],
     /**if outputDir is a valid directory, entityProcessor will write output to files here. */
     outputDir?: string,
@@ -67,7 +67,7 @@ export type EntityProcessorOptions = {
      * - stop after specific stage for the first file in filePaths. 
      * - leave undefined to process all files in filePaths 
      * */
-    stopAfter?: EntityProcessorStageEnum,
+    stopAfter?: EntityPipelineStageEnum,
     parseOptions?: ParseOptions,
     responseOptions?: RecordResponseOptions
 }
@@ -79,9 +79,9 @@ export type EntityProcessorOptions = {
  * @returns 
  */
 async function done(
-    options: EntityProcessorOptions, 
+    options: EntityPipelineOptions, 
     fileName: string,
-    stage: EntityProcessorStageEnum,
+    stage: EntityPipelineStageEnum,
     stageData: Record<string, any>,
 ): Promise<boolean> {
     const { stopAfter, outputDir } = options;
@@ -90,7 +90,7 @@ async function done(
         write(stageData, outputPath);
     }
     if (stopAfter && stopAfter === stage) {
-        mlog.info(`[END processEntityFiles()] - done(options...) returned true`,
+        mlog.info(`[END runEntityPipeline()] - done(options...) returned true`,
             TAB+`fileName: '${fileName}'`,
             TAB+`   stage: '${stage}'`,
             outputDir 
@@ -108,21 +108,21 @@ async function done(
  * @note updating entities might not be necessary any more?
  * @param entityType {@link EntityRecordTypeEnum} (`string`)
  * @param filePaths `string | string[]`
- * @param options {@link EntityProcessorOptions}
+ * @param options {@link EntityPipelineOptions}
  * @returns **`void`**
  */
-export async function processEntityFiles(
+export async function runEntityPipeline(
     entityType: EntityRecordTypeEnum,
     filePaths: string | string[],
-    options: EntityProcessorOptions
+    options: EntityPipelineOptions
 ): Promise<void> {
     if (!entityType || !filePaths 
         || (typeof filePaths !== 'string' && !isNonEmptyArray(filePaths))) {
-        mlog.error(`[processEntityFiles()] entityType or filePaths is undefined or invalid.`);
+        mlog.error(`[runEntityPipeline()] entityType or filePaths is undefined or invalid.`);
     }
     filePaths = isNonEmptyArray(filePaths) ? filePaths : [filePaths];
     if (isNonEmptyArray(options.clearLogFiles)) clearFile(...options.clearLogFiles);
-    mlog.info(`[START processEntityFiles()]`);
+    mlog.info(`[START runEntityPipeline()]`);
     for (let i = 0; i < filePaths.length; i++) {
         const csvFilePath = filePaths[i];
         let fileName = path.basename(csvFilePath);
@@ -133,16 +133,16 @@ export async function processEntityFiles(
         const parseResults: ParseResults = await parseRecordCsv(
             csvFilePath, parseOptions
         );
-        if (await done(options, fileName, EntityProcessorStageEnum.PARSE, parseResults)) return;
+        if (await done(options, fileName, EntityPipelineStageEnum.PARSE, parseResults)) return;
         const validatedResults: ValidatedParseResults = await processParseResults(
             parseResults, 
             POST_PROCESSING_OPTIONS as ProcessParseResultsOptions 
         );
-        if (await done(options, fileName, EntityProcessorStageEnum.VALIDATE, validatedResults)) return;
+        if (await done(options, fileName, EntityPipelineStageEnum.VALIDATE, validatedResults)) return;
         
         const entityResponses: RecordResponse[] 
             = await putEntities(validatedResults[entityType].valid);
-        if (await done(options, fileName, EntityProcessorStageEnum.ENTITIES, entityResponses)) return;
+        if (await done(options, fileName, EntityPipelineStageEnum.ENTITIES, entityResponses)) return;
         
         await DELAY(TWO_SECONDS);
         const matches: RecordOptions[] = matchContactsToEntityResponses(
@@ -150,7 +150,7 @@ export async function processEntityFiles(
             entityResponses
         ).matches;
         const contactResponses: RecordResponse[] = await putContacts(matches);
-        if (await done(options, fileName, EntityProcessorStageEnum.CONTACTS, contactResponses)) return;
+        if (await done(options, fileName, EntityPipelineStageEnum.CONTACTS, contactResponses)) return;
         
         // const entityUpdates: RecordOptions[] = generateEntityUpdates(
         //     entityType,
@@ -164,7 +164,7 @@ export async function processEntityFiles(
         // );
         // if (await done(options, fileName, EntityProcessorStageEnum.UPDATE, updateResponses)) return;
     }
-    mlog.info(`[END processEntityFiles()]`);
+    mlog.info(`[END runEntityPipeline()]`);
     STOP_RUNNING(0);
 }
 
@@ -358,9 +358,7 @@ export function generateEntityUpdates(
                 idValue: contactResult.fields.entityid as string
             },
         );
-        if (typeof contactResult.fields.externalid === 'string' 
-            && contactResult.fields.externalid
-        ) {
+        if (isNonEmptyString(contactResult.fields.externalid)) {
             update.idOptions?.push({
                 idProp: idPropertyEnum.EXTERNAL_ID, 
                 searchOperator: SearchOperatorEnum.TEXT.IS, 

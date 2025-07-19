@@ -1,15 +1,14 @@
 /**
  * @file src/config/env.ts
- * @description Environment variables for the SuiteCloud project.
  */
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
-import * as readline from 'node:readline/promises';
-import path from 'node:path';
-import { stdin as input, stdout as output } from 'node:process';
+import * as fs from "fs";
+import * as dotenv from "dotenv";
+import * as readline from "node:readline/promises";
+import path from "node:path";
+import { stdin as input, stdout as output } from "node:process";
 import { 
     AccountEnvironmentEnum, SuiteScriptEnvironment, ScriptDictionary
-} from 'src/utils/ns/SuiteScriptEnvironment';
+} from "src/utils/ns/SuiteScriptEnvironment";
 dotenv.config();
 
 export const BASE_ACCOUNT_ID = (process.env.ACCOUNT_ID 

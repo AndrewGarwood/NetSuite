@@ -1,5 +1,5 @@
 /**
- * @file src/utils/api/types/RecordApi.ts
+ * @file src/api/types/RecordApi.ts
  */
 import { 
     FieldDictionary, 
@@ -14,7 +14,7 @@ import {
     SubrecordValue, 
 } from '.';
 import { EntityRecordTypeEnum, RecordTypeEnum } from '../../utils/ns/record/Record';
-
+import { RowSourceMetaData } from 'src/utils/io';
 /**
  * @typedefn **`RecordRequest`**
  * @property {RecordOptions | Array<RecordOptions>} recordOptions = {@link RecordOptions} | `Array<`{@link RecordOptions}`>`
@@ -63,6 +63,25 @@ export type RecordOptions = {
         [sublistId: string]: Array<SublistLine> 
             | Array<{[sublistFieldId: string]: FieldValue | SubrecordValue}> 
     };
+    meta?: {
+        /** 
+         * info about what generated this RecordOptions object
+         * e.g. {@link RowSourceMetaData} 
+         * */
+        dataSource: RowSourceMetaData | any;
+        sourceType: string;
+        [key: string]: any
+    }
+}
+
+export enum SourceTypeEnum {
+    FILE = 'FILE',
+    /** 
+     * `if` `sourceType === ROW_ARRAY` and `dataSource === number[]`, and know corresponding `filePath`,
+     * then indexing `await getRows(filePath)` with numbers from `dataSource` will be accurate
+     */
+    ROW_ARRAY = 'ROW_ARRAY',
+    ROW_SUBSET_ARRAY = 'ROW_SUBSET_ARRAY'
 }
 
 

@@ -4,14 +4,14 @@
  */
 import { parseLogger as plog, mainLogger as mlog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG 
-} from '../../config/setupLog';
+} from "../../config/setupLog";
 import { 
     clean,
 } from "../../utils/io/regex/index";
-import { ColumnSliceOptions } from '../../utils/io';
+import { ColumnSliceOptions } from "../../utils/io";
 import * as validate from "../../utils/argumentValidation";
-import { RecordTypeEnum } from 'src/utils/ns/Enums';
-import { SB_TERM_DICTIONARY, TermBase } from 'src/utils/ns/record/accounting/Term';
+import { RecordTypeEnum } from "src/utils/ns/Enums";
+import { SB_TERM_DICTIONARY, TermBase } from "src/utils/ns/record/accounting/Term";
 
 export const SUPPRESS: any[] = [];
 /**

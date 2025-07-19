@@ -5,8 +5,8 @@ import {
     parseLogger as plog, mainLogger as mlog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG, 
     DATA_DIR
-} from '../../config';
-import { HUMAN_VENDORS_TRIMMED } from '../vendor/vendorConstants';
+} from "../../config";
+import { HUMAN_VENDORS_TRIMMED } from "../vendor/vendorConstants";
 import { 
     FieldValue, 
 } from "../../api/types";
@@ -20,11 +20,11 @@ import {
     stringContainsAnyOf, JOB_TITLE_SUFFIX_PATTERN, extractJobTitleSuffix,
     REMOVE_JOB_TITLE_SUFFIX, KOREA_ADDRESS_LATIN_TEXT_PATTERN
 } from "../../utils/io/regex/index";
-import { checkForOverride, CLEAN_NAME_REPLACE_OPTIONS, ColumnSliceOptions, ValueMapping } from '../../utils/io';
-import { field, SUPPRESS } from './common';
-import { readJsonFileAsObject as read } from '../../utils/io';
-import path from 'node:path';
-import { RecordTypeEnum } from 'src/utils/ns/Enums';
+import { checkForOverride, CLEAN_NAME_REPLACE_OPTIONS, ColumnSliceOptions, ValueMapping } from "../../utils/io";
+import { field, SUPPRESS } from "./common";
+import { readJsonFileAsObject as read } from "../../utils/io";
+import path from "node:path";
+import { RecordTypeEnum } from "src/utils/ns/Enums";
 
 export const ENTITY_VALUE_OVERRIDES = {} as ValueMapping;
 Object.assign(ENTITY_VALUE_OVERRIDES, read(
@@ -47,7 +47,9 @@ export const entityId = (
         replace: [
             { searchValue: /(\^|\*)$/g, replaceValue: '' },
             { searchValue: /Scienc$/g, replaceValue: 'Science' },
-            { searchValue: /Ctr(\.)?$/g, replaceValue: 'Center' },
+            { searchValue: /(?<= )Ctr(\.)?$/g, replaceValue: 'Center' },
+            { searchValue: /(?<= )Ctr(\.)(?= )/g, replaceValue: 'Center' },
+            { searchValue: /(?<= )Ctr(?=-.+)/g, replaceValue: 'Center ' },
             REPLACE_EM_HYPHEN, 
             ENSURE_SPACE_AROUND_HYPHEN,
         ]

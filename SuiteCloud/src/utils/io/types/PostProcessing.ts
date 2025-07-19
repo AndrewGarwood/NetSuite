@@ -19,9 +19,6 @@ export enum PostProcessingOperationEnum {
 }
 
 /**
- * @TODO maybe add something like a "RecordReferenceOptions" so that if the 
- * `ParseRecordOptions` object has a field that requires a record reference, 
- * call the GET_Record endpoint to get it from NetSuite with a corresponding `idSearchOptions` object
  * - {@link ParseResults}
  * @typedefn **`RecordPostProcessingOptions`**
  * @property {CloneOptions} [cloneOptions] - {@link CloneOptions} - Options for cloning records.
@@ -61,14 +58,15 @@ export type CloneOptions = {
 
 
 /**
- * Used to add key value pairs to the `fields` and `sublists` of a {@link RecordOptions} 
- * object in post processing.
+ * Used in post processing.
  * @typedefn **`ComposeOptions`**
  * @property {RecordTypeEnum | EntityRecordTypeEnum | string} recordType - {@link RecordTypeEnum}
  */
 export type ComposeOptions = {
     recordType: string,
-    idOptions?: { composer: (record: RecordOptions, idOptions: idSearchOptions[]) => idSearchOptions[] | Promise<idSearchOptions[]> },
+    idOptions?: { 
+        composer: (record: RecordOptions, idOptions: idSearchOptions[]) => idSearchOptions[] | Promise<idSearchOptions[]> 
+    },
     fields?: {
         composer: (record: RecordOptions, fields: FieldDictionary) => FieldDictionary | Promise<FieldDictionary>
     },

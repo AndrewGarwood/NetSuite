@@ -203,14 +203,14 @@ export function formatAllDebugLogs(
             file.endsWith('.txt') && !file.includes('.FORMATTED.')
         );
         if (txtFiles.length === 0) {
-            mlog.info(`[formatAllDebugLogs()] No .txt log files found in ${logDir}`);
+            mlog.warn(`[formatAllDebugLogs()] No .txt log files found in ${logDir}`);
             return;
         }
         for (const txtFile of txtFiles) {
             const inputPath = path.join(logDir, txtFile);
             try {
                 formatDebugLogFile(inputPath);
-                mlog.info(`[formatAllDebugLogs()] Formatted: ${txtFile}`);
+                // mlog.info(`[formatAllDebugLogs()] Formatted: ${txtFile}`);
             } catch (error) {
                 mlog.error(`[formatAllDebugLogs()] Failed to format ${txtFile}:`, error);
             }

@@ -4,7 +4,7 @@
 
 import { 
     pruneLogger as plog, mainLogger as mlog, INDENT_LOG_LINE as TAB 
-} from '../config';
+} from "../config";
 import { 
     FieldDictionary,
     RecordOptions,
@@ -15,17 +15,17 @@ import {
     SublistLine,
     SubrecordValue,
 } from "../api/types";
-import { hasKeys, isNullLike, RADIO_FIELD_FALSE, RADIO_FIELD_TRUE, anyNull, isNonEmptyArray } from "../utils/typeValidation";
-import { equivalentAlphanumericStrings as equivalentAlphanumeric } from '../utils/io/regex/index';
+import { hasKeys, isNullLike as isNull, RADIO_FIELD_FALSE, RADIO_FIELD_TRUE, anyNull, isNonEmptyArray } from "../utils/typeValidation";
+import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "../utils/io/regex/index";
 import * as validate from "../utils/argumentValidation";
-import { isRecordOptions, isNonEmptyString } from '../utils/typeValidation';
-import { EntityRecordTypeEnum, RecordTypeEnum } from 'src/utils/ns/Enums';
+import { isNonEmptyString } from "../utils/typeValidation";
+import { EntityRecordTypeEnum, RecordTypeEnum } from "src/utils/ns/Enums";
 /** `['entity', 'trandate']` */
 const SALES_ORDER_REQUIRED_FIELDS = ['entity', 'trandate'];
 
 const CONTACT_REQUIRED_FIELDS = ['firstname', 'lastname']
 const ADDRESS_REQUIRED_FIELDS = ['addr1']; // , 'country'
-const ENTITY_REQUIRED_FIELDS = ['entityid', 'isperson', 'companyname']
+const ENTITY_REQUIRED_FIELDS = ['entityid', 'companyname'] // 'isperson', 
 /** 
  * `ENTITY_REQUIRED_FIELDS = ['entityid', 'companyname']` 
  * - `if` entity isperson, call {@link nameFieldsAreRequired}, 
@@ -35,7 +35,7 @@ const ENTITY_REQUIRED_FIELDS = ['entityid', 'isperson', 'companyname']
 export const entity = (
     options: RecordOptions,
 ): RecordOptions | null => {
-    if (isNullLike(options) || !options.fields) {
+    if (isNull(options) || !options.fields) {
         plog.warn(`pruneEntity(): options or options.fields is null or undefined, returning null`);
         return null;
     }
@@ -95,8 +95,8 @@ export const address = (
         return null;
     }
     const attentionIsRedundant = Boolean(addressOptions.fields 
-        && typeof addressOptions.fields.addressee === 'string'
-        && typeof addressOptions.fields.attention === 'string'
+        && isNonEmptyString(addressOptions.fields.addressee)
+        && isNonEmptyString(addressOptions.fields.attention)
         && (
             equivalentAlphanumeric(
                 addressOptions.fields.addressee, 
@@ -124,7 +124,7 @@ export const address = (
 export const pruneAddressBook = (
     options: RecordOptions,
 ): RecordOptions | null => {
-    if (isNullLike(options) || !options.sublists) {
+    if (isNull(options) || !options.sublists) {
         return null;
     }
     const linesToKeep: number[] = [];
@@ -158,7 +158,7 @@ export const pruneAddressBook = (
 export const contact = (
     options: RecordOptions,
 ): RecordOptions | null => {
-    if (isNullLike(options) || !options.fields) {
+    if (isNull(options) || !options.fields) {
         mlog.warn(`prune.contact(): options or options.fields is null or undefined, returning null`);
         return null;
     }
@@ -193,7 +193,7 @@ export const contact = (
 export const salesOrder = async (
     options: RecordOptions
 ): Promise<RecordOptions | null> => {
-    if (isNullLike(options) || !options.fields || !options.sublists) {
+    if (isNull(options) || !options.fields || !options.sublists) {
         mlog.warn(`[prune.salesOrder()]: Invalid 'options' parameter`,
             TAB+`options or options.fields or options.sublists is null or undefined.`,
             TAB+` -> returning null`

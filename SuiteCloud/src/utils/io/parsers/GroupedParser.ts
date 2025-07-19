@@ -15,7 +15,11 @@ import { FieldDependencyResolver } from "./FieldDependencyResolver";
 import { 
     ParseResults, EvaluationContext,
     FieldDictionaryParseOptions, SublistDictionaryParseOptions, FieldParseOptions,
-    SubrecordParseOptions
+    SubrecordParseOptions,
+    isNodeLeaves,
+    isRowDictionary,
+    isNodeStucture,
+    isFieldParseOptions
 } from "../types";
 import { 
     FieldDictionary, SublistDictionary, SublistLine, RecordOptions,
@@ -25,8 +29,7 @@ import {
     NOT_DYNAMIC
 } from "../../../api";
 import {
-    isNonEmptyArray, isEmptyArray, anyNull, isNullLike as isNull, isSubrecordValue,
-    isFieldParseOptions, isNodeLeaves, isNodeStucture, isRowDictionary
+    isNonEmptyArray, isEmptyArray, anyNull, isNullLike as isNull,
 } from "../../typeValidation";
 import { 
     getDelimiterFromFilePath, isValidCsv, NodeLeaves,

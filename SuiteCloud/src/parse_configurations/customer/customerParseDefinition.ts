@@ -24,6 +24,7 @@ import * as prune from "../pruneFunctions";
 import * as customerEval from "./customerEvaluatorFunctions";
 import { ContactRoleEnum, CustomerTaxItemEnum, RecordTypeEnum, SearchOperatorEnum } from "src/utils/ns/Enums";
 import { SB_TERM_DICTIONARY } from "src/utils/ns/record/accounting/Term";
+import { isNonEmptyString } from "src/utils/typeValidation";
 
 /** use to set the field `"isinactive"` to false */
 const NOT_INACTIVE = false;
@@ -124,15 +125,18 @@ export const CONTACT_CUSTOMER_SHARED_FIELDS: FieldDictionaryParseOptions = {
     isperson: { evaluator: customerEval.customerIsPerson, args: [C.ENTITY_ID, C.COMPANY] },
     isinactive: { defaultValue: NOT_INACTIVE },
     email: { evaluator: evaluate.email, args: [C.EMAIL, C.ALT_EMAIL] },
-    altemail: { evaluator: evaluate.email, 
-        args: [{ colName: C.EMAIL, minIndex: 1}, C.ALT_EMAIL, C.CC_EMAIL] as Array<string | ColumnSliceOptions>
+    altemail: { evaluator: evaluate.email, args: [
+            {colName: C.EMAIL, minIndex: 1}, C.ALT_EMAIL, C.CC_EMAIL
+        ] as Array<string | ColumnSliceOptions>
     },
     phone: { evaluator: evaluate.phone, args: [C.PHONE, C.ALT_PHONE, C.WORK_PHONE] },
-    mobilephone: { evaluator: evaluate.phone, 
-        args: [C.MOBILE_PHONE, C.ALT_MOBILE,{ colName: C.PHONE, minIndex: 2}] as Array<string | ColumnSliceOptions> 
+    mobilephone: { evaluator: evaluate.phone, args: [
+            C.MOBILE_PHONE, C.ALT_MOBILE, {colName: C.PHONE, minIndex: 2}
+        ] as Array<string | ColumnSliceOptions> 
     },
-    homephone: { evaluator: evaluate.phone, 
-        args: [C.HOME_PHONE, { colName: C.PHONE, minIndex: 3}] as Array<string | ColumnSliceOptions> 
+    homephone: { evaluator: evaluate.phone, args: [
+            C.HOME_PHONE, {colName: C.PHONE, minIndex: 3}
+        ] as Array<string | ColumnSliceOptions> 
     },
     fax: { evaluator: evaluate.phone, args: [C.FAX, C.ALT_FAX] },
     salutation: { evaluator: evaluate.salutation, args: [C.SALUTATION, ...NAME_COLUMNS] },
@@ -173,9 +177,7 @@ const SHIPPING_ADDRESS_OPTIONS: SubrecordParseOptions = {
     } as FieldDictionaryParseOptions,
 };
 
-export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions | {
-    [sublistId: string]: SublistLineParseOptions[];
-} = {
+export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions = {
     addressbook: [
         { 
             lineIdOptions: {lineIdProp: 'label'} as SublistLineIdOptions, 
@@ -189,7 +191,7 @@ export const ADDRESS_BOOK_SUBLIST_PARSE_OPTIONS: SublistDictionaryParseOptions |
         },  
     ] as SublistLineParseOptions[],
 };
-/**@TODO handle removal of name fields if isperson === 'F' in post processing */
+
 export const CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: C.ENTITY_ID,
     fieldOptions: {
@@ -197,7 +199,9 @@ export const CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
         ...CONTACT_CUSTOMER_SHARED_FIELDS,
         externalid: { evaluator: evaluate.entityExternalId, args: [RecordTypeEnum.CUSTOMER, C.ENTITY_ID] },
         altphone: { evaluator: evaluate.phone, 
-            args: [{ colName: C.PHONE, minIndex: 1}, C.ALT_PHONE, C.WORK_PHONE, C.SHIP_TO_FOUR, C.SHIP_TO_FIVE] as Array<string | ColumnSliceOptions> 
+            args: [{ colName: C.PHONE, minIndex: 1}, 
+                C.ALT_PHONE, C.WORK_PHONE, C.SHIP_TO_FOUR, C.SHIP_TO_FIVE
+            ] as Array<string | ColumnSliceOptions> 
         },
         entitystatus: { evaluator: customerEval.customerStatus, args: [C.CATEGORY] },
         category: { evaluator: customerEval.customerCategory, args: [C.CATEGORY, CATEGORY_DICT] },
@@ -223,7 +227,7 @@ export const CONTACT_PARSE_OPTIONS: RecordParseOptions = {
         officephone: { evaluator: evaluate.phone, args: [C.WORK_PHONE, C.SHIP_TO_FOUR, C.SHIP_TO_FIVE] },
         company: { evaluator: customerEval.customerCompany, args: [C.ENTITY_ID, C.COMPANY] },
         contactrole: {defaultValue: ContactRoleEnum.PRIMARY_CONTACT },
-    } as FieldDictionaryParseOptions | ({[fieldId: string]: FieldParseOptions | SubrecordParseOptions;}),
+    } as FieldDictionaryParseOptions,
 };
 /** 
  * from parsed customer RecordOptions, 
@@ -272,10 +276,7 @@ const CUSTOMER_COMPOSE_OPTIONS: ComposeOptions = {
                 },
             );
             
-            if (
-                typeof fields.firstname === 'string' 
-                && typeof fields.lastname === 'string'
-                && fields.firstname && fields.lastname
+            if (isNonEmptyString(fields.firstname) && isNonEmptyString(fields.lastname)
                 && fields.entityid !== `${fields.firstname} ${fields.lastname}`
             ) {
                 idOptions.push({
@@ -288,15 +289,13 @@ const CUSTOMER_COMPOSE_OPTIONS: ComposeOptions = {
         }
     }
 }
-export const CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS: ProcessParseResultsOptions | {
-    [recordType: string]: RecordPostProcessingOptions;
-} = {
+export const CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS: ProcessParseResultsOptions = {
     [RecordTypeEnum.CONTACT]: {
         cloneOptions: CLONE_CUSTOMER_FIELDS_TO_CONTACT_OPTIONS,
         pruneFunc: prune.contact
-    },
+    } as RecordPostProcessingOptions,
     [RecordTypeEnum.CUSTOMER]: {
         composeOptions: CUSTOMER_COMPOSE_OPTIONS,
         pruneFunc: prune.entity
-    },
+    } as RecordPostProcessingOptions,
 };

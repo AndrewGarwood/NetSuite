@@ -131,9 +131,9 @@ const LINE_ITEM_SUBLIST_OPTIONS: SublistDictionaryParseOptions = {
     item: [{
         lineIdOptions: {lineIdEvaluator: lineItemIdEvaluator},
         item: { evaluator: evaluate.itemId, args: [SO.ITEM] },
-        quantity: { colName: SO.QUANTITY },
-        rate: { colName: SO.RATE },
-        // amount: { colName: SO.AMOUNT },
+        quantity: { colName: SO.QUANTITY, defaultValue: 1 },
+        rate: { colName: SO.RATE, defaultValue: 0.0 },
+        amount: { colName: SO.AMOUNT, defaultValue: 0.0 },
         description: { colName: SO.ITEM_MEMO },
         istaxable: { defaultValue: false },
         isclosed: { defaultValue: true },
@@ -156,7 +156,6 @@ const EXTERNAL_ID_ARGS: any[] = [
     SO.TRAN_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER
 ];
 
-/**@TODO decide what to assign to the `otherrefnum` property */
 export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: SO.TRAN_ID,
     fieldOptions: {
@@ -211,7 +210,7 @@ const lineItemComposer = async (
     sublistLines = await assignItemInternalIds(sublistLines);
     for (let i = 0; i < sublistLines.length; i++) {
         const numericFields = [
-            'quantity', 'rate', // 'amount'
+            'quantity', 'rate', 'amount'
         ];
         for (const fieldId of numericFields) { 
             // force positive values bc :"error.SuiteScriptError","name":"USER_ERROR", 
@@ -275,13 +274,11 @@ export const SO_CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
         entityid: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
         externalid: { evaluator: evaluate.entityExternalId, args: [RecordTypeEnum.CUSTOMER, SO.ENTITY_ID] }, // could do this in ComposeOptions instead
         companyname: { evaluator: customerEval.customerCompany, args: [SO.ENTITY_ID] },
-        phone: { evaluator: evaluate.phone, args: [SO.PHONE] },
+        phone: { evaluator: evaluate.phone, args: [{ colName: SO.PHONE, minIndex: 0}] },
         altphone: { evaluator: evaluate.phone, args: [{ colName: SO.PHONE, minIndex: 1}] as Array<string | ColumnSliceOptions>  },
-        email: { evaluator: evaluate.email, args: [SO.EMAIL] },
-        altemail: { evaluator: evaluate.email, 
-            args: [{ colName: SO.EMAIL, minIndex: 1}] as Array<string | ColumnSliceOptions>
-        },
-        fax: { evaluator: evaluate.phone, args: [SO.FAX] },
+        email: { evaluator: evaluate.email, args: [{ colName: SO.EMAIL, minIndex: 0}] },
+        altemail: { evaluator: evaluate.email, args: [{ colName: SO.EMAIL, minIndex: 1}] },
+        fax: { evaluator: evaluate.phone, args: [{ colName: SO.FAX, minIndex: 0}] },
         salutation: { evaluator: evaluate.salutation, args: [undefined, ...NAME_COLUMNS] },
         firstname: { evaluator: evaluate.firstName, args: [undefined, ...NAME_COLUMNS] },
         middlename: { evaluator: evaluate.middleName, args: [undefined, ...NAME_COLUMNS] },

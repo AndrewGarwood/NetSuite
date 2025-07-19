@@ -29,12 +29,12 @@ import { SALES_ORDER_PARSE_OPTIONS as SO_PARSE_OPTIONS,
 import * as customerConstants from "./parse_configurations/customer/customerConstants";
 import * as soConstants from "./parse_configurations/salesorder/salesOrderConstants";
 import { 
-    processEntityFiles, EntityProcessorOptions, EntityProcessorStageEnum
-} from "./entityProcessor";
-import { processTransactionFiles, 
-    TransactionProcessorOptions, 
-    TransactionProcessorStageEnum, TransactionEntityMatchOptions, MatchSourceEnum,
-} from "./transactionProcessor";
+    runEntityPipeline, EntityPipelineOptions, EntityPipelineStageEnum
+} from "./EntityPipeline";
+import { runTransactionPipeline, 
+    TransactionPipelineOptions, 
+    TransactionPipelineStageEnum, TransactionEntityMatchOptions, MatchSourceEnum,
+} from "./TransactionPipeline";
 import { validateFiles, extractTargetRows } from "./DataReconciler";
 import { isEmptyArray, isNonEmptyString } from "./utils/typeValidation";
 import * as validate from './utils/argumentValidation'
@@ -47,22 +47,25 @@ async function main() {
     mlog.info(`[START main()] at ${getCurrentPacificTime()}`)
     await instantiateAuthManager();
     await initializeData();
-    STOP_RUNNING(0);
+    // STOP_RUNNING(0);
     const viableFiles = getDirectoryFiles(
         soConstants.VIABLE_SO_DIR, '.csv', '.tsv'
     );
-    let filePaths = viableFiles.slice(1, 2); // handle subset for now
+    let filePaths = viableFiles.slice(0, 1); // handle subset for now
+    let otherPaths = [soConstants.SINGLE_ORDER_FILE];
     mlog.info([
         `viableFiles.length: ${viableFiles.length}`,
         `operating on: ${filePaths.length} file(s)`
     ].join(TAB));
-    const stagesToWrite: TransactionProcessorStageEnum[] = [
-        TransactionProcessorStageEnum.PUT_SALES_ORDERS
-    ]
-    await callTransactionProcessor(
+    await DELAY(1000, null);
+    const stagesToWrite: TransactionPipelineStageEnum[] = [
+        // TransactionPipelineStageEnum.PARSE,
+        TransactionPipelineStageEnum.PUT_SALES_ORDERS
+    ];
+    await invokeTransactionPipeline(
         filePaths,
         soConstants.SALES_ORDER_LOG_DIR, 
-        TransactionProcessorStageEnum.END,
+        TransactionPipelineStageEnum.END,
         stagesToWrite
     );
 
@@ -83,12 +86,12 @@ main().catch(error => {
  * or just take absolute value in post processing?
  */
 
-async function callTransactionProcessor(
+async function invokeTransactionPipeline(
     transactionFilePaths: string | string[],
     outputDir?: string,
-    stopAfter: TransactionProcessorStageEnum = TransactionProcessorStageEnum.END,
-    stagesToWrite: TransactionProcessorStageEnum[] = [
-        TransactionProcessorStageEnum.PUT_SALES_ORDERS
+    stopAfter: TransactionPipelineStageEnum = TransactionPipelineStageEnum.END,
+    stagesToWrite: TransactionPipelineStageEnum[] = [
+        TransactionPipelineStageEnum.PUT_SALES_ORDERS
     ]
 ): Promise<void> {
     if (isNonEmptyString(transactionFilePaths)) { // assume single file path given
@@ -107,23 +110,24 @@ async function callTransactionProcessor(
         entityFieldId: 'entity',
         matchMethod: MatchSourceEnum.API
     }
-    const options: TransactionProcessorOptions = {
+    const options: TransactionPipelineOptions = {
         parseOptions,
         postProcessingOptions,
         matchOptions,
+        generateMissingEntities: true,
         clearLogFiles: LOG_FILES,
         outputDir,
         stagesToWrite, 
         stopAfter
     }
-    mlog.debug(`[main.callTransactionProcessor()] calling processTransactionFiles...`)
-    await processTransactionFiles(tranType, transactionFilePaths, options);
+    mlog.debug(`[invokeTransactionPipeline()] calling runTransactionPipeline...`)
+    await runTransactionPipeline(tranType, transactionFilePaths, options);
 }
 
-async function callEntityProcessor(
+async function invokeEntityPipeline(
     useSubset: boolean = true,
     outputDir?: string,
-    stopAfter?: EntityProcessorStageEnum
+    stopAfter?: EntityPipelineStageEnum
 ): Promise<void> {
     const entityType = EntityRecordTypeEnum.CUSTOMER;
     const ALL_CUSTOMERS = [
@@ -135,14 +139,14 @@ async function callEntityProcessor(
         ? [customerConstants.SUBSET_FILE]
         : ALL_CUSTOMERS
     );
-    const options: EntityProcessorOptions = {
+    const options: EntityPipelineOptions = {
         clearLogFiles: [
             DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH
         ],
         outputDir, 
         stopAfter
     }
-    await processEntityFiles(entityType, customerFilePaths, options);
+    await runEntityPipeline(entityType, customerFilePaths, options);
 }
 
-export { callEntityProcessor, callTransactionProcessor}
+export { invokeEntityPipeline, invokeTransactionPipeline }

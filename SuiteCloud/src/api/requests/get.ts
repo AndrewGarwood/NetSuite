@@ -1,6 +1,6 @@
 /**
  * @file src/api/requests/get.ts
- * @TODO maybe rewrite the GET endpoing in GET_Record.js to have the request just be idProp, idVal, and recordType
+ * @TODO maybe rewrite the GET endpoint in GET_Record.js to have the request just be idProp, idVal, and recordType
  */
 import axios from "axios";
 import { 

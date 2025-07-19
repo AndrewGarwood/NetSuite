@@ -11,7 +11,9 @@ import { FieldDependencyResolver } from "./FieldDependencyResolver";
 import { 
     FieldDictionaryParseOptions, SublistDictionaryParseOptions, 
     EvaluationContext, RowContext, FieldParseOptions, SubrecordParseOptions,
-    ValueMapping, SublistLineParseOptions, SublistLineIdOptions
+    ValueMapping, SublistLineParseOptions, SublistLineIdOptions,
+    isFieldParseOptions,
+    isValueMappingEntry
 } from "../types";
 import { 
     FieldDictionary, SublistDictionary, SublistLine, 
@@ -19,7 +21,7 @@ import {
     SetSublistSubrecordOptions, isFieldValue
 } from "../../../api";
 import {
-    isNonEmptyArray, anyNull, isFieldParseOptions, isValueMappingEntry,
+    isNonEmptyArray, anyNull,
     BOOLEAN_TRUE_VALUES, BOOLEAN_FALSE_VALUES, isBooleanFieldId,
     areEquivalentObjects
 } from "../../typeValidation";
@@ -129,7 +131,7 @@ export abstract class BaseParser implements ParseStrategy {
             return null;
         }
         let value: FieldValue | undefined = undefined;
-        const { defaultValue, colName, evaluator, args, cache } = valueOptions;
+        const { defaultValue: defaultValue, colName, evaluator, args, cache } = valueOptions;
         if (evaluator) {
             value = await evaluator(row, context, ...(args || []));
             this.info.push(NL+` -> value from evaluator(row) = '${value}'`);
