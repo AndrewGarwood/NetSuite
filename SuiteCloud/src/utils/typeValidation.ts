@@ -3,17 +3,17 @@
  */
 
 import { mainLogger as mlog } from "src/config/setupLog";
-import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "./io/regex/index";
+import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "./regex/index";
 
 /**
  * @param value `any` the value to check
  * @returns **`isNullLike`** `boolean` = `value is '' | (Array<any> & { length: 0 }) | null | undefined | Record<string, never>`
- * - `true` `if` the `value` is null, undefined, empty object (no keys), empty array, or empty string
- * - `false` `otherwise`
+ * - **`true`** `if` the `value` is null, undefined, empty object (no keys), empty array, or empty string
+ * - **`false`** `otherwise`
  */
 export function isNullLike(
     value: any
-): value is '' | (Array<any> & { length: 0 }) | null | undefined | Record<string, never> {
+): value is '' | null | undefined | (Array<any> & { length: 0 }) | Record<string, never> {
     if (value === null || value === undefined) {
         return true;
     }
@@ -52,8 +52,8 @@ export function anyNull(...values: any[]): boolean {
 /**
  * @param value 
  * @returns **`isNonEmptyArray`** `boolean` = `value is Array<any> & { length: number }`
- * - `true` if `value` is an array and has at least one element, 
- * - `false` otherwise.
+ * - **`true`** if `value` is an array and has at least one element, 
+ * - **`false`** otherwise.
  */
 export function isNonEmptyArray(value: any): value is Array<any> & { length: number } {
     return Array.isArray(value) && value.length > 0;
@@ -62,7 +62,7 @@ export function isNonEmptyArray(value: any): value is Array<any> & { length: num
  * @param value `any`
  * @returns **`isEmptyArray`** `boolean` = `value is Array<any> & { length: 0 }`
  * - **`true`** if `value` is an array and has no elements,
- * - `false` `otherwise`
+ * - **`false`** `otherwise`
  */
 export function isEmptyArray(value: any): value is Array<any> & { length: 0 } {
     return Array.isArray(value) && value.length === 0; 
@@ -110,6 +110,7 @@ export function hasNonTrivialKeys(
     });
     return hasKeyWithNonTrivialValue;
 }
+
 /**
  * @TODO add overload on param `keys` where keys = `{ required: string[], optional: string[] }`
  * @note maybe redundant with the syntax `key in obj` ? but able to check more than one
@@ -204,8 +205,8 @@ export function isNumericString(value: any): boolean {
 /**
  * @param value `any`
  * @returns **`isNonEmptyString`** `boolean`
- * - `true` `if` `value` is a non-empty string (not just whitespace),
- * - `false` `otherwise`.
+ * - **`true`** `if` `value` is a non-empty string (not just whitespace),
+ * - **`false`** `otherwise`.
  */
 export function isNonEmptyString(
     value: any

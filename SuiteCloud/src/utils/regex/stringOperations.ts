@@ -1,11 +1,11 @@
 /**
  * @file src/utils/io/regex/stringOperations.ts
  */
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL} from "../../../config";
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL} from "../../config";
 import { CleanStringOptions, StringCaseOptions, StringReplaceOptions } from ".";
+import { RegExpFlagsEnum } from "./types/StringOptions";
 import { clean } from "./cleaning";
 import { distance as levenshteinDistance } from "fastest-levenshtein";
-import { RegExpFlagsEnum } from "./configureParameters";
 
 
 

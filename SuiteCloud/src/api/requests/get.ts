@@ -20,6 +20,7 @@ import { getAccessToken } from "../configureAuth";
 import path from "node:path";
 import { RecordTypeEnum } from "../../utils/ns/record/Record";
 import { SearchOperatorEnum } from "../../utils/ns/search/Search";
+import * as validate from "../../utils/argumentValidation";
 
 
 export const GET_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.GET_Record.scriptId as number;
@@ -115,18 +116,11 @@ export async function GET(
     deployId: number,
     params: Record<string, any>,
 ): Promise<any> {
-    if (!params) {
-        mlog.error('[get.GET()] params is undefined. Cannot call RESTlet.');
-        throw new Error('[get.GET()] params is undefined. Cannot call RESTlet.');
-    }
-    if (!scriptId || !deployId) {
-        mlog.error('[get.GET()] scriptId or deployId is undefined. Cannot call RESTlet.');
-        throw new Error('[get.GET()] scriptId or deployId is undefined. Cannot call RESTlet.');
-    }
-    if (!accessToken) {
-        mlog.error('[get.GET()] getAccessToken() is undefined. Cannot call RESTlet.');
-        throw new Error('[get.GET()] getAccessToken() is undefined. Cannot call RESTlet.');
-    }
+    const source = `${__filename}.GET`;
+    validate.stringArgument(source, {accessToken});
+    validate.numberArgument(source, {scriptId}, true);
+    validate.numberArgument(source, {deployId}, true);
+    validate.objectArgument(source, {params});
     const restletUrl = createUrlWithParams(RESTLET_URL_STEM, {
         script: scriptId,
         deploy: deployId,

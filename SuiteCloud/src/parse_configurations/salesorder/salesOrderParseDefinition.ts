@@ -9,7 +9,6 @@ import {
     FieldDictionary,
 } from "../../api/types";
 import { 
-    CleanStringOptions, 
     FieldDictionaryParseOptions,
     FieldParseOptions,
     RecordParseOptions,
@@ -29,6 +28,7 @@ import { CustomerStatusEnum, CustomerTaxItemEnum, RecordTypeEnum, SalesOrderStat
 import { getSkuDictionary } from "src/config";
 import { isNonEmptyString } from "src/utils/typeValidation";
 import { SB_TERM_DICTIONARY } from "src/utils/ns";
+import { CleanStringOptions, toTitleCase } from "src/utils/regex";
 
 /** 
  * @TODO decide if it is better to move value assignment of 
@@ -156,6 +156,11 @@ const EXTERNAL_ID_ARGS: any[] = [
     SO.TRAN_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER
 ];
 
+const MEMO_ARGS: any[] = [
+    'QuickBooks Summary', SO.TRAN_TYPE,  SO.TRAN_NUM,
+    SO.TRAN_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER,
+]
+
 export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: SO.TRAN_ID,
     fieldOptions: {
@@ -163,7 +168,7 @@ export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
         location: { defaultValue: 1 },
         istaxable: { defaultValue: false },
         taxrate: { defaultValue: 0 },
-        // orderstatus: { defaultValue: SalesOrderStatusEnum.CLOSED },
+        memo: { evaluator: soEval.memo, args: MEMO_ARGS },
         externalid: { evaluator: soEval.transactionExternalId, args: EXTERNAL_ID_ARGS },
         otherrefnum: { evaluator: soEval.otherReferenceNumber, args: [SO.CHECK_NUMBER, SO.PO_NUMBER] },
         entity: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
@@ -216,7 +221,7 @@ const lineItemComposer = async (
             // force positive values bc :"error.SuiteScriptError","name":"USER_ERROR", 
             // "Inventory items must have a positive amount."
             if (isNonEmptyString(sublistLines[i][fieldId])) {
-                sublistLines[i][fieldId] = Math.abs(Number(sublistLines[i][fieldId]));
+                sublistLines[i][fieldId] = Math.abs(Number(sublistLines[i][fieldId])) ?? 0;
             }
         }
         const qty = sublistLines[i].quantity as number;
@@ -240,7 +245,8 @@ const addEncodedExternalIdSearchOption = (
     options: RecordOptions, 
     idOptions: idSearchOptions[]
 ): idSearchOptions[] => {
-    if (!options || !options.fields || !isNonEmptyString(options.fields.externalid)) {
+    if (!options || !options.fields 
+        || !isNonEmptyString(options.fields.externalid)) {
         throw new Error(
             `[salesOrderParseDefinition.ComposeOptions] Unable to compose idOptions from externalid field.`
         );
@@ -254,9 +260,51 @@ const addEncodedExternalIdSearchOption = (
     return idOptions;
 }
 
+const appendMemo = (
+    options: RecordOptions,
+    fields: FieldDictionary
+): FieldDictionary => {
+    if (!options || !options.sublists) {
+        return fields;
+    }
+    /** expected format: `'SO:9999_NUM:0000_PO:1111(TRAN_TYPE)<salesorder>'` */
+    let externalId = fields.externalid as string;
+    let tranType = (/(?<=\()[A-Z]+(?=\))/.exec(externalId) || [''])[0];
+    let expectedTotal: number = 0.00;
+    let itemSublist = options.sublists.item;
+    let memo = fields.memo || '';
+    let notes: string[] = [`Notes:`, 
+        `External ID: ${externalId}`, 
+        `QuickBooks Transaction Type: ${tranType ? toTitleCase(tranType) : 'UNDEFINED'}`,
+        // `(index, SKU): rate * quantity = amount`
+    ];
+    let index = 1;
+    for (const lineItem of itemSublist) {
+        if (!isNonEmptyString(lineItem.amount) || !isNonEmptyString(lineItem.item)) { 
+            continue; 
+        }
+        let sku = String(lineItem.item);
+        const isDiscountItem = isNonEmptyString(sku && /discount/i.test(sku));
+        let amount: string | number = lineItem.amount;
+        // notes.push(`(${index}, ${sku}): ${lineItem.rate} * ${lineItem.quantity} = ${lineItem.amount}`);
+        amount = Math.abs(Number(amount));
+        expectedTotal += isDiscountItem ? -1 * amount : amount;
+        index++;
+    }
+    memo += notes.join(TAB) + NL+`Expected Total: $${expectedTotal.toFixed(2)}`;
+    fields.memo = memo;
+    return fields;
+}
+
+/**
+ * - {@link addEncodedExternalIdSearchOption}
+ * - {@link appendMemo}
+ * - {@link lineItemComposer}
+ */
 const SALES_ORDER_COMPOSE_OPTIONS: ComposeOptions = {
     recordType: RecordTypeEnum.SALES_ORDER,
     idOptions: { composer: addEncodedExternalIdSearchOption },
+    fields: { composer: appendMemo },
     sublists: {
         item: { composer: lineItemComposer }
     }

@@ -14,7 +14,8 @@ import {
 import {
     isNonEmptyArray, isEmptyArray, isNullLike, hasNonTrivialKeys,
     areEquivalentObjects,
-    hasKeys
+    hasKeys,
+    isNonEmptyString
 } from "./utils/typeValidation";
 import { 
     FieldValue, FieldDictionary, SublistDictionary, SublistLine, 
@@ -48,9 +49,6 @@ const DEFAULT_OPERATION_ORDER: OperationEnum[] = [
 ];
 
 /**
- * @TODO maybe change shape of 'options' param to not map recordType to RecordPostProcessingOptions 
- * because some records' cloneOptions might depend on another's (e.g. trying to clone a field that has been pruned)
- * ... maybe make a dependency graph or something...
  * @param initialResults {@link ParseResults}
  * @param options {@link ProcessParseResultsOptions} 
  * - = `{ [recordType: string]: `{@link RecordPostProcessingOptions}` }`
@@ -59,15 +57,11 @@ const DEFAULT_OPERATION_ORDER: OperationEnum[] = [
  */
 export async function processParseResults(
     initialResults: ParseResults,
-    options: ProcessParseResultsOptions,
+    options?: ProcessParseResultsOptions,
 ): Promise<ValidatedParseResults> {
     validate.objectArgument(
         `parseResultsProcessor.processParseResults`, {initialResults}, `ParseResults`
     );
-    validate.objectArgument(
-        `parseResultsProcessor.processParseResults`, {options}, `ProcessParseResultsOptions`
-    );
-    // Initialize results structure
     const results: ValidatedParseResults = {};
     for (const recordType of Object.keys(initialResults)) {
         const isInvalidParseResultsEntry = (!recordType 
@@ -78,25 +72,33 @@ export async function processParseResults(
             )
         );
         if (isInvalidParseResultsEntry) {
-            mlog.error(`processParseResults() Invalid argument: 'initialResults'`,
-                TAB+`expected: 'initialResults' (ParseResults) to have keys as record type strings and values as non-empty array of RecordOptions.`,
-                TAB+`received: ${typeof recordType} = '${recordType}' with value: ${indentedStringify(initialResults[recordType])}`,
-                TAB+`returning empty results...`
-            );
+            mlog.error([`processParseResults() Invalid argument: 'initialResults'`,
+                `expected: 'initialResults' (ParseResults) to have keys as record type strings and values as non-empty array of RecordOptions.`,
+                `received: ${typeof recordType} = '${recordType}' with value: ${indentedStringify(initialResults[recordType])}`,
+                `returning empty results...`
+            ].join(TAB));
             return {};
         }
         results[recordType] = { valid: [], invalid: [] };
     }
-
+    if (isNullLike(options)) {
+        for (const recordType in initialResults) {
+            results[recordType] = {
+                valid: initialResults[recordType],
+                invalid: []
+            }
+        }
+        return results;
+    }
     // Process each record type according to its operation order
     for (const recordType of Object.keys(options)) {
-        if (!recordType || typeof recordType !== 'string' || !hasKeys(initialResults, recordType)) {
-            mlog.error(`processParseResults() Invalid ProcessParseResultsOptions.recordType:`,
-                TAB+`expected: 'recordType' (string) to be a valid record type key in initialResults.`,
-                TAB+`received: ${typeof recordType} = '${recordType}'`,
-                TAB+`needed key in initialResults keys: ${JSON.stringify(Object.keys(initialResults))}`,
-                TAB+`continuing to next processOptions...`,
-            );
+        if (!isNonEmptyString(recordType) || !hasKeys(initialResults, recordType)) {
+            mlog.error([`processParseResults() Invalid ProcessParseResultsOptions.recordType:`,
+                `expected: 'recordType' (string) to be a valid record type key in initialResults.`,
+                `received: ${typeof recordType} = '${recordType}'`,
+                `needed key in initialResults keys: ${JSON.stringify(Object.keys(initialResults))}`,
+                `continuing to next processOptions...`,
+            ].join(TAB));
             continue;
         }
         const processes = options[recordType] as RecordPostProcessingOptions;
@@ -286,7 +288,7 @@ export async function processComposeOptions(
         );
         return record;
     }
-    if (composeOptions.fields && hasNonTrivialKeys(composeOptions.fields)) {
+    if (composeOptions.fields && typeof composeOptions.fields.composer === 'function') {
         if (!record.fields) {
             record.fields = {};
         }
@@ -305,6 +307,7 @@ export async function processComposeOptions(
                 record.sublists[sublistId] = [{} as SublistLine];
             }
             // let composer handle each line, just pass in the sublist lines
+            if (typeof sublistConfig.composer !== 'function') { continue }
             record.sublists[sublistId] = await sublistConfig.composer(record, record.sublists[sublistId])
         }
     }
@@ -329,4 +332,20 @@ function getRecordId(
         return postOptions.fields[idProp] as string;
     }
     return undefined;
+}
+
+export function getValidatedDictionaries(validatedResults: ValidatedParseResults): { 
+    validDict: { [recordType: string]: RecordOptions[] }, 
+    invalidDict: { [recordType: string]: RecordOptions[]} 
+} {
+    validate.objectArgument(`${__filename}.getValidatedDictionaries`, {validatedResults});
+    const invalidDict = Object.keys(validatedResults).reduce((acc, key) => {
+        if (isNonEmptyArray(validatedResults[key].invalid)) acc[key] = validatedResults[key].invalid;
+        return acc;
+    }, {} as { [recordType: string]: RecordOptions[] });
+    const validDict = Object.keys(validatedResults).reduce((acc, key) => {
+        acc[key] = validatedResults[key].valid;
+        return acc;
+    }, {} as { [recordType: string]: RecordOptions[] });
+    return { validDict, invalidDict }
 }

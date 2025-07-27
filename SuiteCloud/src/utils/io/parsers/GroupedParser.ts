@@ -33,7 +33,7 @@ import {
 } from "../../typeValidation";
 import { 
     getDelimiterFromFilePath, isValidCsv, NodeLeaves,
-    ParseOptions, RecordParseOptions, CleanStringOptions, RecordRowGroup, 
+    ParseOptions, RecordParseOptions, RecordRowGroup, 
     GroupReturnTypeEnum, GroupContext, Ancestor, HierarchyOptions, 
     SublistLineParseOptions
 } from "../";
@@ -43,7 +43,7 @@ import {
     INDENT_LOG_LINE as TAB, 
     NEW_LINE as NL,
 } from "../../../config";
-import { clean } from "../regex/index";
+import { clean } from "../../regex";
 
 
 /**

@@ -1,9 +1,14 @@
 /**
  * @file src/utils/io/regex/misc.ts
  */
-import { isNonEmptyArray } from "../../typeValidation";
-import { mainLogger as mlog, parseLogger as plog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../../config";
-
+import { isNonEmptyArray } from "../typeValidation";
+import { mainLogger as mlog, parseLogger as plog, INDENT_LOG_LINE as TAB, 
+    NEW_LINE as NL 
+} from "../../config";
+/**
+ * = `= /^[^/\\:*?"<>|]+(\.[^/\\:*?"<>|]+)$/`
+ */
+export const FILE_NAME_WITH_EXTENSION_PATTERN = /^[^/\\:*?"<>|]+(\.[^/\\:*?"<>|]+)$/; 
 /**
  * `re` = `/^\s*(\d{4}-\d{2}-\d{2}|\d{1,2}[\/-]\d{1,2}[\/-]\d{4})\s*$/`
  * 1. matches `YYYY-MM-DD` (ISO) format.

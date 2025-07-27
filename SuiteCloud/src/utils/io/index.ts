@@ -7,4 +7,3 @@ export * from "./writing";
 export * from "./logging";
 export * from "./types";
 export * from "./parsers";
-export * from "./regex/index";

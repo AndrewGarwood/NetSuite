@@ -4,10 +4,28 @@
 
 import { hasKeys, isIntegerArray, isNonEmptyString } from "src/utils/typeValidation";
 import { FieldParseOptions, ValueMappingEntry, CloneOptions, 
-    ComposeOptions, WriteJsonOptions, RowSourceMetaData } from ".";
+    ComposeOptions, WriteJsonOptions, RowSourceMetaData, 
+    FileData} from ".";
 import { RecordOptions } from "src/api";
-import { CleanStringOptions, NodeLeaves, NodeStructure, RowDictionary } from "..";
+import { NodeLeaves, NodeStructure, RowDictionary } from "..";
 
+/**
+ * @consideration `FILE_NAME_WITH_EXTENSION_PATTERN = /^[^/\\:*?"<>|]+(\.[^/\\:*?"<>|]+)$/`
+ * @param value `any`
+ * @returns **`isFileData`** `boolean`
+ * - **`true`** if the `value` is a {@link FileData} object with keys `fileName` and `fileContent`,
+ * where `fileName` is a string and `fileContent` is a base64 encoded string,
+ * - && fileNamePattern.test(value.fileName)
+ * - **`false`** `otherwise`.
+ */
+export function isFileData(value: any): value is FileData {
+    return (value && typeof value === 'object'
+        && hasKeys(value, ['fileName', 'fileContent'])
+        && isNonEmptyString(value.fileName)
+        // && fileNamePattern.test(value.fileName)
+        && isNonEmptyString(value.fileContent)
+    );
+}
 
 /**
  * 
@@ -77,19 +95,6 @@ export function isComposeOptions(value: any): value is ComposeOptions {
         && typeof value.recordType === 'string' 
         && (value.fields === undefined || typeof value.fields === 'object') 
         && (value.sublists === undefined || typeof value.sublists === 'object')
-    );
-}
-
-/**
- * - {@link CleanStringOptions}
- * @param value `any`
- * @returns **`isCleanStringOptions`** `boolean`
- * - **`true`** if the `value` is an object with at least one key in `['strip', 'case', 'pad', 'replace']` and no other keys,
- * - **`false`** `otherwise`.
- */
-export function isCleanStringOptions(value: any): value is CleanStringOptions {
-    return (value && typeof value === 'object'
-        && hasKeys(value, ['strip', 'case', 'pad', 'replace'], false, true)
     );
 }
 

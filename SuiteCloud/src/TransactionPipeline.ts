@@ -9,8 +9,9 @@ import {
     getCsvRows, getOneToOneDictionary,
     ValidatedParseResults,
     ProcessParseResultsOptions, ParseOptions, ParseResults,
-    getCurrentPacificTime, extractLeaf,
+    getCurrentPacificTime, 
     indentedStringify, clearFile,
+    getFileNameTimestamp,
 } from "./utils/io";
 import { 
     STOP_RUNNING, DELAY,
@@ -32,7 +33,7 @@ import {
     LogTypeEnum, 
 } from "./api";
 import { parseRecordCsv } from "./csvParser";
-import { processParseResults } from "./parseResultsProcessor";
+import { processParseResults, getValidatedDictionaries } from "./parseResultsProcessor";
 import { 
     isNonEmptyArray, anyNull, isNullLike as isNull, isEmptyArray, hasKeys, 
     TypeOfEnum, isNonEmptyString, isIntegerArray,
@@ -66,6 +67,7 @@ export const SO_RESPONSE_OPTIONS: RecordResponseOptions = {
  * @property **`VALIDATE`** = `'VALIDATE'`
  * @property **`MATCH_ENTITY`** = `'MATCH_ENTITY'`
  * @property **`PUT_SALES_ORDERS`** = `'PUT_SALES_ORDERS'`
+ * @property **`END`** = `'END'`
  */
 export enum TransactionPipelineStageEnum {
     PARSE = 'PARSE',
@@ -96,7 +98,7 @@ export type LocalFileMatchOptions = {
 
 export type TransactionPipelineOptions = {
     parseOptions: ParseOptions;
-    postProcessingOptions: ProcessParseResultsOptions;
+    postProcessingOptions?: ProcessParseResultsOptions;
     /** 
      * {@link TransactionEntityMatchOptions} = `{ 
      * entityType: EntityRecordTypeEnum | string; entityFieldId: string; 
@@ -158,7 +160,7 @@ async function done(
     }
     if (stopAfter && stopAfter === stage) {
         mlog.info([
-            `[END processEntityFiles()] - done(options...) returned true`,
+            `[END runTransactionPipeline()] - done(options...) returned true`,
             `fileName: '${fileName}'`,
             `   stage: '${stage}'`,
         ].join(TAB));
@@ -183,9 +185,9 @@ export async function runTransactionPipeline(
     const {
         clearLogFiles, parseOptions, postProcessingOptions, responseOptions 
     } = options as TransactionPipelineOptions;
-    if (!parseOptions || !postProcessingOptions) {
-        throw new Error([`[runTransactionPipeline()] Invalid ProcessorOptions`,
-            `(missing parseOptions or postProcessingOptions)`,
+    if (!parseOptions) {
+        throw new Error([`[runTransactionPipeline()] Invalid TransactionPipelineOptions`,
+            `(missing parseOptions)`,
         ].join(TAB));
     }
     if (isNonEmptyArray(clearLogFiles)) clearFile(...clearLogFiles);
@@ -195,17 +197,16 @@ export async function runTransactionPipeline(
     );
     // mlog.info(`[START runTransactionPipeline()]`);
     for (let i = 0; i < filePaths.length; i++) {
-        const csvFilePath = filePaths[i];
-        let fileName = path.basename(csvFilePath);
+        const csvPath = filePaths[i];
+        let fileName = path.basename(csvPath);
         // ====================================================================
         // TransactionPipelineStageEnum.PARSE
         // ====================================================================
         const parseResults: ParseResults = await parseRecordCsv(
-            csvFilePath, parseOptions, SourceTypeEnum.FILE
+            csvPath, parseOptions, SourceTypeEnum.LOCAL_FILE
         );
         if (await done(
-            options, fileName, 
-            TransactionPipelineStageEnum.PARSE, parseResults
+            options, fileName, TransactionPipelineStageEnum.PARSE, parseResults
         )) return;
         
         // ====================================================================
@@ -215,8 +216,7 @@ export async function runTransactionPipeline(
             parseResults, postProcessingOptions
         ) as ValidatedParseResults;
         if (await done(
-            options, fileName, 
-            TransactionPipelineStageEnum.VALIDATE, validatedResults
+            options, fileName, TransactionPipelineStageEnum.VALIDATE, validatedResults
         )) return;
         if (!options.matchOptions) {
             mlog.warn(`[runTransactionPipeline()] Aborting Process.`,
@@ -226,20 +226,13 @@ export async function runTransactionPipeline(
             );
             return;
         }
-        const invalidDict = Object.keys(validatedResults).reduce((acc, key) => {
-            acc[key] = validatedResults[key].invalid;
-            return acc;
-        }, {} as { [recordType: string]: RecordOptions[] });
+        const { validDict, invalidDict } = getValidatedDictionaries(validatedResults);
         const invalidTransactions = Object.values(invalidDict).flat();
-        if (Object.keys(invalidDict).some(recordType => invalidDict[recordType].length > 0)) {
+        if (invalidTransactions.length > 0) {
             write(invalidDict, path.join(CLOUD_LOG_DIR, `salesorders`, 
                 `${getFileNameTimestamp()}_${fileName}_invalidOptions.json`)
             );
         }
-        const validDict = Object.keys(validatedResults).reduce((acc, key) => {
-            acc[key] = validatedResults[key].valid;
-            return acc;
-        }, {} as { [recordType: string]: RecordOptions[] });
         const validTransactions = Object.values(validDict).flat();
         mlog.info(`[runTransactionPipeline()] calling matchTransactionEntity()...`);
         // ====================================================================
@@ -258,7 +251,7 @@ export async function runTransactionPipeline(
             ].join(TAB));
             if (options.generateMissingEntities === true) {
                 resolvedTransactions.push(...await resolveUnmatchedTransactions(
-                    csvFilePath, matchResults.errors, 
+                    csvPath, matchResults.errors, 
                     options.matchOptions.entityType as EntityRecordTypeEnum
                 ))
                 mlog.debug([`back in pipeline func after calling resolveUnmatched func...`,
@@ -269,7 +262,7 @@ export async function runTransactionPipeline(
                 write(
                     {
                         timestamp: getCurrentPacificTime(),
-                        sourceFile: csvFilePath,
+                        sourceFile: csvPath,
                         numMatchErrors: matchResults.errors.length, 
                         errors: matchResults.errors
                     } as MatchErrorDetails, 
@@ -305,8 +298,7 @@ export async function runTransactionPipeline(
             NL+` -> final payload length: ${payload.length}`
         );
         const transactionResponses = await putTransactions(
-            (matchResults.matches).concat(resolvedTransactions), 
-            responseOptions || SO_RESPONSE_OPTIONS
+            payload, responseOptions || SO_RESPONSE_OPTIONS
         ) as RecordResponse[];
         let successCount = 0;
         const rejectResponses: any[] = [];
@@ -328,7 +320,7 @@ export async function runTransactionPipeline(
             write(
                 {
                     timestamp: getCurrentPacificTime(),
-                    sourceFile: csvFilePath,
+                    sourceFile: csvPath,
                     numRejects,
                     rejectResponses,
                 }, 
@@ -656,19 +648,6 @@ export function isTransactionEntityMatchOptions(
         )
     );
 }
-/**
- * @returns **`timestamp`** `string` = `(${MM}-${DD})-(${HH}-${mm}.${ss}.${ms})`
- */
-function getFileNameTimestamp(): string {
-    const now = new Date();
-    const MM = String(now.getMonth() + 1).padStart(2, '0');
-    const DD = String(now.getDate()).padStart(2, '0');
-    const HH = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
-    const ss = String(now.getSeconds()).padStart(2, '0');
-    const ms = String(now.getMilliseconds()).padStart(3, '0');
-    return `(${MM}-${DD})-(${HH}-${mm}.${ss}.${ms})`
-}
 
 
 
@@ -722,8 +701,8 @@ export async function resolveUnmatchedTransactions(
     let entDict: Record<string, RecordOptions[]> = {}
     for (const txn of transactions) {
         if (!txn.fields || !isNonEmptyString(txn.fields.entity)) { continue }
-        missingEntities.add(txn.fields.entity);
         const ent = txn.fields.entity;
+        missingEntities.add(ent);
         if (!entDict[ent]) {
             entDict[ent] = [txn]
         } else {
@@ -756,7 +735,7 @@ export async function resolveUnmatchedTransactions(
         `abs diff = ${diff}`
     ].join(TAB));
     if (diff !== 0) {
-        throw new Error(`ayo the diff should be 0`)
+        mlog.error(`ayo the diff should be 0`)
     }
     const parseResults: ParseResults = await parseRecordCsv(
         targetRows, { [entityType]: SO_CUSTOMER_PARSE_OPTIONS } as ParseOptions
@@ -779,7 +758,7 @@ export async function resolveUnmatchedTransactions(
         `number of entities in validatedParse: ${validatedResults[entityType].valid.length}`
     ].join(TAB))
     if (missingEntities.size !== validatedResults[entityType].valid.length) {
-        throw new Error(`bad news mate, something's off with the amount of entities.`)
+        mlog.error(`bad news mate, something's off with the amount of entities.`)
     }
 
     const resolved: RecordOptions[] = [];
@@ -802,13 +781,22 @@ export async function resolveUnmatchedTransactions(
         }
         if (isNonEmptyArray(res.rejects)) entityRejects.push(...res.rejects)
     }
+    if (isNonEmptyArray(entityRejects)) {
+        mlog.error([`[resolveUnmatchedTransactions()]`,
+            `There were some rejects when putting entities:`,
+            `   num rejects: ${entityRejects.length}`,
+        ].join(TAB));
+        write({entityRejects, timestamp: getCurrentPacificTime()},
+            path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_resolveUnmatchedTransactions_entityRejects.json`)
+        );
+    }
     mlog.debug([`[resolveUnmatchedTransactions()] Sanity Check 3`,
         `number of entities from transactions: ${missingEntities.size}`,
         `  number of entities from targetRows: ${numEntsFromExtraction}`,
         `   number of entities from responses: ${Object.keys(generatedEntities).length}`,
     ].join(TAB));
     if (!Object.keys(generatedEntities).every(ent => ent in entDict)) {
-        throw new Error(`wait a dang minute, some generated ents not in entDict`)
+        mlog.error(`wait a dang minute, some generated ents not in entDict`)
     }
     for (const ent of Object.keys(entDict)) {
         for (const txn of entDict[ent]) {

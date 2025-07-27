@@ -1,5 +1,5 @@
 /**
- * @file src/utils/io/regex/index.ts
+ * @file src/utils/regex/index.ts
  */
 export * from "./configureParameters";
 export * from "./cleaning";

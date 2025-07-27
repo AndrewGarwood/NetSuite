@@ -4,45 +4,44 @@
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config";
 import { clean, 
     CleanStringOptions, 
-    StringReplaceOptions, 
     StringReplaceParams, StringCaseOptions, 
     extractLeaf, REPLACE_EM_HYPHEN,
     isCleanStringOptions
-} from "../../utils/io";
+} from "../../utils/regex";
 import * as validate from "../../utils/argumentValidation"
 import { isNonEmptyString } from "../../utils/typeValidation";
 
-
 /**
+ * - convert to upper case
  * - replace em hyphen with regular hyphen
  * - remove space around hyphens
  * - replace spaces with underscores
  */
 export const CLEAN_ITEM_ID_OPTIONS = {
-    case: { toUpper: true },
+    case: { toUpper: true } as StringCaseOptions,
     replace: [
         REPLACE_EM_HYPHEN,
         { searchValue: /\s*-\s*/g, replaceValue: '-' },
         { searchValue: /\s+/g, replaceValue: '_' },
-        { searchValue: /(%|,)*/g, replaceValue: '' },
-        // { searchValue: /&/g, replaceValue: 'AND' },
+        { searchValue: /(%|,|&)*/g, replaceValue: '' },
         { searchValue: /\s*(ml|oz)\s*$/ig, replaceValue: '' },
-    ]
-}
+    ] as StringReplaceParams[]
+} as CleanStringOptions
 
 export const itemId = async (
     row: Record<string, any>, 
     itemIdColumn: string,
     cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
 ): Promise<string> => {
-    validate.objectArgument('[itemEvaluatorFunctions.itemId()]', {row});
-    validate.objectArgument('[itemEvaluatorFunctions.itemId()]', {cleanOptions})
-    validate.stringArgument('[itemEvaluatorFunctions.itemId()]', {itemIdColumn});
+    let source = `${__filename}.itemId`;
+    validate.objectArgument(source, {row});
+    validate.objectArgument(source, {cleanOptions})
+    validate.stringArgument(source, {itemIdColumn});
     const originalValue = String(row[itemIdColumn]);
     let itemId = clean(extractLeaf(String(row[itemIdColumn])), cleanOptions);
     if (!isNonEmptyString(itemId)) {
-        mlog.warn(`[itemEvaluatorFunctions.itemId()] cleaned, extracted leaf is falsey`,
-            TAB+ `[evaluate.itemId()] itemIdColumn: '${itemIdColumn}'`,
+        mlog.warn(`[${source}()] cleaned, extracted leaf is falsey`,
+            TAB+ ` itemIdColumn: '${itemIdColumn}'`,
             TAB+`original value: '${String(row[itemIdColumn])}'`,
             TAB+`extracted leaf: '${extractLeaf(String(row[itemIdColumn]))}'`,
             TAB+`cleaned itemId: '${clean(extractLeaf(String(row[itemIdColumn])), cleanOptions)}'`,
@@ -59,11 +58,12 @@ export const displayName = async (
     itemIdColumn: string,
     cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
 ): Promise<string> => {
-    validate.multipleStringArguments('[itemEvaluatorFunctions.displayName()]', 
+    let source = `${__filename}.displayName`;
+    validate.multipleStringArguments(source, 
         {descriptionColumn, itemIdColumn}
     );
-    validate.objectArgument('[itemEvaluatorFunctions.displayName()]', {row});
-    validate.objectArgument('[itemEvaluatorFunctions.displayName()]', {cleanOptions}, 
+    validate.objectArgument(source, {row});
+    validate.objectArgument(source, {cleanOptions}, 
         'CleanStringOptions', isCleanStringOptions
     );
     let itemIdValue = itemId(row, itemIdColumn, cleanOptions);
@@ -77,10 +77,11 @@ export const description = async (
     descriptionColumn: string,
     altDescriptionColumn: string,
 ): Promise<string> => {
-    validate.multipleStringArguments('[itemEvaluatorFunctions.salesDescription()]', 
+    let source = `${__filename}.description`;
+    validate.multipleStringArguments(source, 
         {descriptionColumn, purchaseDescriptionColumn: altDescriptionColumn}
     );
-    validate.objectArgument('[itemEvaluatorFunctions.salesDescription()]',{row});
+    validate.objectArgument(source, {row});
     let desc = clean(row[descriptionColumn]);
     let altDesc = clean(row[altDescriptionColumn]);
     return JSON.stringify(

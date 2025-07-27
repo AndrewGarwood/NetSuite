@@ -23,7 +23,8 @@ import {
 } from '../../utils/io/reading';
 import { getCurrentPacificTime } from '../../utils/io/dateTime';
 import { 
-    mainLogger as mlog, authLogger as alog, INDENT_LOG_LINE as TAB, NEW_LINE as NL 
+    mainLogger as mlog, apiLogger as alog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
+    INFO_LOGS as INFO 
 } from '../../config/setupLog';
 
 export { AuthManager, TokenStatus, AuthState, type AuthOptions, type TokenMetadata };
@@ -266,14 +267,12 @@ class AuthManager {
     public getCurrentValidToken(): { token: TokenResponse; source: string } | null {
         const step3Token = this.loadTokenFromFile(STEP3_TOKENS_PATH);
         if (step3Token 
-            && this.validateTokenResponse(step3Token) === TokenStatus.VALID
-        ) {
+            && this.validateTokenResponse(step3Token) === TokenStatus.VALID) {
                 return { token: step3Token, source: 'STEP3' };
         }
         const step2Token = this.loadTokenFromFile(STEP2_TOKENS_PATH);
         if (step2Token 
-            && this.validateTokenResponse(step2Token) === TokenStatus.VALID
-        ) {
+            && this.validateTokenResponse(step2Token) === TokenStatus.VALID) {
             return { token: step2Token, source: 'STEP2' };
         }
 
@@ -488,7 +487,6 @@ class AuthManager {
             throw new Error(`[AuthManager.generateGrantParams()] Invalid param 'options'; received both 'code' and 'refreshToken' properties`);
         }
         const params = new URLSearchParams({ redirect_uri: REDIRECT_URI });
-        
         if (options.code) {
             params.append('code', options.code);
             params.append('grant_type', GrantTypeEnum.AUTHORIZATION_CODE);

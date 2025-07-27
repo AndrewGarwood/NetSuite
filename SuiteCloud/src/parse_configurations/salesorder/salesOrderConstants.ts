@@ -68,6 +68,7 @@ export enum SalesOrderColumnEnum {
     /**use as customer/contact entityid */
     ENTITY_ID = 'Source Name', // 
     TRAN_ID = 'S. O. #',// 'Trans #',
+    TRAN_NUM = 'Trans #',// 'Trans #',
     TRAN_TYPE = 'Type',
     /** given the content of the tsv file, I think this is the date of the invoice */
     TRAN_DATE = 'Date',

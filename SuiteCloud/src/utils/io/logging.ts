@@ -4,7 +4,7 @@
 import * as fs from "fs";
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
 import { OUTPUT_DIR } from "../../config/env";
-import { isNonEmptyArray, } from "../typeValidation";
+import { isNonEmptyArray, isNonEmptyString, } from "../typeValidation";
 import * as validate from "../argumentValidation";
 import * as path from "path";
 
@@ -139,15 +139,16 @@ function formatSingleLogEntry(logObj: Record<string, any>): string {
     ).sort((a, b) => parseInt(a) - parseInt(b)); // Sort numeric keys
     // Add metadata line
     if (metaKeys.length > 0) {
-        const metaValue = logObj[metaKeys[0]]; // Use first meta key found
+        let metaValue = metaKeys.map(key => logObj[key]).join(' ');
+        // const metaValue = logObj[metaKeys[0]]; // Use first meta key found
         if (metaValue) {
-            lines.push(unescapeString(metaValue));
+            lines.push(unescapeString(metaValue) + '\n');
         }
     }
     // Add content lines (without the numeric keys)
     for (const key of contentKeys) {
         const value = logObj[key];
-        if (value && typeof value === 'string') {
+        if (isNonEmptyString(value)) {
             const unescapedValue = unescapeString(value);
             if (unescapedValue.trim()) {
                 lines.push(unescapedValue);

@@ -7,7 +7,7 @@ import { parseLogger as plog, mainLogger as mlog,
 } from "../../config/setupLog";
 import { 
     clean,
-} from "../../utils/io/regex/index";
+} from "../../utils/regex";
 import { ColumnSliceOptions } from "../../utils/io";
 import * as validate from "../../utils/argumentValidation";
 import { RecordTypeEnum } from "src/utils/ns/Enums";

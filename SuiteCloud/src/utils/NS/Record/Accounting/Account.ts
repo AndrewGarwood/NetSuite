@@ -1,14 +1,10 @@
 /**
+ * @notimplemented
  * @file Account.ts
  */
 
 import { RecordRef } from "../Record";
 
-export type AccountDictionary = {
-    [accountType: string]: {
-        [accountName: string]: string
-    }
-}
 export enum AccountTypeEnum {
     EQUITY = 'Equity',
     INCOME = 'Income',
@@ -26,7 +22,13 @@ export enum AccountTypeEnum {
     FIXED_ASSET = 'Fixed Asset',
     OTHER_ASSET = 'Other Asset',
     CREDIT_CARD = 'Credit Card'
-};
+}
+
+export type AccountDictionary = {
+    [K in keyof typeof AccountTypeEnum]?: {
+        [accountName: string]: string
+    }
+}
 
 export type AccountingBookDetail = {
     accountingbook?: RecordRef;

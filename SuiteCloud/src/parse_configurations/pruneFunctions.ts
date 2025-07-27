@@ -16,10 +16,11 @@ import {
     SubrecordValue,
 } from "../api/types";
 import { hasKeys, isNullLike as isNull, RADIO_FIELD_FALSE, RADIO_FIELD_TRUE, anyNull, isNonEmptyArray } from "../utils/typeValidation";
-import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "../utils/io/regex/index";
+import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "../utils/regex";
 import * as validate from "../utils/argumentValidation";
 import { isNonEmptyString } from "../utils/typeValidation";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "src/utils/ns/Enums";
+import { indentedStringify } from "src/utils/io";
 /** `['entity', 'trandate']` */
 const SALES_ORDER_REQUIRED_FIELDS = ['entity', 'trandate'];
 
@@ -193,7 +194,7 @@ export const contact = (
 export const salesOrder = async (
     options: RecordOptions
 ): Promise<RecordOptions | null> => {
-    if (isNull(options) || !options.fields || !options.sublists) {
+    if (isNull(options) || !options.fields || !options.sublists || !options.sublists.item) {
         mlog.warn(`[prune.salesOrder()]: Invalid 'options' parameter`,
             TAB+`options or options.fields or options.sublists is null or undefined.`,
             TAB+` -> returning null`
@@ -214,10 +215,21 @@ export const salesOrder = async (
         );
         return null; 
     }
-    if (!options.fields.externalid) { 
+    if (!isNonEmptyString(options.fields.externalid)) { 
         throw new Error(
             `[prune.salesOrder()] RecordOptions.fields.externalid is null or undefined`
         );
+    }
+    const itemSublist = options.sublists.item;
+    if (itemSublist.some(lineItem => 
+        lineItem.amount === null || lineItem.amount === undefined 
+        || (Number(lineItem.amount) < 0))) {
+        mlog.error([`[prune.salesOrder()]: lineItem.amount is < 0`,
+            `    item sublist: ${JSON.stringify(options.sublists.item)}`,
+            `order externalid: ${options.fields.externalid}`,
+            `meta: ${indentedStringify(options.meta || {})}`
+        ].join(TAB));
+        throw new Error(`bad amount`);
     }
     // /** should be something like `'SO:9999_NUM:0000_PO:1111(TRAN_TYPE)<salesorder>'` */
     // const externalIdValue = options.fields.externalid as string;

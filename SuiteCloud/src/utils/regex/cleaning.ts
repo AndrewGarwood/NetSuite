@@ -1,10 +1,10 @@
 /**
  * @file src/utils/io/regex/cleaning.ts
  */
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../../config";
-import { isNonEmptyArray } from "../../typeValidation";
-import { RegExpFlagsEnum } from "./configureParameters";
-import { CleanStringOptions, isCleanStringOptions, StringCaseOptions, StringPadOptions, StringReplaceOptions, StringStripOptions } from "../";
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config";
+import { isNonEmptyArray } from "../typeValidation";
+import { CleanStringOptions, isCleanStringOptions, StringCaseOptions, 
+    StringPadOptions, StringReplaceOptions, StringStripOptions } from "./";
 
 export function clean(s: string, options?: CleanStringOptions): string
 /**

@@ -31,7 +31,7 @@ import {
     INDENT_LOG_LINE as TAB, 
     NEW_LINE as NL,
 } from "../../../config";
-import { clean } from "../regex/index";
+import { clean } from "../../regex";
 
 /**
  * @class **`StandardParser`**

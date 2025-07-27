@@ -19,8 +19,8 @@ import {
     equivalentAlphanumericStrings as equivalentAlphanumeric,
     stringContainsAnyOf, JOB_TITLE_SUFFIX_PATTERN, extractJobTitleSuffix,
     REMOVE_JOB_TITLE_SUFFIX, KOREA_ADDRESS_LATIN_TEXT_PATTERN
-} from "../../utils/io/regex/index";
-import { checkForOverride, CLEAN_NAME_REPLACE_OPTIONS, ColumnSliceOptions, ValueMapping } from "../../utils/io";
+} from "../../utils/regex";
+import { checkForOverride, ColumnSliceOptions, ValueMapping } from "../../utils/io";
 import { field, SUPPRESS } from "./common";
 import { readJsonFileAsObject as read } from "../../utils/io";
 import path from "node:path";

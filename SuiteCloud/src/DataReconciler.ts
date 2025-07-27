@@ -5,10 +5,10 @@ import * as fs from 'fs';
 import { EntityRecordTypeEnum, RecordTypeEnum, CustomerTaxItemEnum, CustomerStatusEnum } from "./utils/ns";
 import { isNonEmptyArray, isEmptyArray, hasKeys, isNullLike as isNull, anyNull, 
     isNonEmptyString, TypeOfEnum } from './utils/typeValidation';
-import { extractLeaf, DelimitedFileTypeEnum, DelimiterCharacterEnum, isValidCsv, isRecordOptions } from "./utils/io";
+import { DelimitedFileTypeEnum, DelimiterCharacterEnum, isValidCsv, isRecordOptions } from "./utils/io";
 import { DATA_DIR, mainLogger as mlog, parseLogger as plog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING, CLOUD_LOG_DIR } from "./config";
 import { getColumnValues, getRows, writeObjectToJson as write, readJsonFileAsObject as read, 
-    getIndexedColumnValues, handleFilePathOrRowsArgument 
+    getIndexedColumnValues, handleFileArgument 
 } from "./utils/io";
 import * as validate from "./utils/argumentValidation";
 import path from "node:path";
@@ -84,7 +84,7 @@ export async function extractTargetRows(
     validate.stringArgument(`${__filename}.extractTargetRows`, `targetColumn`, targetColumn);
     validate.functionArgument(`${__filename}.extractTargetRows`, `extractor`, extractor);
     validate.arrayArgument(`${__filename}.extractTargetRows`, `targetValues`, targetValues, TypeOfEnum.STRING);
-    const rows = await handleFilePathOrRowsArgument(
+    const rows = await handleFileArgument(
         rowSource, extractTargetRows.name, [targetColumn]
     );
     const targetRows: Record<string, any>[] = [];

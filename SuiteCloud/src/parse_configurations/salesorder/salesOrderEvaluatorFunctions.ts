@@ -5,12 +5,14 @@ import { parseLogger as plog,
     mainLogger as mlog, DEBUG_LOGS, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
 } from "../../config";
 import { 
-    clean as clean, extractLeaf, CleanStringOptions,
+    CleanStringOptions,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
-    equivalentAlphanumericStrings as equivalentAlphanumeric, 
-} from "../../utils/io/regex/index";
+    clean, 
+    equivalentAlphanumericStrings as equivalentAlphanumeric,
+    extractLeaf, 
+} from "../../utils/regex";
 import { SalesOrderColumnEnum as SO, } from "./salesOrderConstants";
-import { isNullLike as isNull, anyNull, hasKeys, hasNonTrivialKeys } from "src/utils/typeValidation";
+import { isNullLike as isNull, anyNull, hasKeys, hasNonTrivialKeys, isNonEmptyString } from "src/utils/typeValidation";
 import { getSkuDictionary, hasSkuInDictionary } from "src/config/dataLoader";
 import { RecordTypeEnum } from "src/utils/ns/Enums";
 import { isCleanStringOptions } from "src/utils/typeGuards";
@@ -71,6 +73,27 @@ export const otherReferenceNumber = (
         ? `${poNumber}` : '');
 }
 
+
+export const memo = (
+    row: Record<string, any>,
+    memoPrefix?: string,
+    typeColumn: string = SO.TRAN_TYPE,
+    ...idColumns: string[]
+): string => {
+    let result = isNonEmptyString(memoPrefix) ? memoPrefix : 'Summary';
+    result = result.trim() + ': {\n'
+    const summary: Record<string, any> = {
+        'Type': clean(row[typeColumn]) || 'UNDEFINED',
+    }
+    for (const col of idColumns) {
+        summary[col] = clean(row[col]) || 'UNDEFINED';
+    }
+    for (const [key, value] of Object.entries(summary)) {
+        result += `${key}: ${value}\n`;
+    }
+    result += '}\n'
+    return result;
+} 
 
 
 

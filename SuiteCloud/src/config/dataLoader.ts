@@ -4,7 +4,7 @@
  * and ensure proper initialization order
  */
 import { DATA_DIR, STOP_RUNNING } from "./env";
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "./setupLog";
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, INFO_LOGS as INFO } from "./setupLog";
 import { readJsonFileAsObject as read, isValidCsv, getCsvRows, getOneToOneDictionary } from "../utils/io/reading";
 import { writeObjectToJson as write } from "src/utils/io";
 import { hasNonTrivialKeys, isNonEmptyArray, isNullLike as isNull, isNonEmptyString as isNonEmptyString, isEmptyArray, hasKeys } from "../utils/typeValidation";
@@ -76,7 +76,7 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
     if (!domains || domains.length === 0) {
         domains.push(...DEFAULT_DOMAINS_TO_LOAD)
     }
-    mlog.info('[initializeData()] Initializing application data...');
+    INFO.push('[initializeData()] Initializing application data...');
     try {
         for (const d of domains) {
             switch (d) {
@@ -96,7 +96,9 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
             }
         }
         dataInitialized = true;
-        mlog.info('[initializeData()] ✓ All data initialized successfully');
+        INFO.push('[initializeData()] ✓ All data initialized successfully');
+        mlog.info(INFO.join(TAB));
+        INFO.length = 0;
     } catch (error) {
         mlog.error('[initializeData()] ✗ Failed to initialize data:', error);
         STOP_RUNNING(1, 'Data initialization failed');
@@ -111,7 +113,7 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
 async function loadRegexConstants(
     filePath: string=REGEX_FILE
 ): Promise<RegexConstants> {
-    validate.existingPathArgument('loadRegexConstants','filePath', filePath);
+    validate.existingPathArgument('loadRegexConstants', {filePath});
     const REGEX_CONSTANTS = read(filePath) as Record<string, any>;
     if (!REGEX_CONSTANTS || !REGEX_CONSTANTS.hasOwnProperty('COMPANY_KEYWORD_LIST') || !REGEX_CONSTANTS.hasOwnProperty('JOB_TITLE_SUFFIX_LIST')) {
         throw new Error(`[loadRegexConstants()] Invalid REGEX_CONSTANTS file at '${filePath}'. Expected json object to have 'COMPANY_KEYWORD_LIST' and 'JOB_TITLE_SUFFIX_LIST' keys.`);
@@ -124,6 +126,7 @@ async function loadRegexConstants(
     if (!isNonEmptyArray(JOB_TITLE_SUFFIX_LIST)) {
         throw new Error(`[loadRegexConstants()] Invalid JOB_TITLE_SUFFIX_LIST in REGEX_CONSTANTS file at '${filePath}'`);
     }
+    INFO.push(`[loadRegexConstants()] Loaded regex constants`,)
     return {
         COMPANY_KEYWORD_LIST,
         JOB_TITLE_SUFFIX_LIST,
@@ -153,7 +156,7 @@ async function loadSkuDictionary(
     try {
         const jsonData = read(jsonPath);
         if (jsonData && hasNonTrivialKeys(jsonData.SKU_TO_INTERNAL_ID_DICT)) {
-            mlog.debug(`[loadSkuDictionary()] Loaded SKU dictionary from JSON: ${Object.keys(jsonData.SKU_TO_INTERNAL_ID_DICT).length} entries`);
+            INFO.push(`[loadSkuDictionary()] Loaded SKU dictionary from JSON: ${Object.keys(jsonData.SKU_TO_INTERNAL_ID_DICT).length} entries`);
             return jsonData.SKU_TO_INTERNAL_ID_DICT as Record<string, string>;
         }
     } catch (error) {
@@ -270,7 +273,7 @@ export function isDataInitialized(): boolean {
  * - Initializes the dictionary if it hasn't been loaded yet from {@link ACCOUNT_DICTIONARY_FILE}.
  * @returns Promise that resolves to the Account dictionary
  */
-export async function getAccountDictionary(): Promise<Record<string, string>> {
+export async function getAccountDictionary(): Promise<AccountDictionary> {
     if (!accountDictionary) {
         accountDictionary = await loadAccountDictionary();
     }

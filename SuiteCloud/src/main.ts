@@ -6,13 +6,9 @@ import path from "node:path";
 import {
     readJsonFileAsObject as read,
     writeObjectToJson as write,
-    writeRowsToCsv,
-    ProcessParseResultsOptions, ParseOptions, ParseResults,
-    RowDictionary, extractLeaf,
+    ProcessParseResultsOptions, ParseOptions,
     trimFile, clearFile, getCurrentPacificTime,
-    getRows,
-    getIndexedColumnValues,
-    getColumnValues, formatDebugLogFile, getDirectoryFiles,
+    formatDebugLogFile, getDirectoryFiles,
 } from "./utils/io";
 import { 
     STOP_RUNNING, CLOUD_LOG_DIR, DATA_DIR,
@@ -23,25 +19,32 @@ import {
     ERROR_DIR, DEBUG_LOGS as DEBUG, SUPPRESSED_LOGS as SUP
 } from "./config";
 import { instantiateAuthManager } from "./api";
+import { 
+    SERVICE_ITEM_PARSE_OPTIONS 
+} from "./parse_configurations/item/itemParseDefinition"
 import { SALES_ORDER_PARSE_OPTIONS as SO_PARSE_OPTIONS, 
     SALES_ORDER_POST_PROCESSING_OPTIONS as SALES_ORDER_POST_PROCESSING_OPTIONS 
 } from "./parse_configurations/salesorder/salesOrderParseDefinition";
 import * as customerConstants from "./parse_configurations/customer/customerConstants";
 import * as soConstants from "./parse_configurations/salesorder/salesOrderConstants";
+import { runItemPipeline, ItemPipelineOptions, ItemPipelineStageEnum } from "./ItemPipeline"
 import { 
     runEntityPipeline, EntityPipelineOptions, EntityPipelineStageEnum
 } from "./EntityPipeline";
 import { runTransactionPipeline, 
     TransactionPipelineOptions, 
     TransactionPipelineStageEnum, TransactionEntityMatchOptions, MatchSourceEnum,
+    LocalFileMatchOptions,
 } from "./TransactionPipeline";
 import { validateFiles, extractTargetRows } from "./DataReconciler";
-import { isEmptyArray, isNonEmptyString } from "./utils/typeValidation";
+import { isEmptyArray, isNonEmptyArray, isNonEmptyString } from "./utils/typeValidation";
 import * as validate from './utils/argumentValidation'
-import { getSkuDictionary, initializeData } from "./config/dataLoader";
+import { initializeData } from "./config/dataLoader";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "./utils/ns/Enums";
 
-const LOG_FILES = [DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH];
+const LOG_FILES = [
+    DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH
+];
 async function main() {
     clearFile(...LOG_FILES);
     mlog.info(`[START main()] at ${getCurrentPacificTime()}`)
@@ -51,25 +54,19 @@ async function main() {
     const viableFiles = getDirectoryFiles(
         soConstants.VIABLE_SO_DIR, '.csv', '.tsv'
     );
-    let filePaths = viableFiles.slice(0, 1); // handle subset for now
-    let otherPaths = [soConstants.SINGLE_ORDER_FILE];
+    let filePaths = viableFiles.slice(49, 50); // handle subset for now
+    let otherPaths = [];
     mlog.info([
         `viableFiles.length: ${viableFiles.length}`,
         `operating on: ${filePaths.length} file(s)`
     ].join(TAB));
     await DELAY(1000, null);
-    const stagesToWrite: TransactionPipelineStageEnum[] = [
-        // TransactionPipelineStageEnum.PARSE,
-        TransactionPipelineStageEnum.PUT_SALES_ORDERS
-    ];
-    await invokeTransactionPipeline(
-        filePaths,
-        soConstants.SALES_ORDER_LOG_DIR, 
-        TransactionPipelineStageEnum.END,
-        stagesToWrite
+    await invokePipeline(RecordTypeEnum.SALES_ORDER, 
+        filePaths, runTransactionPipeline, SO_PIPELINE_CONFIG
     );
-
-    mlog.info(`[END main()] at ${getCurrentPacificTime()}`);
+    mlog.info(`[END main()] at ${getCurrentPacificTime()}`,
+        TAB+`handling logs...`
+    );
     trimFile(5, ...LOG_FILES);
     for (const filePath of LOG_FILES) { formatDebugLogFile(filePath) }
     STOP_RUNNING(0);
@@ -80,51 +77,79 @@ main().catch(error => {
     STOP_RUNNING(1);
 });
 
-/**
- * @TODO in python pre processing, 
- * set aside transactions with negative qty/price/amount to handle later?
- * or just take absolute value in post processing?
- */
+const SO_PIPELINE_CONFIG: TransactionPipelineOptions = {
+    parseOptions: { 
+        [RecordTypeEnum.SALES_ORDER]: SO_PARSE_OPTIONS 
+    } as ParseOptions,
+    postProcessingOptions: { 
+        [RecordTypeEnum.SALES_ORDER]: SALES_ORDER_POST_PROCESSING_OPTIONS 
+    } as ProcessParseResultsOptions,
+    matchOptions: {
+        entityType: EntityRecordTypeEnum.CUSTOMER,
+        entityFieldId: 'entity',
+        matchMethod: MatchSourceEnum.API,
+        localFileOptions: {
+            filePath: path.join(DATA_DIR, 'uploaded', 'customer.tsv'),
+            entityIdColumn: 'Name',
+            internalIdColumn: 'Internal ID'
+        } as LocalFileMatchOptions
+    } as TransactionEntityMatchOptions,
+    generateMissingEntities: true,
+    clearLogFiles: LOG_FILES,
+    outputDir: soConstants.SALES_ORDER_LOG_DIR,
+    stagesToWrite: [TransactionPipelineStageEnum.PUT_SALES_ORDERS],
+    stopAfter: TransactionPipelineStageEnum.END
+}
 
-async function invokeTransactionPipeline(
+const SERVICE_ITEM_PIPELINE_CONFIG: ItemPipelineOptions = {
+    parseOptions: { [RecordTypeEnum.SERVICE_ITEM]: SERVICE_ITEM_PARSE_OPTIONS },
+    clearLogFiles: LOG_FILES,
+    outputDir: path.join(CLOUD_LOG_DIR, 'items'),
+    stagesToWrite: [ItemPipelineStageEnum.PARSE, ItemPipelineStageEnum.PUT_ITEMS],
+    stopAfter: ItemPipelineStageEnum.PARSE
+}
+
+export async function invokePipeline(
+    recordType: RecordTypeEnum,
+    filePaths: string | string[],
+    pipeline: (recordType: string, filePaths: string[], pipelineOptions: any) => Promise<void>,
+    options: TransactionPipelineOptions | ItemPipelineOptions | EntityPipelineOptions
+): Promise<void> {
+    const source = `${__filename}.invokePipeline`;
+    filePaths = isNonEmptyArray(filePaths) ? filePaths : [filePaths]
+    validate.arrayArgument(source, {filePaths}, 'string', fs.existsSync);
+    recordType = validate.enumArgument(source, {RecordTypeEnum}, {recordType}) as RecordTypeEnum;
+    validate.functionArgument(source, {pipeline});
+    validate.objectArgument(source, {options});
+    mlog.debug(`[${source}()] calling ${pipeline.name}...`);
+    await pipeline(recordType, filePaths, options);
+}
+
+/**
+ * @deprecated use {@link invokePipeline}
+ * @param transactionType 
+ * @param transactionFilePaths 
+ * @param options 
+ */
+export async function invokeTransactionPipeline(
+    transactionType: RecordTypeEnum,
     transactionFilePaths: string | string[],
-    outputDir?: string,
-    stopAfter: TransactionPipelineStageEnum = TransactionPipelineStageEnum.END,
-    stagesToWrite: TransactionPipelineStageEnum[] = [
-        TransactionPipelineStageEnum.PUT_SALES_ORDERS
-    ]
+    options: TransactionPipelineOptions
 ): Promise<void> {
     if (isNonEmptyString(transactionFilePaths)) { // assume single file path given
         transactionFilePaths = [transactionFilePaths]
     }
-    // mlog.debug(`[START main.callTransactionProcessor()] defining variables...`)
-    const parseOptions: ParseOptions = { 
-        [RecordTypeEnum.SALES_ORDER]: SO_PARSE_OPTIONS 
-    };
-    const postProcessingOptions: ProcessParseResultsOptions = {
-        [RecordTypeEnum.SALES_ORDER]: SALES_ORDER_POST_PROCESSING_OPTIONS
-    };
-    const tranType = RecordTypeEnum.SALES_ORDER;
-    const matchOptions: TransactionEntityMatchOptions = {
-        entityType: EntityRecordTypeEnum.CUSTOMER,
-        entityFieldId: 'entity',
-        matchMethod: MatchSourceEnum.API
-    }
-    const options: TransactionPipelineOptions = {
-        parseOptions,
-        postProcessingOptions,
-        matchOptions,
-        generateMissingEntities: true,
-        clearLogFiles: LOG_FILES,
-        outputDir,
-        stagesToWrite, 
-        stopAfter
-    }
-    mlog.debug(`[invokeTransactionPipeline()] calling runTransactionPipeline...`)
-    await runTransactionPipeline(tranType, transactionFilePaths, options);
+    mlog.debug(`[invokeTransactionPipeline()] calling runTransactionPipeline...`);
+    await runTransactionPipeline(transactionType, transactionFilePaths, options);
 }
 
-async function invokeEntityPipeline(
+/**
+ * @deprecated  use {@link invokePipeline}
+ * @param useSubset 
+ * @param outputDir 
+ * @param stopAfter 
+ */
+export async function invokeEntityPipeline(
     useSubset: boolean = true,
     outputDir?: string,
     stopAfter?: EntityPipelineStageEnum
@@ -148,5 +173,3 @@ async function invokeEntityPipeline(
     }
     await runEntityPipeline(entityType, customerFilePaths, options);
 }
-
-export { invokeEntityPipeline, invokeTransactionPipeline }

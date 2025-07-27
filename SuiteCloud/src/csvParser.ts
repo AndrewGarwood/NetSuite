@@ -21,7 +21,6 @@ import { isRowSourceMetaData, RowSourceMetaData } from "./utils/io";
 import * as validate from "./utils/argumentValidation";
 import { 
     ValueMapping, ValueMappingEntry, getRows,
-    clean, equivalentAlphanumericStrings as equivalentAlphanumeric,
     FieldDictionaryParseOptions,
     FieldParseOptions,
     SublistDictionaryParseOptions,
@@ -33,9 +32,11 @@ import {
     isValidCsv,
     isFieldParseOptions,
     isValueMappingEntry,
-    SublistLineIdOptions,
-    DATE_STRING_PATTERN, indentedStringify, handleFilePathOrRowsArgument
+    SublistLineIdOptions, indentedStringify, handleFileArgument
 } from "./utils/io";
+import {
+    clean, equivalentAlphanumericStrings as equivalentAlphanumeric, DATE_STRING_PATTERN
+} from "./utils/regex";
 import fs from 'fs';
 import { 
     FieldValue, FieldDictionary, SublistDictionary, SublistLine, 
@@ -49,7 +50,7 @@ const NOT_DYNAMIC = false;
 let rowIndex: number = 0;
 
 /**
- * @param source `string | Record<string, any>[]` {@link handleFilePathOrRowsArgument}
+ * @param source `string | Record<string, any>[]` {@link handleFileArgument}
  * @param parseOptions {@link ParseOptions}
  * @returns **`results`** `Promise<`{@link ParseResults}`>` 
  * = `{ [recordType: string]:` {@link RecordOptions}`[] }`
@@ -71,7 +72,7 @@ export async function parseRecordCsv(
         TAB+`recordTypes: ${JSON.stringify(Object.keys(parseOptions))}`,
         typeof source === 'string' ? TAB+`   filePath: '${source}'` : '',
     );           
-    const rows = await handleFilePathOrRowsArgument(source, 'csvParser.parseRecordCsv');
+    const rows = await handleFileArgument(source, 'csvParser.parseRecordCsv');
     const results: ParseResults = {};
     const intermediate: IntermediateParseResults = {};
     for (const recordType of Object.keys(parseOptions)) {
@@ -156,7 +157,7 @@ async function updateRecordMeta(
         if (!record.meta || !isRowSourceMetaData(record.meta.dataSource)) {
             record.meta = {
                 dataSource: { [source]: [rowIndex] } as RowSourceMetaData,
-                sourceType: SourceTypeEnum.FILE
+                sourceType: SourceTypeEnum.LOCAL_FILE
             };
         } else if (!record.meta.dataSource[source].includes(rowIndex)) {
             record.meta.dataSource[source].push(rowIndex);

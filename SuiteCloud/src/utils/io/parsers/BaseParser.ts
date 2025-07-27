@@ -35,7 +35,7 @@ import {
     clean, 
     equivalentAlphanumericStrings as equivalentAlphanumeric, 
     DATE_STRING_PATTERN 
-} from "../regex/index";
+} from "../../regex";
 import { indentedStringify } from "../writing";
 
 /**

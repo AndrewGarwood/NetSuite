@@ -1,15 +1,26 @@
 /**
- * @file src/utils/io/IO.ts
+ * @file src/utils/io/Io.ts
  */
 import {
     StringCaseOptions, StringPadOptions, StringStripOptions
-} from "../regex/index"
+} from "../../regex/index"
 
 export type WriteJsonOptions = {
     data: Record<string, any> | string;
     filePath: string;
     indent?: number;
     enableOverwrite?: boolean;
+}
+
+/**
+ * @property **`fileName`** `string` - just the name with its extension
+ * @property **`fileContent`** `string` - `base64` encoded string
+ */
+export type FileData = { 
+    /** `string` - just the name with its extension */
+    fileName: string, 
+    /** `base64` encoded string */
+    fileContent: string
 }
 
 /**

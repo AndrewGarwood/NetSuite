@@ -3,7 +3,8 @@
  * @description Interface and types for different CSV parsing strategies
  */
 
-import { ParseResults, RowContext, ParseOptions, CleanStringOptions } from "../..";
+import { CleanStringOptions } from "src/utils/regex";
+import { ParseResults, RowContext, ParseOptions } from "../..";
 import type { ParseMetaData, ParseError } from "../../../../ParseManager";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "src/api";
 

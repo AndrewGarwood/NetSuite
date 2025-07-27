@@ -74,14 +74,22 @@ export type RecordOptions = {
     }
 }
 
+/**
+ * @enum {string} **`SourceTypeEnum`**
+ */
 export enum SourceTypeEnum {
-    FILE = 'FILE',
+    LOCAL_FILE = 'LOCAL_FILE',
     /** 
      * `if` `sourceType === ROW_ARRAY` and `dataSource === number[]`, and know corresponding `filePath`,
-     * then indexing `await getRows(filePath)` with numbers from `dataSource` will be accurate
+     * then subsequently indexing `await getRows(filePath)` with numbers from `dataSource` will be accurate
      */
     ROW_ARRAY = 'ROW_ARRAY',
-    ROW_SUBSET_ARRAY = 'ROW_SUBSET_ARRAY'
+    ROW_SUBSET_ARRAY = 'ROW_SUBSET_ARRAY',
+    /** assume `base64` encoded `string` */
+    ENCODED_FILE_CONTENT_STRING = 'ENCODED_FILE_CONTENT_STRING',
+    /** the {@link Buffer} object created from `Buffer.from(ENCODED_FILE_CONTENT_STRING, 'base64')` or `fs.readFileSync(filePath)` */
+    BUFFER = 'BUFFER',
 }
+
 
 

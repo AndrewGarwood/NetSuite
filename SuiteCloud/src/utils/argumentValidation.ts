@@ -6,7 +6,8 @@
  */
 import { 
     isNonEmptyString, isNonEmptyArray, isNullLike, hasKeys, isEmptyArray, 
-    TypeOfEnum 
+    TypeOfEnum, 
+    isNumericString
 } from "./typeValidation";
 import { 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL 
@@ -68,7 +69,8 @@ export function multipleStringArguments(
 export function existingPathArgument(
     source: string,
     arg2: string | { [label: string]: any },
-    value?: any
+    value?: any,
+    extension?: string
 ): void {
     let label: string = '';
     if (typeof arg2 === 'object') {
@@ -79,22 +81,62 @@ export function existingPathArgument(
         label = keys[0];
         value = arg2[label];
     }
-    if (!isNonEmptyString(value) || !existsSync(value)) {
-        mlog.error([`[${source}()] Invalid argument: '${label}'`,
-            `Expected ${label} to be: existing file path`,
+    if (!isNonEmptyString(value) || !existsSync(value) 
+        && (isNonEmptyString(extension) 
+            ? value.toLowerCase().endsWith(extension.toLowerCase()) 
+            : true)) {
+        const message = [`[${source}()] Invalid argument: '${label}'`,
+            `Expected ${label} to be: existing file path` 
+            + (isNonEmptyString(extension) ? ` with extension '${extension}'` : ``),
             `Received ${label} value: ${typeof value}`
-        ].join(TAB));
-        throw new Error([`[${source}()] Invalid argument: '${label}'`,
-            `Expected ${label} to be: existing file path`,
-            `Received ${label} value: ${typeof value}`
-        ].join(TAB));
+        ].join(TAB)
+        mlog.error(message);
+        throw new Error(message);
     }
 }
+
+export function numericStringArgument(
+    source: string,
+    arg2: string | { [label: string]: any },
+    value?: any
+): void {
+    let label: string = '';
+    if (typeof arg2 === 'object') {
+        const keys = Object.keys(arg2);
+        if (keys.length !== 1) {
+            throw new Error(`[argumentValidation.numericStringArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key`);
+        }
+        label = keys[0];
+        value = arg2[label];
+    }
+    if (typeof value !== TypeOfEnum.NUMBER 
+        && (typeof value !== TypeOfEnum.STRING || !isNumericString(value))) {
+        const message = [`[${source}()] Invalid argument: '${label}'`,
+            `Expected ${label} to be: number or string (numeric string)`,
+            `Received ${label} value: ${typeof value}`
+        ].join(TAB);
+        mlog.error(message);
+        throw new Error(message);
+    }
+}
+
+export function numberArgument(
+    source: string,
+    labeledNumber: { [label: string]: any },
+    requireInteger?: boolean
+): void
+
+export function numberArgument(
+    source: string,
+    label: string,
+    value: any,
+    requireInteger?: boolean
+): void
 
 /**
  * @param source `string` indicating what called `validateNumberArgument()`
  * @param arg2 `string | { [label: string]: any }` the argument/parameter name
- * @param value `any` the value passed into the `source` 
+ * @param arg3 `any` the value passed into the `source` 
  * for the argument corresponding to `label`
  * @param requireInteger `boolean` optional, if `true`, validates that `value` is an integer
  * - `default` is `false`, meaning `value` can be a float
@@ -107,10 +149,11 @@ export function existingPathArgument(
 export function numberArgument(
     source: string,
     arg2: string | { [label: string]: any },
-    value?: any,
+    arg3?: number | boolean | any,
     requireInteger: boolean = false
 ): void {
     let label: string = '';
+    let value: any = arg3;
     if (typeof arg2 === 'object') {
         const keys = Object.keys(arg2);
         if (keys.length !== 1) {
@@ -118,18 +161,25 @@ export function numberArgument(
         }
         label = keys[0];
         value = arg2[label];
+        if (typeof arg3 === 'boolean') {
+            requireInteger = arg3;
+        }
     }
     if (typeof value !== TypeOfEnum.NUMBER || isNaN(value)) {
-        throw new Error([`[${source}()] Invalid argument: '${label}'`,
+        const message = [`[${source}()] Invalid argument: '${label}'`,
             `Expected ${label} to be: number`,
             `Received ${label} value: ${typeof value}`
-        ].join(TAB));
+        ].join(TAB);
+        mlog.error(message);
+        throw new Error(message);
     }
     if (requireInteger && !Number.isInteger(value)) {
-        throw new Error([`[${source}()] Invalid argument: '${label}'`,
+        const message = [`[${source}()] Invalid argument: '${label}'`,
             `Expected ${label} to be: integer`,
             `Received ${label} value: ${typeof value}`
-        ].join(TAB));
+        ].join(TAB);
+        mlog.error(message);
+        throw new Error(message);
     }
 }
 
@@ -312,9 +362,9 @@ export function arrayArgument(
     if (elementTypeGuard && typeof elementTypeGuard === 'function') {
         if (!value.every((v: any) => elementTypeGuard(v))) {
             const message = [`[${source}()] Invalid argument: '${label}'`,
-                `Expected ${label} to be: array of ${elementType || 'ELEMENT_TYPE_NOT_FOUND'}`,
+                `Expected ${label} to be: Array` + isNonEmptyString(elementType) ? `<${elementType}>` : ``,
                 `Received ${label} value: ${JSON.stringify(value)}`,
-                `Element typeGuard function: ${elementTypeGuard.name}(value: any): value is ${elementType || 'ELEMENT_TYPE_NOT_FOUND'}`
+                `Element typeGuard function: ${elementTypeGuard.name}`
             ].join(TAB);
             mlog.error(message);
             throw new Error(message);
@@ -392,6 +442,7 @@ export function objectArgument(
 ): void
 
 /**
+ * @note does not allow for arrays
  * @param source `string` indicating what called `validateObjectArgument`
  * @param arg2 `string | { [label: string]: any }` the argument/parameter name or a single object dict mapping label to value
  * @param arg3 `any | string` the value passed into the `source` or the object type name
@@ -448,9 +499,9 @@ export function objectArgument(
             : undefined
         )
     ) as ((value: any) => boolean) | undefined;
-    if (typeof value !== 'object' || (isNullLike(value) && !allowEmpty)) {
+    if (typeof value !== 'object' || Array.isArray(value) || (isNullLike(value) && !allowEmpty)) {
         throw new Error([`[${source}()] Invalid argument: '${label}'`,
-            `Expected ${label} to be: non-empty object`,
+            `Expected ${label} to be: non-array, non-empty object`,
             `Received ${label} value: ${typeof value}`
         ].join(TAB));
     }
@@ -460,7 +511,162 @@ export function objectArgument(
         throw new Error([`[${source}()] Invalid argument: '${label}'`,
             `Expected ${label} to be: object of type '${objectTypeName}'`,
             `Received ${label} value: ${JSON.stringify(value)}`,
-            `Element typeGuard function: ${objectTypeGuard.name}(value: any): value is ${objectTypeName}`
+            `Element typeGuard function: ${objectTypeGuard.name}`
         ].join(TAB));
     }
+}
+
+
+export function enumArgument(
+    source: string,
+    enumLabel: string,
+    enumObject: Record<string, string> | Record<string, number>,
+    label: string,
+    value: any
+): string | number
+
+export function enumArgument(
+    source: string,
+    /** 
+     * @key the name of the enumObject
+     * @value the enumObject itself 
+     * */
+    labeledEnumObject: { [enumLabel: string]: Record<string, string> | Record<string, number> },
+    /** 
+     * @key the name/lagel of the argument whose value should be typeof enumObject, 
+     * @value the value to check 
+     * */
+    labeledValue: { [label: string]: any}
+): string | number
+
+/**
+ * @param source `string` indicating what called `enumArgument()`
+ * @param arg2 `string | { [enumLabel: string]: Record<string, string> | Record<string, number> }` 
+ * the enum label or labeled enum object
+ * @param arg3 `Record<string, string> | Record<string, number> | { [label: string]: any }` 
+ * the enum object or labeled value object
+ * @param arg4 `string | undefined` the argument label (if using first overload)
+ * @param value `any` the value to validate (if using first overload)
+ * @returns {string | number} the validated enum value
+ * @throws {Error} if `value` is not a valid enum value
+ * 
+ * **String Enums**: Flexible case-insensitive matching for both keys and values
+ * - Input can be a string that matches any enum key or value (case-insensitive)
+ * - Non-string inputs must exactly match an enum value
+ * 
+ * **Number Enums**: Key or exact value matching
+ * - String input must exactly match an enum key (case-sensitive)
+ * - Number input must exactly match an enum value
+ * 
+ * **`message`**: `[source()] Invalid argument: '${label}'`
+ * -  `Expected ${label} to be: valid ${enumLabel} enum key or value`
+ * -  `Received ${label} value: ${value} (${typeof value})`
+ * -  `Valid ${enumLabel} options: [key1, value1, key2, value2, ...]`
+ */
+export function enumArgument(
+    source: string,
+    arg2: string | { [enumLabel: string]: Record<string, string> | Record<string, number> },
+    arg3?: Record<string, string> | Record<string, number> | { [label: string]: any },
+    arg4?: string,
+    value?: any
+): string | number {
+    let enumLabel: string = '';
+    let enumObject: Record<string, string> | Record<string, number>;
+    let label: string = '';
+    let valueToCheck: any;
+
+    if (typeof arg2 === 'string') {
+        // First overload: (source, enumLabel, enumObject, label, value)
+        enumLabel = arg2;
+        enumObject = arg3 as Record<string, string> | Record<string, number>;
+        label = arg4 as string;
+        valueToCheck = value;
+    } else if (typeof arg2 === 'object') {
+        // Second overload: (source, labeledEnumObject, labeledValue)
+        const enumKeys = Object.keys(arg2);
+        if (enumKeys.length !== 1) {
+            throw new Error(`[argumentValidation.enumArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key for enum object`);
+        }
+        enumLabel = enumKeys[0];
+        enumObject = arg2[enumLabel];
+
+        const valueKeys = Object.keys(arg3 as { [label: string]: any });
+        if (valueKeys.length !== 1) {
+            throw new Error(`[argumentValidation.enumArgument()] Invalid argument: '${JSON.stringify(arg3)}' - expected a single key for value object`);
+        }
+        label = valueKeys[0];
+        valueToCheck = (arg3 as { [label: string]: any })[label];
+    } else {
+        throw new Error(`[argumentValidation.enumArgument()] Invalid parameters: expected either (enumLabel, enumObject, label, value) or ({enumLabel: enumObject}, {label: value})`);
+    }
+
+    // Validate that enumObject is provided and is an object
+    if (!enumObject || typeof enumObject !== 'object') {
+        throw new Error(`[argumentValidation.enumArgument()] Invalid enum object for '${enumLabel}': expected non-empty object`);
+    }
+
+    const enumKeys = Object.keys(enumObject);
+    const enumValues = Object.values(enumObject);
+    
+    // Determine if this is a string or number enum
+    const isStringEnum = enumValues.every(val => typeof val === 'string');
+    const isNumberEnum = enumValues.every(val => typeof val === 'number');
+    
+    if (!isStringEnum && !isNumberEnum) {
+        throw new Error(`[argumentValidation.enumArgument()] Invalid enum object for '${enumLabel}': enum values must be all strings or all numbers`);
+    }
+
+    let matchedValue: string | number | undefined;
+
+    if (isStringEnum) {
+        // For string enums, check both keys and values with case-insensitive matching
+        if (typeof valueToCheck === 'string') {
+            const lowerValueToCheck = valueToCheck.toLowerCase();
+            
+            // Check if it matches a key (case-insensitive)
+            const matchingKey = enumKeys.find(key => key.toLowerCase() === lowerValueToCheck);
+            if (matchingKey) {
+                matchedValue = enumObject[matchingKey] as string;
+            } else {
+                // Check if it matches a value (case-insensitive)
+                const matchingValue = enumValues.find(val => 
+                    typeof val === 'string' && val.toLowerCase() === lowerValueToCheck
+                );
+                if (matchingValue) {
+                    matchedValue = matchingValue as string;
+                }
+            }
+        } else {
+            // For non-string input, only check exact value match
+            if (enumValues.includes(valueToCheck)) {
+                matchedValue = valueToCheck as string;
+            }
+        }
+    } else if (isNumberEnum) {
+        // For number enums, check if value is a number or string key
+        if (typeof valueToCheck === 'number' && enumValues.includes(valueToCheck)) {
+            matchedValue = valueToCheck;
+        } else if (typeof valueToCheck === 'string') {
+            // Check if string matches a key (case-sensitive for number enums)
+            if (enumKeys.includes(valueToCheck)) {
+                matchedValue = enumObject[valueToCheck] as number;
+            }
+        }
+    }
+
+    if (matchedValue === undefined) {
+        const validOptions = isStringEnum 
+            ? [...enumKeys, ...enumValues].map(v => `'${v}'`).join(', ')
+            : [...enumKeys, ...enumValues].join(', ');
+            
+        const message = [`[${source}()] Invalid argument: '${label}'`,
+            `Expected ${label} to be: valid ${enumLabel} enum ${isStringEnum ? 'key or value' : 'key (string) or value (number)'}`,
+            `Received ${label} value: ${valueToCheck} (${typeof valueToCheck})`,
+            `Valid ${enumLabel} options: [${validOptions}]`
+        ].join(TAB);
+        mlog.error(message);
+        throw new Error(message);
+    }
+
+    return matchedValue;
 }

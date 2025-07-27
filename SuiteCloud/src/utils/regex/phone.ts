@@ -3,7 +3,7 @@
  */
 import { StringStripOptions } from ".";
 import { clean } from "./cleaning";
-import { RegExpFlagsEnum } from "./configureParameters";
+import { RegExpFlagsEnum } from "./types/StringOptions";
 
 
 /**

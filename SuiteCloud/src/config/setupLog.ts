@@ -149,8 +149,8 @@ parseLogger.attachTransport((logObj: ILogObj) => {
 
 /** `type: "hidden", name: "pruneLogger"` */
 export const pruneLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
-/** `type: "hidden", name: "authLogger"` */
-export const authLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
+/** `type: "hidden", name: "apiLogger"` */
+export const apiLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
 
 /**
  * compress metadata into `logObj['-1']` then return stringified `logObj`

@@ -15,6 +15,7 @@ import {
 import { SB_REST_SCRIPTS } from "../configureRequests";
 import { getAccessToken } from "../configureAuth";
 import path from "node:path";
+import * as validate from "../../utils/argumentValidation";
 
 const DELETE_RECORD_BY_TYPE_SCRIPT_ID = 
     SB_REST_SCRIPTS.DELETE_DeleteRecordByType.scriptId as number;
@@ -28,24 +29,16 @@ const DELETE_RECORD_BY_TYPE_DEPLOY_ID =
  * @param params `Record<string, any>` to pass as query parameters into the {@link URL}. constructed using {@link createUrlWithParams}
  * @returns **`response`** - `Promise<any>`
  */
-export async function DELETE(
+async function DELETE(
     accessToken: string, 
     scriptId: number, 
     deployId: number,
     params: Record<string, any>,
 ): Promise<any> {
-    if (!scriptId || !deployId) {
-        mlog.error('delete.DELETE() scriptId or deployId is undefined. Cannot call RESTlet.');
-        throw new Error('delete.DELETE() scriptId or deployId is undefined. Cannot call RESTlet.');
-    }
-    if (!accessToken) {
-        mlog.error('delete.DELETE() getAccessToken() is undefined. Cannot call RESTlet.');
-        throw new Error('delete.DELETE() getAccessToken() is undefined. Cannot call RESTlet.');
-    }
-    if (!params) {
-        mlog.error('delete.DELETE() params is undefined. Cannot call RESTlet.');
-        throw new Error('delete.DELETE() params is undefined. Cannot call RESTlet.');
-    }
+    const source = `${__filename}.DELETE`;
+    validate.stringArgument(source, {accessToken});
+    validate.numberArgument(source, {scriptId}, true);
+    validate.numberArgument(source, {deployId}, true);
     const restletUrl = createUrlWithParams(RESTLET_URL_STEM, {
         script: scriptId,
         deploy: deployId,
@@ -80,10 +73,10 @@ export async function deleteRecordByType(
     scriptId: number=DELETE_RECORD_BY_TYPE_SCRIPT_ID,
     deployId: number=DELETE_RECORD_BY_TYPE_DEPLOY_ID
 ): Promise<DeleteRecordByTypeResponse> {
-    if (!payload || Object.keys(payload).length === 0) {
-        mlog.error('[deleteRecordByType()] payload is undefined or empty. Cannot call RESTlet. Exiting...');
-        return {} as DeleteRecordByTypeResponse;
-    }
+    const source = `${__filename}.deleteRecordByType`;
+    validate.numberArgument(source, {scriptId}, true);
+    validate.numberArgument(source, {deployId}, true);
+    validate.objectArgument(source, {payload});
     const accessToken = await getAccessToken();
     if (!accessToken) {
         mlog.error('[deleteRecordByType()] getAccessToken() is undefined. Cannot call RESTlet. Exiting...');

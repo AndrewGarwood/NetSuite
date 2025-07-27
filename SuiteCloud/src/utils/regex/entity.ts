@@ -1,11 +1,12 @@
 /**
  * @file src/utils/io/regex/entity.ts
  */
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG } from "../../../config";
-import { StringReplaceOptions, StringStripOptions, KOREA_ADDRESS_LATIN_TEXT_PATTERN, StringReplaceParams } from ".";
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
+    DEBUG_LOGS as DEBUG } from "../../config";
+import { StringReplaceOptions, StringStripOptions, KOREA_ADDRESS_LATIN_TEXT_PATTERN, StringReplaceParams,  } from ".";
+import { RegExpFlagsEnum } from "./types/StringOptions";
 import { clean } from "./cleaning";
-import { getJobTitleSuffixList, getCompanyKeywordList } from "../../../config/dataLoader";
-import { RegExpFlagsEnum } from "./configureParameters";
+import { getJobTitleSuffixList, getCompanyKeywordList } from "../../config/dataLoader";
 import { stringContainsAnyOf, stringEndsWithAnyOf } from "./stringOperations";
 const SUPPRESS: any[] = [];
 
