@@ -122,66 +122,6 @@ export async function extractTargetRows(
 }
 
 
-const SO_ERROR_HISTORY_DIR = path.join(CLOUD_LOG_DIR, 'salesorders');
-
-// export async function resolveUnmatchedTransactions(
-//     dir: string = SO_ERROR_HISTORY_DIR,
-//     entityType: EntityRecordTypeEnum = EntityRecordTypeEnum.CUSTOMER
-// ): Promise<any> {
-//     validate.stringArgument(`rejectHandler.resolveUnmatchedTransactions`, {dir})
-//     const errorFiles = (fs.readdirSync(dir)
-//         .filter(file => file.toLowerCase().endsWith('_matchErrors.json'))
-//         .map(file => path.join(dir, file))
-//     );
-//     if (!isNonEmptyArray(errorFiles)) {
-//         throw new Error([`[reject  Handler.resolveUnmatchedTransactions()]`,
-//             `Found 0 files with the name pattern '*_matchErrors.json'`,
-//             `directory received: '${dir}'`
-//         ].join(TAB))
-//     }
-//     mlog.debug([`[resolveUnmatchedTransactions()]`,
-//         `Found ${errorFiles.length} matchError file(s)`
-//     ].join(TAB));
-//     const resolved: RecordOptions[] = [];
-//     const unresolved: RecordOptions[] = [];
-//     for (let i = 0; i < errorFiles.length; i++) {
-//         const filePath = errorFiles[i];
-//         const jsonData = read(filePath);
-//         if (isNull(jsonData) || !hasKeys(jsonData, 'errors')) {
-//             mlog.warn([`[resolveUnmatchedTransactions()] Invalid json data`,
-//                 `errorFiles index: ${i+1}`, `filePath: '${filePath}'`,
-//                 `typeof jsonData: ${typeof jsonData}`,
-//                 `Expected Key: 'errors: RecordOptions[]'`,
-//             ].join(TAB));
-//             continue;
-//         }
-//         const transactions = jsonData.errors as RecordOptions[]
-//         try {
-//             validate.arrayArgument(
-//                 `rejectHandler.resolveUnmatchedTransactions.for`, {transactions}, 
-//                 'RecordOptions', isRecordOptions
-//             );
-//         } catch (error) {
-//             mlog.warn([`Invalid RecordOptions array, continuing to next file...`,
-//                 `errorFiles index: ${i+1}`, `filePath: '${filePath}'`,
-//                 JSON.stringify(error as any, null, 4)
-//             ].join(TAB))
-//             continue;
-//         }
-//         const missingEntities: string[] = [];
-//         for (const txn of transactions) {
-//             if (!txn.fields || !isNonEmptyString(txn.fields.entity)) { continue }
-//             missingEntities.push(txn.fields.entity as string);
-//         }
-//         for (let j = 0; j < transactions.length; j++) {
-//         }
-//     }
-// }
-
-
-
-
-
 export async function generateEntityFromTransaction(
     transaction: RecordOptions,
     entityType: EntityRecordTypeEnum

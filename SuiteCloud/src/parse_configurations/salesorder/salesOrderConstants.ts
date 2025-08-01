@@ -85,6 +85,8 @@ export enum SalesOrderColumnEnum {
     RATE = 'Sales Price',
     AMOUNT = 'Amount',
     CHECK_NUMBER = 'Check #',
+    /** concatenation of street1, street2, city, state, zip */
+    NAME_ADDRESS = 'Name Address',
     PRIMARY_CONTACT = 'Name Contact',
     PHONE = 'Name Phone #',
     FAX = 'Name Fax #',

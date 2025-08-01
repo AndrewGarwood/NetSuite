@@ -27,18 +27,18 @@ import { SALES_ORDER_PARSE_OPTIONS as SO_PARSE_OPTIONS,
 } from "./parse_configurations/salesorder/salesOrderParseDefinition";
 import * as customerConstants from "./parse_configurations/customer/customerConstants";
 import * as soConstants from "./parse_configurations/salesorder/salesOrderConstants";
-import { runItemPipeline, ItemPipelineOptions, ItemPipelineStageEnum } from "./ItemPipeline"
+import { runItemPipeline, ItemPipelineOptions, ItemPipelineStageEnum } from "./pipelines/ItemPipeline"
 import { 
     runEntityPipeline, EntityPipelineOptions, EntityPipelineStageEnum
-} from "./EntityPipeline";
+} from "./pipelines/EntityPipeline";
 import { runTransactionPipeline, 
     TransactionPipelineOptions, 
     TransactionPipelineStageEnum, TransactionEntityMatchOptions, MatchSourceEnum,
     LocalFileMatchOptions,
-} from "./TransactionPipeline";
+} from "./pipelines/TransactionPipeline";
 import { validateFiles, extractTargetRows } from "./DataReconciler";
 import { isEmptyArray, isNonEmptyArray, isNonEmptyString } from "./utils/typeValidation";
-import * as validate from './utils/argumentValidation'
+import * as validate from "./utils/argumentValidation";
 import { initializeData } from "./config/dataLoader";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "./utils/ns/Enums";
 
@@ -50,20 +50,28 @@ async function main() {
     mlog.info(`[START main()] at ${getCurrentPacificTime()}`)
     await instantiateAuthManager();
     await initializeData();
-    // STOP_RUNNING(0);
+
     const viableFiles = getDirectoryFiles(
         soConstants.VIABLE_SO_DIR, '.csv', '.tsv'
     );
-    let filePaths = viableFiles.slice(49, 50); // handle subset for now
+    let soFiles = viableFiles.slice(60, undefined); // handle subset for now
     let otherPaths = [];
     mlog.info([
         `viableFiles.length: ${viableFiles.length}`,
-        `operating on: ${filePaths.length} file(s)`
+        `operating on: ${soFiles.length} file(s)`
     ].join(TAB));
     await DELAY(1000, null);
     await invokePipeline(RecordTypeEnum.SALES_ORDER, 
-        filePaths, runTransactionPipeline, SO_PIPELINE_CONFIG
+        soFiles, runTransactionPipeline, SO_PIPELINE_CONFIG
     );
+
+    // let serviceItemFile = path.join(DATA_DIR, 'items', 'service_item_copy.tsv');
+    // await invokePipeline(RecordTypeEnum.SERVICE_ITEM, 
+    //     serviceItemFile, runItemPipeline, SERVICE_ITEM_PIPELINE_CONFIG
+    // );
+
+
+
     mlog.info(`[END main()] at ${getCurrentPacificTime()}`,
         TAB+`handling logs...`
     );
@@ -73,7 +81,7 @@ async function main() {
 }
 
 main().catch(error => {
-    mlog.error('Error executing main() function', JSON.stringify(error));
+    mlog.error('Error executing main() function', JSON.stringify(error as any));
     STOP_RUNNING(1);
 });
 
@@ -103,73 +111,24 @@ const SO_PIPELINE_CONFIG: TransactionPipelineOptions = {
 
 const SERVICE_ITEM_PIPELINE_CONFIG: ItemPipelineOptions = {
     parseOptions: { [RecordTypeEnum.SERVICE_ITEM]: SERVICE_ITEM_PARSE_OPTIONS },
-    clearLogFiles: LOG_FILES,
+    clearLogFiles: [],
     outputDir: path.join(CLOUD_LOG_DIR, 'items'),
-    stagesToWrite: [ItemPipelineStageEnum.PARSE, ItemPipelineStageEnum.PUT_ITEMS],
-    stopAfter: ItemPipelineStageEnum.PARSE
+    stagesToWrite: [ItemPipelineStageEnum.VALIDATE, ItemPipelineStageEnum.PUT_ITEMS],
+    stopAfter: ItemPipelineStageEnum.VALIDATE
 }
 
 export async function invokePipeline(
     recordType: RecordTypeEnum,
     filePaths: string | string[],
-    pipeline: (recordType: string, filePaths: string[], pipelineOptions: any) => Promise<void>,
-    options: TransactionPipelineOptions | ItemPipelineOptions | EntityPipelineOptions
+    pipeline: (recordType: string, filePaths: string[], options: any) => Promise<void>,
+    pipelineOptions: TransactionPipelineOptions | ItemPipelineOptions | EntityPipelineOptions
 ): Promise<void> {
-    const source = `${__filename}.invokePipeline`;
+    const source = `main.invokePipeline`;
     filePaths = isNonEmptyArray(filePaths) ? filePaths : [filePaths]
     validate.arrayArgument(source, {filePaths}, 'string', fs.existsSync);
     recordType = validate.enumArgument(source, {RecordTypeEnum}, {recordType}) as RecordTypeEnum;
     validate.functionArgument(source, {pipeline});
-    validate.objectArgument(source, {options});
-    mlog.debug(`[${source}()] calling ${pipeline.name}...`);
-    await pipeline(recordType, filePaths, options);
-}
-
-/**
- * @deprecated use {@link invokePipeline}
- * @param transactionType 
- * @param transactionFilePaths 
- * @param options 
- */
-export async function invokeTransactionPipeline(
-    transactionType: RecordTypeEnum,
-    transactionFilePaths: string | string[],
-    options: TransactionPipelineOptions
-): Promise<void> {
-    if (isNonEmptyString(transactionFilePaths)) { // assume single file path given
-        transactionFilePaths = [transactionFilePaths]
-    }
-    mlog.debug(`[invokeTransactionPipeline()] calling runTransactionPipeline...`);
-    await runTransactionPipeline(transactionType, transactionFilePaths, options);
-}
-
-/**
- * @deprecated  use {@link invokePipeline}
- * @param useSubset 
- * @param outputDir 
- * @param stopAfter 
- */
-export async function invokeEntityPipeline(
-    useSubset: boolean = true,
-    outputDir?: string,
-    stopAfter?: EntityPipelineStageEnum
-): Promise<void> {
-    const entityType = EntityRecordTypeEnum.CUSTOMER;
-    const ALL_CUSTOMERS = [
-        customerConstants.FIRST_PART_FILE, 
-        customerConstants.SECOND_PART_FILE, 
-        customerConstants.THIRD_PART_FILE
-    ];
-    const customerFilePaths = (useSubset 
-        ? [customerConstants.SUBSET_FILE]
-        : ALL_CUSTOMERS
-    );
-    const options: EntityPipelineOptions = {
-        clearLogFiles: [
-            DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH, ERROR_LOG_FILEPATH
-        ],
-        outputDir, 
-        stopAfter
-    }
-    await runEntityPipeline(entityType, customerFilePaths, options);
+    validate.objectArgument(source, {pipelineOptions});
+    mlog.debug(`[${source}()] calling ${pipeline.name}(...)`);
+    await pipeline(recordType, filePaths, pipelineOptions);
 }

@@ -9,12 +9,12 @@ import {
     ProcessParseResultsOptions, ParseOptions, ParseResults,
     getCurrentPacificTime,
     indentedStringify, clearFile,
-} from "./utils/io";
+} from "../utils/io";
 import { 
     STOP_RUNNING,  DELAY, 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
     ERROR_DIR
-} from "./config";
+} from "../config";
 import { 
     EntityRecordTypeEnum, RecordOptions, RecordRequest, RecordResponse, 
     RecordResult, idPropertyEnum,
@@ -25,14 +25,14 @@ import {
     FieldDictionary,
     idSearchOptions,
     SearchOperatorEnum, 
-} from "./api";
+} from "../api";
 import { CUSTOMER_PARSE_OPTIONS, CONTACT_PARSE_OPTIONS, 
     CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS as POST_PROCESSING_OPTIONS 
-} from "./parse_configurations/customer/customerParseDefinition";
-import * as customerConstants from "./parse_configurations/customer/customerConstants";
-import { parseRecordCsv } from "./csvParser";
-import { processParseResults } from "./parseResultsProcessor";
-import { RadioFieldBoolean, RADIO_FIELD_TRUE, isNonEmptyArray, isNonEmptyString } from "./utils/typeValidation";
+} from "../parse_configurations/customer/customerParseDefinition";
+import * as customerConstants from "../parse_configurations/customer/customerConstants";
+import { parseRecordCsv } from "../csvParser";
+import { processParseResults } from "../parseResultsProcessor";
+import { RadioFieldBoolean, RADIO_FIELD_TRUE, isNonEmptyArray, isNonEmptyString } from "../utils/typeValidation";
 
 /** 
  * {@link RecordResponseOptions}

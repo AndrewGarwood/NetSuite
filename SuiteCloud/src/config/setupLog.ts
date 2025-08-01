@@ -14,7 +14,10 @@ export const DEFAULT_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, "DEBUG.txt");
 /**`CLOUD_LOG_DIR/ERROR.txt` */
 export const ERROR_LOG_FILEPATH = path.join(CLOUD_LOG_DIR, "ERROR.txt");
 /**`CLOUD_LOG_DIR/PARSE_LOG.txt` */
-export const PARSE_LOG_FILEPATH = path.join(CLOUD_LOG_DIR, 'PARSE_LOG.txt'); 
+export const PARSE_LOG_FILEPATH = path.join(CLOUD_LOG_DIR, 'PARSE_LOG.txt');
+/**`OUTPUT_DIR/logs/MISC.txt` */
+export const MISC_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, 'MISC.txt'); 
+
 /** 
  * `INDENT_LOG_LINE =  '\n\t• '` = newLine + tab + bullet + space
  * - log.debug(s1, INDENT_LOG_LINE + s2, INDENT_LOG_LINE + s3,...) 
@@ -92,11 +95,9 @@ const PRETTY_LOG_STYLES: IPrettyLogStyles = {
         nameWithDelimiterSuffix: ["whiteBright", "bold", "bgBlack"],
         errorName: ["red", "bold"],
         errorMessage: "redBright",
-};   
-/** `type: "pretty"` */
-const MAIN_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
-    type: "pretty", // "pretty" | "hidden" | "json"
-    name: "NS_Main",
+};
+
+const COMMON_SETTINGS: { [settingsParamKey: string]: any } = {
     minLevel: 0,
     prettyLogTemplate: LOG_TEMPLATE,
     prettyErrorTemplate: ERROR_TEMPLATE,
@@ -105,17 +106,11 @@ const MAIN_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
     prettyLogTimeZone: "local",
     prettyLogStyles: PRETTY_LOG_STYLES,
 }
-/** `type: "hidden"` -> suppress logs from being sent to console */
-const PARSE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
-    type: "hidden", // "pretty" | "hidden" | "json"
-    name: "NS_Parse",
-    minLevel: 0,
-    prettyLogTemplate: LOG_TEMPLATE,
-    prettyErrorTemplate: ERROR_TEMPLATE,
-    prettyErrorStackTemplate: ERROR_STACK_TEMPLATE,
-    stylePrettyLogs: true,
-    prettyLogTimeZone: "local",
-    prettyLogStyles: PRETTY_LOG_STYLES,
+/** `type: "pretty"` */
+const MAIN_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
+    type: "pretty", // "pretty" | "hidden" | "json"
+    name: "NS_Main",
+    ...COMMON_SETTINGS
 }
 
 /** `type: "pretty", name: "mainLogger"` */
@@ -127,7 +122,6 @@ mainLogger.attachTransport((logObj: ILogObj) => {
     );
 });
 
-
 /** `type: "pretty", name: "errorLogger"` */ //logObj: ILogObj & ILogObjMeta
 export const errorLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
 errorLogger.attachTransport((logObj: ILogObj) => {
@@ -137,6 +131,12 @@ errorLogger.attachTransport((logObj: ILogObj) => {
     );
 });
 
+/** `type: "hidden"` -> suppress logs from being sent to console */
+const PARSE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
+    type: "hidden", // "pretty" | "hidden" | "json"
+    name: "NS_Parse",
+    ...COMMON_SETTINGS
+}
 /** `type: "hidden", name: "parseLogger"` */
 export const parseLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
 parseLogger.attachTransport((logObj: ILogObj) => {
@@ -146,11 +146,23 @@ parseLogger.attachTransport((logObj: ILogObj) => {
     );
 });
 
-
 /** `type: "hidden", name: "pruneLogger"` */
 export const pruneLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
 /** `type: "hidden", name: "apiLogger"` */
 export const apiLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
+
+const MISC_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
+    type: "pretty", // "pretty" | "hidden" | "json"
+    name: "Misc",
+    ...COMMON_SETTINGS
+}
+export const miscLogger = new Logger<ILogObj>(MISC_LOGGER_SETTINGS);
+miscLogger.attachTransport((logObj: ILogObj) => {
+    appendFileSync(
+        MISC_LOG_FILEPATH, formatLogObj(logObj), 
+        { encoding: "utf-8" } as WriteFileOptions
+    );
+})
 
 /**
  * compress metadata into `logObj['-1']` then return stringified `logObj`

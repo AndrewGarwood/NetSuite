@@ -2,8 +2,7 @@
  * @file src/utils/typeValidation.ts
  */
 
-import { mainLogger as mlog } from "src/config/setupLog";
-import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "./regex/index";
+import { equivalentAlphanumericStrings } from "./regex/index";
 
 /**
  * @param value `any` the value to check
@@ -71,7 +70,7 @@ export function isEmptyArray(value: any): value is Array<any> & { length: 0 } {
 /**
  * @param value `any`
  * @returns **`isIntegerArray`** `boolean` = `value is Array<number> & { length: number }`
- * - **`true`** if `value` is an array with `length > 0` and each of its elements is an integer
+ * - **`true`** if `value` is an array with `length > 0` and each of its elements is an `integer`
  * - **`false`** `otherwise`
  */
 export function isIntegerArray(
@@ -84,6 +83,20 @@ export function isIntegerArray(
             && Number.isInteger(arrElement)
             && arrElement >= 0
     ))
+}
+
+/**
+ * @param value `any`
+ * @returns **`isStringArray`** `boolean` = `value is Array<string> & { length: number }`
+ * - **`true`** if `value` is an array with `length > 0` and each of its elements is a `string`
+ * - **`false`** `otherwise`
+ */
+export function isStringArray(
+    value: any
+): value is Array<string> & { length: number } {
+    return (isNonEmptyArray(value) 
+        && value.every(arrElement => typeof arrElement === 'string')
+    );
 }
 
 /**
@@ -110,7 +123,6 @@ export function hasNonTrivialKeys(
     });
     return hasKeyWithNonTrivialValue;
 }
-
 /**
  * @TODO add overload on param `keys` where keys = `{ required: string[], optional: string[] }`
  * @note maybe redundant with the syntax `key in obj` ? but able to check more than one
@@ -193,7 +205,7 @@ export function areEquivalentObjects(
         } else if (typeof valA === "object" && valA && typeof valB === "object" && valB) {
             return areEquivalentObjects(valA, valB);
         }
-        return equivalentAlphanumeric(valA, valB);
+        return equivalentAlphanumericStrings(valA, valB);
     });
 }
 
@@ -205,8 +217,8 @@ export function isNumericString(value: any): boolean {
 /**
  * @param value `any`
  * @returns **`isNonEmptyString`** `boolean`
- * - **`true`** `if` `value` is a non-empty string (not just whitespace),
- * - **`false`** `otherwise`.
+ * - `true` `if` `value` is a non-empty string (not just whitespace),
+ * - `false` `otherwise`.
  */
 export function isNonEmptyString(
     value: any
@@ -244,6 +256,9 @@ export enum TypeOfEnum {
     OBJECT = 'object',
     FUNCTION = 'function',
 }
+
+
+
 
 
 /**

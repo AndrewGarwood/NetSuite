@@ -12,14 +12,14 @@ import {
     getCurrentPacificTime, 
     indentedStringify, clearFile,
     getFileNameTimestamp,
-} from "./utils/io";
+} from "../utils/io";
 import { 
     STOP_RUNNING, DELAY,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
     INFO_LOGS, DEBUG_LOGS as DEBUG, SUPPRESSED_LOGS as SUP, 
     ERROR_DIR,
     CLOUD_LOG_DIR
-} from "./config";
+} from "../config";
 import { 
     RecordOptions, RecordRequest, RecordResponse, 
     RecordResult, idPropertyEnum,
@@ -31,23 +31,23 @@ import {
     SetFieldSubrecordOptions,
     SourceTypeEnum,
     LogTypeEnum, 
-} from "./api";
-import { parseRecordCsv } from "./csvParser";
-import { processParseResults, getValidatedDictionaries } from "./parseResultsProcessor";
+} from "../api";
+import { parseRecordCsv } from "../csvParser";
+import { processParseResults, getValidatedDictionaries } from "../parseResultsProcessor";
 import { 
     isNonEmptyArray, anyNull, isNullLike as isNull, isEmptyArray, hasKeys, 
     TypeOfEnum, isNonEmptyString, isIntegerArray,
-} from './utils/typeValidation';
-import { getColumnValues, getRows, isValidCsv } from './utils/io/reading';
-import * as validate from './utils/argumentValidation';
-import { EntityRecordTypeEnum, RecordTypeEnum, SearchOperatorEnum } from './utils/ns/Enums';
-import { extractTargetRows } from './DataReconciler';
-import { entityId } from './parse_configurations/evaluators';
-import { SalesOrderColumnEnum } from './parse_configurations/salesorder/salesOrderConstants';
-import { SO_CUSTOMER_PARSE_OPTIONS, SO_CUSTOMER_POST_PROCESSING_OPTIONS } from './parse_configurations/salesorder/salesOrderParseDefinition';
+} from '../utils/typeValidation';
+import { getColumnValues, getRows, isValidCsv } from '../utils/io/reading';
+import * as validate from '../utils/argumentValidation';
+import { EntityRecordTypeEnum, RecordTypeEnum, SearchOperatorEnum } from '../utils/ns/Enums';
+import { extractTargetRows } from '../DataReconciler';
+import { entityId } from '../parse_configurations/evaluators';
+import { SalesOrderColumnEnum } from '../parse_configurations/salesorder/salesOrderConstants';
+import { SO_CUSTOMER_PARSE_OPTIONS, SO_CUSTOMER_POST_PROCESSING_OPTIONS } from '../parse_configurations/salesorder/salesOrderParseDefinition';
 import { putEntities } from './EntityPipeline';
-import { isRecordOptions, isRecordResponseOptions, isRowSourceMetaData } from './utils/typeGuards';
-import { RowSourceMetaData } from './utils/io';
+import { isRecordOptions, isRecordResponseOptions, isRowSourceMetaData } from '../utils/typeGuards';
+import { RowSourceMetaData } from '../utils/io';
 /** 
  * `responseFields`: `[
  * 'tranid', 'trandate', 'entity', 'externalid', 

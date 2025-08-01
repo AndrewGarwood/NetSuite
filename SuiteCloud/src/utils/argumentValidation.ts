@@ -12,7 +12,8 @@ import {
 import { 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL 
 } from "../config/setupLog";
-import { existsSync } from "fs";
+import { RegExpFlagsEnum, stringEndsWithAnyOf } from "./regex";
+import * as fs from "fs";
 
 /**
  * - {@link isNonEmptyString}`(value: any): value is string & { length: number; }`
@@ -42,11 +43,11 @@ export function stringArgument(
         value = arg2[label];
     }
     if (!isNonEmptyString(value)) {
-        mlog.error([`[${source}()] Invalid argument: '${label}'`,
+        mlog.error([`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: non-empty string`,
             `Received ${label} value: ${typeof value}`
         ].join(TAB))
-        throw new Error([`[${source}()] Invalid argument: '${label}'`,
+        throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: non-empty string`,
             `Received ${label} value: ${typeof value}`
         ].join(TAB));
@@ -66,33 +67,73 @@ export function multipleStringArguments(
     }
 }
 
-export function existingPathArgument(
+export function multipleExistingFileArguments(
+    source: string,
+    extension: string | string[],
+    labeledFilePaths: Record<string, string>
+): void {
+    for (const [label, value] of Object.entries(labeledFilePaths)) {
+        existingFileArgument(source, extension, label, value);
+    }
+}
+
+export function existingFileArgument(
+    source: string,
+    extension: string | string[],
+    arg3: string | { [label: string]: any },
+    value?: any,
+): void {
+    let label: string = '';
+    if (typeof arg3 === 'object') {
+        const keys = Object.keys(arg3);
+        if (keys.length !== 1) {
+            throw new Error(`[argumentValidation.existingFileArgument()] Invalid argument: '${JSON.stringify(arg3)}' - expected a single key`);
+        }
+        label = keys[0];
+        value = arg3[label];
+    }
+    if (!isNonEmptyString(value) 
+        || !stringEndsWithAnyOf(value, extension, RegExpFlagsEnum.IGNORE_CASE)
+        || !isFile(value)) {
+        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
+            `Expected ${label} to be: existing file with extension '${extension}'`,
+            `Received ${label} value: ${typeof value}`
+        ].join(TAB);
+        mlog.error(message);
+        throw new Error(message);
+    }
+}
+
+export function existingDirectoryArgument(
     source: string,
     arg2: string | { [label: string]: any },
     value?: any,
-    extension?: string
 ): void {
     let label: string = '';
     if (typeof arg2 === 'object') {
         const keys = Object.keys(arg2);
         if (keys.length !== 1) {
-            throw new Error(`[argumentValidation.existingPathArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key`);
+            throw new Error(`[argumentValidation.existingDirectoryArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key`);
         }
         label = keys[0];
         value = arg2[label];
     }
-    if (!isNonEmptyString(value) || !existsSync(value) 
-        && (isNonEmptyString(extension) 
-            ? value.toLowerCase().endsWith(extension.toLowerCase()) 
-            : true)) {
-        const message = [`[${source}()] Invalid argument: '${label}'`,
-            `Expected ${label} to be: existing file path` 
-            + (isNonEmptyString(extension) ? ` with extension '${extension}'` : ``),
+    if (!isNonEmptyString(value) || !isDirectory(value)) {
+        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
+            `Expected ${label} to be: existing directory`,
             `Received ${label} value: ${typeof value}`
-        ].join(TAB)
+        ].join(TAB);
         mlog.error(message);
         throw new Error(message);
     }
+}
+
+export function isDirectory(pathString: string): boolean {
+    return fs.existsSync(pathString) && fs.statSync(pathString).isDirectory();
+}
+
+export function isFile(pathString: string): boolean {
+    return fs.existsSync(pathString) && fs.statSync(pathString).isFile();
 }
 
 export function numericStringArgument(
@@ -111,7 +152,7 @@ export function numericStringArgument(
     }
     if (typeof value !== TypeOfEnum.NUMBER 
         && (typeof value !== TypeOfEnum.STRING || !isNumericString(value))) {
-        const message = [`[${source}()] Invalid argument: '${label}'`,
+        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: number or string (numeric string)`,
             `Received ${label} value: ${typeof value}`
         ].join(TAB);
@@ -166,7 +207,7 @@ export function numberArgument(
         }
     }
     if (typeof value !== TypeOfEnum.NUMBER || isNaN(value)) {
-        const message = [`[${source}()] Invalid argument: '${label}'`,
+        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: number`,
             `Received ${label} value: ${typeof value}`
         ].join(TAB);
@@ -174,7 +215,7 @@ export function numberArgument(
         throw new Error(message);
     }
     if (requireInteger && !Number.isInteger(value)) {
-        const message = [`[${source}()] Invalid argument: '${label}'`,
+        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: integer`,
             `Received ${label} value: ${typeof value}`
         ].join(TAB);
@@ -210,7 +251,7 @@ export function booleanArgument(
         value = arg2[label];
     }
     if (typeof value !== TypeOfEnum.BOOLEAN) {
-        throw new Error([`[${source}()] Invalid argument: '${label}'`,
+        throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: ${TypeOfEnum.BOOLEAN}`,
             `Received ${label} value: ${typeof value}`
         ].join(TAB));
@@ -331,7 +372,7 @@ export function arrayArgument(
     }
     
     if (!Array.isArray(value)) {
-        const message = [`[${source}()] Invalid argument: '${label}'`,
+        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: array`,
             `Received ${label} value: ${typeof value}`
         ].join(TAB);
@@ -340,7 +381,7 @@ export function arrayArgument(
     }
     
     if (isEmptyArray(value) && !allowEmpty) {
-        const message = [`[${source}()] Invalid argument: '${label}'`,
+        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: non-empty array`,
             `Received ${label} value: empty array`
         ].join(TAB);
@@ -350,7 +391,7 @@ export function arrayArgument(
     
     if (elementType && Object.values(TypeOfEnum).includes(elementType as TypeOfEnum)) {
         if (!value.every((v: any) => typeof v === elementType)) {
-            const message = [`[${source}()] Invalid argument: '${label}'`,
+            const message = [`${bracketed(source)} Invalid argument: '${label}'`,
                 `Expected ${label} to be: array of ${elementType}`,
                 `Received ${label} value: ${JSON.stringify(value)}`
             ].join(TAB);
@@ -361,7 +402,7 @@ export function arrayArgument(
     
     if (elementTypeGuard && typeof elementTypeGuard === 'function') {
         if (!value.every((v: any) => elementTypeGuard(v))) {
-            const message = [`[${source}()] Invalid argument: '${label}'`,
+            const message = [`${bracketed(source)} Invalid argument: '${label}'`,
                 `Expected ${label} to be: Array` + isNonEmptyString(elementType) ? `<${elementType}>` : ``,
                 `Received ${label} value: ${JSON.stringify(value)}`,
                 `Element typeGuard function: ${elementTypeGuard.name}`
@@ -400,7 +441,7 @@ export function functionArgument(
         value = arg2[label];
     }
     if (typeof value !== 'function') {
-        throw new Error([`[${source}()] Invalid argument: '${label}'`,
+        throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: function`,
             `Received ${label} value: ${typeof value}`
         ].join(TAB));
@@ -500,7 +541,7 @@ export function objectArgument(
         )
     ) as ((value: any) => boolean) | undefined;
     if (typeof value !== 'object' || Array.isArray(value) || (isNullLike(value) && !allowEmpty)) {
-        throw new Error([`[${source}()] Invalid argument: '${label}'`,
+        throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: non-array, non-empty object`,
             `Received ${label} value: ${typeof value}`
         ].join(TAB));
@@ -508,7 +549,7 @@ export function objectArgument(
     if (objectTypeGuard 
         && typeof objectTypeGuard === 'function' 
         && !objectTypeGuard(value)) {
-        throw new Error([`[${source}()] Invalid argument: '${label}'`,
+        throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: object of type '${objectTypeName}'`,
             `Received ${label} value: ${JSON.stringify(value)}`,
             `Element typeGuard function: ${objectTypeGuard.name}`
@@ -659,7 +700,7 @@ export function enumArgument(
             ? [...enumKeys, ...enumValues].map(v => `'${v}'`).join(', ')
             : [...enumKeys, ...enumValues].join(', ');
             
-        const message = [`[${source}()] Invalid argument: '${label}'`,
+        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: valid ${enumLabel} enum ${isStringEnum ? 'key or value' : 'key (string) or value (number)'}`,
             `Received ${label} value: ${valueToCheck} (${typeof valueToCheck})`,
             `Valid ${enumLabel} options: [${validOptions}]`
@@ -669,4 +710,49 @@ export function enumArgument(
     }
 
     return matchedValue;
+}
+
+/**
+ * @description surrounds `s` with brackets if it doesn't already have them
+ * @param s `string`
+ * @returns **`bracketedString`** `string`
+ */
+export const bracketed = (s: string): string => {
+    if (!isNonEmptyString(s)) s = 'argumentValidation'
+    s = s.trim();
+    if (!/^\[.*\]$/.test(s)) {
+        s = `[${s}()]`
+    }
+    return s;
+}
+
+
+/** @deprecated use existingFileArgument() or existingDirectoryArgument() */
+export function existingPathArgument(
+    source: string,
+    arg2: string | { [label: string]: any },
+    value?: any,
+    extension?: string
+): void {
+    let label: string = '';
+    if (typeof arg2 === 'object') {
+        const keys = Object.keys(arg2);
+        if (keys.length !== 1) {
+            throw new Error(`[argumentValidation.existingPathArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key`);
+        }
+        label = keys[0];
+        value = arg2[label];
+    }
+    if (!isNonEmptyString(value) || !fs.existsSync(value) 
+        && (isNonEmptyString(extension) 
+            ? value.toLowerCase().endsWith(extension.toLowerCase()) 
+            : true)) {
+        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
+            `Expected ${label} to be: existing path` 
+            + (isNonEmptyString(extension) ? ` with extension '${extension}'` : ``),
+            `Received ${label} value: ${typeof value}`
+        ].join(TAB)
+        mlog.error(message);
+        throw new Error(message);
+    }
 }

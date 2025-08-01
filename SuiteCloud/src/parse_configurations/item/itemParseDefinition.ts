@@ -1,7 +1,7 @@
 /**
  * @file src/parse_configurations/item/itemParseDefinition.ts
  */
-
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB } from "src/config";
 import { 
     FieldParseOptions,
     FieldDictionaryParseOptions,
@@ -14,6 +14,7 @@ import { ItemColumnEnum as C } from "./itemConstants";
 import * as evaluate from "../evaluators";
 import { RecordTypeEnum, AccountTypeEnum } from "../../utils/ns";
 import { RecordOptions } from "src/api/types/RecordEndpoint";
+import { hasKeys } from "src/utils/typeValidation";
 
 // seemingly unnecessary enums, but can scale up
 enum LocationEnum {
@@ -42,8 +43,11 @@ export const SERVICE_ITEM_PARSE_OPTIONS: RecordParseOptions = {
         location: { defaultValue: LocationEnum.HQ },
         taxschedule: { defaultValue: TaxScheduleEnum.DEFAULT },
         incomeaccount: { evaluator: evaluate.accountInternalId, 
-            args: [C.INCOME_ACCOUNT, AccountTypeEnum.INCOME, AccountTypeEnum.OTHER_INCOME] 
-        }
+            args: [C.ACCOUNT, AccountTypeEnum.INCOME, AccountTypeEnum.OTHER_INCOME] 
+        },
+        expenseaccount: { evaluator: evaluate.accountInternalId, 
+            args: [C.ACCOUNT, AccountTypeEnum.EXPENSE, AccountTypeEnum.OTHER_EXPENSE] 
+        },
     } as FieldDictionaryParseOptions,
     sublistOptions: {
         price1: [
@@ -55,6 +59,23 @@ export const SERVICE_ITEM_PARSE_OPTIONS: RecordParseOptions = {
     } as SublistDictionaryParseOptions
 }
 
+/** check options.fields hasKeys(incomeaccount or expenseaccount) */
+export const serviceItem = async (
+    options: RecordOptions
+): Promise<RecordOptions | null> => {
+    if (!options || !options.fields) {
+        return null;
+    }
+    if (!hasKeys(options.fields, ['expenseaccount', 'incomeaccount'], false)) {
+        mlog.warn([
+            `[prune.serviceItem()] options.fields is missing account field`,
+            `keys Expected: one of ['expenseaccount', 'incomeaccount']`,
+            `keys Received: ${JSON.stringify(Object.keys(options.fields))}`
+        ].join(TAB));
+        return null;
+    }
+    return options;
+}
 export const SERVICE_ITEM_POST_PROCESSING_OPTIONS: RecordPostProcessingOptions = {
-    pruneFunc: (options: RecordOptions): RecordOptions => { return options } // temporary
+    pruneFunc: serviceItem
 }

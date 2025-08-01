@@ -11,11 +11,12 @@ import { RegExpFlagsEnum, StringCaseOptions, stringEndsWithAnyOf,
 } from "../regex";
 import { FileData, ParseOneToManyOptions,} from "./types/Io";
 import { STOP_RUNNING } from "src/config/env";
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config/setupLog";
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, SUPPRESSED_LOGS as SUP } from "src/config/setupLog";
 import { DelimiterCharacterEnum, ValueMapping, DelimitedFileTypeEnum, isValueMappingEntry, isFileData } from "./types";
 import { isNonEmptyArray, anyNull, isNullLike as isNull, hasKeys, isNonEmptyString, 
     isEmptyArray } from "../typeValidation";
 import * as validate from "../argumentValidation";
+import { indentedStringify } from "./writing";
 
 type FieldValue = Date | number | number[] | string | string[] | boolean | null;
 /**
@@ -50,19 +51,19 @@ export function isValidCsv(
             if (!isNonEmptyString(header)) {
                 mlog.warn([
                     `[reading.isValidCsv]: Invalid parameter: 'requiredHeaders`,
-                    `requiredHeaders must be of type: Array<string>, but`,
+                    `requiredHeaders must be of type: Array<string>`,
                     `found array element of type: '${typeof header}' (skipping)`
-                ].join(' '));
+                ].join(TAB));
                 return true; // skip headers if they are not strings
             }
             return headerRow.includes(header)
         });
         if (!hasRequiredHeaders) {
-            mlog.warn(`[isValidCsv()]: Required headers missing from headerRow`,
-                TAB+`filePath: '${filePath}'`,
-                TAB+`requiredHeaders: ${JSON.stringify(requiredHeaders)}`,
-                TAB+` csvFileHeaders: ${JSON.stringify(headerRow)}`
-            ) 
+            mlog.warn([`[isValidCsv()]: Required headers missing from headerRow`,
+                `filePath: '${filePath}'`,
+                `requiredHeaders: ${JSON.stringify(requiredHeaders)}`,
+                ` csvFileHeaders: ${JSON.stringify(headerRow)}`
+            ].join(TAB)); 
             return false; 
         }
     }
@@ -83,14 +84,14 @@ export function isValidCsv(
         if (headerRow.length !== rowValues.length 
             && i !== lines.length-1 // allow for empty last row in files.
         ) {
-            mlog.warn(`[isValidCsv()]: Invalid row found: header.length !== rowValues.length`,
-                TAB+`   header.length: ${headerRow.length},`,
-                TAB+`rowValues.length: ${rowValues.length}`,
-                TAB+` -> Difference =  ${headerRow.length - rowValues.length}`,
-                TAB+`   header: ${JSON.stringify(headerRow)}`,
-                TAB+`rowValues: ${JSON.stringify(rowValues)}`,
-                TAB+` rowIndex: ${i},`,
-                TAB+` filePath: '${filePath}'`,
+            mlog.warn([`[isValidCsv()]: Invalid row found: header.length !== rowValues.length`,
+                `   header.length: ${headerRow.length},`,
+                `rowValues.length: ${rowValues.length}`,
+                ` -> Difference =  ${headerRow.length - rowValues.length}`,
+                `   header: ${JSON.stringify(headerRow)}`,
+                `rowValues: ${JSON.stringify(rowValues)}`,
+                ` rowIndex: ${i},`,
+                ` filePath: '${filePath}'`].join(TAB),
                 NL+`returning false...`
             );
             return false;
@@ -170,42 +171,130 @@ export function validateFileExtension(filePath: string, expectedExtension: strin
     return filePath + '.' + expectedExtension;
 }
 
-/**
- * @param originalValue - the initial value to check if it should be overwritten
- * @param originalKey - the original column header (`key`) of the value being transformed
- * @param valueOverrides see {@link ValueMapping}
- * @returns **`mappedValue?.newValue`**: {@link FieldValue} if `originalValue` satisfies `valueOverrides`, otherwise returns `initialValue`
- */
-export function checkForOverride(
-    originalValue: string, 
-    originalKey: string, 
-    valueOverrides: ValueMapping
-): FieldValue {
-    if (!originalValue || isNull(valueOverrides)) {
-        return originalValue;
-    }   
-    if (Object.keys(valueOverrides).includes(originalValue)) {
-        let mappedValue = valueOverrides[originalValue as keyof typeof valueOverrides];
-        if (isValueMappingEntry(mappedValue) && mappedValue.validColumns) {
-            const validColumns = Array.isArray(mappedValue.validColumns) 
-                ? mappedValue.validColumns 
-                : [mappedValue.validColumns];
-            if (validColumns.includes(originalKey)) {
-                return mappedValue.newValue as FieldValue;
-            }
-        } else {
-            return mappedValue as FieldValue;
-        }
-    }
-    return originalValue;
+export function isDirectory(pathString: string): boolean {
+    return fs.existsSync(pathString) && fs.statSync(pathString).isDirectory();
 }
 
+export function isFile(pathString: string): boolean {
+    return fs.existsSync(pathString) && fs.statSync(pathString).isFile();
+}
+
+
+/**
+ * - {@link getDirectoryFiles}
+ * @param arg1 `Array<`{@link FileData}` | string> | string`
+ * - `files:` {@link FileData}`[]`
+ * - `filePaths:` `string[]`
+ * - `dirPath:` `string`
+ * @param sheetName `string`
+ * @param requiredHeaders `string[]` `if` left `undefined`, 
+ * `requiredHeaders` will be set to the headers of first non empty file from `arg1`
+ * @param strictRequirement `boolean` 
+ * - `Default` = `true`
+ * - `if` `true`, then every `row` **must** have headers/keys exactly equal to `requiredHeaders`
+ * - `else` `false`, then if a `row` is missing one or more `header` in `requiredHeaders`, 
+ * for each missing `header`, set `row[header] = ''` (empty string), 
+ * @param targetExtensions `string[]` try to read rows of all files whose type is in `targetExtensions`
+ * @returns **`concatenatedRows`** `Promise<Record<string, any>[]>`
+ */
+export async function concatenateFiles(
+    arg1: Array<FileData | string> | string,
+    sheetName: string = 'Sheet1',
+    requiredHeaders: string[] = [],
+    strictRequirement: boolean = true,
+    targetExtensions: string[] = ['.csv', '.tsv', '.xlsx']
+): Promise<Record<string, any>[]> {
+    const source = `[reading.concatenateDirectoryFiles()]`;
+    validate.stringArgument(source, {sheetName});
+    validate.arrayArgument(source, {targetExtensions}, 'string', isNonEmptyString);
+    let files: Array<FileData | string>;
+    if (isNonEmptyArray(arg1)) {
+        files = arg1;
+    } else if (isDirectory(arg1)) {
+        files = getDirectoryFiles(arg1, ...targetExtensions);
+    } else if (isFile(arg1) 
+        && stringEndsWithAnyOf(arg1, targetExtensions, RegExpFlagsEnum.IGNORE_CASE)) {
+        files = [arg1];
+    } else {
+        let message = [`${source} Invalid parameter: 'arg1'`,
+            `Expected: arg1: (Array<FileData | string> | string) to be one of:`,
+            `files: FileData[] | filePaths: string[] | filePath: string | dirPath: string`,
+            `Received: ${typeof arg1}`
+        ].join(TAB);
+        mlog.error(message);
+        throw new Error(message);
+    }
+    if (!isNonEmptyArray(files)) { // i.e. isEmptyArray.... shouldn't get here
+        mlog.error(`${source} how did this happen, we're smarter than this`)
+        return []
+    } else if (files.length === 1) {
+        return await getRows(files[0], sheetName);
+    } // else if files.length > 1, need to make sure each file has same headers
+    const concatenatedRows: Record<string, any>[] = [];
+    let haveDefinedRequiredHeaders = (isNonEmptyArray(requiredHeaders) 
+        && requiredHeaders.every(h => isNonEmptyString(h)) 
+            ? true : false
+    );
+    for (const fileRepresentative of files) {
+        const rows = await getRows(fileRepresentative, sheetName);
+        if (!isNonEmptyArray(rows)) { continue }
+        if (!haveDefinedRequiredHeaders) {
+            let firstValidRow = rows.find(row => !isNull(row));
+            if (!firstValidRow) { continue }
+            requiredHeaders = Object.keys(firstValidRow);
+            haveDefinedRequiredHeaders = true;
+        }
+        if (!isNonEmptyArray(requiredHeaders)) {
+            mlog.warn(`${source} No requiredHeaders defined,`,
+                `skipping file: '${isFileData(fileRepresentative) 
+                    ? fileRepresentative.fileName : fileRepresentative
+                }'`
+            );
+            continue;
+        }
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            if (!hasKeys(row, requiredHeaders)) {
+                let missingHeaders = requiredHeaders.filter(h => !hasKeys(row, h));
+                if (strictRequirement) {
+                    let message = [`${source} Invalid row: missing required header(s)`,
+                        `(strictRequirement === true)`,
+                        `           file: '${isFileData(fileRepresentative) 
+                            ? fileRepresentative.fileName : fileRepresentative
+                        }'`,
+                        `       rowIndex: ${i}`,
+                        `requiredHeaders: ${JSON.stringify(requiredHeaders)}`,
+                        ` missingHeaders: ${JSON.stringify(missingHeaders)}`
+                    ].join(TAB);
+                    mlog.error(message);
+                    throw new Error(message);
+                }
+                for (const header of missingHeaders) {
+                    row[header] = '';
+                }
+            }
+            concatenatedRows.push(row);
+        }
+    }
+    return concatenatedRows;
+}
+
+
+/**
+ * @param arg1 {@link FileData}` | string` one of the following:
+ * - `fileData:` {@link FileData} = `{ fileName: string; fileContent: string; }` 
+ * - `filePath:` `string`
+ * @param sheetName `string` `optional`
+ * - defined/used `if` `arg1` pertains to an excel file and you want to specify which sheet to read
+ * - `Default` = `'Sheet1'`
+ * @returns **`rows`** `Promise<Record<string, any>[]>`
+ */
 export async function getRows(
     arg1: FileData | string,
     sheetName: string = 'Sheet1'
 ): Promise<Record<string, any>[]> {
     if (isFileData(arg1)) {
-        const { fileName, fileContent } = arg1;
+        const { fileName } = arg1 as FileData;
         if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
             return getExcelRows(arg1, sheetName);
         }
@@ -314,7 +403,7 @@ export async function getCsvRows(
             .pipe(csv({ separator: delimiter }))
             .on('data', (row: Record<string, any>) => rows.push(row))
             .on('end', () => {
-                mlog.info([`[${source}()] Successfully read CSV file.`,
+                SUP.push([`[${source}()] Successfully read CSV file.`,
                     `filePath: '${filePath}'`,
                     `Number of rows read: ${rows.length}`
                 ].join(TAB));
@@ -398,6 +487,12 @@ export async function getColumnValues(
     }
     return values.sort();
 }
+
+/**
+ * @param arg1 `string | Record<string, any>[]` - the `filePath` to a CSV file or an array of rows.
+ * @param columnName `string` - the column name whose values will be returned.
+ * @returns **`indexedColumnValues`** `Promise<Record<string, number[]>>`
+ */
 export async function getIndexedColumnValues(
     arg1: string | FileData | Record<string, any>[],
     columnName: string,
@@ -443,10 +538,8 @@ export async function handleFileArgument(
             `        Source:   ${invocationSource}`,
             `requiredHeaders ? ${isNonEmptyArray(requiredHeaders) 
                 ? JSON.stringify(requiredHeaders) 
-                : 'none'
-            }`
-            ].join(TAB)
-        );
+                : 'none'}`
+        ].join(TAB));
     } 
     if (isNonEmptyString(arg1)) { // arg1 is file path string
         rows = await getRows(arg1);
@@ -475,8 +568,8 @@ export async function handleFileArgument(
 /**
  * @param dir `string` path to target directory
  * @param targetExtensions `string[] optional` - array of file extensions to filter files by.
- * - If not provided, all files in the directory will be returned.
- * - If provided, only files with extensions matching the array will be returned.
+ * - `If` not provided, all files in the directory will be returned.
+ * - `If` provided, only files with extensions matching the array will be returned.
  * @returns **`targetFiles`** `string[]` array of full file paths
  */
 export function getDirectoryFiles(
@@ -631,4 +724,34 @@ export function parseCsvForOneToMany(
             TAB+'Given File Path:', '"' + filePath + '"');
         return {} as Record<string, Array<string>>;
     }
+}
+
+/**
+ * @param originalValue - the initial value to check if it should be overwritten
+ * @param originalKey - the original column header (`key`) of the value being transformed
+ * @param valueOverrides see {@link ValueMapping}
+ * @returns **`mappedValue?.newValue`**: {@link FieldValue} if `originalValue` satisfies `valueOverrides`, otherwise returns `initialValue`
+ */
+export function checkForOverride(
+    originalValue: string, 
+    originalKey: string, 
+    valueOverrides: ValueMapping
+): FieldValue {
+    if (!originalValue || isNull(valueOverrides)) {
+        return originalValue;
+    }   
+    if (Object.keys(valueOverrides).includes(originalValue)) {
+        let mappedValue = valueOverrides[originalValue as keyof typeof valueOverrides];
+        if (isValueMappingEntry(mappedValue) && mappedValue.validColumns) {
+            const validColumns = Array.isArray(mappedValue.validColumns) 
+                ? mappedValue.validColumns 
+                : [mappedValue.validColumns];
+            if (validColumns.includes(originalKey)) {
+                return mappedValue.newValue as FieldValue;
+            }
+        } else {
+            return mappedValue as FieldValue;
+        }
+    }
+    return originalValue;
 }

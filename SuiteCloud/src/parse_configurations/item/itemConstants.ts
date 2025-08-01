@@ -14,7 +14,7 @@ export const SERVICE_ITEM_FILE = path.join(ITEM_DIR, 'service_items_copy.tsv');
 export enum ItemColumnEnum {
     ITEM_ID = 'Item',
     ACTIVE_STATUS = 'Active Status',
-    INCOME_ACCOUNT = 'Account',
+    ACCOUNT = 'Account',
     DESCRIPTION = 'Description',
     PURCHASE_DESCRIPTION = 'Purchase Description',
     COST = 'Cost',

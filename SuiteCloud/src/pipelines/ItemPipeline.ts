@@ -1,5 +1,5 @@
 /**
- * @file src/TransactionPipeline.ts
+ * @file src/ItemPipeline.ts
  */
 import path from 'node:path';
 import * as fs from 'fs';
@@ -12,14 +12,14 @@ import {
     getCurrentPacificTime, 
     indentedStringify, clearFile,
     getFileNameTimestamp, RowSourceMetaData
-} from "./utils/io";
+} from "../utils/io";
 import { 
     STOP_RUNNING, DELAY,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
     INFO_LOGS, DEBUG_LOGS as DEBUG, SUPPRESSED_LOGS as SUP, 
     ERROR_DIR,
     CLOUD_LOG_DIR
-} from "./config";
+} from "../config";
 import { 
     RecordOptions, RecordRequest, RecordResponse, 
     RecordResult, idPropertyEnum,
@@ -31,17 +31,17 @@ import {
     SetFieldSubrecordOptions,
     SourceTypeEnum,
     LogTypeEnum, 
-} from "./api";
-import { parseRecordCsv } from "./csvParser";
-import { processParseResults, getValidatedDictionaries } from "./parseResultsProcessor";
+} from "../api";
+import { parseRecordCsv } from "../csvParser";
+import { processParseResults, getValidatedDictionaries } from "../parseResultsProcessor";
 import { 
     isNonEmptyArray, isNullLike as isNull, isEmptyArray, hasKeys, 
     TypeOfEnum, isNonEmptyString, isIntegerArray,
-} from './utils/typeValidation';
-import { getColumnValues, getRows, isValidCsv } from './utils/io/reading';
-import * as validate from './utils/argumentValidation';
-import { RecordTypeEnum, SearchOperatorEnum } from './utils/ns/Enums';
-import { isRecordOptions, isRecordResponseOptions, isRowSourceMetaData } from './utils/typeGuards';
+} from '../utils/typeValidation';
+import { getColumnValues, getRows, isValidCsv } from '../utils/io/reading';
+import * as validate from '../utils/argumentValidation';
+import { RecordTypeEnum, SearchOperatorEnum } from '../utils/ns/Enums';
+import { isRecordOptions, isRecordResponseOptions, isRowSourceMetaData } from '../utils/typeGuards';
 
 
 export const ITEM_RESPONSE_OPTIONS: RecordResponseOptions = {
