@@ -1,5 +1,5 @@
 /**
- * @file src/utils/io/regex/entity.ts
+ * @file src/utils/regex/entity.ts
  */
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
     DEBUG_LOGS as DEBUG } from "../../config";

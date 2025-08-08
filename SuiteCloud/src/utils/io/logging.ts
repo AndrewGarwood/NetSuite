@@ -2,11 +2,10 @@
  * @file src/utils/io/logging.ts
  */
 import * as fs from "fs";
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
-import { OUTPUT_DIR } from "../../config/env";
+import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, LOCAL_LOG_DIR } from "../../config/setupLog";
 import { isNonEmptyArray, isNonEmptyString, } from "../typeValidation";
 import * as validate from "../argumentValidation";
-import * as path from "path";
+import path from "node:path";
 
 /**
  * Auto-formats debug logs at the end of application execution.
@@ -58,7 +57,6 @@ export function formatDebugLogFile(
     try {
         const fileContent = fs.readFileSync(inputFilePath, 'utf-8');
         const formattedContent = formatLogContent(fileContent);
-        
         fs.writeFileSync(outputFilePath, formattedContent, { encoding: 'utf-8' });
         // mlog.info(`[formatDebugLogFile()] Formatted log file saved to '${outputFilePath}'`);
     } catch (error) {
@@ -86,13 +84,11 @@ function formatLogContent(content: string): string {
             currentJsonObject = line;
         } else if (insideJsonObject) {
             currentJsonObject += '\n' + line;
-            
             // Count braces to detect end of JSON object
             for (const char of line) {
                 if (char === '{') braceCount++;
                 if (char === '}') braceCount--;
             }
-            
             if (braceCount === 0) {
                 // End of JSON object, process it
                 try {
@@ -109,7 +105,6 @@ function formatLogContent(content: string): string {
                         currentJsonObject,''
                     );
                 }
-                
                 insideJsonObject = false;
                 currentJsonObject = '';
             }
@@ -183,17 +178,7 @@ function unescapeString(s: string): string {
 export function formatAllDebugLogs(
     logDirectory?: string
 ): void {
-    let logDir: string = logDirectory || '';
-    if (!logDir) {
-        try {
-            const { LOCAL_LOG_DIR } = require('../../config/setupLog');
-            logDir = LOCAL_LOG_DIR;
-        } catch (error) {
-            mlog.error('[formatAllDebugLogs()] Could not import LOCAL_LOG_DIR, using OUTPUT_DIR/logs');
-            logDir = path.join(OUTPUT_DIR, 'logs');
-        }
-    }
-    
+    let logDir: string = logDirectory || LOCAL_LOG_DIR;
     if (!fs.existsSync(logDir)) {
         mlog.warn(`[formatAllDebugLogs()] Log directory does not exist: ${logDir}`);
         return;

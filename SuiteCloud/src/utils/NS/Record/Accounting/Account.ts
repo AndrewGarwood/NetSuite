@@ -1,5 +1,4 @@
 /**
- * @notimplemented
  * @file Account.ts
  */
 

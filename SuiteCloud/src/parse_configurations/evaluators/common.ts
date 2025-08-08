@@ -10,8 +10,8 @@ import {
 } from "../../utils/regex";
 import { ColumnSliceOptions } from "../../utils/io";
 import * as validate from "../../utils/argumentValidation";
-import { RecordTypeEnum } from "src/utils/ns/Enums";
-import { SB_TERM_DICTIONARY, TermBase } from "src/utils/ns/record/accounting/Term";
+import { RecordTypeEnum } from "../../utils/ns/Enums";
+import { SB_TERM_DICTIONARY, TermBase } from "../../utils/ns/record/accounting/Term";
 
 export const SUPPRESS: any[] = [];
 /**

@@ -1,4 +1,6 @@
-
+/**
+ * @file src/utils/regex/types/typeGuards.ts
+ */
 import { CleanStringOptions } from ".";
 import { hasKeys } from "../../typeValidation";
 

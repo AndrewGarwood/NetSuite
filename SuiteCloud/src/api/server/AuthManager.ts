@@ -1,31 +1,31 @@
 /**
  * @file src/api/server/AuthManager.ts
  */
-import express, { Request, Response } from 'express';
-import { Server } from 'node:http';
-import axios from 'axios';
-import open from 'open';
-import bodyParser from 'body-parser';
-import path from 'node:path';
-import fs from 'node:fs';
+import express, { Request, Response } from "express";
+import { Server } from "node:http";
+import axios from "axios";
+import open from "open";
+import bodyParser from "body-parser";
+import path from "node:path";
+import fs from "node:fs";
 import { 
     TOKEN_DIR, SERVER_PORT, REDIRECT_URI, AUTH_URL, TOKEN_URL, 
     REST_CLIENT_ID as CLIENT_ID, REST_CLIENT_SECRET as CLIENT_SECRET,
     SCOPE, STATE
-} from '../../config/env';
-import { createUrlWithParams } from '../url';
-import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from './types';
+} from "../../config/env";
+import { createUrlWithParams } from "../url";
+import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from "./types";
 import { 
     writeObjectToJson as write 
-} from '../../utils/io/writing';
+} from "../../utils/io/writing";
 import { 
     readJsonFileAsObject as read
-} from '../../utils/io/reading';
-import { getCurrentPacificTime } from '../../utils/io/dateTime';
+} from "../../utils/io/reading";
+import { getCurrentPacificTime } from "../../utils/io/dateTime";
 import { 
     mainLogger as mlog, apiLogger as alog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
     INFO_LOGS as INFO 
-} from '../../config/setupLog';
+} from "../../config/setupLog";
 
 export { AuthManager, TokenStatus, AuthState, type AuthOptions, type TokenMetadata };
 

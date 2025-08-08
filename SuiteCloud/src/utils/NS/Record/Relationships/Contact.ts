@@ -12,7 +12,7 @@ import { AddressBook } from "./Address";
 
 
 /**
- * @interface **`ContactBase`**
+ * @interface ContactBase
  * @description interface with basic properties for Contact Record fields in NetSuite.
  * - see {@link Contact} for full interface with all properties.
  * @property {string} entityid - Contact name as it appears in all lists.
@@ -66,7 +66,7 @@ export enum ContactRoleEnum {
 
 
 /**
- * @interface **`Contact`**
+ * @interface Contact
  * @description interface with all properties for Contact Record fields in NetSuite.
  * - see {@link ContactBase} for basic properties.
  * @property {string} altemail - Alternate e-mail address for this contact, optional.
@@ -235,7 +235,7 @@ export interface Contact extends ContactBase {
 }
 
 /**
- * @interface **`ContactSublists`**
+ * @interface ContactSublists
  * */
 export interface ContactSublists {
     /**

@@ -4,6 +4,7 @@
     "scripts": {
         "test": "jest",
         "start": "ts-node -r tsconfig-paths/register --project tsconfig.node.json src/main.ts",
+        "interactive": "ts-node -r tsconfig-paths/register --project tsconfig.node.json src/mainInteractive.ts",
         "build": "tsc --project tsconfig.node.json",
         "build:check": "tsc --noEmit",
         "misc": "ts-node -r tsconfig-paths/register --project tsconfig.node.json src/misc.ts"
@@ -72,9 +73,11 @@
         "@hitc/netsuite-upload": "^2.0.6",
         "@oracle/suitecloud-cli": "^3.0.0",
         "@types/http-cache-semantics": "^4.0.4",
+        "@types/inquirer": "^9.0.9",
         "crypto-js": "^4.2.0",
         "dotenv": "^16.4.7",
         "http-cache-semantics": "^4.2.0",
+        "inquirer": "^12.9.0",
         "kill-port": "^2.0.1",
         "netsuite-api-client": "^1.0.3",
         "oauth-1.0a": "^2.2.6",

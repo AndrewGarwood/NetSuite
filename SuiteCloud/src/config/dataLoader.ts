@@ -6,11 +6,11 @@
 import { DATA_DIR, STOP_RUNNING } from "./env";
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, INFO_LOGS as INFO } from "./setupLog";
 import { readJsonFileAsObject as read, isValidCsv, getCsvRows, getOneToOneDictionary } from "../utils/io/reading";
-import { writeObjectToJson as write } from "src/utils/io";
-import { hasNonTrivialKeys, isNonEmptyArray, isNullLike as isNull, isNonEmptyString as isNonEmptyString, isEmptyArray, hasKeys } from "../utils/typeValidation";
+import { writeObjectToJson as write } from "../utils/io";
+import { hasNonTrivialKeys, isNonEmptyArray, isNullLike as isNull } from "../utils/typeValidation";
 import * as validate from "../utils/argumentValidation"
 import path from "node:path";
-import { AccountTypeEnum, AccountDictionary } from "src/utils/ns";
+import { AccountTypeEnum, AccountDictionary } from "../utils/ns";
 
 // Global state to track if data has been loaded
 let dataInitialized = false;
@@ -28,7 +28,7 @@ export enum DataDomainEnum {
 /** `DATA_DIR/items/SKU_TO_INTERNAL_ID_DICT.json` */
 const SKU_DICTIONARY_FILE = path.join(DATA_DIR, 'items', 'SKU_TO_INTERNAL_ID_DICT.json');
 /** `DATA_DIR/uploaded/inventory_item.tsv` */
-const INVENTORY_ITEM_FILE = path.join(DATA_DIR, 'uploaded', 'inventory_item.tsv');
+const ITEM_FILE = path.join(DATA_DIR, 'items', 'sb_all_item_export.tsv');
 
 let skuDictionary: Record<string, string> | null = null;
 /** `DATA_DIR/accounts/accountDictionary.json` */
@@ -62,21 +62,27 @@ const DEFAULT_DOMAINS_TO_LOAD = [
     DataDomainEnum.REGEX, 
     DataDomainEnum.INVENTORY,
 ];
+
 /**
- * Initialize all data required by the application.
- * This should be called once at the start of the application.
+ * @TODO change param of initializeData to be { [DataDomainEnum | string]: args[] } 
+ * where args are passed in to the corresponding dataLoading function... or maybe 
+ * something like `{ [DataDomainEnum | string]: { loader: function, args: any[] }[] }` 
+ * 
+ * - Initialize all data required by the application.
+ * - This should be called once at the start of the application.
  * - sets {@link dataInitialized} to `true`
  * @param domains `...`{@link DataDomainEnum}`[]` defaults to `[DataDomainEnum.REGEX, DataDomainEnum.INVENTORY]`
  */
 export async function initializeData(...domains: DataDomainEnum[]): Promise<void> {
+    const source = `[dataLoader.initializeData()]`
     if (dataInitialized) {
-        mlog.info('[initializeData()] Data already initialized, skipping...');
+        mlog.info(`${source} Data already initialized, skipping...`);
         return;
     }
-    if (!domains || domains.length === 0) {
-        domains.push(...DEFAULT_DOMAINS_TO_LOAD)
+    if (!isNonEmptyArray(domains)) {
+        domains = DEFAULT_DOMAINS_TO_LOAD;
     }
-    INFO.push('[initializeData()] Initializing application data...');
+    INFO.push(`${source} Initializing application data...`);
     try {
         for (const d of domains) {
             switch (d) {
@@ -90,95 +96,75 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
                     break;
                 default:
                     mlog.warn(
-                        `[initializeData()] Unrecognized data domain: '${d}'. Skipping...`
+                        `${source} Unrecognized data domain: '${d}'. Skipping...`
                     );
                     continue;
             }
         }
         dataInitialized = true;
-        INFO.push('[initializeData()] ✓ All data initialized successfully');
-        mlog.info(INFO.join(TAB));
+        mlog.info(INFO.join(TAB), NL+`${source} ✓ All data initialized successfully`);
         INFO.length = 0;
     } catch (error) {
-        mlog.error('[initializeData()] ✗ Failed to initialize data:', error);
+        mlog.error(`${source} ✗ Failed to initialize data:`, error);
         STOP_RUNNING(1, 'Data initialization failed');
     }
 }
 
-/**
- * Load regex constants
- * @param filePath `string` - Path to the regex constants JSON file (default: `REGEX_FILE`)
- * @returns **`regexConstants`** {@link RegexConstants}
- */
-async function loadRegexConstants(
-    filePath: string=REGEX_FILE
-): Promise<RegexConstants> {
-    validate.existingPathArgument('loadRegexConstants', {filePath});
-    const REGEX_CONSTANTS = read(filePath) as Record<string, any>;
-    if (!REGEX_CONSTANTS || !REGEX_CONSTANTS.hasOwnProperty('COMPANY_KEYWORD_LIST') || !REGEX_CONSTANTS.hasOwnProperty('JOB_TITLE_SUFFIX_LIST')) {
-        throw new Error(`[loadRegexConstants()] Invalid REGEX_CONSTANTS file at '${filePath}'. Expected json object to have 'COMPANY_KEYWORD_LIST' and 'JOB_TITLE_SUFFIX_LIST' keys.`);
-    }
-    const COMPANY_KEYWORD_LIST: string[] = REGEX_CONSTANTS.COMPANY_KEYWORD_LIST || [];
-    if (!isNonEmptyArray(COMPANY_KEYWORD_LIST)) {
-        throw new Error(`[loadRegexConstants()] Invalid COMPANY_KEYWORD_LIST in REGEX_CONSTANTS file at '${filePath}'`);
-    }
-    const JOB_TITLE_SUFFIX_LIST: string[] = REGEX_CONSTANTS.JOB_TITLE_SUFFIX_LIST || [];
-    if (!isNonEmptyArray(JOB_TITLE_SUFFIX_LIST)) {
-        throw new Error(`[loadRegexConstants()] Invalid JOB_TITLE_SUFFIX_LIST in REGEX_CONSTANTS file at '${filePath}'`);
-    }
-    INFO.push(`[loadRegexConstants()] Loaded regex constants`,)
-    return {
-        COMPANY_KEYWORD_LIST,
-        JOB_TITLE_SUFFIX_LIST,
-    };
-}
 
 
 /**
- * Load SKU dictionary from JSON or CSV
- * @param jsonPath `string` - Path to the JSON file (default: SKU_DICTIONARY_FILE)
- * @param csvPath `string` - Path to the CSV file (default: INVENTORY_ITEM_FILE)
- * @param skuColumn `string` - Column name for SKU (default: 'Name')
- * @param internalIdColumn `string` - Column name for Internal ID (default: DEFAULT_INTERNAL_ID_COLUMN)
+ * - always load from csv
+ * @consideration could try reading json first and compare if all keys are in 
+ * dictionary from return value of `getOneToOneDictionary`
+ * @param jsonPath `string` - Path to the JSON file `(default: SKU_DICTIONARY_FILE)`
+ * @param csvPath `string` - Path to the CSV file `(default: ITEM_FILE)`
+ * @param skuColumn `string` - Column name for SKU `(default: 'Name')`
+ * @param internalIdColumn `string` - Column name for Internal ID `(default: DEFAULT_INTERNAL_ID_COLUMN)`
+ * @param lazyLoad `boolean` `(default: true)`
+ * - set to `true` if just want to load from `jsonPath` (assume file exists)
+ * - set to `false` if you want to overwrite file at `jsonPath` (if it exists)
  * @returns **`dictionary`** `Promise<Record<string, string>>`
  */
 async function loadSkuDictionary(
     jsonPath: string = SKU_DICTIONARY_FILE,
-    csvPath: string = INVENTORY_ITEM_FILE, 
+    csvPath: string = ITEM_FILE, 
     skuColumn: string = 'Name',
-    internalIdColumn: string = DEFAULT_INTERNAL_ID_COLUMN
+    internalIdColumn: string = DEFAULT_INTERNAL_ID_COLUMN,
+    lazyLoad: boolean = true
 ): Promise<Record<string, string>> {
+    const source = `[dataLoader.loadSkuDictionary()]`
     validate.multipleStringArguments(
         `dataLoader.loadSkuDictionary`, 
         {jsonPath, csvPath, skuColumn, internalIdColumn}
     )
-    // 1. Try to load from JSON file first
-    try {
-        const jsonData = read(jsonPath);
-        if (jsonData && hasNonTrivialKeys(jsonData.SKU_TO_INTERNAL_ID_DICT)) {
-            INFO.push(`[loadSkuDictionary()] Loaded SKU dictionary from JSON: ${Object.keys(jsonData.SKU_TO_INTERNAL_ID_DICT).length} entries`);
-            return jsonData.SKU_TO_INTERNAL_ID_DICT as Record<string, string>;
-        }
-    } catch (error) {
-        mlog.warn(`[loadSkuDictionary()] Could not read JSON file, will try CSV: ${error}`);
+    
+    if (lazyLoad) { // Try to load from JSON file first
+        try {
+            const jsonData = read(jsonPath);
+            if (jsonData && hasNonTrivialKeys(jsonData.SKU_TO_INTERNAL_ID_DICT)) {
+                INFO.push(`${source} Loaded SKU dictionary from JSON: ${Object.keys(jsonData.SKU_TO_INTERNAL_ID_DICT).length} entries`);
+                return jsonData.SKU_TO_INTERNAL_ID_DICT as Record<string, string>;
+            }
+        } catch (error) {
+            mlog.warn(`${source} Could not read JSON file, will try CSV: ${error}`);
+        } 
     }
     
     // 2. Build dictionary from CSV file
     if (!isValidCsv(csvPath, [skuColumn, internalIdColumn])) {
-        throw new Error(`[loadSkuDictionary()] No JSON data && Invalid CSV file: '${csvPath}'`);
+        throw new Error(`${source} No JSON data && Invalid CSV file: '${csvPath}'`);
     }
     const dictionary = await getOneToOneDictionary(csvPath, skuColumn, internalIdColumn);
     if (!hasNonTrivialKeys(dictionary)) {
-        throw new Error(`[loadSkuDictionary()] No valid data found in CSV file: '${csvPath}'`);
+        throw new Error(`${source} No valid data found in CSV file: '${csvPath}'`);
     }
-    // 3. Cache the dictionary to JSON for future use
+    // Cache the dictionary to JSON for future use
     try {
         write({ SKU_TO_INTERNAL_ID_DICT: dictionary }, jsonPath);
-        mlog.debug(`[loadSkuDictionary()] Built and cached SKU dictionary: ${Object.keys(dictionary).length} entries`);
+        mlog.debug(`${source} Built and cached SKU dictionary: ${Object.keys(dictionary).length} entries`);
     } catch (error) {
-        mlog.warn(`[loadSkuDictionary()] Could not write to JSON cache: ${error}`);
+        mlog.warn(`${source} Could not write to JSON cache: ${error}`);
     }
-
     return dictionary;
 }
 
@@ -190,7 +176,7 @@ async function loadSkuDictionary(
 async function loadAccountDictionary(
     jsonPath: string=ACCOUNT_DICTIONARY_FILE,
 ): Promise<AccountDictionary> {
-    validate.existingPathArgument(`dataLoader.loadAccountDictionary`, {jsonPath});
+    validate.existingFileArgument(`dataLoader.loadAccountDictionary`, '.json', {jsonPath});
     const jsonData = read(jsonPath);
     if (isNull(jsonData)) {
         throw new Error([
@@ -230,6 +216,33 @@ async function loadClassDictionary(
     return dictionary;
 }
 
+/**
+ * Load regex constants
+ * @param filePath `string` - Path to the regex constants JSON file (default: `REGEX_FILE`)
+ * @returns **`regexConstants`** {@link RegexConstants}
+ */
+async function loadRegexConstants(
+    filePath: string=REGEX_FILE
+): Promise<RegexConstants> {
+    validate.existingPathArgument('loadRegexConstants', {filePath});
+    const REGEX_CONSTANTS = read(filePath) as Record<string, any>;
+    if (!REGEX_CONSTANTS || !REGEX_CONSTANTS.hasOwnProperty('COMPANY_KEYWORD_LIST') || !REGEX_CONSTANTS.hasOwnProperty('JOB_TITLE_SUFFIX_LIST')) {
+        throw new Error(`[loadRegexConstants()] Invalid REGEX_CONSTANTS file at '${filePath}'. Expected json object to have 'COMPANY_KEYWORD_LIST' and 'JOB_TITLE_SUFFIX_LIST' keys.`);
+    }
+    const COMPANY_KEYWORD_LIST: string[] = REGEX_CONSTANTS.COMPANY_KEYWORD_LIST || [];
+    if (!isNonEmptyArray(COMPANY_KEYWORD_LIST)) {
+        throw new Error(`[loadRegexConstants()] Invalid COMPANY_KEYWORD_LIST in REGEX_CONSTANTS file at '${filePath}'`);
+    }
+    const JOB_TITLE_SUFFIX_LIST: string[] = REGEX_CONSTANTS.JOB_TITLE_SUFFIX_LIST || [];
+    if (!isNonEmptyArray(JOB_TITLE_SUFFIX_LIST)) {
+        throw new Error(`[loadRegexConstants()] Invalid JOB_TITLE_SUFFIX_LIST in REGEX_CONSTANTS file at '${filePath}'`);
+    }
+    INFO.push(`[dataLoader.loadRegexConstants()] Loaded regex constants`,)
+    return {
+        COMPANY_KEYWORD_LIST,
+        JOB_TITLE_SUFFIX_LIST,
+    };
+}
 /**
  * `Sync` Get regex constants
  * @returns **`regexConstants`** {@link RegexConstants}

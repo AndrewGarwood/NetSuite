@@ -1,9 +1,9 @@
 /**
- * @file src/utils/io/regex/misc.ts
+ * @file src/utils/regex/misc.ts
  */
 import { isNonEmptyArray } from "../typeValidation";
 import { mainLogger as mlog, parseLogger as plog, INDENT_LOG_LINE as TAB, 
-    NEW_LINE as NL 
+    NEW_LINE as NL, STOP_RUNNING 
 } from "../../config";
 /**
  * = `= /^[^/\\:*?"<>|]+(\.[^/\\:*?"<>|]+)$/`
@@ -24,6 +24,8 @@ export const KOREA_ADDRESS_LATIN_TEXT_PATTERN = new RegExp(
 );
 
 /**
+ * @consideration `removeClasses` is unnecessary, can assume true if a value for 
+ * classDelimiter is provided -> have to remove default value for classDelimiter
  * @param value `string` - the string value from which to extract `leaf`
  * @param removeClasses `boolean` - remove string prefixes from result `leaf`
  * - `Default` = `true` 
@@ -38,17 +40,8 @@ export function extractLeaf(
     removeClasses: boolean = true, 
     classDelimiter: string = ':',
 ): string {
-    // const skuExceptions: Record<string, string> = {
-    //     'DISCOUNT (Discount)': 'DISCOUNT', 
-    //     'S&H (Shipping)': 'S&H',
-    //     'SHOW DISCOUNT': 'SHOW DISCOUNT'
-    // };
-    // const skuPattern = new RegExp(/(?<=^.*:)([^: ])*(?= ?.*$)/);
-    // if (Object.keys(skuExceptions).includes(value)) {
-    //     return skuExceptions[value];
-    // }
-    let result = '';
-    if (value.includes(' (')) {
+    let result = value;
+    if (value.includes(' (')) { // remove description enclosed in parentheses
         result = value.split(' (')[0];
         // const match = skuValue.match(skuPattern);
         // if (isNonEmptyArray(match)) {
@@ -57,11 +50,13 @@ export function extractLeaf(
     }
     if (removeClasses && result.includes(classDelimiter)) { 
         let classifierSplit = result.split(classDelimiter);
-        return classifierSplit[classifierSplit.length-1]
-    } // else it's an item class and not an actual item sku ?
-    // mlog.warn(
-    //     `[extractSku()] Unable to extract sku from value: '${skuValue}'`, `current result: '${result}'`
-    // );
+        result = classifierSplit[classifierSplit.length - 1];
+    } 
+    // if (value.includes(':')) {mlog.debug([`[regex.misc.extractLeaf()]`,
+    //     `      initial value: '${value}'`,
+    //     `after removeClasses: '${result}'`,
+    //     ].join(TAB));
+    // STOP_RUNNING(0)}
     return result || value;
 
 }

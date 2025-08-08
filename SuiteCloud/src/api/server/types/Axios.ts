@@ -1,6 +1,5 @@
 /**
  * @file src/api/server/types/AxiosEnums.ts
- * @module AxiosEnums
  */
 
 /**

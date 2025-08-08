@@ -1,8 +1,9 @@
 /**
  * @file src/utils/regex/configureParameters.ts
  */
-import { StringStripOptions, StringReplaceParams, 
-    } from ".";
+import { 
+    StringStripOptions, StringReplaceParams, 
+} from ".";
 
 /** strip leading `.` and (trailing `.` if satisfy stripRightCondition: {@link doesNotEndWithKnownAbbreviation}) */
 export { STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION } from "./entity";

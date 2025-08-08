@@ -1,10 +1,12 @@
 /**
- * @file src/utils/io/regex/cleaning.ts
+ * @file src/utils/regex/cleaning.ts
  */
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config";
 import { isNonEmptyArray } from "../typeValidation";
-import { CleanStringOptions, isCleanStringOptions, StringCaseOptions, 
-    StringPadOptions, StringReplaceOptions, StringStripOptions } from "./";
+import { 
+    CleanStringOptions, isCleanStringOptions, StringCaseOptions, 
+    StringPadOptions, StringReplaceOptions, StringStripOptions 
+} from "./";
 
 export function clean(s: string, options?: CleanStringOptions): string
 /**
@@ -12,7 +14,7 @@ export function clean(s: string, options?: CleanStringOptions): string
  * - converts to string and trims, then: 
  * - applies options in this order: `StringReplaceOptions`, `StringStripOptions`, `StringCaseOptions`, `StringPadOptions`
  * - Removes leading+trailing spaces, extra spaces, commas, and dots from a string (e.g. `'..'` becomes `'.'`)
- * - optionally applies 4 option params with: {@link String.replace}, {@link applyStripOptions}, {@link applyCaseOptions}, and {@link applyPadOptions}.
+ * - optionally applies 4 option params with: {@link string.replace}, {@link applyStripOptions}, {@link applyCaseOptions}, and {@link applyPadOptions}.
  * @param s - the `string` to clean
  * @param stripOptions — {@link StringStripOptions}
  * - `optional` strip options to apply to the string
@@ -60,22 +62,8 @@ export function clean(
     );
     s = String(s).trim() || '';
     s = s.replace(/\s+/g, ' ').replace(/\.{2,}/g, '.').replace(/,{2,}/g, ',');
-    // @consideration could put this in its own function for consistency
-    if (replaceOptions && isNonEmptyArray(replaceOptions)) {
-        for (const params of replaceOptions) {
-            let initialValue = s;
-            // Reset regex state if it's a global regex to avoid stateful issues
-            if (params.searchValue instanceof RegExp && params.searchValue.global) {
-                // mlog.debug(`--------FOUND GLOBAL THINGY--------`)
-                params.searchValue.lastIndex = 0;
-            }
-            s = initialValue.replace(params.searchValue, params.replaceValue)
-            // mlog.debug(`[clean()]`,
-            //     TAB+`params: ${JSON.stringify(params)}`,
-            //     TAB+`initialValue: '${initialValue}'`,
-            //     TAB+`cleanedValue: '${s}'`
-            // );
-        }
+    if (isNonEmptyArray(replaceOptions)) {
+        s = applyReplaceOptions(s, replaceOptions)
     }
     if (stripOptions) {
         s = applyStripOptions(s, stripOptions);
@@ -100,6 +88,30 @@ export function toTitleCase(s: string): string {
     return s
         .replace(/\b\w/g, char => char.toUpperCase())
         .replace(/(?<=\b[A-Z]{1})\w*\b/g, char => char.toLowerCase());
+}
+
+/**
+ * @TODO convert
+ * `s = s.replace(/\s+/g, ' ').replace(/\.{2,}/g, '.').replace(/,{2,}/g, ',');` 
+ * to StringReplaceOptions and test to ensure consistent output
+ * */
+const CLEAN_BASIC_REPLACE_OPTIONS: StringReplaceOptions = []
+/**
+ * @param s `string`
+ * @param replaceOptions `Array<`{@link StringReplaceParams}`>`
+ * @returns **`s`** `string` with replace options applied
+ */
+export function applyReplaceOptions(s: string, replaceOptions: StringReplaceOptions): string {
+    if (!isNonEmptyArray(replaceOptions)) return s
+    for (const params of replaceOptions) {
+        let initialValue = s;
+        // Reset regex state if it's a global regex to avoid stateful issues
+        if (params.searchValue instanceof RegExp && params.searchValue.global) {
+            params.searchValue.lastIndex = 0;
+        }
+        s = initialValue.replace(params.searchValue, params.replaceValue).trim();
+    }
+    return s;
 }
 
 /**

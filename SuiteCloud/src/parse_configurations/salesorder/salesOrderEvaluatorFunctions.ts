@@ -12,10 +12,10 @@ import {
     extractLeaf, 
 } from "../../utils/regex";
 import { SalesOrderColumnEnum as SO, } from "./salesOrderConstants";
-import { isNullLike as isNull, anyNull, hasKeys, hasNonTrivialKeys, isNonEmptyString } from "src/utils/typeValidation";
-import { getSkuDictionary, hasSkuInDictionary } from "src/config/dataLoader";
-import { RecordTypeEnum } from "src/utils/ns/Enums";
-import { isCleanStringOptions } from "src/utils/typeGuards";
+import { isNullLike as isNull, anyNull, hasKeys, hasNonTrivialKeys, isNonEmptyString } from "../../utils/typeValidation";
+import { getSkuDictionary, hasSkuInDictionary } from "../../config/dataLoader";
+import { RecordTypeEnum } from "../../utils/ns/Enums";
+import { isCleanStringOptions } from "../../utils/typeGuards";
 
 /**
  * @example
@@ -54,8 +54,8 @@ export const transactionExternalId = (
 }
 
 /**
- * from NetSuite documentation: "If your customer is paying by check, enter the number here.
- * If your customer is issuing a purchase order, enter the PO number here."
+ * from NetSuite documentation: `"If your customer is paying by check, enter the number here.
+ * If your customer is issuing a purchase order, enter the PO number here."`
  * @param row `Record<string, any>`
  * @param checkNumberColumn `string`
  * @param poNumberColumn `string`
@@ -70,7 +70,8 @@ export const otherReferenceNumber = (
     const poNumber = clean(row[poNumberColumn]);
     return (checkNumber 
         ? `Check #: ${checkNumber}` : poNumber 
-        ? `${poNumber}` : '');
+        ? `${poNumber}` : ''
+    );
 }
 
 
@@ -81,7 +82,7 @@ export const memo = (
     ...idColumns: string[]
 ): string => {
     let result = isNonEmptyString(memoPrefix) ? memoPrefix : 'Summary';
-    result = result.trim() + ': {\n'
+    result = result.trim() + ': {'
     const summary: Record<string, any> = {
         'Type': clean(row[typeColumn]) || 'UNDEFINED',
     }
@@ -89,9 +90,9 @@ export const memo = (
         summary[col] = clean(row[col]) || 'UNDEFINED';
     }
     for (const [key, value] of Object.entries(summary)) {
-        result += `${key}: ${value}\n`;
+        result += `${key}: ${value}, `;
     }
-    result += '}\n'
+    result += '} '
     return result;
 } 
 

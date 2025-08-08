@@ -2,9 +2,12 @@
  * @file src/api/requests/put.ts
  */
 import axios from "axios";
-import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify, getFileNameTimestamp, isRecordOptions } from "../../utils/io";
-import { apiLogger as alog, mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
-import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
+import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify, 
+    getFileNameTimestamp, isRecordOptions } from "../../utils/io";
+import { apiLogger as alog, mainLogger as mlog, INDENT_LOG_LINE as TAB, 
+    NEW_LINE as NL } from "../../config/setupLog";
+import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, 
+    DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "../url";
 import { AxiosContentTypeEnum } from "../server";
 import { 
@@ -15,10 +18,10 @@ import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "
 import { getAccessToken } from "../configureAuth";
 import path from "node:path";
 import * as validate from "../../utils/argumentValidation";
-import { isEmptyArray } from "src/utils/typeValidation";
+import { isEmptyArray } from "../../utils/typeValidation";
 
-const UPSERT_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.PUT_UpsertRecord.scriptId as number;
-const UPSERT_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.PUT_UpsertRecord.deployId as number;
+const UPSERT_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.PUT_Record.scriptId as number;
+const UPSERT_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.PUT_Record.deployId as number;
 /**
  * enforces a max number of records per post call (see {@link BATCH_SIZE}) 
  * - e.g. if `payload.postOptions.length` > BATCH_SIZE_100,
@@ -33,7 +36,7 @@ export async function upsertRecordPayload(
     scriptId: number=UPSERT_RECORD_SCRIPT_ID, 
     deployId: number=UPSERT_RECORD_DEPLOY_ID,
 ): Promise<RecordResponse[]> {
-    const source = `${__filename}.upsertRecordPayload`;
+    const source = `put.upsertRecordPayload`;
     validate.numberArgument(source, {scriptId}, true);
     validate.numberArgument(source, {deployId}, true);
     validate.objectArgument(source, {payload});
@@ -110,7 +113,7 @@ async function PUT(
     payload: Record<string, any> | any,
     contentType: AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN_TEXT = AxiosContentTypeEnum.JSON,
 ): Promise<any> {
-    const source = `${__filename}.PUT`;
+    const source = `put.PUT`;
     validate.multipleStringArguments(source, {accessToken, contentType});
     validate.numberArgument(source, {scriptId}, true);
     validate.numberArgument(source, {deployId}, true);
@@ -128,7 +131,7 @@ async function PUT(
         });
         return response;
     } catch (error) {
-        mlog.error(`[PUT()] ERROR: ${(error as any).message 
+        mlog.error(`[${source}()] ERROR: ${(error as any).message 
                 ? (error as any).message 
                 : JSON.stringify(error as any)
             }`
@@ -137,6 +140,6 @@ async function PUT(
             {timestamp: getCurrentPacificTime(), caught: (error as any)}, 
             path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_${source}.json`)
         );
-        throw new Error('[PUT()] Failed to call RESTlet with payload');
+        throw new Error(`[${source}()] Failed to call RESTlet with payload`);
     }
 }

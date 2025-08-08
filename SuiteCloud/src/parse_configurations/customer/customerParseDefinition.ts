@@ -22,9 +22,9 @@ import { CustomerColumnEnum as C, CUSTOMER_CATEGORY_MAPPING as CATEGORY_DICT } f
 import * as evaluate from "../evaluatorFunctions";
 import * as prune from "../pruneFunctions";
 import * as customerEval from "./customerEvaluatorFunctions";
-import { ContactRoleEnum, CustomerTaxItemEnum, RecordTypeEnum, SearchOperatorEnum } from "src/utils/ns/Enums";
-import { SB_TERM_DICTIONARY } from "src/utils/ns/record/accounting/Term";
-import { isNonEmptyString } from "src/utils/typeValidation";
+import { ContactRoleEnum, CustomerTaxItemEnum, RecordTypeEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
+import { SB_TERM_DICTIONARY } from "../../utils/ns/record/accounting/Term";
+import { isNonEmptyString } from "../../utils/typeValidation";
 
 /** use to set the field `"isinactive"` to false */
 const NOT_INACTIVE = false;

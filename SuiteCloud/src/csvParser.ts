@@ -15,12 +15,13 @@ import {
     BOOLEAN_FALSE_VALUES,
     isBooleanFieldId,
     areEquivalentObjects,
-    isIntegerArray
+    isIntegerArray,
+    hasKeys
 } from "./utils/typeValidation";
 import { isRowSourceMetaData, RowSourceMetaData } from "./utils/io";
 import * as validate from "./utils/argumentValidation";
 import { 
-    ValueMapping, ValueMappingEntry, getRows,
+    ValueMapping,
     FieldDictionaryParseOptions,
     FieldParseOptions,
     SublistDictionaryParseOptions,
@@ -29,15 +30,13 @@ import {
     ParseResults,
     IntermediateParseResults,
     SublistLineParseOptions,
-    isValidCsv,
     isFieldParseOptions,
     isValueMappingEntry,
     SublistLineIdOptions, indentedStringify, handleFileArgument
 } from "./utils/io";
 import {
-    clean, equivalentAlphanumericStrings as equivalentAlphanumeric, DATE_STRING_PATTERN
+    clean, equivalentAlphanumericStrings, DATE_STRING_PATTERN
 } from "./utils/regex";
-import fs from 'fs';
 import { 
     FieldValue, FieldDictionary, SublistDictionary, SublistLine, 
     SubrecordValue, SetFieldSubrecordOptions, SetSublistSubrecordOptions, 
@@ -229,7 +228,7 @@ async function processFieldDictionaryParseOptions(
     fields: FieldDictionary,
     fieldOptions: FieldDictionaryParseOptions,
 ): Promise<FieldDictionary> {
-    if (!row || !fields || !fieldOptions || isEmptyArray(Object.keys(fieldOptions))) {
+    if (!row || !fields || isNull(fieldOptions)) {
         return fields;
     }
     for (const fieldId of Object.keys(fieldOptions)) {
@@ -264,7 +263,7 @@ async function processSublistDictionaryParseOptions(
         NL + `[START processSublistDictionaryParseOptions()]`,
         TAB+`Object.keys(sublistOptions): ${JSON.stringify(Object.keys(sublistOptions))}`,
     );
-    if (!row || !sublistOptions || isEmptyArray(Object.keys(sublistOptions))) {
+    if (!row || isNull(sublistOptions)) {
         return sublists;
     }
     SUP.push(
@@ -354,9 +353,9 @@ async function generateSublistSubrecordOptions(
     validate.multipleStringArguments(`csvParser.generateSublistSubrecordOptions`, 
         { parentSublistId, parentFieldId }
     );
-    validate.objectArgument(`csvParser.generateSublistSubrecordOptions`, `row`, row);
-    validate.objectArgument(`csvParser.generateSublistSubrecordOptions`, `subrecordOptions`, 
-        subrecordOptions, 'SubrecordParseOptions', isSubrecordValue
+    validate.objectArgument(`csvParser.generateSublistSubrecordOptions`, {row});
+    validate.objectArgument(`csvParser.generateSublistSubrecordOptions`, 
+        {subrecordOptions}, 'SubrecordParseOptions', isSubrecordValue
     );
     SUP.push(
         NL + `[START generateSublistSubrecordOptions()]`, 
@@ -444,11 +443,12 @@ async function parseFieldValue(
             SUP.push(NL+` -> error in evaluator, using fallback value: '${value}'`);
         }
     } else if (colName) {
-        if (!Object.keys(row).includes(colName)) {
-            mlog.error(`[csvParser.parseFieldValue()] Invalid FieldParseOptions.colName`,
-                TAB+`colName: '${colName}' is not in row's keys`,
-                TAB+`Object.keys(row): ${JSON.stringify(Object.keys(row))}`
-            );
+        if (!hasKeys(row, colName)) {
+            mlog.error([`[csvParser.parseFieldValue()] Invalid FieldParseOptions.colName`,
+                `colName: '${colName}' is not in row's keys`,
+                `Object.keys(row): ${JSON.stringify(Object.keys(row))}`,
+                `rowIndex: ${rowIndex}`
+            ].join(TAB));
             throw new Error(`[csvParser.parseFieldValue()] Invalid FieldParseOptions.colName`);
         }
         value = await transformValue(clean(row[colName]), colName, fieldId, 
@@ -486,10 +486,10 @@ export async function transformValue(
     if (valueMapping && trimmedValue in valueMapping) {
         const mappedValue = valueMapping[trimmedValue];
         if (isValueMappingEntry(mappedValue)) {
-            const validColumns = Array.isArray(mappedValue.validColumns) 
+            const validColumns = (Array.isArray(mappedValue.validColumns) 
                 ? mappedValue.validColumns 
-                : [mappedValue.validColumns];
-                
+                : [mappedValue.validColumns]
+            );    
             if (validColumns.includes(originalKey)) {
                 return mappedValue.newValue;
             }
@@ -551,7 +551,7 @@ export async function isDuplicateSublistLine(
         if (lineIdEvaluator && typeof lineIdEvaluator === 'function') {
             const existingLineId = lineIdEvaluator(existingLine, ...(args || []));
             const newLineId = lineIdEvaluator(newLine, ...(args || []));
-            return equivalentAlphanumeric(existingLineId, newLineId);
+            return equivalentAlphanumericStrings(existingLineId, newLineId);
         }
         const canCompareUsingLineIdProp = Boolean(lineIdProp
             && existingLine.lineIdProp === lineIdProp
@@ -566,7 +566,7 @@ export async function isDuplicateSublistLine(
                 TAB + `existingLine['${lineIdProp}']: '${existingLine[lineIdProp]}'`,
                 TAB + `     newLine['${lineIdProp}']: '${newLine[lineIdProp]}'`,
             );
-            return equivalentAlphanumeric(
+            return equivalentAlphanumericStrings(
                 existingLine[lineIdProp] as string, newLine[lineIdProp] as string
             );
         } 
@@ -574,7 +574,7 @@ export async function isDuplicateSublistLine(
             const valA = existingLine[fieldId];
             const valB = newLine[fieldId];
             let areFieldsEqual = (isFieldValue(valA) && isFieldValue(valB)
-                ? equivalentAlphanumeric(String(valA), String(valB))
+                ? equivalentAlphanumericStrings(String(valA), String(valB))
                 : areEquivalentObjects(valA as SubrecordValue, valB as SubrecordValue)
             );
             SUP.push(

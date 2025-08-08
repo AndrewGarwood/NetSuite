@@ -8,7 +8,7 @@ import path from "node:path";
 import { stdin as input, stdout as output } from "node:process";
 import { 
     AccountEnvironmentEnum, SuiteScriptEnvironment, ScriptDictionary
-} from "src/utils/ns/SuiteScriptEnvironment";
+} from "../utils/ns/SuiteScript";
 dotenv.config();
 
 export const BASE_ACCOUNT_ID = (process.env.ACCOUNT_ID 
@@ -116,7 +116,7 @@ export const AUTHORIZATION_HEADER: string = [
 
 /** 
  * see {@link SuiteScriptEnvironment}
- * @description instantiate known script deployments from your NetSuite 
+ * @description instantiate existing script deployments from your NetSuite 
  * production and sandbox accounts.
  * */
 export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
@@ -127,10 +127,6 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
                 scriptId: 167,
                 deployId: 1,
             },
-            POST_BatchUpsertRecord: {
-                scriptId: 172,
-                deployId: 1,
-            },
             DELETE_DeleteRecordByType: {
                 scriptId: 173,
                 deployId: 1,
@@ -139,7 +135,7 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
                 scriptId: 175,
                 deployId: 1,
             },
-            PUT_UpsertRecord: {
+            PUT_Record: {
                 scriptId: 176,
                 deployId: 1,
             },
@@ -162,9 +158,8 @@ export const ORGANIZATION = (process.env.ORGANIZATION
 );
 
 /** 
- * = the directory where the `node_modules` folder lives
- * - `'./SuiteCloud/{home is here}'` 
- * - it's a child of `SuiteCloud`
+ * = the directory where `package.json` and the `node_modules` folder live
+ * - `'./SuiteCloud/{home is here}'`
  * */
 export const NODE_HOME_DIR = process.cwd() as string;
 
@@ -178,7 +173,9 @@ export const SRC_DIR = path.join(NODE_HOME_DIR, 'src') as string;
 export const TOKEN_DIR = path.join(SRC_DIR, 'api', 'server', 'tokens') as string;
 
 /** `'C:/Users/${USER}/OneDrive - ${ORGANIZATION}'` */ 
-export const ONE_DRIVE_DIR = path.join('C:', 'Users', USER, `OneDrive - ${ORGANIZATION}`);
+export const ONE_DRIVE_DIR = path.join('C:', 'Users', USER, 
+    ORGANIZATION ? `OneDrive - ${ORGANIZATION}` : `OneDrive`
+);
 
 /** `'`{@link ONE_DRIVE_DIR}`/NetSuite/logs'` */
 export const CLOUD_LOG_DIR = path.join(ONE_DRIVE_DIR, 'NetSuite', 'logs') as string;

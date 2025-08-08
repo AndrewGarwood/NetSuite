@@ -1,10 +1,10 @@
 /**
  * @file src/DataReconciler.ts
  */
-import * as fs from 'fs';
+import * as fs from "node:fs";
 import { EntityRecordTypeEnum, RecordTypeEnum, CustomerTaxItemEnum, CustomerStatusEnum } from "./utils/ns";
 import { isNonEmptyArray, isEmptyArray, hasKeys, isNullLike as isNull, anyNull, 
-    isNonEmptyString, TypeOfEnum } from './utils/typeValidation';
+    isNonEmptyString, TypeOfEnum } from "./utils/typeValidation";
 import { DelimitedFileTypeEnum, DelimiterCharacterEnum, isValidCsv, isRecordOptions } from "./utils/io";
 import { DATA_DIR, mainLogger as mlog, parseLogger as plog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING, CLOUD_LOG_DIR } from "./config";
 import { getColumnValues, getRows, writeObjectToJson as write, readJsonFileAsObject as read, 
@@ -12,19 +12,34 @@ import { getColumnValues, getRows, writeObjectToJson as write, readJsonFileAsObj
 } from "./utils/io";
 import * as validate from "./utils/argumentValidation";
 import path from "node:path";
-import { RecordOptions, SetFieldSubrecordOptions, SetSublistSubrecordOptions, SublistLine } from './api';
+import { 
+    RecordOptions, SetFieldSubrecordOptions, SetSublistSubrecordOptions, SublistLine,
+    GetRecordRequest, GetRecordResponse, getRecordById 
+} from "./api";
 
 
+/**
+ * @param validationDict 
+ * @param csvFiles 
+ * @param column 
+ * @param extractor 
+ * @param extractorArgs 
+ * @returns **`missingValues`** `Promise<{ [filePath: string]: string[] }>`
+ * - get references to all files that have a row where row[column] `not in validationDict`
+ * > should probably change validationDict to validationSet or an array or somethin
+ */
 export async function validateFiles(
+    validationDict: Record<string, string>,
     csvFiles: string[],
     column: string, 
-    extractor: (columnValue: string) => string, 
-    validationDict: Record<string, string>
+    extractor: (columnValue: string, ...args: any[]) => string | Promise<string>,
+    extractorArgs: any[] = []
 ): Promise<{ [filePath: string]: string[] }> {
-    validate.arrayArgument(`${__filename}.validateFiles`, {csvFiles}, TypeOfEnum.STRING);
-    validate.stringArgument(`${__filename}.validateFiles`, {column});
-    validate.functionArgument(`${__filename}.validateFiles`, {extractor});
-    validate.objectArgument(`${__filename}.validateFiles`, {validationDict});
+    const source = `[DataReconciler.validateFiles()]`
+    validate.arrayArgument(source, {csvFiles}, TypeOfEnum.STRING);
+    validate.stringArgument(source, {column});
+    validate.functionArgument(source, {extractor});
+    validate.objectArgument(source, {validationDict});
     const missingValues = {} as { [filePath: string]: string[] };
     for (const csvPath of csvFiles) {
         if (!isValidCsv(csvPath)) {
@@ -34,9 +49,9 @@ export async function validateFiles(
         missingValues[csvPath] = [];
         const columnValues = await getColumnValues(csvPath, column, false);
         for (const originalValue of columnValues) {
-            const extractedValue = extractor(originalValue);
+            const extractedValue = await extractor(originalValue, ...extractorArgs);
             if (!isNonEmptyString(extractedValue)) {
-                plog.warn(`[${__filename}.validateFiles()] extractor(value) returned null,`,
+                plog.warn(`${source} extractor(value) returned null,`,
                     `undefined, or empty string, or is not a string`,
                     TAB+`originalValue: '${originalValue}'`, 
                     TAB+`     filePath: '${csvPath}'`
@@ -72,18 +87,19 @@ export async function extractTargetRows(
     rowSource: string | Record<string, any>[],
     targetColumn: string, 
     targetValues: string[],
-    extractor?: (columnValue: string, ...args: any[]) => string, 
+    extractor?: (columnValue: string, ...args: any[]) => string | Promise<string>, 
     extractorArgs?: any[]
 ): Promise<Record<string, any>[]> {
+    const source = `[DataReconciler.extractTargetRows()]`
     if(!isNonEmptyString(rowSource) && !isNonEmptyArray(rowSource)) {
-        throw new Error([`[${__filename}.extractTargetRows()] Invalid param 'rowSource'`,
+        throw new Error([`${source} Invalid param 'rowSource'`,
             `Expected rowSource: string | Record<string, any>[]`,
             `Received rowSource: '${typeof rowSource}'`
         ].join(TAB));
     }
-    validate.stringArgument(`${__filename}.extractTargetRows`, `targetColumn`, targetColumn);
-    validate.functionArgument(`${__filename}.extractTargetRows`, `extractor`, extractor);
-    validate.arrayArgument(`${__filename}.extractTargetRows`, `targetValues`, targetValues, TypeOfEnum.STRING);
+    validate.stringArgument(source, {targetColumn});
+    if (extractor !== undefined) validate.functionArgument(source, {extractor});
+    validate.arrayArgument(source, {targetValues}, TypeOfEnum.STRING);
     const rows = await handleFileArgument(
         rowSource, extractTargetRows.name, [targetColumn]
     );
@@ -91,7 +107,7 @@ export async function extractTargetRows(
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         if (!hasKeys(row, targetColumn)) {
-            mlog.warn(`[${__filename}.extractTargetRows()] row does not have provided targetColumn`,
+            mlog.warn(`${source} row does not have provided targetColumn`,
                 TAB+`    targetColumn: '${targetColumn}'`,
                 TAB+`Object.keys(row):  ${JSON.stringify(Object.keys(row))}`,
             );
@@ -100,13 +116,13 @@ export async function extractTargetRows(
         const originalValue = String(row[targetColumn]);
         if (targetValues.includes(originalValue)) {
             targetRows.push(row);
-            plog.debug(`[${__filename}.extractTargetRows()] ORIGINAL VALUE IN TARGET VALUES`)
+            plog.debug(`${source} ORIGINAL VALUE IN TARGET VALUES`)
             continue;
         }
         if (!extractor) { continue }
-        const extractedValue = extractor(originalValue, extractorArgs);
+        const extractedValue = await extractor(originalValue, extractorArgs);
         if (!isNonEmptyString(extractedValue)) {
-            plog.warn(`[${__filename}.extractTargetRows()] extractor(value) returned null,`,
+            plog.warn(`${source} extractor(value) returned null,`,
                 `undefined, or empty string, or is not a string`,
                 TAB+` originalValue: '${originalValue}'`, 
                 TAB+`rowSource type: '${typeof rowSource}'`
@@ -122,58 +138,13 @@ export async function extractTargetRows(
 }
 
 
-export async function generateEntityFromTransaction(
-    transaction: RecordOptions,
-    entityType: EntityRecordTypeEnum
-): Promise<RecordOptions> {
-    validate.objectArgument('transactionProcessor.generateEntityFromTransaction', 
-        {transaction}, 'RecordOptions', isRecordOptions
-    );
-    validate.stringArgument('transactionProcessor.generateEntityFromTransaction', 
-        {entityType}
-    );
-    if (isNull(transaction.fields) || !isNonEmptyString(transaction.fields.entity)) {
-        throw new Error(`[generateEntityFromTransaction()] RecordOptions.fields is empty, null, or undefined`)
-    }
-    const entity: RecordOptions = {
-        recordType: entityType,
-    }
-    const addressSublist: SublistLine[] = [];
-    for (const addressFieldId of ['billingaddress', 'shippingaddress']) {
-        if (!transaction.fields[addressFieldId]) continue
-        const bodyAddr = transaction.fields[addressFieldId] as SetFieldSubrecordOptions;
-        const sublistAddr = {
-            subrecordType: bodyAddr.subrecordType,
-            sublistId: 'addressbook',
-            fieldId: 'addressbookaddress',
-            fields: bodyAddr.fields
-        } as SetSublistSubrecordOptions
-        addressSublist.push({ address: sublistAddr })
-    }
-    Object.assign(entity, {
-        fields: {
-            entityid: transaction.fields.entity,
-            externalid: `${transaction.fields.entity}<${entityType}>`,
-            entitystatus: CustomerStatusEnum.CLOSED_WON,
-            taxable: true,
-            taxitem: CustomerTaxItemEnum.YOUR_TAX_ITEM
-        },
-        
-    })
-
-    return {} as RecordOptions;
-}
-
-
-
-
 
 
 
 
 
 /**
- * @goal for each source csv file, make sure specified RecordReference field has
+ * @goal make sure specified RecordReference field has
  * an existing record on NetSuite that we can use.
  * (e.g. when upserting a record with RecordOptions, 
  * a field where RecordOptions.fields[fieldId] = internalid of a record on NetSuite

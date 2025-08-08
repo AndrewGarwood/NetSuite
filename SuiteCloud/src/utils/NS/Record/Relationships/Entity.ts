@@ -5,7 +5,6 @@
  */
 import { Relationship, RelationshipSublists } from "./Relationship";
 import { RadioFieldBoolean } from "../../../typeValidation";
-import { CustomerCategoryEnum } from "./Customer";
 import { RecordRef } from "../Record";
 import { AddressBook, AddressBookEntry, Address } from "./Address";
 
@@ -34,7 +33,7 @@ export interface Entity extends Relationship {
      * probably exists different cateogry sets for each entity type, 
      * e.g. {@link CustomerCategoryEnum} 
      * */
-    category?: string | RecordRef | CustomerCategoryEnum;
+    category?: string | RecordRef ;
     altemail?: string;
     /**@label `'Website'` */
     url?: string;

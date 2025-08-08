@@ -4,16 +4,17 @@
 import {
     FieldValue,
 } from "../../api/types";
-import { mainLogger as mlog, parseLogger as plog, DEBUG_LOGS as DEBUG, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config";
+import { mainLogger as mlog, parseLogger as plog, DEBUG_LOGS as DEBUG, INDENT_LOG_LINE as TAB, 
+    NEW_LINE as NL } from "../../config";
 import { RADIO_FIELD_TRUE, RADIO_FIELD_FALSE, anyNull } from "../../utils/typeValidation";
 import {
     clean,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION,
     equivalentAlphanumericStrings as equivalentAlphanumeric
-} from "../../utils/io/regex/index";
+} from "../../utils/regex";
 import { isPerson, firstName, middleName, lastName, entityId, ENTITY_VALUE_OVERRIDES } from "../evaluatorFunctions";
 import { CustomerColumnEnum as C } from "./customerConstants";
-import { ValueMapping, checkForOverride } from "src/utils/io";
+import { ValueMapping, checkForOverride } from "../../utils/io";
 import { SUPPRESS } from "../evaluators/common";
 
 

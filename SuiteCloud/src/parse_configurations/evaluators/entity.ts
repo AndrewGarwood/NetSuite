@@ -16,7 +16,6 @@ import {
     isValidEmail,
     SALUTATION_REGEX, ATTN_SALUTATION_PREFIX_PATTERN, LAST_NAME_COMMA_FIRST_NAME_PATTERN,
     REMOVE_ATTN_SALUTATION_PREFIX, ENSURE_SPACE_AROUND_HYPHEN, REPLACE_EM_HYPHEN,
-    equivalentAlphanumericStrings as equivalentAlphanumeric,
     stringContainsAnyOf, JOB_TITLE_SUFFIX_PATTERN, extractJobTitleSuffix,
     REMOVE_JOB_TITLE_SUFFIX, KOREA_ADDRESS_LATIN_TEXT_PATTERN
 } from "../../utils/regex";
@@ -24,7 +23,7 @@ import { checkForOverride, ColumnSliceOptions, ValueMapping } from "../../utils/
 import { field, SUPPRESS } from "./common";
 import { readJsonFileAsObject as read } from "../../utils/io";
 import path from "node:path";
-import { RecordTypeEnum } from "src/utils/ns/Enums";
+import { RecordTypeEnum } from "../../utils/ns/Enums";
 
 export const ENTITY_VALUE_OVERRIDES = {} as ValueMapping;
 Object.assign(ENTITY_VALUE_OVERRIDES, read(

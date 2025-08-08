@@ -1,5 +1,5 @@
 /**
- * @file src/utils/io/regex/phone.ts
+ * @file src/utils/regex/phone.ts
  */
 import { StringStripOptions } from ".";
 import { clean } from "./cleaning";

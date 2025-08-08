@@ -8,7 +8,7 @@ import {
     ValidatedParseResults,
     ProcessParseResultsOptions, ParseOptions, ParseResults,
     getCurrentPacificTime,
-    indentedStringify, clearFile,
+    indentedStringify, clearFileSync,
 } from "../utils/io";
 import { 
     STOP_RUNNING,  DELAY, 
@@ -121,7 +121,7 @@ export async function runEntityPipeline(
         mlog.error(`[runEntityPipeline()] entityType or filePaths is undefined or invalid.`);
     }
     filePaths = isNonEmptyArray(filePaths) ? filePaths : [filePaths];
-    if (isNonEmptyArray(options.clearLogFiles)) clearFile(...options.clearLogFiles);
+    if (isNonEmptyArray(options.clearLogFiles)) clearFileSync(...options.clearLogFiles);
     mlog.info(`[START runEntityPipeline()]`);
     for (let i = 0; i < filePaths.length; i++) {
         const csvFilePath = filePaths[i];

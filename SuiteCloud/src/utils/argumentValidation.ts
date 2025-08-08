@@ -483,6 +483,21 @@ export function objectArgument(
 ): void
 
 /**
+ * @param source `string` indicating what called `validateObjectArgument`
+ * @param labeledValue `{ [label: string]: any }` a single object dict mapping label to value
+ * @param labeledTypeGuard `{ [functionName: string]: (value: any) => boolean }` a single object dict mapping type guard function name to the function
+ * @param allowEmpty `boolean` optional, if `true`, allows `value` to be an empty object `{} or undefined`
+ * @description This overload automatically derives the object type name from the type guard function name using regex.
+ * For example, if the type guard function is named `isRecordOptions`, the object type name will be extracted as `RecordOptions`.
+ */
+export function objectArgument(
+    source: string,
+    labeledValue: { [label: string]: any },
+    labeledTypeGuard: { [functionName: string]: (value: any) => boolean },
+    allowEmpty?: boolean
+): void
+
+/**
  * @note does not allow for arrays
  * @param source `string` indicating what called `validateObjectArgument`
  * @param arg2 `string | { [label: string]: any }` the argument/parameter name or a single object dict mapping label to value
@@ -506,16 +521,20 @@ export function objectArgument(
     source: string,
     /** label or single object dict mapping label to value */
     arg2: string | { [label: string]: any },
-    /** value (any) | objectTypeName (string) */
-    arg3?: string | any,
-    /** objectTypeName (string) | objectTypeGuard (function) */
-    arg4?: string | ((value: any) => boolean),
+    /** value (any) | objectTypeName (string) | labeledTypeGuard ({ [functionName: string]: function }) */
+    arg3?: string | any | { [functionName: string]: (value: any) => boolean },
+    /** objectTypeName (string) | objectTypeGuard (function) | allowEmpty (boolean) */
+    arg4?: string | ((value: any) => boolean) | boolean,
     /** objectTypeGuard | allowEmpty (boolean) */
     arg5?: ((value: any) => boolean) | boolean,
     allowEmpty: boolean | undefined = false
 ): void {
     let label: string = '';
     let value: any = undefined;
+    let objectTypeName: string | undefined = undefined;
+    let objectTypeGuard: ((value: any) => boolean) | undefined = undefined;
+    let isNewOverload = false;
+
     if (typeof arg2 === 'object') {
         const keys = Object.keys(arg2);
         if (keys.length !== 1) {
@@ -523,28 +542,79 @@ export function objectArgument(
         }
         label = keys[0];
         value = arg2[label];
+        // Check if this is the overload: objectArgument(source, {value}, {typeGuard}, allowEmpty?)
+        if (arg3 && typeof arg3 === 'object' && !Array.isArray(arg3)) {
+            const typeGuardKeys = Object.keys(arg3);
+            
+            // Validate that there's exactly one type guard
+            if (typeGuardKeys.length !== 1) {
+                throw new Error(`[argumentValidation.objectArgument()] Invalid labeledTypeGuard: expected exactly one type guard function, got ${typeGuardKeys.length}`);
+            }
+            
+            const functionName = typeGuardKeys[0];
+            const typeGuardFunction = arg3[functionName];
+            
+            // Validate that the value is a function
+            if (typeof typeGuardFunction !== 'function') {
+                throw new Error(`[argumentValidation.objectArgument()] Invalid labeledTypeGuard: expected function for '${functionName}', got ${typeof typeGuardFunction}`);
+            }
+            
+            isNewOverload = true;
+            objectTypeGuard = typeGuardFunction;
+            const typeGuardFunctionNamePattern = /(?<=^is).*$/i;
+            // Extract object type name from function name using regex
+            // e.g., "isRecordOptions" -> "RecordOptions"
+            const match = typeGuardFunctionNamePattern.exec(functionName);
+            objectTypeName = isNonEmptyArray(match) ? match[0] : functionName;
+            
+            allowEmpty = (typeof arg4 === 'boolean') ? arg4 : false;
+        }
     } else if (typeof arg2 === 'string') {
         label = arg2;
         value = arg3;
     } else {
         throw new Error(`[argumentValidation.objectArgument()] Invalid parameters: expected either a single object with a single key ({label: value}) or two separate arguments (label, value)`);
     }
-    let objectTypeName = (typeof arg3 === 'string'
-        ? arg3
-        : `object (Record<string, any>)`
-    ) as string;
-    let objectTypeGuard = (typeof arg4 === 'function'
-        ? arg4
-        : (typeof arg5 === 'function'
-            ? arg5
-            : undefined
-        )
-    ) as ((value: any) => boolean) | undefined;
-    if (typeof value !== 'object' || Array.isArray(value) || (isNullLike(value) && !allowEmpty)) {
+
+    if (objectTypeName === undefined && isNonEmptyString(arg3)) {
+        objectTypeName = arg3
+    } else if (objectTypeName === undefined) {
+        objectTypeName = `object Record<string, any>`
+    }
+    if (objectTypeGuard === undefined) {
+        objectTypeGuard = (typeof arg4 === 'function'
+            ? arg4
+            : (typeof arg5 === 'function'
+                ? arg5
+                : undefined
+            )
+        ) as ((value: any) => boolean) | undefined;
+    }
+    // Check for valid object (allow empty object if allowEmpty is true)
+    if (typeof value !== 'object' || Array.isArray(value) || isNullLike(value)) {
+        if (isNullLike(value) && allowEmpty) {
+            return; // Allow undefined/null when allowEmpty is true
+        }
         throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: non-array, non-empty object`,
+            `Expected ${label} to be: non-array, non-empty object`+(
+                objectTypeName ? ` of type: ${objectTypeName}` : ''
+            ),
             `Received ${label} value: ${typeof value}`
         ].join(TAB));
+    }
+    
+    // Check for empty object (skip type guard if allowEmpty is true and object is empty)
+    const isEmptyObject = Object.keys(value).length === 0;
+    if (!allowEmpty && isEmptyObject) {
+        throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
+            `Expected ${label} to be: non-empty object`,
+            `Received ${label} value: ${JSON.stringify(value)}`
+        ].join(TAB));
+    }
+    
+    // Skip type guard validation if allowEmpty is true and object is empty
+    if (allowEmpty && isEmptyObject) {
+        return;
     }
     if (objectTypeGuard 
         && typeof objectTypeGuard === 'function' 
@@ -727,7 +797,7 @@ export const bracketed = (s: string): string => {
 }
 
 
-/** @deprecated use existingFileArgument() or existingDirectoryArgument() */
+/** use existingFileArgument() or existingDirectoryArgument() */
 export function existingPathArgument(
     source: string,
     arg2: string | { [label: string]: any },
@@ -750,7 +820,7 @@ export function existingPathArgument(
         const message = [`${bracketed(source)} Invalid argument: '${label}'`,
             `Expected ${label} to be: existing path` 
             + (isNonEmptyString(extension) ? ` with extension '${extension}'` : ``),
-            `Received ${label} value: ${typeof value}`
+            `Received ${label} value: ${typeof value} = '${value}'`
         ].join(TAB)
         mlog.error(message);
         throw new Error(message);

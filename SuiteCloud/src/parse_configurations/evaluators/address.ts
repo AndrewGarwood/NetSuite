@@ -1,23 +1,25 @@
+/**
+ * @file src/parse_configurations/evaluators/address.ts
+ */
 import { parseLogger as plog, mainLogger as mlog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG, 
-    STOP_RUNNING
 } from "../../config";
 import { 
     FieldValue, 
 } from "../../api/types";
 import { 
-    extractPhone, clean, extractEmail, extractName, stringEndsWithAnyOf, RegExpFlagsEnum,
-    STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, COMPANY_KEYWORDS_PATTERN, COMPANY_ABBREVIATION_PATTERN,
-    SALUTATION_REGEX, ATTN_SALUTATION_PREFIX_PATTERN, LAST_NAME_COMMA_FIRST_NAME_PATTERN,
-    REMOVE_ATTN_SALUTATION_PREFIX, ENSURE_SPACE_AROUND_HYPHEN, REPLACE_EM_HYPHEN,
+    clean, stringEndsWithAnyOf, 
+    STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
+    REMOVE_ATTN_SALUTATION_PREFIX, 
     equivalentAlphanumericStrings as equivalentAlphanumeric,
-    stringContainsAnyOf, JOB_TITLE_SUFFIX_PATTERN, extractJobTitleSuffix,
-    REMOVE_JOB_TITLE_SUFFIX, KOREA_ADDRESS_LATIN_TEXT_PATTERN,
+    JOB_TITLE_SUFFIX_PATTERN, KOREA_ADDRESS_LATIN_TEXT_PATTERN,
 } from "../../utils/regex";
 import { checkForOverride, } from "../../utils/io";
-import { ENTITY_VALUE_OVERRIDES, entityId, firstName, lastName, middleName, salutation, jobTitleSuffix } from "./entity";
+import { ENTITY_VALUE_OVERRIDES, entityId, firstName, lastName, middleName, 
+    salutation, jobTitleSuffix 
+} from "./entity";
 import { SUPPRESS } from "./common";
-import { CountryAbbreviationEnum, StateAbbreviationEnum } from "src/utils/ns/Enums";
+import { CountryAbbreviationEnum, StateAbbreviationEnum } from "../../utils/ns/Enums";
 
 
 

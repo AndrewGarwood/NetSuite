@@ -4,7 +4,7 @@
 
 import { 
     pruneLogger as plog, mainLogger as mlog, INDENT_LOG_LINE as TAB 
-} from "../config";
+} from "../config/setupLog";
 import { 
     FieldDictionary,
     RecordOptions,
@@ -15,12 +15,13 @@ import {
     SublistLine,
     SubrecordValue,
 } from "../api/types";
-import { hasKeys, isNullLike as isNull, RADIO_FIELD_FALSE, RADIO_FIELD_TRUE, anyNull, isNonEmptyArray } from "../utils/typeValidation";
-import { equivalentAlphanumericStrings as equivalentAlphanumeric } from "../utils/regex";
-import * as validate from "../utils/argumentValidation";
-import { isNonEmptyString } from "../utils/typeValidation";
-import { EntityRecordTypeEnum, RecordTypeEnum } from "src/utils/ns/Enums";
-import { indentedStringify } from "src/utils/io";
+import { hasKeys, isNullLike as isNull, RADIO_FIELD_FALSE, 
+    RADIO_FIELD_TRUE, anyNull, isNonEmptyArray, isNonEmptyString 
+} from "../utils/typeValidation";
+import { clean, equivalentAlphanumericStrings as equivalentAlphanumeric, RegExpFlagsEnum } from "../utils/regex";
+import { EntityRecordTypeEnum, RecordTypeEnum } from "../utils/ns/Enums";
+import { indentedStringify } from "../utils/io/writing";
+
 /** `['entity', 'trandate']` */
 const SALES_ORDER_REQUIRED_FIELDS = ['entity', 'trandate'];
 
@@ -194,60 +195,44 @@ export const contact = (
 export const salesOrder = async (
     options: RecordOptions
 ): Promise<RecordOptions | null> => {
+    const source = `[prune.salesOrder()]`
     if (isNull(options) || !options.fields || !options.sublists || !options.sublists.item) {
-        mlog.warn(`[prune.salesOrder()]: Invalid 'options' parameter`,
-            TAB+`options or options.fields or options.sublists is null or undefined.`,
-            TAB+` -> returning null`
-        );
+        mlog.warn([`${source}: Invalid 'options' parameter`,
+            `options or options.fields or options.sublists is null or undefined.`,
+            ` -> returning null`
+        ].join(TAB));
         return null;
     }
     if (options.recordType !== RecordTypeEnum.SALES_ORDER) {
-        mlog.error(`[prune.salesOrder()] Prune Function mismatch: invalid options.recordType`,
-            TAB+`expected: '${RecordTypeEnum.SALES_ORDER}'`,
-            TAB+`received: '${options.recordType}'`
-        );
+        mlog.error([`${source} Prune Function mismatch: invalid options.recordType`,
+            `expected: '${RecordTypeEnum.SALES_ORDER}'`,
+            `received: '${options.recordType}'`
+        ].join(TAB));
         return null;
     }
     if (!hasKeys(options.fields, SALES_ORDER_REQUIRED_FIELDS)) { 
-        plog.warn(`[prune.salesOrder()]: options.fields does not have required fields.`,
-            TAB+`required: ${JSON.stringify(SALES_ORDER_REQUIRED_FIELDS)}`,
-            TAB+`received: ${JSON.stringify(options.fields)}`
-        );
+        plog.warn([`${source}: options.fields does not have required fields.`,
+            `required: ${JSON.stringify(SALES_ORDER_REQUIRED_FIELDS)}`,
+            `received: ${JSON.stringify(options.fields)}`
+        ].join(TAB));
         return null; 
     }
     if (!isNonEmptyString(options.fields.externalid)) { 
         throw new Error(
-            `[prune.salesOrder()] RecordOptions.fields.externalid is null or undefined`
+            `${source} RecordOptions.fields.externalid is null or undefined`
         );
     }
     const itemSublist = options.sublists.item;
     if (itemSublist.some(lineItem => 
         lineItem.amount === null || lineItem.amount === undefined 
         || (Number(lineItem.amount) < 0))) {
-        mlog.error([`[prune.salesOrder()]: lineItem.amount is < 0`,
+        mlog.error([`${source}: lineItem.amount is < 0`,
             `    item sublist: ${JSON.stringify(options.sublists.item)}`,
             `order externalid: ${options.fields.externalid}`,
             `meta: ${indentedStringify(options.meta || {})}`
         ].join(TAB));
         throw new Error(`bad amount`);
     }
-    // /** should be something like `'SO:9999_NUM:0000_PO:1111(TRAN_TYPE)<salesorder>'` */
-    // const externalIdValue = options.fields.externalid as string;
-    // const soNum = externalIdValue.split('_')[0].split(':')[1];
-    // if (!soNum) {
-    //     throw new Error(
-    //         `[prune.salesOrder()] sales order number from externalid is null or undefined`
-    //     );
-    // }
-    // /** getProblematicTransactions should already be loaded from initializeData() call at start of main.main()*/
-    // const soNumbersToIgnore = new Set(await getProblematicTransactions());
-    // if (soNumbersToIgnore.has(soNum)) {
-    //     plog.debug(`[prune.salesOrder()] pruning problematic transaction`,
-    //         TAB+`filtering out this RecordOptions because it has a line item with a sku not yet defined in netsuite account; will handle later`,
-    //         TAB+`options.fields.externalid: '${externalIdValue}'`
-    //     );
-    //     return null;
-    // }
 
     if (options.fields.billingaddress) {
         let validatedAddress = address(
@@ -270,17 +255,17 @@ export const salesOrder = async (
         }
     }
     if (!options.fields.billingaddress && !options.fields.shippingaddress) {
-        plog.warn(`[prune.salesOrder()]: options.fields does not have any address fields.`,
+        plog.warn(`${source}: options.fields does not have any address fields.`,
             TAB+`options.fields.externalid: '${options.fields.externalid}'`,
         );
         // return null;
     }
     if (!isNonEmptyArray(options.sublists.item)) {
-        mlog.warn(`[prune.salesOrder()]: options.sublists.item is empty or not an array.`,
-            TAB+`options.sublists.item: ${JSON.stringify(options.sublists.item)}`,
-            TAB+`options.fields.externalid: '${options.fields.externalid}'`,
-            TAB+` -> returning null`
-        );
+        mlog.warn([`${source}: options.sublists.item is empty or not an array.`,
+            `options.sublists.item: ${JSON.stringify(options.sublists.item)}`,
+            `options.fields.externalid: '${options.fields.externalid}'`,
+            ` -> returning null`
+        ].join(TAB));
         return null;
     }
     return options;

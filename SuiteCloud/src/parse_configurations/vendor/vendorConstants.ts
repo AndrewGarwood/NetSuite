@@ -3,8 +3,7 @@
  */
 import { DATA_DIR, mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING } from "../../config";
 import { clean, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION } from "../../utils/regex";
-import { readJsonFileAsObject as read, } from "../../utils/io/reading";
-import { validatePath } from "../../utils/io/reading";
+import { readJsonFileAsObject as read, validatePath } from "../../utils/io/reading";
 import { hasKeys } from "../../utils/typeValidation";
 import path from "node:path";
 

@@ -6,9 +6,18 @@
         "esModuleInterop": true,
         "target": "es2020",
         "sourceMap": true,
-        "baseUrl": ".",
+        "baseUrl": "./src",
+        "skipLibCheck": true,
         "paths": {
-            "src/*": ["./src/*"]
+            "src/*": ["./src/*"],
+            "@api/*": ["./src/api/*"],     
+            "@utils/*": ["./src/utils/*"],
+            "@config/*": ["./src/config/*"],
+            "@ns/*": ["./src/utils/ns/*"]
         }
-    }
+    },
+    "exclude": [
+        "node_modules/**/*",
+        "node_modules/**/**/*"
+    ]
 }

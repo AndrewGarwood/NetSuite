@@ -2,10 +2,12 @@
  * @file src/config/setupLog.ts
  * @reference https://tslog.js.org/#/?id=pretty-templates-and-styles-color-settings
  */
-import { OUTPUT_DIR, CLOUD_LOG_DIR } from './env';
-import { Logger, ISettingsParam, ISettings, ILogObj, ILogObjMeta, IPrettyLogStyles, IMeta } from 'tslog';
-import path from 'node:path';
-import { appendFileSync, WriteFileOptions } from 'node:fs';
+import { OUTPUT_DIR, CLOUD_LOG_DIR } from "./env";
+import { Logger, ISettingsParam, ISettings, ILogObj, 
+    ILogObjMeta, IPrettyLogStyles, IMeta 
+} from "tslog";
+import path from "node:path";
+import { appendFileSync, WriteFileOptions } from "node:fs";
 
 /** LOCAL_LOG_DIR (in onedrive) or `OUTPUT_DIR/logs` */
 export const LOCAL_LOG_DIR = path.join(OUTPUT_DIR, "logs");  

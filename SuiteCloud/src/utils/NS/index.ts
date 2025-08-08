@@ -6,4 +6,4 @@ export * from "./record";
 export * from "./Enums";
 export * from "./File";
 export * from "./search";
-export * from "./SuiteScriptEnvironment";
+export * from "./SuiteScript";

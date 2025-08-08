@@ -1,7 +1,8 @@
 /**
  * @file src/parse_configurations/salesorder/salesOrderParseDefinition.ts
  */
-import { mainLogger as mlog, pruneLogger as plog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "src/config";
+import { mainLogger as mlog, pruneLogger as plog, 
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
 import {
     SublistLine,
     RecordOptions, idSearchOptions, idPropertyEnum,
@@ -24,11 +25,11 @@ import * as evaluate from "../evaluatorFunctions";
 import * as customerEval from "../customer/customerEvaluatorFunctions";
 import * as soEval from "./salesOrderEvaluatorFunctions";
 import { SalesOrderColumnEnum as SO } from "./salesOrderConstants";
-import { CustomerStatusEnum, CustomerTaxItemEnum, RecordTypeEnum, SalesOrderStatusEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
-import { getSkuDictionary } from "src/config";
-import { isNonEmptyString } from "src/utils/typeValidation";
-import { SB_TERM_DICTIONARY } from "src/utils/ns";
-import { CleanStringOptions, toTitleCase } from "src/utils/regex";
+import { CustomerStatusEnum, CustomerTaxItemEnum, RecordTypeEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
+import { getSkuDictionary } from "../../config/dataLoader";
+import { isNonEmptyString } from "../../utils/typeValidation";
+import { SB_TERM_DICTIONARY } from "../../utils/ns";
+import { CleanStringOptions, toTitleCase } from "../../utils/regex";
 
 /** 
  * @TODO decide if it is better to move value assignment of 
@@ -153,16 +154,16 @@ const externalIdKeyOptions: CleanStringOptions = {
 }
 const EXTERNAL_ID_ARGS: any[] = [
     RecordTypeEnum.SALES_ORDER, SO.TRAN_TYPE, externalIdKeyOptions, 
-    SO.TRAN_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER
+    SO.SO_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER
 ];
 
 const MEMO_ARGS: any[] = [
-    'QuickBooks Summary', SO.TRAN_TYPE,  SO.TRAN_NUM,
-    SO.TRAN_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER,
+    'QB Summary', SO.TRAN_TYPE, SO.TRAN_NUM,
+    SO.SO_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER,
 ]
 
 export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
-    keyColumn: SO.TRAN_ID,
+    keyColumn: SO.SO_ID,
     fieldOptions: {
         custbody_ava_disable_tax_calculation: { defaultValue: true },
         location: { defaultValue: 1 },
@@ -193,10 +194,14 @@ const assignItemInternalIds = async (
     const skuDict = await getSkuDictionary();
     for (let i = 0; i < sublistLines.length; i++) {
         let sku = sublistLines[i].item as string;
-        if (skuDict[sku]) {
-            sublistLines[i].item = skuDict[sku];
+        if (!skuDict[sku]) {
+            mlog.error([`[SalesOrderParseDefinition.lineItemComposer.assignItemInternalids()]`,
+                `Error: sku not found in SkuDictionary`,
+                `  sku: '${sku}'`
+            ].join(TAB))
             continue;
         }
+        sublistLines[i].item = skuDict[sku];
     }
     return sublistLines;
 }
@@ -214,16 +219,18 @@ const lineItemComposer = async (
 ): Promise<SublistLine[]> => {
     sublistLines = await assignItemInternalIds(sublistLines);
     for (let i = 0; i < sublistLines.length; i++) {
-        const numericFields = [
-            'quantity', 'rate', 'amount'
-        ];
-        for (const fieldId of numericFields) { 
-            // force positive values bc :"error.SuiteScriptError","name":"USER_ERROR", 
-            // "Inventory items must have a positive amount."
+        const floatFields = ['rate', 'amount'];
+        for (const fieldId of floatFields) { 
             if (isNonEmptyString(sublistLines[i][fieldId])) {
-                sublistLines[i][fieldId] = Math.abs(Number(sublistLines[i][fieldId])) ?? 0;
+                sublistLines[i][fieldId] = Math.abs(Number(sublistLines[i][fieldId])) ?? 0.0;
             }
         }
+        sublistLines[i].quantity = (
+            isNonEmptyString(sublistLines[i].quantity) 
+                && Number(sublistLines[i].quantity) !== 0
+            ? Math.abs(Number(sublistLines[i].quantity))
+            : 1
+        );
         const qty = sublistLines[i].quantity as number;
         const quantityFields = [
             // 'quantityavailable', 'quantitycommitted', 'quantityfulfilled', 
@@ -269,13 +276,14 @@ const appendMemo = (
     }
     /** expected format: `'SO:9999_NUM:0000_PO:1111(TRAN_TYPE)<salesorder>'` */
     let externalId = fields.externalid as string;
-    let tranType = (/(?<=\()[A-Z]+(?=\))/.exec(externalId) || [''])[0];
+    let tranType = (/(?<=\()[A-Z]+(?=\)<)/.exec(externalId) || [''])[0];
     let expectedTotal: number = 0.00;
     let itemSublist = options.sublists.item;
-    let memo = fields.memo || '';
-    let notes: string[] = [`Notes:`, 
+    const ogMemo = fields.memo as string;
+    let memo = fields.memo as string || '';
+    let notes: string[] = [
         `External ID: ${externalId}`, 
-        `QuickBooks Transaction Type: ${tranType ? toTitleCase(tranType) : 'UNDEFINED'}`,
+        `QB Type: '${tranType ? toTitleCase(tranType) : 'UNDEFINED'}'`,
         // `(index, SKU): rate * quantity = amount`
     ];
     let index = 1;
@@ -291,8 +299,8 @@ const appendMemo = (
         expectedTotal += isDiscountItem ? -1 * amount : amount;
         index++;
     }
-    memo += notes.join(TAB) + NL+`Expected Total: $${expectedTotal.toFixed(2)}`;
-    fields.memo = memo;
+    memo += notes.join(', ') + `, Expected Total: $${expectedTotal.toFixed(2)}`;
+    fields.memo = memo.length <= 999 ? memo : ogMemo;
     return fields;
 }
 

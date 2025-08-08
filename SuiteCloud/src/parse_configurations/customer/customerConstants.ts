@@ -2,8 +2,8 @@
  * @file src/parse_configurations/customer/customerConstants.ts
  */
 import path from "node:path";
-import { DATA_DIR, CLOUD_LOG_DIR } from "src/config/env";
-import { ValueMapping, readJsonFileAsObject as read } from "src/utils/io";
+import { DATA_DIR, CLOUD_LOG_DIR } from "../../config/env";
+import { ValueMapping, readJsonFileAsObject as read } from "../../utils/io";
 
 /** `${DATA_DIR}/customers` */
 export const CUSTOMER_DIR = `${DATA_DIR}/customers` as string;

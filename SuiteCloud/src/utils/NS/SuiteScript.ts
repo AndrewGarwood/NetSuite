@@ -1,8 +1,27 @@
 /**
- * @file src/utils/ns/SuiteScriptEnvironment.ts
+ * @file src/utils/ns/SuiteScript.ts
  * @description strucutres to define/hold the scripts one has uploaded/deployed to NetSuite.
  */
 
+export interface SuiteScriptError {
+    type: string;
+    name: string;
+    message: string;
+    id: string;
+    stack: string[];
+    cause?: SuiteScriptErrorCause;
+    notifyOff: boolean;
+    userFacing: boolean;
+}
+
+export interface SuiteScriptErrorCause {
+    type: string;
+    code: string;
+    details: string;
+    userEvent?: any;
+    stackTrace: string[];
+    notifyOff: boolean;
+}
 
 /**
  * @enum {string} **`AccountEnvironmentEnum`**

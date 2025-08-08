@@ -15,11 +15,14 @@ export enum ItemColumnEnum {
     ITEM_ID = 'Item',
     ACTIVE_STATUS = 'Active Status',
     ACCOUNT = 'Account',
+    ASSET_ACCOUNT = 'Asset Account',
+    COGS_ACCOUNT = 'COGS Account',
     DESCRIPTION = 'Description',
     PURCHASE_DESCRIPTION = 'Purchase Description',
     COST = 'Cost',
     PRICE = 'Price',
     PREFERRED_VENDOR = 'Preferred Vendor',
+    MPN = 'MPN'
 }
 
 const ITEM_COLUMNS = [

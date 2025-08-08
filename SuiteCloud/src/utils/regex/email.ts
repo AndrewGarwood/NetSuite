@@ -1,5 +1,5 @@
 /**
- * @file src/utils/io/regex/email.ts
+ * @file src/utils/regex/email.ts
  */
 import { stringContainsAnyOf } from "./stringOperations";
 import { RegExpFlagsEnum } from "./types/StringOptions";

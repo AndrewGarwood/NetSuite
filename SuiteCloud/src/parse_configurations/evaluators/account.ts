@@ -6,10 +6,10 @@ import {
 } from "../../config";
 import { extractLeaf, equivalentAlphanumericStrings } from "../../utils/regex";
 import { getAccountDictionary } from "../../config/dataLoader";
-import { AccountDictionary, AccountTypeEnum } from "src/utils/ns";
+import { AccountDictionary, AccountTypeEnum } from "../../utils/ns";
 import * as validate from "../../utils/argumentValidation";
-import { isNonEmptyString, isNullLike } from "src/utils/typeValidation";
-import { indentedStringify } from "src/utils/io";
+import { isNonEmptyString, isNullLike } from "../../utils/typeValidation";
+import { indentedStringify } from "../../utils/io";
 
 export const accountInternalId = async (
     row: Record<string, any>,
@@ -20,7 +20,7 @@ export const accountInternalId = async (
     validate.stringArgument(source, {accountColumn});
     validate.arrayArgument(source, {accountTypes}, 'string', isNonEmptyString);
     let accountName = extractLeaf(String(row[accountColumn]), true, ':');
-    const accountDict = await getAccountDictionary();
+    const accountDict = await getAccountDictionary() as AccountDictionary;
     const targetAccounts: { [accountName: string]: string } = {}
     for (const acctType of accountTypes) {
         let subDict = accountDict[acctType];

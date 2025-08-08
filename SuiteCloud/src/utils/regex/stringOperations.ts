@@ -1,11 +1,12 @@
 /**
- * @file src/utils/io/regex/stringOperations.ts
+ * @file src/utils/regex/stringOperations.ts
  */
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL} from "../../config";
 import { CleanStringOptions, StringCaseOptions, StringReplaceOptions } from ".";
 import { RegExpFlagsEnum } from "./types/StringOptions";
 import { clean } from "./cleaning";
 import { distance as levenshteinDistance } from "fastest-levenshtein";
+import { isNonEmptyArray } from "../typeValidation";
 
 
 
@@ -34,16 +35,22 @@ export function stringEndsWithAnyOf(
     if (typeof suffixes === 'string') {
         suffixes = [suffixes]; // Convert string to array of suffixes
     }
+    let flagString = (isNonEmptyArray(flags) 
+        ? flags.join('') 
+        : suffixes instanceof RegExp && suffixes.flags
+        ? suffixes.flags 
+        : undefined 
+    );
     if (Array.isArray(suffixes)) {   
-        /** Escape special regex characters in suffixes, then join them with '|' (OR) */
+        /** Escape special regex characters in suffixes and join them with '|' (OR) */
         const escapedSuffixes = suffixes.map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
         const pattern = `(${escapedSuffixes.join('|')})\\s*$`;
-        regex = new RegExp(pattern, flags?.join('') || undefined);
+        regex = new RegExp(pattern, flagString);
     } else if (suffixes instanceof RegExp) {
-        let source = suffixes.source.endsWith('\\s*$') 
-            ? suffixes.source 
-            : suffixes.source + '\\s*$';
-        regex = new RegExp(source, flags?.join('') || undefined);    
+        regex = (suffixes.source.endsWith('$') 
+            ? new RegExp(suffixes, flagString) 
+            : new RegExp(suffixes.source + '\\s*$', flagString)
+        );
     }
 
     if (!regex) {
@@ -76,16 +83,22 @@ export function stringStartsWithAnyOf(
     if (typeof prefixes === 'string') {
         prefixes = [prefixes]; // Convert string to array of prefixes
     }
+    let flagString = (isNonEmptyArray(flags) 
+        ? flags.join('') 
+        : prefixes instanceof RegExp && prefixes.flags 
+        ? prefixes.flags 
+        : undefined
+    ); 
     if (Array.isArray(prefixes)) {   
         /** Escape special regex characters in suffixes and join them with '|' (OR) */
         const escapedPrefixes = prefixes.map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
         const pattern = `^\\s*(${escapedPrefixes.join('|')})`;
-        regex = new RegExp(pattern, flags?.join('') || undefined);
+        regex = new RegExp(pattern, flagString);
     } else if (prefixes instanceof RegExp) {
-        let source = prefixes.source.startsWith('^\\s*') 
-            ? prefixes.source 
-            : '^\\s*' + prefixes.source;
-        regex = new RegExp(source, flags?.join('') || undefined); 
+        regex = (prefixes.source.startsWith('^') 
+            ? new RegExp(prefixes, flagString)
+            : new RegExp('^\\s*' + prefixes.source, flagString)
+        ); 
     }
 
     if (!regex) {
@@ -117,13 +130,19 @@ export function stringContainsAnyOf(
     if (typeof substrings === 'string') {
         substrings = [substrings]; // Convert string to array of substrings
     }
+    let flagString = (isNonEmptyArray(flags) 
+        ? flags.join('') 
+        : substrings instanceof RegExp && substrings.flags
+        ? substrings.flags 
+        : undefined
+    );
     if (Array.isArray(substrings)) {   
         /** Escape special regex characters in suffixes and join them with '|' (OR) */
         const escapedSubstrings = substrings.map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
         const pattern = `(${escapedSubstrings.join('|')})`;
-        regex = new RegExp(pattern, flags?.join('') || undefined);
+        regex = new RegExp(pattern, flagString);
     } else if (substrings instanceof RegExp) {
-        regex = new RegExp(substrings.source, flags?.join('') || undefined); 
+        regex = new RegExp(substrings, flagString); 
     }
 
     if (!regex) {

@@ -1,7 +1,8 @@
 /**
  * @file src/utils/io/types/PostProcessing.ts
  */
-import { FieldDictionary, idSearchOptions, SublistLine } from "src/api";
+
+import { FieldDictionary, idSearchOptions, SublistLine } from "../../../api";
 import { RecordOptions } from "../../../api/types/RecordEndpoint";
 
 /**

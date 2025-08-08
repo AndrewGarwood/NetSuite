@@ -2,7 +2,7 @@
     "compilerOptions": {
         "strict": true,
         "module": "commonjs", // "amd"
-        "target": "es5",
+        "target": "es2015",
         "moduleResolution": "node",
         "downlevelIteration": true,
         "sourceMap": false,
@@ -10,17 +10,27 @@
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "experimentalDecorators": true,
-        "baseUrl": ".",
+        "skipLibCheck": true,
+        "baseUrl": "./src",
         // "outDir": "./dist/FileCabinet/SuiteScripts",
-        "lib": ["ES7","ES6", "DOM.Iterable", "DOM", "es5", "es2015.promise", "dom"],
-        "paths": {      
+        "lib": ["ES7","ES6", "DOM.Iterable", "DOM", "es5", "es2015.promise", "dom", "ES2015"],
+        "paths": {
+            "src/*": ["./src/*"],
+            "@api/*": ["./src/api/*"],     
+            "@utils/*": ["./src/utils/*"],
+            "@config/*": ["./src/config/*"],
+            "@ns/*": ["./src/utils/ns/*"],
             "N": ["node_modules/@hitc/netsuite-types/N"],
             "N/*": ["node_modules/@hitc/netsuite-types/N/*"]
         }
     },
     "include": [
-        "src/server/AuthManager.ts", 
+        "src/api/server/AuthManager.ts", 
         "src/main.ts", 
     ],
-    "exclude": ["node_modules", "src/FileCabinet/SuiteScripts/**/*.js", "src/FileCabinet/SuiteScripts/**/*.js", "src/FileCabinet/SuiteScripts/REST/*.js"]
+    "exclude": [
+        "node_modules/**/*", 
+        "node_modules/**/**/*", 
+        "src/api/endpoints/*.js"
+    ]
 }

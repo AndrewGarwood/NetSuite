@@ -2,30 +2,12 @@
  * @file src/utils/io/types/typeGuards.ts
  */
 
-import { hasKeys, isIntegerArray, isNonEmptyString } from "src/utils/typeValidation";
+import { hasKeys, isIntegerArray, isNonEmptyString } from "../../typeValidation";
 import { FieldParseOptions, ValueMappingEntry, CloneOptions, 
-    ComposeOptions, WriteJsonOptions, RowSourceMetaData, 
-    FileData} from ".";
-import { RecordOptions } from "src/api";
+    ComposeOptions, WriteJsonOptions, RowSourceMetaData, FileData } from ".";
+import { RecordOptions } from "../../../api";
 import { NodeLeaves, NodeStructure, RowDictionary } from "..";
 
-/**
- * @consideration `FILE_NAME_WITH_EXTENSION_PATTERN = /^[^/\\:*?"<>|]+(\.[^/\\:*?"<>|]+)$/`
- * @param value `any`
- * @returns **`isFileData`** `boolean`
- * - **`true`** if the `value` is a {@link FileData} object with keys `fileName` and `fileContent`,
- * where `fileName` is a string and `fileContent` is a base64 encoded string,
- * - && fileNamePattern.test(value.fileName)
- * - **`false`** `otherwise`.
- */
-export function isFileData(value: any): value is FileData {
-    return (value && typeof value === 'object'
-        && hasKeys(value, ['fileName', 'fileContent'])
-        && isNonEmptyString(value.fileName)
-        // && fileNamePattern.test(value.fileName)
-        && isNonEmptyString(value.fileContent)
-    );
-}
 
 /**
  * 
@@ -101,7 +83,7 @@ export function isComposeOptions(value: any): value is ComposeOptions {
 /**
  * - {@link RowDictionary} = `{ [rowIndex: number]: Record<string, any>; }`
  * @param value 
- * @returns 
+ * @returns **`isRowDictionary`** `boolean`
  */
 export function isRowDictionary(value: any): value is RowDictionary {
     return (value && typeof value === 'object'
@@ -159,5 +141,23 @@ export function isWriteJsonOptions(value: any): value is WriteJsonOptions {
 export function isValueMappingEntry(value: any): value is ValueMappingEntry {
     return (value && typeof value === 'object' 
         && hasKeys(value, ['newValue', 'validColumns'])
+    );
+}
+
+/**
+ * @consideration `FILE_NAME_WITH_EXTENSION_PATTERN = /^[^/\\:*?"<>|]+(\.[^/\\:*?"<>|]+)$/`
+ * @param value `any`
+ * @returns **`isFileData`** `boolean`
+ * - **`true`** if the `value` is a {@link FileData} object with keys `fileName` and `fileContent`,
+ * where `fileName` is a string and `fileContent` is a base64 encoded string,
+ * - && fileNamePattern.test(value.fileName)
+ * - **`false`** `otherwise`.
+ */
+export function isFileData(value: any): value is FileData {
+    return (value && typeof value === 'object'
+        && hasKeys(value, ['fileName', 'fileContent'])
+        && isNonEmptyString(value.fileName)
+        // && fileNamePattern.test(value.fileName)
+        && isNonEmptyString(value.fileContent)
     );
 }

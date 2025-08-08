@@ -3,8 +3,8 @@
  */
 
 
-export * from './Address';
-export * from './Contact';
-export * from './Customer';
-export * from './Vendor';
-export * from './Lead';
+export * from "./Address";
+export * from "./Contact";
+export * from "./Customer";
+export * from "./Vendor";
+export * from "./Lead";
