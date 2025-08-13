@@ -5,7 +5,9 @@ import * as fs from "node:fs";
 import { EntityRecordTypeEnum, RecordTypeEnum, CustomerTaxItemEnum, CustomerStatusEnum } from "./utils/ns";
 import { isNonEmptyArray, isEmptyArray, hasKeys, isNullLike as isNull, anyNull, 
     isNonEmptyString, TypeOfEnum } from "./utils/typeValidation";
-import { DelimitedFileTypeEnum, DelimiterCharacterEnum, isValidCsv, isRecordOptions } from "./utils/io";
+import { DelimitedFileTypeEnum, DelimiterCharacterEnum, 
+    isValidCsvSync, isRecordOptions, indentedStringify 
+} from "./utils/io";
 import { DATA_DIR, mainLogger as mlog, parseLogger as plog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING, CLOUD_LOG_DIR } from "./config";
 import { getColumnValues, getRows, writeObjectToJson as write, readJsonFileAsObject as read, 
     getIndexedColumnValues, handleFileArgument 
@@ -36,13 +38,13 @@ export async function validateFiles(
     extractorArgs: any[] = []
 ): Promise<{ [filePath: string]: string[] }> {
     const source = `[DataReconciler.validateFiles()]`
-    validate.arrayArgument(source, {csvFiles}, TypeOfEnum.STRING);
+    validate.arrayArgument(source, {csvFiles, isNonEmptyString});
     validate.stringArgument(source, {column});
     validate.functionArgument(source, {extractor});
     validate.objectArgument(source, {validationDict});
     const missingValues = {} as { [filePath: string]: string[] };
     for (const csvPath of csvFiles) {
-        if (!isValidCsv(csvPath)) {
+        if (!isValidCsvSync(csvPath)) {
             mlog.warn(`csvFiles contained invalid csvPath`) 
             continue; 
         }
@@ -99,10 +101,11 @@ export async function extractTargetRows(
     }
     validate.stringArgument(source, {targetColumn});
     if (extractor !== undefined) validate.functionArgument(source, {extractor});
-    validate.arrayArgument(source, {targetValues}, TypeOfEnum.STRING);
+    validate.arrayArgument(source, {targetValues, isNonEmptyString});
     const rows = await handleFileArgument(
         rowSource, extractTargetRows.name, [targetColumn]
     );
+    let valuesFound: string[] = [];
     const targetRows: Record<string, any>[] = [];
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
@@ -116,6 +119,7 @@ export async function extractTargetRows(
         const originalValue = String(row[targetColumn]);
         if (targetValues.includes(originalValue)) {
             targetRows.push(row);
+            if (!valuesFound.includes(originalValue)) valuesFound.push(originalValue);
             plog.debug(`${source} ORIGINAL VALUE IN TARGET VALUES`)
             continue;
         }
@@ -130,9 +134,16 @@ export async function extractTargetRows(
             continue;
         }
         if (targetValues.includes(extractedValue)) {
+            if (!valuesFound.includes(extractedValue)) valuesFound.push(extractedValue);
             targetRows.push(row);
             continue;
         }
+    }
+    let missingValues = targetValues.filter(v=> !valuesFound.includes(v));
+    if (missingValues.length > 0) {
+        mlog.warn([`${source} ${missingValues.length} value(s) from targetValues did not have a matching row`,
+            indentedStringify(missingValues)
+        ].join(TAB))
     }
     return targetRows;
 }

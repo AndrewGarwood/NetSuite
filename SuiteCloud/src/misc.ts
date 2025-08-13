@@ -4,31 +4,220 @@
  */
 import * as fs from "fs";
 import path from "node:path";
-import { DATA_DIR, LOCAL_LOG_DIR, ONE_DRIVE_DIR, } from "./config";
+import { CLOUD_LOG_DIR, DATA_DIR, getBinDictionary, initializeData, LOCAL_LOG_DIR, ONE_DRIVE_DIR, } from "./config";
 import { 
-    STOP_RUNNING, DELAY, 
-    miscLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, MISC_LOG_FILEPATH
+    STOP_RUNNING, DELAY, simpleLogger as slog,
+    miscLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, MISC_LOG_FILEPATH, PARSE_LOG_FILEPATH
 } from "./config";
 import {
     readJsonFileAsObject as read,
     writeObjectToJson as write,
     writeRowsToCsv as writeRows,
-    trimFile, clearFile, 
+    trimFile,
+    clearFile, 
     getCurrentPacificTime,
     formatDebugLogFile, 
     concatenateFiles,
     getRows,
     getColumnValues,
     getIndexedColumnValues, validatePath,
-    indentedStringify
+    indentedStringify,
+    getDirectoryFiles,
+    isRowSourceMetaData,
+    isDirectory,
 } from "./utils/io";
-import { equivalentAlphanumericStrings, CleanStringOptions, clean, 
-    stringContainsAnyOf, RegExpFlagsEnum } from "./utils/regex";
+import { 
+    equivalentAlphanumericStrings, CleanStringOptions, clean, 
+    stringContainsAnyOf, RegExpFlagsEnum, 
+    extractLeaf
+} from "./utils/regex";
 import { SalesOrderColumnEnum } from "./parse_configurations/salesorder/salesOrderConstants";
 import { CustomerColumnEnum } from "./parse_configurations/customer/customerConstants";
-import { hasKeys, isIntegerArray, isNonEmptyArray } from "./utils/typeValidation";
+import { ItemColumnEnum } from "./parse_configurations/item/itemConstants";
+import { 
+    hasKeys, isEmptyArray, isIntegerArray, isNonEmptyArray, 
+    isNonEmptyString, isNullLike 
+} from "./utils/typeValidation";
 import * as validate from "./utils/argumentValidation";
 import { search as fuzzySearch, MatchData } from "fast-fuzzy";
+import { idPropertyEnum, LogTypeEnum, RecordOptions, 
+    RecordResponse, RecordTypeEnum, RecordResponseOptions,
+    SearchOperatorEnum, getRecordById, 
+    instantiateAuthManager,
+
+} from "./api";
+import { SuiteScriptError, encodeExternalId } from "./utils/ns";
+import { CLEAN_ITEM_ID_OPTIONS } from "./parse_configurations/evaluators/item";
+import { 
+    putItems, putBins, BIN_RESPONSE_OPTIONS, 
+    generateWarehouseDictionary, 
+    WarehouseDictionary, itemIdExtractor 
+} from "./pipelines";
+import { extractTargetRows } from "./DataReconciler";
+
+/**
+ * @TODO clean 8-12 item export in python and load to tsv
+ */
+
+async function main(): Promise<void> {
+    const source = `[misc.main()]`
+    await clearFile(MISC_LOG_FILEPATH);
+    await initializeData();
+    await instantiateAuthManager();
+    mlog.info(`${source} START at ${getCurrentPacificTime()}`);
+    const itemFile = path.join(DATA_DIR, 'items', '2025_07_09_ALL_ITEMS.tsv');
+    const binNumberFile = path.join(ONE_DRIVE_DIR, 'Bin Numbers.xlsx');
+    const LNII_rows = await extractLotNumberedItemRows(itemFile, binNumberFile);
+    writeRows(LNII_rows, path.join(DATA_DIR, 'items', 'lot_numbered_inventory_item.tsv'));
+
+
+    await trimFile(5, MISC_LOG_FILEPATH);
+    formatDebugLogFile(MISC_LOG_FILEPATH);
+    STOP_RUNNING(0);
+}
+main().catch(error => {
+    mlog.error(`ERROR [misc.main()]:`, JSON.stringify(error as any));
+    STOP_RUNNING(1);
+});
+
+async function extractLotNumberedItemRows(
+    itemSourceFile: string,
+    binSourceFile: string
+): Promise<Record<string, any>[]> {
+    const source = `[misc.extractLotNumberedItemRows()]`;
+    let itemRows = await getRows(itemSourceFile);
+    let locationBins = await generateWarehouseDictionary(binSourceFile);
+    let targetItems: string[] = [];
+    for (let [locId, binDict] of Object.entries(locationBins)) {
+        let initialLength = targetItems.length
+        for (let binId in binDict) {
+            let binContent = binDict[binId];
+            targetItems.push(...Object.keys(binContent).filter(
+                itemId => !targetItems.includes(itemId)
+            ));
+        
+        }
+        slog.debug([`${source} handled locId '${locId}'`,
+            `added ${targetItems.length - initialLength} item(s) from ${locId}'s bin(s)`
+        ].join(TAB));
+    }
+    let targetRows = await extractTargetRows(
+        itemRows, ItemColumnEnum.ITEM_ID, targetItems, itemIdExtractor
+    );
+    mlog.debug([`${source} finished getting rows from itemSourceFile`,
+        // `targetItems.length: ${targetItems.length}`,
+        // ` targetRows.length: ${targetRows.length}`,
+        // `       difference = ${targetItems.length - targetRows.length}`
+    ].join(TAB));
+    return targetRows;
+
+
+
+}
+
+
+type RejectInfo = {
+    timestamp: string;
+    sourceFile: string;
+    numRejects: number;
+    rejectResponses: RecordResponse[];
+}
+
+/**
+ * @param inputDir `string` directory path to look files ending with `targetSuffix` 
+ * @param targetSuffix `string` e.g. `'_putRejects.json'`
+ * @param outputDir `string` `optional` directory path to write two files:
+ * 1. actual source data rows based on metadata in RejectInfo
+ * 2. reasons the source data's generated request objects were rejected
+ * @returns `Promise<void>`
+ */
+async function isolateFailedRequests(
+    inputDir: string, 
+    targetSuffix: string,
+    outputDir?: string
+): Promise<void> {
+    const source = `[misc.isolateFailedRequests()]`
+    validate.existingDirectoryArgument(source, {inputDir});
+    validate.stringArgument(source, {targetSuffix});
+    if (outputDir) validate.existingDirectoryArgument(source, {outputDir});
+    const rejectFiles = getDirectoryFiles(inputDir, '.json')
+        .filter(f => f.endsWith(targetSuffix));
+    if (!isEmptyArray(rejectFiles)) {
+        mlog.warn([`${source} No reject files found with provided arguments`,
+            `    inputDir: '${inputDir}'`,
+            `targetSuffix: '${targetSuffix}'`
+        ].join(TAB));
+        return;
+    }
+    mlog.debug(`${source} rejectFiles.length: ${rejectFiles.length}`);
+    const isoErrors: any[] = [];
+    const rejectReasons: any[] = [];
+    const issueDict: { [filePath: string]: number[] } = {};
+    fileLoop:
+    for (const filePath of rejectFiles) {
+        const jsonData = read(filePath);
+        let { sourceFile, rejectResponses } = jsonData as RejectInfo;
+        let correctedPath = sourceFile.replace(/\.dev/, 'dev');
+        issueDict[correctedPath] = [];
+        responseLoop:
+        for (const res of rejectResponses) {
+            const logDetails = (res.logArray
+                .filter(l => l.type === LogTypeEnum.ERROR)
+                .map(l => JSON.parse(l.details))
+            );
+            rejectReasons.push(...logDetails);
+            const rejects: RecordOptions[] = res.rejects ?? [];
+            rejectLoop:
+            for (let i = 0; i < rejects.length; i++) {
+                const record = rejects[i];
+                if (isNullLike(record.meta)) { continue }
+                let dataSource = record.meta.dataSource;
+                if (!isRowSourceMetaData(dataSource)) { continue }
+                if (!hasKeys(dataSource, sourceFile)) {
+                    mlog.error(`${source} RejectInfo.sourceFile not in dataSource.keys()`)
+                    isoErrors.push(res);
+                    break responseLoop;
+                }
+                issueDict[correctedPath].push(...dataSource[sourceFile])
+            }
+        }
+    }
+    const issueRows: Record<string, any>[] = [];
+    for (const [sourceFile, rowIndices] of Object.entries(issueDict)) {
+        const rows = await getRows(sourceFile);
+        issueRows.push(...rowIndices.map(i => rows[i]));
+    }
+    mlog.debug([`${source} Isolated problematic rows`,
+        `isolation errors: ${isoErrors.length}`,
+        `issueRows.length: ${issueRows.length}`,
+        `num transactions: ${(
+            await getColumnValues(issueRows, SalesOrderColumnEnum.SO_ID)
+        ).length}`
+    ].join(TAB));
+    
+    if (outputDir) {
+        writeRows(issueRows, path.join(outputDir, `${path.basename(inputDir)}_reject_rows.tsv`));
+        write({rejectReasons}, path.join(outputDir, `${path.basename(inputDir)}_reject_reasons.json`));
+    }
+}
+
+async function storeReadableErrors(): Promise<void> {
+    const errorResolutionDir = path.join(CLOUD_LOG_DIR, 'salesorders', 'error_resolution');
+    const jsonData = read(
+        path.join(errorResolutionDir, 'viable_reject_reasons.json')
+    ) as { rejectReasons: SuiteScriptError[] }; 
+    const errors = jsonData.rejectReasons ?? [];
+    const errorDict: Record<string, any> = {};
+    for (const e of errors) {
+        if (!hasKeys(errorDict, e.name)) {
+            errorDict[e.name] = [];
+        }
+        if (!errorDict[e.name].includes(e.message)) {
+            errorDict[e.name].push(e.message)
+        }
+    }
+    write(errorDict, path.join(errorResolutionDir, 'readable_errors.json'))
+}
 
 enum SourceColumnEnum {
     ENTITY = 'Entity',
@@ -37,30 +226,12 @@ enum SourceColumnEnum {
 
 const ENT_TOLERANCE = 0.9;
 const ADDR_TOLERANCE = 0.8;
-
-async function main(): Promise<void> {
-    const source = `[misc.main()]`
-    clearFile(MISC_LOG_FILEPATH);
-    mlog.info(`${source} START at ${getCurrentPacificTime()}`);
-
-    // await searchInCustomers();
-    /*
-    > Pause
-        •      num unique ents:  48
-        • num unique addresses:  39
-    */
-
-    trimFile(5, MISC_LOG_FILEPATH);
-    formatDebugLogFile(MISC_LOG_FILEPATH);
-    STOP_RUNNING(0);
-}
-
-main().catch(error => {
-    mlog.error(`ERROR [misc.main()]:`, JSON.stringify(error as any));
-    STOP_RUNNING(1);
-});
-
-
+// await searchInCustomers();
+/*
+> Pause
+    •      num unique ents:  48
+    • num unique addresses:  39
+*/
 async function searchInCustomers(): Promise<void> {
     const source = `[misc.searchInCustomers()]`
     const entFile = path.join(DATA_DIR, 'reports', 'client_entity_list.tsv');
@@ -76,8 +247,7 @@ async function searchInCustomers(): Promise<void> {
     mlog.debug([`Pause`, 
         `     num unique ents:  ${Object.keys(targetEntDict).length}`,
         `num unique addresses:  ${Object.keys(targetAddressDict).length}`,
-        ].join(TAB),
-    );
+    ].join(TAB));
     STOP_RUNNING(1);
     const POTENTIAL_ENT_COLUMNS = [
         CustomerColumnEnum.PRIMARY_CONTACT, 

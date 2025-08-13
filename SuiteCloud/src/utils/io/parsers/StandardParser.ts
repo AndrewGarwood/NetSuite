@@ -3,8 +3,8 @@
  * @description Standard row-by-row CSV parsing strategy
  */
 
-import csv from 'csv-parser';
-import fs from 'fs';
+import csv from "csv-parser";
+import * as fs from "node:fs";
 import { BaseParser } from "./BaseParser";
 import { 
     ParseManagerContext, ParseStrategyEnum 
@@ -23,7 +23,7 @@ import {
 } from "../../typeValidation";
 import { 
     getDelimiterFromFilePath, 
-    isValidCsv
+    isValidCsvSync
 } from "../";
 import { 
     mainLogger as mlog, 
@@ -51,7 +51,7 @@ export class StandardParser extends BaseParser {
     
     validateInput(context: ParseManagerContext): void {
         const { filePath, parseOptions } = context;
-        if (!isValidCsv(filePath)) {
+        if (!isValidCsvSync(filePath)) {
             throw new Error(`[StandardParser.validateInput()] Invalid CSV file: ${filePath}`);
         }
         for (const [recordType, options] of Object.entries(parseOptions)) {

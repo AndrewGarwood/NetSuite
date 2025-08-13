@@ -138,7 +138,7 @@ export function hasNonTrivialKeys(
  * - **`true`** `if` `obj` is of type 'object' and has the required key(s), 
  * - **`false`** `otherwise`
  */
-export function hasKeys<T extends Object>(
+export function hasKeys<T extends object>(
     obj: T, 
     keys: Array<keyof T> | string[] | string, 
     requireAll: boolean = true,
@@ -196,7 +196,7 @@ export function areEquivalentObjects(
     const keysB = Object.keys(objB);
     if (keysA.length !== keysB.length) return false;
     return keysA.every(key => {
-        if (!objB.hasOwnProperty(key)) return false; // key not in both objects
+        if (!hasKeys(objB, key)) return false; // key not in both objects
         const valA = objA[key];
         const valB = objB[key];
         if (Array.isArray(valA) && Array.isArray(valB)) {
@@ -239,9 +239,8 @@ export function isPrimitiveValue(
     return false;
 }
 
-
-
 /**
+ * @TODO deprecate and remove this
  * @enum {string} **`TypeOfEnum`**
  * @property **`STRING`** = `'string'`
  * @property **`NUMBER`** = `'number'`
@@ -256,43 +255,3 @@ export enum TypeOfEnum {
     OBJECT = 'object',
     FUNCTION = 'function',
 }
-
-
-
-
-
-/**
- * @param fieldId `string`
- * @returns 
- */
-export const isBooleanFieldId = (fieldId: string): boolean => {
-    return BOOLEAN_FIELD_ID_LIST.includes(fieldId) || BOOLEAN_FIELD_ID_REGEX.test(fieldId);
-}
-
-/**
- * Represents the `boolean` value `true` for a radio field in NetSuite.
- */
-export const RADIO_FIELD_TRUE = 'T';
-/**
- * Represents the `boolean` value `false` for a radio field in NetSuite.
- */
-export const RADIO_FIELD_FALSE = 'F';
-/**
- * - `= typeof `{@link RADIO_FIELD_TRUE}` | typeof `{@link RADIO_FIELD_FALSE}`;` 
- * @description
- * Value representing the state of a radio field in NetSuite. (i.e. is the button filled in or not)
- * - e.g. the Customer record's `'isperson'` field.
- * */
-export type RadioFieldBoolean = typeof RADIO_FIELD_TRUE | typeof RADIO_FIELD_FALSE;   
-
-
-/** `re` = `/(^(is|give|send|fax|email)[a-z0-9]{2,}$)/` */
-export const BOOLEAN_FIELD_ID_REGEX = new RegExp(/(^(is|give|send|fax|email)[a-z0-9]{2,}$)/)
-export const BOOLEAN_TRUE_VALUES = ['true', 'yes', 'y'];
-export const BOOLEAN_FALSE_VALUES = ['false', 'no', 'n'];
-export const BOOLEAN_FIELD_ID_LIST = [
-    'isinactive', 'isprivate', 'giveaccess', 'emailtransactions', 'faxtransactions', 
-    'is1099eligible', 'isdefaultbilling', 'isdefaultshipping', 'isprimary', 'isprimaryshipto', 
-    'isprimarybilling', 'isprimaryshipping'
-];
-

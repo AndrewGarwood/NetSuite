@@ -32,8 +32,8 @@ import { CUSTOMER_PARSE_OPTIONS, CONTACT_PARSE_OPTIONS,
 import * as customerConstants from "../parse_configurations/customer/customerConstants";
 import { parseRecordCsv } from "../csvParser";
 import { processParseResults } from "../parseResultsProcessor";
-import { RadioFieldBoolean, RADIO_FIELD_TRUE, isNonEmptyArray, isNonEmptyString } from "../utils/typeValidation";
-
+import { isNonEmptyArray, isNonEmptyString } from "../utils/typeValidation";
+import { RadioFieldBoolean, RADIO_FIELD_TRUE, } from "../utils/ns/";
 /** 
  * {@link RecordResponseOptions}
  * - `responseFields: ['entityid', 'externalid', 'isperson', 'companyname', 'email'];` 

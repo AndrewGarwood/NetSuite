@@ -58,7 +58,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 } catch (e) {
                     writeLog(LogTypeEnum.ERROR, 
                         `[put()] Error processing '${options.recordType}' RecordOptions at index ${i}:`, 
-                        JSON.stringify(e), // JSON.stringify(options)
+                        e, // JSON.stringify(options)
                     );
                     rejects.push(options);
                     continue;
@@ -83,7 +83,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 numRecordsProcessed: results.length,
                 numRejects: rejects.length,
                 numErrorLogs: logArray.filter(log => log.type === LogTypeEnum.ERROR).length,
-            }, JSON.stringify(e));
+            }, e);
             /**@type {RecordResponse} */
             return {
                 status: 500,
@@ -136,7 +136,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         const deletions = [];
         /**@type {object | undefined} */
         let rec = undefined;
-        isDynamic = typeof isDynamic !== 'boolean' ? NOT_DYNAMIC : isDynamic;
+        isDynamic = typeof isDynamic === 'boolean' ? isDynamic : NOT_DYNAMIC;
         const recId = searchForRecordById(recordType, idOptions, fields);
         const isExistingRecord = typeof recId === 'number' && recId > 0;
         if (isExistingRecord && fields && isNonEmptyArray(Object.keys(fields))) { 
@@ -161,25 +161,63 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             );
             rec = record.create({type: recordType, isDynamic });
         }
-        if (isNonEmptyArray(Object.keys(fields))) {
-            rec = processFieldDictionary(rec, recordType, fields);
+        
+        if (fields && isNonEmptyArray(Object.keys(fields))) {
+            try {
+                rec = processFieldDictionary(rec, recordType, fields);
+            } catch (error) {
+                writeLog(LogTypeEnum.ERROR, `[processRecordOptions()] Error processing options.fields`,                `recordType: ${recordType}`,
+                    `  recordId: '${recId}' (null/undefined if new record)`,
+                    `error: `, error
+                );
+                return null;
+            }
         }
-        if (isNonEmptyArray(Object.keys(sublists))) {
-            rec = processSublistDictionary(rec, recordType, sublists);
+        if (sublists && isNonEmptyArray(Object.keys(sublists))) {
+            try {
+                rec = processSublistDictionary(rec, recordType, sublists);
+            } catch (error) {
+                writeLog(LogTypeEnum.ERROR, `[processRecordOptions()] Error processing options.sublists`,                `recordType: ${recordType}`,
+                    `  recordId: '${recId}' (null/undefined if new record)`,
+                    `error: `, error
+                );
+                return null;
+            }
         }
         /**@type {RecordResult} {@link RecordResult} */
-        const result = {
-            recordType,
-            internalid: rec.save({ enableSourcing: true, ignoreMandatoryFields: true }), 
-            //(isExistingRecord ? recId : rec.save({ enableSourcing: true, ignoreMandatoryFields: true })), 
-            //rec.save({ enableSourcing: true, ignoreMandatoryFields: true }), //
-        };
-        if (responseOptions && responseOptions.responseFields) {
-            result.fields = getResponseFields(rec, responseOptions.responseFields);
-            result.fields.recordType = recordType;
+        const result = { recordType };
+        //(isExistingRecord ? recId : rec.save({ enableSourcing: true, ignoreMandatoryFields: true })), 
+        //rec.save({ enableSourcing: true, ignoreMandatoryFields: true }), //
+        
+        try {
+            result.internalid = rec.save({ 
+                enableSourcing: true,
+                ignoreMandatoryFields: true 
+            });
+        } catch (error) {
+            writeLog(LogTypeEnum.ERROR, `[processRecordOptions()] Error saving record`,
+                `an error occurred when calling the save() function.`
+                `recordType: ${recordType}`,
+                `  recordId: '${recId}' (null/undefined if new record)`,
+                `error: `, error
+            );
+            return null;
         }
-        if (responseOptions && responseOptions.responseSublists) {
-            result.sublists = getResponseSublists(rec, responseOptions.responseSublists);
+        try {
+            if (responseOptions && responseOptions.responseFields) {
+                result.fields = getResponseFields(rec, responseOptions.responseFields);
+                result.fields.recordType = recordType;
+            }
+            if (responseOptions && responseOptions.responseSublists) {
+                result.sublists = getResponseSublists(rec, responseOptions.responseSublists);
+            } 
+        } catch (error) {
+            writeLog(LogTypeEnum.ERROR, `[processRecordOptions()] Error processing ResponseOptions`,
+                `recordType: ${recordType}`,
+                `  recordId: '${recId}' (null/undefined if new record)`,
+                `error: `, error
+            )
+            return null;
         }
         return result;   
     }

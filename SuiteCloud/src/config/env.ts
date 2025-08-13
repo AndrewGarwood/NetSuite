@@ -22,9 +22,9 @@ export const inSandbox = (process.env.NODE_ENV === AccountEnvironmentEnum.SANDBO
 export const inProduction = (process.env.NODE_ENV === AccountEnvironmentEnum.PRODUCTION) as boolean;
 
 /** Dependent on `NODE_ENV` value set in `.env` file */
-export const ACCOUNT_ID = inProduction 
+export const ACCOUNT_ID = inProduction && BASE_ACCOUNT_ID && !BASE_ACCOUNT_ID.startsWith('MISSING')
     ? BASE_ACCOUNT_ID as string 
-    : (`${BASE_ACCOUNT_ID}-sb1` || 'MISSING_ENV_VARIABLE-ACCOUNT_ID') as string;
+    : `${BASE_ACCOUNT_ID}-sb1` as string;
 
 /*
 ===============================================================================

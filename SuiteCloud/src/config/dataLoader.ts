@@ -4,13 +4,14 @@
  * and ensure proper initialization order
  */
 import { DATA_DIR, STOP_RUNNING } from "./env";
-import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, INFO_LOGS as INFO } from "./setupLog";
-import { readJsonFileAsObject as read, isValidCsv, getCsvRows, getOneToOneDictionary } from "../utils/io/reading";
+import { mainLogger as mlog, simpleLogger as slog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "./setupLog";
+import { readJsonFileAsObject as read, isValidCsvSync, getCsvRows, getOneToOneDictionary, isValidCsv } from "../utils/io/reading";
 import { writeObjectToJson as write } from "../utils/io";
-import { hasNonTrivialKeys, isNonEmptyArray, isNullLike as isNull } from "../utils/typeValidation";
+import { hasKeys, hasNonTrivialKeys, isNonEmptyArray, isNullLike as isNull } from "../utils/typeValidation";
 import * as validate from "../utils/argumentValidation"
 import path from "node:path";
 import { AccountTypeEnum, AccountDictionary } from "../utils/ns";
+
 
 // Global state to track if data has been loaded
 let dataInitialized = false;
@@ -29,18 +30,27 @@ export enum DataDomainEnum {
 const SKU_DICTIONARY_FILE = path.join(DATA_DIR, 'items', 'SKU_TO_INTERNAL_ID_DICT.json');
 /** `DATA_DIR/uploaded/inventory_item.tsv` */
 const ITEM_FILE = path.join(DATA_DIR, 'items', 'sb_all_item_export.tsv');
-
-let skuDictionary: Record<string, string> | null = null;
+/** `DATA_DIR, 'binnumbers', 'bins.tsv'` */
+const BIN_NUMBERS_FILE = path.join(DATA_DIR, 'binnumbers', 'bins.tsv');
+/** `DATA_DIR, '.constants', 'classes.tsv'` */
+const CLASSES_FILE = path.join(DATA_DIR, '.constants', 'classes.tsv');
 /** `DATA_DIR/accounts/accountDictionary.json` */
 const ACCOUNT_DICTIONARY_FILE = path.join(DATA_DIR, 'accounts', 'accountDictionary.json');
+
+let skuDictionary: Record<string, string> | null = null;
 /** map `account` to `'internalid'` */
 let accountDictionary: Record<string, any> | null = null;
 
+/** map `binnumber` to `internalid` */
+let binDictionary: Record<string, string> | null = null;
+const BIN_NUMBER_COLUMN = 'Bin Number';
+// @TODO
+// import { WarehouseDictionary, BinContent, WarehouseBin } from "src/pipelines";
+// let warehouseDictionary: WarehouseDictionary | null = null;
 
-const CLASSES_FILE = path.join(DATA_DIR, '.constants', 'classes.tsv');
-/** map `class` to `'internalid'` */
+/** map `className` to `'internalid'` */
 let classDictionary: Record<string, string> | null = null;
-
+const ClASS_NAME_COLUMN = 'Name';
 
 /* ------------------------- LOAD REGEX CONFIG ----------------------------- */
 /** `DATA_DIR/.constants/regex_constants.json` */
@@ -82,7 +92,7 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
     if (!isNonEmptyArray(domains)) {
         domains = DEFAULT_DOMAINS_TO_LOAD;
     }
-    INFO.push(`${source} Initializing application data...`);
+    mlog.info(`${source} Initializing application data...`);
     try {
         for (const d of domains) {
             switch (d) {
@@ -92,6 +102,7 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
                 case DataDomainEnum.INVENTORY:
                     skuDictionary = await loadSkuDictionary();
                     accountDictionary = await loadAccountDictionary();
+                    binDictionary = await loadBinDictionary();
                     classDictionary = await loadClassDictionary();
                     break;
                 default:
@@ -102,8 +113,7 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
             }
         }
         dataInitialized = true;
-        mlog.info(INFO.join(TAB), NL+`${source} ✓ All data initialized successfully`);
-        INFO.length = 0;
+        slog.info(`${source} ✓ All data initialized successfully`);
     } catch (error) {
         mlog.error(`${source} ✗ Failed to initialize data:`, error);
         STOP_RUNNING(1, 'Data initialization failed');
@@ -113,9 +123,9 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
 
 
 /**
- * - always load from csv
  * @consideration could try reading json first and compare if all keys are in 
  * dictionary from return value of `getOneToOneDictionary`
+ * @domain {@link DataDomainEnum.INVENTORY}
  * @param jsonPath `string` - Path to the JSON file `(default: SKU_DICTIONARY_FILE)`
  * @param csvPath `string` - Path to the CSV file `(default: ITEM_FILE)`
  * @param skuColumn `string` - Column name for SKU `(default: 'Name')`
@@ -142,7 +152,7 @@ async function loadSkuDictionary(
         try {
             const jsonData = read(jsonPath);
             if (jsonData && hasNonTrivialKeys(jsonData.SKU_TO_INTERNAL_ID_DICT)) {
-                INFO.push(`${source} Loaded SKU dictionary from JSON: ${Object.keys(jsonData.SKU_TO_INTERNAL_ID_DICT).length} entries`);
+                slog.info(`\t${source} Loaded SKU dictionary from JSON: ${Object.keys(jsonData.SKU_TO_INTERNAL_ID_DICT).length} entries`);
                 return jsonData.SKU_TO_INTERNAL_ID_DICT as Record<string, string>;
             }
         } catch (error) {
@@ -151,7 +161,7 @@ async function loadSkuDictionary(
     }
     
     // 2. Build dictionary from CSV file
-    if (!isValidCsv(csvPath, [skuColumn, internalIdColumn])) {
+    if (!isValidCsvSync(csvPath, [skuColumn, internalIdColumn])) {
         throw new Error(`${source} No JSON data && Invalid CSV file: '${csvPath}'`);
     }
     const dictionary = await getOneToOneDictionary(csvPath, skuColumn, internalIdColumn);
@@ -168,7 +178,37 @@ async function loadSkuDictionary(
     return dictionary;
 }
 
+async function loadOneToOneDictionary(
+    csvPath: string,
+    keyColumn: string,
+    valueColumn: string=DEFAULT_INTERNAL_ID_COLUMN,
+): Promise<Record<string, string>> {
+    const source = `[dataLoader.loadSimpleDictionary('${path.basename(csvPath)}')]`;
+    validate.multipleStringArguments(source, {keyColumn, valueColumn});
+    if (!isValidCsvSync(csvPath, [keyColumn, valueColumn])) {
+        let msg = [`${source} Invalid CSV file provided (either not found or missing required columns)`,
+            `  keyColumn: '${keyColumn}'`,
+            `valueColumn: '${valueColumn}'`,
+            `   filePath: '${csvPath}'`
+        ].join(TAB);
+        mlog.error(msg)
+        throw new Error(msg);
+    }
+    let dict = await getOneToOneDictionary(csvPath, keyColumn, valueColumn);
+    if (isNull(dict)) {
+        let msg = [`${source} CSV file did not have data in provided columns`,
+            `  keyColumn: '${keyColumn}'`,
+            `valueColumn: '${valueColumn}'`,
+            `   filePath: '${csvPath}'`
+        ].join(TAB);
+        mlog.error(msg)
+        throw new Error(msg);
+    }
+    return dict;
+}
+
 /**
+ * @domain {@link DataDomainEnum.INVENTORY}
  * @param jsonPath `string` - Defaults to {@link ACCOUNT_DICTIONARY_FILE}
  * @returns **`dictionary`** `Promise<`{@link AccountDictionary}`>` = `{ [accountType: string]: { [accountName: string]: string } }`
  * - `accountType` -> `accountName` -> `internalid (string)`
@@ -197,23 +237,20 @@ async function loadAccountDictionary(
     return jsonData as AccountDictionary;
 }
 
-async function loadClassDictionary(
-    csvPath: string=CLASSES_FILE,
-    classColumn: string = 'Name',
+async function loadBinDictionary(
+    csvPath: string=BIN_NUMBERS_FILE,
+    binNumberColumn: string = BIN_NUMBER_COLUMN,
     internalIdColumn: string = DEFAULT_INTERNAL_ID_COLUMN
 ): Promise<Record<string, string>> {
-    // handled by isValidCsv() validate.existingFileArgument('dataLoader.loadClassDictionary', {csvPath});
-    validate.multipleStringArguments('dataLoader.loadClassDictionary', 
-        {classColumn, internalIdColumn}
-    );
-    if (!isValidCsv(csvPath, [classColumn, internalIdColumn])) {
-        throw new Error(`[loadClassDictionary()] Invalid CSV file: '${csvPath}'`);
-    }
-    const dictionary = await getOneToOneDictionary(csvPath, classColumn, internalIdColumn);
-    if (!hasNonTrivialKeys(dictionary)) { 
-        throw new Error(`[loadClassDictionary()] No data in CSV file: '${csvPath}'`); 
-    }
-    return dictionary;
+    return await loadOneToOneDictionary(csvPath, binNumberColumn, internalIdColumn);
+}
+
+async function loadClassDictionary(
+    csvPath: string=CLASSES_FILE,
+    classColumn: string = ClASS_NAME_COLUMN,
+    internalIdColumn: string = DEFAULT_INTERNAL_ID_COLUMN
+): Promise<Record<string, string>> {
+    return await loadOneToOneDictionary(csvPath, classColumn, internalIdColumn);
 }
 
 /**
@@ -224,27 +261,28 @@ async function loadClassDictionary(
 async function loadRegexConstants(
     filePath: string=REGEX_FILE
 ): Promise<RegexConstants> {
-    validate.existingPathArgument('loadRegexConstants', {filePath});
+    const source = `[dataLoader.loadRegexConstants()]`
+    validate.existingPathArgument(source, {filePath});
     const REGEX_CONSTANTS = read(filePath) as Record<string, any>;
-    if (!REGEX_CONSTANTS || !REGEX_CONSTANTS.hasOwnProperty('COMPANY_KEYWORD_LIST') || !REGEX_CONSTANTS.hasOwnProperty('JOB_TITLE_SUFFIX_LIST')) {
-        throw new Error(`[loadRegexConstants()] Invalid REGEX_CONSTANTS file at '${filePath}'. Expected json object to have 'COMPANY_KEYWORD_LIST' and 'JOB_TITLE_SUFFIX_LIST' keys.`);
+    if (!REGEX_CONSTANTS || !hasKeys(REGEX_CONSTANTS, ['COMPANY_KEYWORD_LIST', 'JOB_TITLE_SUFFIX_LIST'])) {
+        throw new Error(`${source} Invalid REGEX_CONSTANTS file at '${filePath}'. Expected json object to have 'COMPANY_KEYWORD_LIST' and 'JOB_TITLE_SUFFIX_LIST' keys.`);
     }
     const COMPANY_KEYWORD_LIST: string[] = REGEX_CONSTANTS.COMPANY_KEYWORD_LIST || [];
     if (!isNonEmptyArray(COMPANY_KEYWORD_LIST)) {
-        throw new Error(`[loadRegexConstants()] Invalid COMPANY_KEYWORD_LIST in REGEX_CONSTANTS file at '${filePath}'`);
+        throw new Error(`${source} Invalid COMPANY_KEYWORD_LIST in REGEX_CONSTANTS file at '${filePath}'`);
     }
     const JOB_TITLE_SUFFIX_LIST: string[] = REGEX_CONSTANTS.JOB_TITLE_SUFFIX_LIST || [];
     if (!isNonEmptyArray(JOB_TITLE_SUFFIX_LIST)) {
-        throw new Error(`[loadRegexConstants()] Invalid JOB_TITLE_SUFFIX_LIST in REGEX_CONSTANTS file at '${filePath}'`);
+        throw new Error(`${source} Invalid JOB_TITLE_SUFFIX_LIST in REGEX_CONSTANTS file at '${filePath}'`);
     }
-    INFO.push(`[dataLoader.loadRegexConstants()] Loaded regex constants`,)
+    slog.info(`${source} Loaded regex constants`,)
     return {
         COMPANY_KEYWORD_LIST,
         JOB_TITLE_SUFFIX_LIST,
     };
 }
 /**
- * `Sync` Get regex constants
+ * `sync` Get regex constants
  * @returns **`regexConstants`** {@link RegexConstants}
  */
 export function getRegexConstants(): RegexConstants {
@@ -255,7 +293,7 @@ export function getRegexConstants(): RegexConstants {
 }
 
 /**
- * `Sync` Get company keyword list
+ * `sync` Get company keyword list
  * @returns **`COMPANY_KEYWORD_LIST`** `string[]`
  */
 export function getCompanyKeywordList(): string[] {
@@ -273,7 +311,7 @@ export function getJobTitleSuffixList(): string[] {
 }
 
 /**
- * `Sync` Check if data has been initialized
+ * `sync` Check if data has been initialized
  * @returns **`dataInitialized`** `boolean`
  */
 export function isDataInitialized(): boolean {
@@ -282,7 +320,7 @@ export function isDataInitialized(): boolean {
 /**
  * `Public API`: Gets the {@link AccountDictionary} = `{ [accountType: string]: Record<string, string> }` 
  * - = `{ [accountType: string]: { [accountName: string]: string } }` 
- * - - accountName mapped to internalid
+ * - - `accountName` mapped to `internalid`
  * - Initializes the dictionary if it hasn't been loaded yet from {@link ACCOUNT_DICTIONARY_FILE}.
  * @returns Promise that resolves to the Account dictionary
  */
@@ -294,9 +332,23 @@ export async function getAccountDictionary(): Promise<AccountDictionary> {
 }
 
 /**
+ * `async`
+ * `Public API`: Gets the Bin Number to Internal ID dictionary from {@link BIN_NUMBERS_FILE}
+ * - Initializes the dictionary if it hasn't been loaded yet.
+ * @returns **`binDictionary`** `Promise<Record<string, string>>`
+ */
+export async function getBinDictionary(): Promise<Record<string, string>> {
+    if (!binDictionary) {
+        binDictionary = await loadBinDictionary();
+    }
+    return binDictionary;
+}
+
+/**
+ * `async`
  * `Public API`: Gets the Class name to Internal ID dictionary from {@link CLASSES_FILE}
  * - Initializes the dictionary if it hasn't been loaded yet.
- * @returns Promise that resolves to the Class dictionary
+ * @returns **`classDictionary`** `Promise<Record<string, string>>`
  */
 export async function getClassDictionary(): Promise<Record<string, string>> {
     if (!classDictionary) {
@@ -306,6 +358,7 @@ export async function getClassDictionary(): Promise<Record<string, string>> {
 }
 
 /**
+ * `async`
  * `Public API`: Gets the SKU to Internal ID dictionary from {@link SKU_DICTIONARY_FILE} = `DATA_DIR/items/SKU_TO_INTERNAL_ID_DICT.json`
  * - Initializes the dictionary if it hasn't been loaded yet.
  * 
@@ -319,6 +372,7 @@ export async function getSkuDictionary(): Promise<Record<string, string>> {
 }
 
 /**
+ * `async`
  * `Public API`: Gets the internal ID for a given SKU.
  * - Initializes the dictionary if it hasn't been loaded yet.
  * 
@@ -331,6 +385,7 @@ export async function getInternalIdForSku(sku: string): Promise<string | undefin
 }
 
 /**
+ * `async`
  * `Public API`: Checks if a SKU exists in the dictionary.
  * - Initializes the dictionary if it hasn't been loaded yet.
  * 
@@ -343,6 +398,7 @@ export async function hasSkuInDictionary(sku: string): Promise<boolean> {
 }
 
 /**
+ * `sync`
  * `Public API`: Gets a synchronous version of the SKU dictionary.
  * - Returns null if the dictionary hasn't been loaded yet.
  * - Use this **only** when you're sure the dictionary has already been initialized.
@@ -354,6 +410,7 @@ export function getSkuDictionarySync(): Record<string, string> | null {
 }
 
 /**
+ * `sync`
  * `Public API`: Clears the SKU dictionary cache.
  * - Useful for testing or when you need to force a reload of the dictionary.
  * - The next call to any SKU dictionary function will reload the data.

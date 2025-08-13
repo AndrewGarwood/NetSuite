@@ -188,6 +188,21 @@ export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
     } as SublistDictionaryParseOptions
 }
 
+/** 
+ * @TODO use the RecordOptions[] parsed from this spec and make GET_Record calls 
+ * to compare parsed amount and amount in NetSutie
+ * */
+export const SALES_ORDER_AMOUNT_VALIDATION_PARSE_OPTIONS: RecordParseOptions = {
+    keyColumn: SO.SO_ID,
+    fieldOptions: {
+        externalid: { evaluator: soEval.transactionExternalId, args: EXTERNAL_ID_ARGS },
+        entity: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
+    },
+    sublistOptions: {
+        ...LINE_ITEM_SUBLIST_OPTIONS,
+    } as SublistDictionaryParseOptions
+}
+
 const assignItemInternalIds = async (
     sublistLines: SublistLine[]
 ): Promise<SublistLine[]> => {

@@ -6,11 +6,10 @@
         "esModuleInterop": true,
         "target": "es2020",
         "sourceMap": true,
-        "baseUrl": "./src",
+        "baseUrl": ".",
         "skipLibCheck": true,
         "paths": {
-            "src/*": ["./src/*"],
-            "@api/*": ["./src/api/*"],     
+            "@api/*": ["./src/api/*"],
             "@utils/*": ["./src/utils/*"],
             "@config/*": ["./src/config/*"],
             "@ns/*": ["./src/utils/ns/*"]

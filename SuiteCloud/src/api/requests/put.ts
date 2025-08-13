@@ -4,7 +4,9 @@
 import axios from "axios";
 import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify, 
     getFileNameTimestamp, isRecordOptions } from "../../utils/io";
-import { apiLogger as alog, mainLogger as mlog, INDENT_LOG_LINE as TAB, 
+import { 
+    apiLogger as alog, mainLogger as mlog, INDENT_LOG_LINE as TAB, 
+    simpleLogger as slog,
     NEW_LINE as NL } from "../../config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, 
     DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
@@ -22,9 +24,10 @@ import { isEmptyArray } from "../../utils/typeValidation";
 
 const UPSERT_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.PUT_Record.scriptId as number;
 const UPSERT_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.PUT_Record.deployId as number;
+
 /**
  * enforces a max number of records per post call (see {@link BATCH_SIZE}) 
- * - e.g. if `payload.postOptions.length` > BATCH_SIZE_100,
+ * - e.g. if `payload.postOptions.length` > BATCH_SIZE,
  * then split into multiple payloads of at most 50 records each
  * @param payload {@link RecordRequest}
  * @param scriptId `number`
@@ -36,7 +39,7 @@ export async function upsertRecordPayload(
     scriptId: number=UPSERT_RECORD_SCRIPT_ID, 
     deployId: number=UPSERT_RECORD_DEPLOY_ID,
 ): Promise<RecordResponse[]> {
-    const source = `put.upsertRecordPayload`;
+    const source = `[put.upsertRecordPayload()]`;
     validate.numberArgument(source, {scriptId}, true);
     validate.numberArgument(source, {deployId}, true);
     validate.objectArgument(source, {payload});
@@ -45,10 +48,7 @@ export async function upsertRecordPayload(
         ? recordOptions : isRecordOptions(recordOptions) ? [recordOptions] : []
     );
     if (isEmptyArray(upsertRecordArray)) return []
-    // for (const record of upsertRecordArray) {
-    //     if (record.meta) delete record.meta;
-    // }
-    const responseDataArr: RecordResponse[] = [];
+    const responses: RecordResponse[] = [];
     const batches: RecordOptions[][] = partitionArrayBySize(
         upsertRecordArray, BATCH_SIZE
     );
@@ -63,11 +63,11 @@ export async function upsertRecordPayload(
                 } as RecordRequest,
             );
             if (!res || !res.data) {
-                mlog.warn(`[put.upsertRecordPayload()] batchIndex=${i} res.data is undefined. Skipping...`);
+                mlog.warn(`${source} batchIndex=${i} res.data is undefined. Skipping...`);
                 continue;
             }
             const resData = res.data as RecordResponse;
-            responseDataArr.push(resData);
+            responses.push(resData);
             const summary = (resData.results as RecordResult[])
                 .reduce((acc, result) => {
                     acc[result.recordType] = (acc[result.recordType] || 0) + 1;
@@ -79,13 +79,13 @@ export async function upsertRecordPayload(
             summary.batchSize = batch.length;
             // summary.successRatio = (resData?.results?.length || 0) / batch.length;
             mlog.info(
-                `[put.upsertRecordPayload()] finished batch ${i+1} of ${batches.length};`,
+                `${source} finished batch ${i+1} of ${batches.length};`,
                 ( summary.numFailed > 0 ? TAB+`summary: ${indentedStringify(summary)}` : '')
             );
             await DELAY(TWO_SECONDS, null);
             continue;
         } catch (error) {
-            mlog.error(`[put.upsertRecordPayload()] Error in put payload (batchIndex=${i}):`, 
+            mlog.error(`${source} Error in put payload (batchIndex=${i}):`, 
                 (error as any)
             );
             write(
@@ -95,7 +95,8 @@ export async function upsertRecordPayload(
             continue;
         }
     }
-    return responseDataArr;
+    slog.info(`${source} END, returning responses`)
+    return responses;
 }
 
 /**

@@ -10,11 +10,11 @@ import {
     ValidatedParseResults,
     ProcessParseResultsOptions, ParseOptions, ParseResults,
     getCurrentPacificTime, 
-    indentedStringify, clearFile,
+    indentedStringify, clearFileSync,
     getFileNameTimestamp, RowSourceMetaData
 } from "../utils/io";
 import { 
-    STOP_RUNNING, DELAY,
+    STOP_RUNNING, DELAY, simpleLogger as slog,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
     INFO_LOGS, DEBUG_LOGS as DEBUG, SUPPRESSED_LOGS as SUP, 
     ERROR_DIR,
@@ -37,55 +37,16 @@ import { processParseResults, getValidatedDictionaries } from "../parseResultsPr
 import { 
     isNonEmptyArray, isNullLike as isNull, isEmptyArray, hasKeys, 
     TypeOfEnum, isNonEmptyString, isIntegerArray,
-} from '../utils/typeValidation';
-import { getColumnValues, getRows, isValidCsv } from '../utils/io/reading';
-import * as validate from '../utils/argumentValidation';
-import { RecordTypeEnum, SearchOperatorEnum } from '../utils/ns/Enums';
-import { isRecordOptions, isRecordResponseOptions, isRowSourceMetaData } from '../utils/typeGuards';
+} from "../utils/typeValidation";
+import { getColumnValues, getRows, isValidCsvSync } from "../utils/io/reading";
+import * as validate from "../utils/argumentValidation";
+import { RecordTypeEnum, SearchOperatorEnum } from "../utils/ns/Enums";
+import { isRecordOptions, isRecordResponseOptions, isRowSourceMetaData } from "../utils/typeGuards";
+import { WarehouseBin, ItemPipelineOptions, ItemPipelineStageEnum, WarehouseDictionary } from "./types";
+import { ITEM_RESPONSE_OPTIONS, BIN_RESPONSE_OPTIONS } from "./ItemConfig";
+import { clean, CleanStringOptions, extractLeaf } from "../utils/regex";
+import { CLEAN_ITEM_ID_OPTIONS } from "../parse_configurations/evaluators/item";
 
-
-export const ITEM_RESPONSE_OPTIONS: RecordResponseOptions = {
-    responseFields: [
-        'itemid', 'externalid', 'displayname'
-    ],
-    responseSublists: {
-        price1: ['pricelevel', 'price']
-    }
-}
-
-/**
- * @enum {string} **`ItemPipelineStageEnum`**
- * @property **`PARSE`** = `'PARSE'`
- * @property **`VALIDATE`** = `'VALIDATE'`
- * @property **`PUT_ITEMS`** = `'PUT_ITEMS'`
- * @property **`END`** = `'END'`
- */
-export enum ItemPipelineStageEnum {
-    PARSE = 'PARSE',
-    VALIDATE = 'VALIDATE',
-    PUT_ITEMS = 'PUT_ITEMS',
-    END = 'END'
-}
-
-export type ItemPipelineOptions = {
-    parseOptions: ParseOptions;
-    postProcessingOptions?: ProcessParseResultsOptions;
-    /** `RecordResponseOptions` for the item put request */
-    responseOptions?: RecordResponseOptions;
-    clearLogFiles?: string[];
-    /**
-     * if `outputDir` is a valid directory, 
-     * `entityProcessor` will write output data from stages in `stagesToWrite` here. 
-     * */
-    outputDir?: string;
-    /** specify at which stage(s) that data being processed should be written to `outputDir` */
-    stagesToWrite?: ItemPipelineStageEnum[];
-    /**
-     * - stop after specific stage for the first file in filePaths. 
-     * - leave undefined to process all files in filePaths 
-     * */
-    stopAfter?: ItemPipelineStageEnum;
-}
 
 /**
  * @param options 
@@ -124,22 +85,22 @@ async function done(
     return false;
 }
 
-export async function runItemPipeline(
+export async function runMainItemPipeline(
     itemType: RecordTypeEnum | string,
     filePaths: string | string[],
     options: ItemPipelineOptions
 ): Promise<void> {
-    const source = `${__filename}.runItemPipeline`;
-    validate.enumArgument(source, {RecordTypeEnum}, {itemType})
+    const source = `ItemPipeline.runItemPipeline`;
+    validate.enumArgument(source, {itemType, RecordTypeEnum})
     validate.objectArgument(source, {options});
     filePaths = isNonEmptyArray(filePaths) ? filePaths : [filePaths];
-    validate.arrayArgument(source, {filePaths}, TypeOfEnum.STRING, isNonEmptyString);
+    validate.arrayArgument(source, {filePaths, isNonEmptyString});
     const {
         clearLogFiles, parseOptions, postProcessingOptions, responseOptions 
     } = options as ItemPipelineOptions;
     validate.objectArgument(source, {parseOptions});
     // validate.objectArgument(source, {postProcessingOptions});
-    if (isNonEmptyArray(clearLogFiles)) clearFile(...clearLogFiles);
+    if (isNonEmptyArray(clearLogFiles)) clearFileSync(...clearLogFiles);
     for (let i = 0; i < filePaths.length; i++) {
         const csvPath = filePaths[i];
         let fileName = path.basename(csvPath);
@@ -223,14 +184,12 @@ export async function putItems(
     items: RecordOptions[],
     responseOptions: RecordResponseOptions = ITEM_RESPONSE_OPTIONS
 ): Promise<RecordResponse[]> {
-    const source = `${__filename}.putItems`;
+    const source = `[ItemPipeline.putItems()]`;
     try {
-        validate.arrayArgument(source, {items}, 'RecordOptions', isRecordOptions);
-        validate.objectArgument(source, {responseOptions}, 
-            'RecordResponseOptions', isRecordResponseOptions
-        );
+        validate.arrayArgument(source, {items , isRecordOptions});
+        validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
     } catch (error) {
-        mlog.error(`[${source}()] Invalid parameters:`, JSON.stringify(error as any));
+        mlog.error(`${source} Invalid parameters:`, JSON.stringify(error as any));
         write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 
             path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_putItems.json`)
         );
@@ -243,10 +202,175 @@ export async function putItems(
         }
         return await upsertRecordPayload(itemRequest) as RecordResponse[]
     } catch (error) {
-        mlog.error(`[${source}()] Error putting items:`, (error as any));
+        mlog.error(`${source} Error putting items:`, (error as any));
         write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 
             path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_putItems.json`)
         );
     }
     return [];
+}
+
+export async function putBins(
+    bins: RecordOptions[],
+    responseOptions: RecordResponseOptions = BIN_RESPONSE_OPTIONS
+): Promise<RecordResponse[]> {
+    const source = `[ItemPipeline.putBins()]`;
+    try {
+        validate.arrayArgument(source, {bins , isRecordOptions});
+        if (responseOptions) validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
+    } catch (error) {
+        mlog.error(`${source} Invalid parameters:`, error);
+        write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 
+            path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_putBins.json`)
+        );
+        return [];
+    }
+    try {
+        const binRequest: RecordRequest = {
+            recordOptions: bins,
+            responseOptions
+        }
+        return await upsertRecordPayload(binRequest) as RecordResponse[]
+    } catch (error) {
+        mlog.error(`${source} Error putting bins:`, error);
+        write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 
+            path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_putBins.json`)
+        );
+    }
+    return []
+}
+
+
+export async function generateBinOptions(
+    warehouses: WarehouseDictionary
+): Promise<RecordOptions[]> {
+    let bins: RecordOptions[] = [];
+    for (let [locationId, binDict] of Object.entries(warehouses)) {
+        let locInternalId = Number(locationId);
+        for (let [binId, binContent] of Object.entries(binDict)) {
+            let contentString = `content: ${JSON.stringify(binContent)}`;
+            let itemString = `items: ${JSON.stringify(Object.keys(binContent))}`;
+            let memoValue = contentString.length <= 999 ? contentString :
+                itemString.length <= 999 ? itemString : '';
+            let rec: RecordOptions = {
+                recordType: RecordTypeEnum.BIN,
+                fields: { 
+                    binnumber: binId,
+                    location: locInternalId,
+                    externalid: `${binId}<bin>`
+                }
+            }
+            if (memoValue && rec.fields) rec.fields.memo = memoValue;
+            bins.push(rec);
+        }
+    }
+    return bins;
+}
+
+/**
+ * @param filePath `string` `path.join(ONE_DRIVE_DIR, 'Bin Numbers.xlsx')`
+ * @param locations `Record<string, number>`
+ * @param idColumn `string`
+ * @returns **`warehouseDictionary`** {@link WarehouseDictionary}
+ */
+export async function generateWarehouseDictionary(
+    filePath: string,
+    locations: Record<string, number> = LOCATION_ID_DICT,
+    idColumn: string = 'Item #'
+): Promise<WarehouseDictionary> {
+    const wDict: WarehouseDictionary = {}
+    for (const [locName, locId] of Object.entries(locations)) {
+        let rows = await getRows(filePath, locName);
+        rows.forEach((r, index) => {
+            for (let k of Object.keys(r)) {
+                let v = String(r[k]).trim();
+                if (!v) { delete r[k] }
+            }
+        })
+        wDict[locId] = await getWarehouseBin(rows);
+        slog.info([`locName: '${locName}'`, 
+            `  rows.length: ${rows.length}`, 
+            `expected bins: ${rows.filter(r => 
+                Object.keys(r).length === 1 && hasKeys(r, idColumn)).length
+            }`,
+            `received bins: ${Object.keys(wDict[locId]).length}`
+        ].join(TAB));
+    }
+    return wDict;
+}
+
+export const LOCATION_ID_DICT = {
+    A: 2,
+    B: 3,
+    C: 4
+}
+
+const BIN_OR_ITEM_ID_COLUMN = 'Item #';
+const DESC_COLUMN = 'Description';
+const LOT_COLUMN = 'Lot/Serial Number';
+
+export async function getWarehouseBin(
+    rows: Record<string, any>[],
+    idColumn: string=BIN_OR_ITEM_ID_COLUMN,
+    descriptionColumn: string=DESC_COLUMN,
+    lotColumn: string=LOT_COLUMN
+): Promise<WarehouseBin> {
+    const source = `[misc.getBinDictionary()]`
+    if (!isNonEmptyArray(rows)) {
+        mlog.error(`${source} Invalid Argument: 'rows' Record<string, any>[]`)
+        return {}
+    }
+    let currentBinId: string = (
+        await itemIdExtractor(String(rows[0][idColumn]))
+    ).replace(/N\/A/, '').trim();
+    if (!currentBinId) {
+        mlog.error(`${source} Unable to start process - first row is missing idColumn value`)
+        return {}
+    }
+    const binDict: WarehouseBin = { [currentBinId]: {} };
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!hasKeys(row, idColumn)) { continue }
+        let idValue = (await itemIdExtractor(String(row[idColumn])))
+            .replace(/N\/A/, '').trim();
+        if (!idValue) { continue }
+        let isNewBinNumber = (Object.keys(row).length === 1 
+            && hasKeys(row, idColumn)
+            && !hasKeys(binDict, idValue)
+        );
+        if (isNewBinNumber) {
+            binDict[idValue] = {};
+            currentBinId = idValue;
+            continue;
+        } // else idValue corresponds to itemId as key in BinContent dict[binNumber]
+        const oneOrTwoDigitPattern = /\d{1,2}/;
+        if (oneOrTwoDigitPattern.test(idValue)) {
+            idValue = idValue.padStart(3, '0');
+        }
+        let desc = String(row[descriptionColumn]).trim();
+        let lotNumber = String(row[lotColumn]).replace(/N\/A/i, '').trim();
+        if (!hasKeys(binDict[currentBinId], idValue)) {
+            binDict[currentBinId][idValue] = {
+                description: '',
+                lotNumbers: []
+            };
+        }
+        if (isNonEmptyString(lotNumber) 
+            && !binDict[currentBinId][idValue].lotNumbers.includes(lotNumber)) {
+            binDict[currentBinId][idValue].lotNumbers.push(lotNumber);
+        }
+        if (isNonEmptyString(desc) 
+            && !binDict[currentBinId][idValue].description) {
+            binDict[currentBinId][idValue].description = desc;
+        }
+    }
+    return binDict as WarehouseBin;
+}
+
+
+export const itemIdExtractor = async (
+    value: string, 
+    cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
+): Promise<string> => {
+    return clean(extractLeaf(value), cleanOptions);
 }

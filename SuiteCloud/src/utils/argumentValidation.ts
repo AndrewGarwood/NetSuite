@@ -15,41 +15,49 @@ import {
 import { RegExpFlagsEnum, stringEndsWithAnyOf } from "./regex";
 import * as fs from "fs";
 
+
+const typeGuardNamePattern = /(?<=^is).*$/i;
+
 /**
  * - {@link isNonEmptyString}`(value: any): value is string & { length: number; }`
- * @param source `string` indicating what called `validateStringArgument()`
+ * @param source `string` indicating what called `stringArgument()`
  * @param arg2 `string | { [label: string]: any }` the argument/parameter name
  * @param value `string` the value passed into the `source` 
  * for the argument corresponding to `label`
  * @throws {Error} if `value` is not a non-empty string
  * 
- * **`message`**: `[source()] Invalid argument: '${label}'`
- * -  `Expected ${label} to be: non-empty string`
- * -  `Received ${label} value: ${typeof value}`
+ * **`msg`**: `[source()] Invalid argument: '${label}'`
+ * -  `Expected '${label}' to be: non-empty string`
+ * -  `Received '${label}' value: ${typeof value} = ${value}`
  */
 export function stringArgument(
     source: string,
     arg2: string | { [label: string]: any },
     value?: any,
 ): void {
+    const vSource = `[argumentValidation.stringArgument()]`
     let label: string = '';
-    if (typeof arg2 === 'object') {
+    if (arg2 && typeof arg2 === 'object') {
         const keys = Object.keys(arg2);
         if (keys.length !== 1) {
-            mlog.error(`[argumentValidation.stringArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key`);
-            throw new Error(`[argumentValidation.stringArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key`);
+            let msg = [`${vSource} Invalid 'arg2' as labeledString`,
+                `Expected: object with single string key`,
+                `Received: ${typeof arg2} = ${JSON.stringify(arg2)}`
+            ].join(TAB)
+            mlog.error(msg);
+            throw new Error(msg);
         }
         label = keys[0];
         value = arg2[label];
     }
     if (!isNonEmptyString(value)) {
         mlog.error([`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: non-empty string`,
-            `Received ${label} value: ${typeof value}`
+            `Expected '${label}' to be: non-empty string`,
+            `Received '${label}' value: ${typeof value} = ${value}`
         ].join(TAB))
         throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: non-empty string`,
-            `Received ${label} value: ${typeof value}`
+            `Expected '${label}' to be: non-empty string`,
+            `Received '${label}' value: ${typeof value} = ${value}`
         ].join(TAB));
     }
 }
@@ -77,6 +85,13 @@ export function multipleExistingFileArguments(
     }
 }
 
+function isDirectory(pathString: string): boolean {
+    return fs.existsSync(pathString) && fs.statSync(pathString).isDirectory();
+}
+
+function isFile(pathString: string): boolean {
+    return fs.existsSync(pathString) && fs.statSync(pathString).isFile();
+}
 export function existingFileArgument(
     source: string,
     extension: string | string[],
@@ -84,7 +99,7 @@ export function existingFileArgument(
     value?: any,
 ): void {
     let label: string = '';
-    if (typeof arg3 === 'object') {
+    if (arg3 && typeof arg3 === 'object') {
         const keys = Object.keys(arg3);
         if (keys.length !== 1) {
             throw new Error(`[argumentValidation.existingFileArgument()] Invalid argument: '${JSON.stringify(arg3)}' - expected a single key`);
@@ -95,12 +110,12 @@ export function existingFileArgument(
     if (!isNonEmptyString(value) 
         || !stringEndsWithAnyOf(value, extension, RegExpFlagsEnum.IGNORE_CASE)
         || !isFile(value)) {
-        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: existing file with extension '${extension}'`,
-            `Received ${label} value: ${typeof value}`
+        const msg = [`${bracketed(source)} Invalid argument: '${label}'`,
+            `Expected '${label}' to be: existing file with extension '${extension}'`,
+            `Received '${label}' value: ${typeof value} = ${value}`
         ].join(TAB);
-        mlog.error(message);
-        throw new Error(message);
+        mlog.error(msg);
+        throw new Error(msg);
     }
 }
 
@@ -110,7 +125,7 @@ export function existingDirectoryArgument(
     value?: any,
 ): void {
     let label: string = '';
-    if (typeof arg2 === 'object') {
+    if (arg2 && typeof arg2 === 'object') {
         const keys = Object.keys(arg2);
         if (keys.length !== 1) {
             throw new Error(`[argumentValidation.existingDirectoryArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key`);
@@ -119,22 +134,15 @@ export function existingDirectoryArgument(
         value = arg2[label];
     }
     if (!isNonEmptyString(value) || !isDirectory(value)) {
-        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: existing directory`,
-            `Received ${label} value: ${typeof value}`
+        const msg = [`${bracketed(source)} Invalid argument: '${label}'`,
+            `Expected '${label}' to be: existing directory`,
+            `Received '${label}' value: ${typeof value} = ${value}`
         ].join(TAB);
-        mlog.error(message);
-        throw new Error(message);
+        mlog.error(msg);
+        throw new Error(msg);
     }
 }
 
-export function isDirectory(pathString: string): boolean {
-    return fs.existsSync(pathString) && fs.statSync(pathString).isDirectory();
-}
-
-export function isFile(pathString: string): boolean {
-    return fs.existsSync(pathString) && fs.statSync(pathString).isFile();
-}
 
 export function numericStringArgument(
     source: string,
@@ -142,7 +150,7 @@ export function numericStringArgument(
     value?: any
 ): void {
     let label: string = '';
-    if (typeof arg2 === 'object') {
+    if (arg2 && typeof arg2 === 'object') {
         const keys = Object.keys(arg2);
         if (keys.length !== 1) {
             throw new Error(`[argumentValidation.numericStringArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key`);
@@ -152,12 +160,12 @@ export function numericStringArgument(
     }
     if (typeof value !== TypeOfEnum.NUMBER 
         && (typeof value !== TypeOfEnum.STRING || !isNumericString(value))) {
-        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: number or string (numeric string)`,
-            `Received ${label} value: ${typeof value}`
+        const msg = [`${bracketed(source)} Invalid argument: '${label}'`,
+            `Expected '${label}' to be: number or string (numeric string)`,
+            `Received '${label}' value: ${typeof value} = ${value}`
         ].join(TAB);
-        mlog.error(message);
-        throw new Error(message);
+        mlog.error(msg);
+        throw new Error(msg);
     }
 }
 
@@ -175,7 +183,7 @@ export function numberArgument(
 ): void
 
 /**
- * @param source `string` indicating what called `validateNumberArgument()`
+ * @param source `string` indicating what called `numberArgument()`
  * @param arg2 `string | { [label: string]: any }` the argument/parameter name
  * @param arg3 `any` the value passed into the `source` 
  * for the argument corresponding to `label`
@@ -183,9 +191,9 @@ export function numberArgument(
  * - `default` is `false`, meaning `value` can be a float
  * @throws {Error} if `value` is not a number or is not an integer (if `requireInteger` is `true`)
  * 
- * **`message`**: `[source()] Invalid argument: '${label}'`
- * -  `Expected ${label} to be: number|integer`
- * -  `Received ${label} value: ${typeof value}`
+ * **`msg`**: `[source()] Invalid argument: '${label}'`
+ * -  `Expected '${label}' to be: number | integer`
+ * -  `Received '${label}' value: ${typeof value} = ${value}`
  */
 export function numberArgument(
     source: string,
@@ -207,34 +215,34 @@ export function numberArgument(
         }
     }
     if (typeof value !== TypeOfEnum.NUMBER || isNaN(value)) {
-        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: number`,
-            `Received ${label} value: ${typeof value}`
+        const msg = [`${bracketed(source)} Invalid argument: '${label}'`,
+            `Expected '${label}' to be: number`,
+            `Received '${label}' value: ${typeof value} = ${value}`
         ].join(TAB);
-        mlog.error(message);
-        throw new Error(message);
+        mlog.error(msg);
+        throw new Error(msg);
     }
     if (requireInteger && !Number.isInteger(value)) {
-        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: integer`,
-            `Received ${label} value: ${typeof value}`
+        const msg = [`${bracketed(source)} Invalid argument: '${label}'`,
+            `Expected '${label}' to be: integer`,
+            `Received '${label}' value: ${typeof value} = ${value}`
         ].join(TAB);
-        mlog.error(message);
-        throw new Error(message);
+        mlog.error(msg);
+        throw new Error(msg);
     }
 }
 
 /**
- * @param source `string` indicating what called `validateBooleanArgument()`
+ * @param source `string` indicating what called `booleanArgument()`
  * @param arg2 `string | { [label: string]: any }` the argument/parameter name
  * @param value `any` the value passed into the `source` 
  * for the argument corresponding to `label`
  * 
  * @throws {Error} `if` `value` is not a `boolean`
  * 
- * **`message`**: `[source()] Invalid argument: '${label}'`
- * -  `Expected ${label} to be: boolean`
- * -  `Received ${label} value: ${typeof value}`
+ * **`msg`**: `[source()] Invalid argument: '${label}'`
+ * -  `Expected '${label}' to be: boolean`
+ * -  `Received '${label}' value: ${typeof value} = ${value}`
  */
 export function booleanArgument(
     source: string,
@@ -252,9 +260,50 @@ export function booleanArgument(
     }
     if (typeof value !== TypeOfEnum.BOOLEAN) {
         throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: ${TypeOfEnum.BOOLEAN}`,
-            `Received ${label} value: ${typeof value}`
+            `Expected '${label}' to be: ${TypeOfEnum.BOOLEAN}`,
+            `Received '${label}' value: ${typeof value} = ${value}`
         ].join(TAB));
+    }
+}
+
+/**
+ * @param source `string` indicating what called `functionArgument`
+ * @param arg2 `string` the argument/parameter name
+ * @param value `any` the value passed into the `source` 
+ * for the argument corresponding to `label`
+ * 
+ * @throws {Error} `if` `value` is not a function
+ * 
+ * **`msg`**: `[source()] Invalid argument: '${label}'`
+ * -  `Expected '${label}' to be: function`
+ * -  `Received '${label}' value: ${typeof value} = ${value}`
+ */
+export function functionArgument(
+    source: string,
+    arg2: string | { [label: string]: any},
+    value?: any
+): void {
+    let label: string = '';
+    if (typeof arg2 === 'object') {
+        const keys = Object.keys(arg2);
+        if (keys.length !== 1) {
+            let msg = [`[argumentValidation.functionArgument()] Invalid arg2 as labeledFunction`,
+                `Expected: object with single key-value pair`,
+                `Received: '${JSON.stringify(arg2)}'`,
+            ].join(TAB);
+            mlog.error(msg);
+            throw new Error(msg);
+        }
+        label = keys[0];
+        value = arg2[label];
+    }
+    if (typeof value !== 'function') {
+        let msg = [`${bracketed(source)} Invalid argument: '${label}'`,
+            `Expected '${label}' to be: function`,
+            `Received '${label}' value: ${typeof value} = ${value}`
+        ].join(TAB);
+        mlog.error(msg);
+        throw new Error(msg);
     }
 }
 
@@ -273,31 +322,14 @@ export function booleanArgument(
  * - `default` is `false`, meaning an empty array will throw an error
  * @throws {Error} `if` `value` is not a non-empty array or does not pass the type checks
  * 
- * **`message`**: `[source()] Invalid argument: '${label}'`
- * -  `Expected ${label} to be: non-empty array`
- * -  `Received ${label} value: ${typeof value}`
+ * **`msg`**: `[source()] Invalid argument: '${label}'`
+ * -  `Expected '${label}' to be: non-empty array`
+ * -  `Received '${label}' value: ${typeof value} = ${value}`
  */
 export function arrayArgument(
     source: string,
     label: string,
-    value?: any,
-    elementType?: TypeOfEnum | string,
-    elementTypeGuard?: (value: any) => boolean,
-    allowEmpty?: boolean
-): void
-
-/**
- * @param source `string` indicating what called `validateArrayArgument`
- * @param labeledArray `{ [label: string]: any }` a single object dict mapping label to value
- * @param elementType `TypeOfEnum | string` optional, the expected type of each element in the array
- * @param elementTypeGuard `(value: any) => boolean` optional, a type guard function
- * @param allowEmpty `boolean` optional, if `true`, allows `value` to be an empty array
- * - `default` is `false`, meaning an empty array will throw an error
- * @throws {Error} `if` `value` is not a non-empty array or does not pass the type checks
- */
-export function arrayArgument(
-    source: string,
-    labeledArray: { [label: string]: any },
+    value: any,
     elementType?: TypeOfEnum | string,
     elementTypeGuard?: (value: any) => boolean,
     allowEmpty?: boolean
@@ -314,142 +346,150 @@ export function arrayArgument(
  * - `default` is `false`, meaning an empty array will throw an error
  * @throws {Error} `if` `value` is not a non-empty array or does not pass the type checks
  * 
- * **`message`**: `[source()] Invalid argument: '${label}'`
- * -  `Expected ${label} to be: non-empty array`
- * -  `Received ${label} value: ${typeof value}`
+ * **`msg`**: `[source()] Invalid argument: '${label}'`
+ * -  `Expected '${label}' to be: non-empty array`
+ * -  `Received '${label}' value: ${typeof value} = ${value}`
  * 
  * `if` `elementTypeGuard` is provided:
- * -  `Expected ${label} to be: non-empty array of ${elementType}`
- * -  `Received ${label} value: ${JSON.stringify(value)}`
+ * -  `Expected '${label}' to be: non-empty array of ${elementType}`
+ * -  `Received '${label}' value: ${JSON.stringify(value)}`
  * -  `Element typeGuard function: ${elementTypeGuard.name}(value: any): value is ${elementType}`
  */
 export function arrayArgument(
     source: string,
-    /** label or single object dict mapping label to value */
+    labeledArgs: { [label: string]: any | ((value: any) => boolean) },
+    allowEmpty?: boolean
+): void
+
+/**
+ * @param source `string` indicating what called `arrayArgument`
+ * @param labeledArray `{ [label: string]: any }` a single object dict mapping label to value
+ * @param labeledElementTypeGuard `{ [functionName: string]: (value: any) => boolean }` a single object dict mapping type guard function name to the function
+ * @param allowEmpty `boolean` optional, if `true`, allows `value` to be an empty array
+ * @description This overload automatically derives the element type name from the type guard function name using regex.
+ * For example, if the type guard function is named `isNonEmptyString`, the element type name will be extracted as `String`.
+ */
+export function arrayArgument(
+    source: string,
+    /** `label (string) | labeledArgs { [label: string]: any | ((value: any) => boolean) }` */
     arg2: string | { [label: string]: any },
-    /** value (any) | elementType (TypeOfEnum | string) */
-    arg3?: any | TypeOfEnum | string,
-    /** elementType (TypeOfEnum | string) | elementTypeGuard (function) */
-    arg4?: TypeOfEnum | string | ((value: any) => boolean),
+    /** `value (any) | allowEmpty (boolean)` */
+    arg3?: any | boolean | undefined,
+    /** elementType (TypeOfEnum | string) | undefined */
+    elementType?: TypeOfEnum | string | undefined,
     /** elementTypeGuard | allowEmpty (boolean) */
-    arg5?: ((value: any) => boolean) | boolean,
-    arg6: boolean = false
+    elementTypeGuard?: ((value: any) => boolean) | undefined,
+    allowEmpty?: boolean | undefined
 ): void {
+    const vSource = `[argumentValidation.arrayArgument()]`;
+    source = bracketed(source);
     let label: string = '';
     let value: any = undefined;
-    
-    if (typeof arg2 === 'object') {
-        const keys = Object.keys(arg2);
-        if (keys.length !== 1) {
-            const message = `[argumentValidation.arrayArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key`;
-            mlog.error(message);
-            throw new Error(message);
-        }
-        label = keys[0];
-        value = arg2[label];
-    } else if (typeof arg2 === 'string') {
+    if (isNonEmptyString(arg2)) {
         label = arg2;
         value = arg3;
+        allowEmpty = allowEmpty ?? false;
+    } else if (arg2 && typeof arg2 === 'object') {
+        let keys = Object.keys(arg2);
+        if (keys.length === 0 || keys.length > 2 || keys.some(k => !isNonEmptyString(k))) {
+            let msg = [`${source} -> ${vSource} Invalid parameter: arg2 as labeledArgs`,
+                `Expected: object with at most 2 keys:`
+                +`{ [arrayLabel: string]: valueToCheck; [typeGuardFunctionName: string]?: typeGuardFunction }`,
+                `Received: object with ${keys.length} key(s)`,
+                `arg2: ${JSON.stringify(arg2)}`
+            ].join(TAB);
+            mlog.error(msg);
+            throw new Error(msg);
+        }
+        let variableLabel = Object.keys(arg2)
+            .find(key => typeof arg2[key] !== 'function');
+        if (!variableLabel) {
+            let msg = [`${source} -> ${vSource} Invalid parameter: arg2 as labeledArgs`,
+                `Expected: object of size 2 with exactly 1 key whose value is a typeGuard function`,
+                `Received: Object.values(arg2) = ${JSON.stringify(Object.values(arg2))}`
+            ].join(TAB);
+            mlog.error(msg);
+            throw new Error(msg);
+        }
+        label = variableLabel;
+        value = arg2[variableLabel];
+        allowEmpty = arg3 ?? false;
+        let functionLabel = Object.keys(arg2)
+            .find(key => typeof arg2[key] === 'function');
+        if (functionLabel) {
+            elementTypeGuard = arg2[functionLabel];
+            const match = typeGuardNamePattern.exec(label);
+            elementType = match ? match[0] : functionLabel;
+        }
     } else {
-        throw new Error(`[argumentValidation.arrayArgument()] Invalid parameters: expected either a single object with a single key ({label: value}) or two separate arguments (label, value)`);
+        let msg = [`${source} -> ${vSource} Invalid parameter: 'arg2'`,
+            `Expected: label (string) | labeledArgs ({ [label: string]: any | ((value: any) => boolean) })`,
+            `Received: ${typeof arg2} = ${arg2}`
+        ].join(TAB);
+        mlog.error(msg);
+        throw new Error(msg);
     }
-    
-    // Parse the parameters based on the overload signature used
-    let elementType: TypeOfEnum | string | undefined;
-    let elementTypeGuard: ((value: any) => boolean) | undefined;
-    let allowEmpty: boolean = arg6;
-    
-    if (typeof arg2 === 'object') {
-        // Called with {label: value}, elementType?, elementTypeGuard?, allowEmpty?
-        elementType = arg3 as TypeOfEnum | string;
-        elementTypeGuard = arg4 as ((value: any) => boolean) | undefined;
-        allowEmpty = (arg5 as boolean) || arg6;
-    } else {
-        // Called with label, value, elementType?, elementTypeGuard?, allowEmpty?
-        elementType = arg4 as TypeOfEnum | string;
-        elementTypeGuard = arg5 as ((value: any) => boolean) | undefined;
-        allowEmpty = arg6;
-    }
-    
     if (!Array.isArray(value)) {
-        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: array`,
-            `Received ${label} value: ${typeof value}`
+        let msg = [`${source} Invalid Array Argument: '${label}'`,
+            `Expected '${label}' to be: Array`+(elementType ? `<${elementType}>`:''),
+            `Received '${label}' value: ${typeof value} = ${value}`
         ].join(TAB);
-        mlog.error(message);
-        throw new Error(message);
+        mlog.error(msg);
+        throw new Error(msg);
     }
-    
-    if (isEmptyArray(value) && !allowEmpty) {
-        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: non-empty array`,
-            `Received ${label} value: empty array`
+    if (!allowEmpty && isEmptyArray(value)) {
+        let msg = [`${source} Invalid Array Argument: '${label}'`,
+            `Expected '${label}' to be: non-empty Array`+(elementType ? `<${elementType}>`:''),
+            `Received '${label}' value: empty array`
         ].join(TAB);
-        mlog.error(message);
-        throw new Error(message);
+        mlog.error(msg);
+        throw new Error(msg);
+    } else if (allowEmpty && isEmptyArray(value)) { 
+        return;
     }
-    
-    if (elementType && Object.values(TypeOfEnum).includes(elementType as TypeOfEnum)) {
-        if (!value.every((v: any) => typeof v === elementType)) {
-            const message = [`${bracketed(source)} Invalid argument: '${label}'`,
-                `Expected ${label} to be: array of ${elementType}`,
-                `Received ${label} value: ${JSON.stringify(value)}`
-            ].join(TAB);
-            mlog.error(message);
-            throw new Error(message);
-        }
-    }
-    
-    if (elementTypeGuard && typeof elementTypeGuard === 'function') {
-        if (!value.every((v: any) => elementTypeGuard(v))) {
-            const message = [`${bracketed(source)} Invalid argument: '${label}'`,
-                `Expected ${label} to be: Array` + isNonEmptyString(elementType) ? `<${elementType}>` : ``,
-                `Received ${label} value: ${JSON.stringify(value)}`,
-                `Element typeGuard function: ${elementTypeGuard.name}`
-            ].join(TAB);
-            mlog.error(message);
-            throw new Error(message);
+    // isNonEmptyArray === true
+    if (typeof elementTypeGuard === 'function') {
+        for (let i = 0; i < value.length; i++) {
+            if (!elementTypeGuard(value[i])) {
+                let msg = [`${source} Invalid Array Argument: '${label}'`,
+                    `Expected '${label}' to be: Array`+(elementType ? `<${elementType}>`:'')+
+                    ` (typeGuard used = '${elementTypeGuard.name}')`,
+                    `Received '${label}' value: Array with invalid element at index ${i}`,
+                    `array[i]: ${typeof value[i]} = ${JSON.stringify(value[i])}`
+                ].join(TAB);
+                mlog.error(msg);
+                throw new Error(msg);
+            }
         }
     }
 }
 
+type ObjectArgumentOptions = { 
+    [valueLabel: string]: any
+} & {
+    [typeGuardLabel: string]: (value: any) => boolean
+}
 
-/**
- * @param source `string` indicating what called `validateFunctionArgument`
- * @param arg2 `string` the argument/parameter name
- * @param value `any` the value passed into the `source` 
- * for the argument corresponding to `label`
- * 
- * @throws {Error} `if` `value` is not a function
- * 
- * **`message`**: `[source()] Invalid argument: '${label}'`
- * -  `Expected ${label} to be: function`
- * -  `Received ${label} value: ${typeof value}`
- */
-export function functionArgument(
-    source: string,
-    arg2: string | { [label: string]: any},
-    value?: any
-): void {
-    let label: string = '';
-    if (typeof arg2 === 'object') {
-        const keys = Object.keys(arg2);
-        if (keys.length !== 1) {
-            throw new Error(`[argumentValidation.functionArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key`);
-        }
-        label = keys[0];
-        value = arg2[label];
+function isObjectArgumentOptions(value: any): value is ObjectArgumentOptions {
+    if (!value || typeof value !== 'object') {
+        return false;
     }
-    if (typeof value !== 'function') {
-        throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: function`,
-            `Received ${label} value: ${typeof value}`
-        ].join(TAB));
-    }
+    let keys = Object.keys(value);
+    const isLabeledValue = (keys.length === 1 
+        && typeof keys[0] !== 'function'
+    );
+    const isLabeledValueWithTypeGuard = (keys.length === 2 
+        && keys.some(k => typeof value[k] === 'function')
+        && keys.some(k => typeof value[k] !== 'function')
+    );
+    return (keys.every(k => isNonEmptyString(k)) 
+        && (isLabeledValue || isLabeledValueWithTypeGuard)
+    );
 }
 
 /**
- * @param source `string` indicating what called `validateObjectArgument`
+ * - `verbose` overload
+ * @param source `string` indicating what called `objectArgument`
  * @param label `string` the argument/parameter name
  * @param value `any` the value passed into the `source` 
  * for the argument corresponding to `label`
@@ -461,203 +501,168 @@ export function functionArgument(
 export function objectArgument(
     source: string,
     label: string,
-    value?: any,
+    value: any,
     objectTypeName?: string,
     objectTypeGuard?: (value: any) => boolean,
     allowEmpty?: boolean
 ): void
 
 /**
- * @param source `string` indicating what called `validateObjectArgument`
- * @param labeledObject `{ [label: string]: any }` a single object dict mapping label to value
- * @param objectTypeName `string` the expected object type name
- * @param objectTypeGuard `(value: any) => boolean` optional, a type guard function
- * @param allowEmpty `boolean` optional, if `true`, allows `value` to be an empty object `{} or undefined`
- */
+ * - `concise` overload
+ * @param source `string` indicating what called `objectArgument`
+ * */
 export function objectArgument(
     source: string,
-    labeledObject: { [label: string]: any },
-    objectTypeName?: string,
-    objectTypeGuard?: (value: any) => boolean,
+    /** maxLength = 2 */
+    labeledArgs: ObjectArgumentOptions | { [label: string]: any | ((value: any) => boolean) },
     allowEmpty?: boolean
 ): void
-
 /**
- * @param source `string` indicating what called `validateObjectArgument`
- * @param labeledValue `{ [label: string]: any }` a single object dict mapping label to value
- * @param labeledTypeGuard `{ [functionName: string]: (value: any) => boolean }` a single object dict mapping type guard function name to the function
- * @param allowEmpty `boolean` optional, if `true`, allows `value` to be an empty object `{} or undefined`
- * @description This overload automatically derives the object type name from the type guard function name using regex.
- * For example, if the type guard function is named `isRecordOptions`, the object type name will be extracted as `RecordOptions`.
- */
-export function objectArgument(
-    source: string,
-    labeledValue: { [label: string]: any },
-    labeledTypeGuard: { [functionName: string]: (value: any) => boolean },
-    allowEmpty?: boolean
-): void
-
-/**
- * @note does not allow for arrays
- * @param source `string` indicating what called `validateObjectArgument`
- * @param arg2 `string | { [label: string]: any }` the argument/parameter name or a single object dict mapping label to value
- * @param arg3 `any | string` the value passed into the `source` or the object type name
- * @param arg4 `string | (value: any) => boolean` optional, a type guard function or the object type name if arg3 was the object value
- * @param arg5 `boolean | (value: any) => boolean | undefined` optional, a type guard function if arg4 was the object type name or `boolean` for the allowEmpty param
- * @param allowEmpty `boolean` optional, if `true`, allows `value` to be an empty object `{} or undefined` (if arg5 was the type guard function)
- * @throws {Error} `if` `value` is not a non-empty object 
- * or does not pass the type guard (if one was provided)
- * 
- * **`message`**: `[source()] Invalid argument: '${label}'`
- * -  `Expected ${label} to be: non-empty 'object'`
- * -  `Received ${label} value: ${typeof value}`
+ * @note **does not allow for arrays**
+ * **`msg`**: `[source()] Invalid argument: '${label}'`
+ * -  `Expected '${label}' to be: non-empty 'object'`
+ * -  `Received '${label}' value: ${typeof value} = ${value}`
  * 
  * `if` `objectTypeGuard` is provided:
- * -  `Expected ${label} to be: object of type '${objectTypeName}'`
- * -  `Received ${label} value: ${JSON.stringify(value)}`
+ * -  `Expected '${label}' to be: object of type '${objectTypeName}'`
+ * -  `Received '${label}' value: ${JSON.stringify(value)}`
  * -  `Element typeGuard function: ${objectTypeGuard.name}(value: any): value is ${objectTypeName}`
  */
 export function objectArgument(
     source: string,
-    /** label or single object dict mapping label to value */
-    arg2: string | { [label: string]: any },
-    /** value (any) | objectTypeName (string) | labeledTypeGuard ({ [functionName: string]: function }) */
-    arg3?: string | any | { [functionName: string]: (value: any) => boolean },
-    /** objectTypeName (string) | objectTypeGuard (function) | allowEmpty (boolean) */
-    arg4?: string | ((value: any) => boolean) | boolean,
-    /** objectTypeGuard | allowEmpty (boolean) */
-    arg5?: ((value: any) => boolean) | boolean,
-    allowEmpty: boolean | undefined = false
+    /** `label (string) | labeledArgs ({ [label: string]: any | ((value: any) => boolean) })` */
+    arg2: string | ObjectArgumentOptions | { [label: string]: any | ((value: any) => boolean) },
+    /** `value (any) | allowEmpty (boolean)` */
+    arg3?: any | boolean,
+    /** `objectTypeName (string) | allowEmpty (boolean)` */
+    objectTypeName?: string | undefined,
+    /** `objectTypeGuard | undefined` */
+    objectTypeGuard?: ((value: any) => boolean) | undefined,
+    /** `allowEmpty (boolean) | undefined` */
+    allowEmpty?: boolean | undefined
 ): void {
+    source = bracketed(source);
+    const vSource = `[argumentValidation.objectArgument()]`;
     let label: string = '';
     let value: any = undefined;
-    let objectTypeName: string | undefined = undefined;
-    let objectTypeGuard: ((value: any) => boolean) | undefined = undefined;
-    let isNewOverload = false;
-
-    if (typeof arg2 === 'object') {
-        const keys = Object.keys(arg2);
-        if (keys.length !== 1) {
-            throw new Error(`[argumentValidation.objectArgument()] Invalid argument: '${JSON.stringify(label)}' - expected a single key`);
-        }
-        label = keys[0];
-        value = arg2[label];
-        // Check if this is the overload: objectArgument(source, {value}, {typeGuard}, allowEmpty?)
-        if (arg3 && typeof arg3 === 'object' && !Array.isArray(arg3)) {
-            const typeGuardKeys = Object.keys(arg3);
-            
-            // Validate that there's exactly one type guard
-            if (typeGuardKeys.length !== 1) {
-                throw new Error(`[argumentValidation.objectArgument()] Invalid labeledTypeGuard: expected exactly one type guard function, got ${typeGuardKeys.length}`);
-            }
-            
-            const functionName = typeGuardKeys[0];
-            const typeGuardFunction = arg3[functionName];
-            
-            // Validate that the value is a function
-            if (typeof typeGuardFunction !== 'function') {
-                throw new Error(`[argumentValidation.objectArgument()] Invalid labeledTypeGuard: expected function for '${functionName}', got ${typeof typeGuardFunction}`);
-            }
-            
-            isNewOverload = true;
-            objectTypeGuard = typeGuardFunction;
-            const typeGuardFunctionNamePattern = /(?<=^is).*$/i;
-            // Extract object type name from function name using regex
-            // e.g., "isRecordOptions" -> "RecordOptions"
-            const match = typeGuardFunctionNamePattern.exec(functionName);
-            objectTypeName = isNonEmptyArray(match) ? match[0] : functionName;
-            
-            allowEmpty = (typeof arg4 === 'boolean') ? arg4 : false;
-        }
-    } else if (typeof arg2 === 'string') {
+    if (typeof arg2 === 'string') {
         label = arg2;
         value = arg3;
-    } else {
-        throw new Error(`[argumentValidation.objectArgument()] Invalid parameters: expected either a single object with a single key ({label: value}) or two separate arguments (label, value)`);
-    }
-
-    if (objectTypeName === undefined && isNonEmptyString(arg3)) {
-        objectTypeName = arg3
-    } else if (objectTypeName === undefined) {
-        objectTypeName = `object Record<string, any>`
-    }
-    if (objectTypeGuard === undefined) {
-        objectTypeGuard = (typeof arg4 === 'function'
-            ? arg4
-            : (typeof arg5 === 'function'
-                ? arg5
-                : undefined
-            )
-        ) as ((value: any) => boolean) | undefined;
-    }
-    // Check for valid object (allow empty object if allowEmpty is true)
-    if (typeof value !== 'object' || Array.isArray(value) || isNullLike(value)) {
-        if (isNullLike(value) && allowEmpty) {
-            return; // Allow undefined/null when allowEmpty is true
+        allowEmpty = allowEmpty ?? false;
+    } else if (isObjectArgumentOptions(arg2)) {
+        let keys = Object.keys(arg2);
+        let functionLabel = keys.find(k => typeof arg2[k] === 'function');
+        let variableLabel = keys.find(k => typeof arg2[k] !== 'function');
+        if (!variableLabel) {
+            let msg = [`${source} -> ${vSource} Invalid parameter: arg2 as labeledArgs`,
+                `Expected: object with labeledObject entry and optional labledTypeGuard entry`,
+                `Received: Object.values(arg2) = ${JSON.stringify(Object.values(arg2))}`
+            ].join(TAB);
+            mlog.error(msg);
+            throw new Error(msg);
         }
-        throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: non-array, non-empty object`+(
-                objectTypeName ? ` of type: ${objectTypeName}` : ''
-            ),
-            `Received ${label} value: ${typeof value}`
-        ].join(TAB));
+        label = variableLabel;
+        value = arg2[variableLabel];
+        allowEmpty = typeof arg3 === 'boolean' ? arg3 : false;
+        if (functionLabel) {
+            const match = typeGuardNamePattern.exec(functionLabel);
+            objectTypeName = match ? match[0] : functionLabel;
+            objectTypeGuard = arg2[functionLabel];
+        }
+    } else {
+        let msg = [`${source} -> ${vSource} Invalid parameter: 'arg2'`,
+            `Expected: label (string) | labeledArgs (ObjectArgumentOptions | { [label: string]: any | ((value: any) => boolean) })`,
+            `Received: ${typeof arg2} = ${arg2}`
+        ].join(TAB);
+        mlog.error(msg);
+        throw new Error(msg);
     }
+    objectTypeName = objectTypeName || 'object Record<string, any>';
+    if (typeof value !== 'object') {
+        let msg = [`${source} Invalid Object Argument: '${label}'`,
+            `Expected '${label}' to be: object of type '${objectTypeName}'`,
+            `Received '${label}' value: ${typeof value} = ${value}`
+        ].join(TAB);
+        mlog.error(msg);
+        throw new Error(msg);
+    }
+    if (value === null || value === undefined) {
+        let msg = [`${source} Invalid Object Argument: '${label}' is null or undefined`,
+            `Expected '${label}' to be: object of type '${objectTypeName}'`,
+            `Received '${label}' value: ${value}`
+        ].join(TAB);
+        mlog.error(msg);
+        throw new Error(msg);
+    } 
+    if (Array.isArray(value)) {
+        let msg = [`${source} Invalid Object Argument: '${label}' is an Array`,
+            `Expected '${label}' to be: object of type '${objectTypeName}'`,
+            `Received '${label}' value: array of length ${value.length}`
+        ].join(TAB);
+        mlog.error(msg);
+        throw new Error(msg);
+    }
+    if (allowEmpty && Object.keys(value).length === 0) { return }
     
-    // Check for empty object (skip type guard if allowEmpty is true and object is empty)
-    const isEmptyObject = Object.keys(value).length === 0;
-    if (!allowEmpty && isEmptyObject) {
-        throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: non-empty object`,
-            `Received ${label} value: ${JSON.stringify(value)}`
-        ].join(TAB));
+    if (typeof objectTypeGuard === 'function' && !objectTypeGuard(value)) {
+        let msg = [`${source} Invalid Object Argument: '${label}'`,
+            `Expected: object of type '${objectTypeName} '`+
+            `(typeGuard used = '${objectTypeGuard.name}')`,
+            `Received: ${typeof value} = ${JSON.stringify(value, null, 4)}`
+        ].join(TAB);
+        mlog.error(msg);
+        throw new Error(msg);
     }
-    
-    // Skip type guard validation if allowEmpty is true and object is empty
-    if (allowEmpty && isEmptyObject) {
-        return;
-    }
-    if (objectTypeGuard 
-        && typeof objectTypeGuard === 'function' 
-        && !objectTypeGuard(value)) {
-        throw new Error([`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: object of type '${objectTypeName}'`,
-            `Received ${label} value: ${JSON.stringify(value)}`,
-            `Element typeGuard function: ${objectTypeGuard.name}`
-        ].join(TAB));
-    }
+    // reached end -> value is a valid object
+    return;
 }
 
+type EnumObject = Record<string, string> | Record<string, number>;
+
+
+type EnumArgumentOptions = { 
+    [valueLabel: string]: any
+} & {
+    [enumLabel: string]: EnumObject 
+}
+
+function isEnumObject(value: any): value is EnumObject {
+    return Boolean(value
+        && typeof value === 'object' && Object.keys(value).length > 0
+        && (Object.values(value).every(v => typeof v === 'string')
+            || 
+            Object.values(value).every(v => typeof v === 'number')
+        )
+    )
+}
+function isEnumArgumentOptions(value: any): value is EnumArgumentOptions {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+    const keys = Object.keys(value);
+    const values = Object.values(value);
+    return (keys.length === 2 
+        && keys.every(k => isNonEmptyString(k))
+        && values.some(v => typeof v === 'number' || typeof v === 'string')
+        && values.some(v => isEnumObject(v))
+    );
+}
 
 export function enumArgument(
     source: string,
-    enumLabel: string,
-    enumObject: Record<string, string> | Record<string, number>,
     label: string,
-    value: any
+    value: any,
+    enumLabel: string,
+    enumObject: EnumObject,
 ): string | number
 
 export function enumArgument(
     source: string,
-    /** 
-     * @key the name of the enumObject
-     * @value the enumObject itself 
-     * */
-    labeledEnumObject: { [enumLabel: string]: Record<string, string> | Record<string, number> },
-    /** 
-     * @key the name/lagel of the argument whose value should be typeof enumObject, 
-     * @value the value to check 
-     * */
-    labeledValue: { [label: string]: any}
+    labeledArgs: EnumArgumentOptions | { [label: string]: string | EnumObject }
 ): string | number
 
 /**
  * @param source `string` indicating what called `enumArgument()`
- * @param arg2 `string | { [enumLabel: string]: Record<string, string> | Record<string, number> }` 
- * the enum label or labeled enum object
- * @param arg3 `Record<string, string> | Record<string, number> | { [label: string]: any }` 
- * the enum object or labeled value object
- * @param arg4 `string | undefined` the argument label (if using first overload)
- * @param value `any` the value to validate (if using first overload)
  * @returns {string | number} the validated enum value
  * @throws {Error} if `value` is not a valid enum value
  * 
@@ -669,66 +674,72 @@ export function enumArgument(
  * - String input must exactly match an enum key (case-sensitive)
  * - Number input must exactly match an enum value
  * 
- * **`message`**: `[source()] Invalid argument: '${label}'`
- * -  `Expected ${label} to be: valid ${enumLabel} enum key or value`
- * -  `Received ${label} value: ${value} (${typeof value})`
+ * **`msg`**: `[source()] Invalid argument: '${label}'`
+ * -  `Expected '${label}' to be: valid ${enumLabel} enum key or value`
+ * -  `Received '${label}' value: ${value} (${typeof value})`
  * -  `Valid ${enumLabel} options: [key1, value1, key2, value2, ...]`
  */
 export function enumArgument(
     source: string,
-    arg2: string | { [enumLabel: string]: Record<string, string> | Record<string, number> },
-    arg3?: Record<string, string> | Record<string, number> | { [label: string]: any },
-    arg4?: string,
-    value?: any
+    /** `label (string) | labeledArgs ({ [label: string]: string | Record<string, number> | Record<string, string> })` */
+    arg2: string | EnumArgumentOptions | { [label: string]: string | EnumObject },
+    value?: any | undefined,
+    enumLabel?: string | undefined,
+    enumObject?: EnumObject | undefined,
 ): string | number {
-    let enumLabel: string = '';
-    let enumObject: Record<string, string> | Record<string, number>;
-    let label: string = '';
+    source = bracketed(source);
+    const vSource = `[argumentValidation.enumArgument]`;
+    let label: string | undefined = undefined;
     let valueToCheck: any;
-
-    if (typeof arg2 === 'string') {
-        // First overload: (source, enumLabel, enumObject, label, value)
-        enumLabel = arg2;
-        enumObject = arg3 as Record<string, string> | Record<string, number>;
-        label = arg4 as string;
+    if (isNonEmptyString(arg2)) {
+        label = arg2;
         valueToCheck = value;
-    } else if (typeof arg2 === 'object') {
-        // Second overload: (source, labeledEnumObject, labeledValue)
-        const enumKeys = Object.keys(arg2);
-        if (enumKeys.length !== 1) {
-            throw new Error(`[argumentValidation.enumArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key for enum object`);
+    } else if (isEnumArgumentOptions(arg2)) {
+        const keys = Object.keys(arg2);
+        label = keys.find(key => 
+            typeof arg2[key] === 'number' || typeof arg2[key] === 'string'
+        );
+        if (!label) {
+            let msg = [`${source} -> ${vSource} Invalid parameter: arg2 as EnumArgumentOptions`,
+                `EnumArgumentOptions does not contain a value comparable to values of an EnumObject`,
+                `Expected arg2 to have single entry of format [valueLabel: string]: (string | number)`
+            ].join(TAB);
+            mlog.error(msg);
+            throw new Error(msg);
         }
-        enumLabel = enumKeys[0];
-        enumObject = arg2[enumLabel];
-
-        const valueKeys = Object.keys(arg3 as { [label: string]: any });
-        if (valueKeys.length !== 1) {
-            throw new Error(`[argumentValidation.enumArgument()] Invalid argument: '${JSON.stringify(arg3)}' - expected a single key for value object`);
+        valueToCheck = arg2[label];
+        enumLabel = keys
+            .filter(key => key !== label)
+            .find(key => isEnumObject(arg2[key]));
+        if (!enumLabel) {
+            let msg = [`${source} -> ${vSource} Invalid parameter: arg2 as EnumArgumentOptions`,
+                `EnumArgumentOptions does not contain an entry with a value that is an EnumObject`,
+                `Expected arg2 to have single entry of format [enumLabel: string]: EnumObject`
+            ].join(TAB);
+            mlog.error(msg);
+            throw new Error(msg);
         }
-        label = valueKeys[0];
-        valueToCheck = (arg3 as { [label: string]: any })[label];
+        enumObject = arg2[enumLabel] as EnumObject;
     } else {
-        throw new Error(`[argumentValidation.enumArgument()] Invalid parameters: expected either (enumLabel, enumObject, label, value) or ({enumLabel: enumObject}, {label: value})`);
+        let msg =[`${source} -> ${vSource} Invalid parameter 'arg2'`,
+            `Expected 'arg2' to be either label (string) | labeledArgs (EnumArgumentOptions)`,
+            `Received ${typeof arg2} = ${arg2}`
+        ].join(TAB);
+        mlog.error(msg);
+        throw new Error(msg);
     }
-
-    // Validate that enumObject is provided and is an object
-    if (!enumObject || typeof enumObject !== 'object') {
-        throw new Error(`[argumentValidation.enumArgument()] Invalid enum object for '${enumLabel}': expected non-empty object`);
+    if (!isEnumObject(enumObject)) {
+        let msg = [`${source} -> ${vSource}.verbose: Invalid EnumObject for '${enumLabel}'`,
+            `Expected non-empty object Record<string, number> | Record<string, string>`,
+        ].join(TAB);
+        mlog.error(msg);
+        throw new Error(msg);
     }
-
     const enumKeys = Object.keys(enumObject);
     const enumValues = Object.values(enumObject);
-    
-    // Determine if this is a string or number enum
     const isStringEnum = enumValues.every(val => typeof val === 'string');
     const isNumberEnum = enumValues.every(val => typeof val === 'number');
-    
-    if (!isStringEnum && !isNumberEnum) {
-        throw new Error(`[argumentValidation.enumArgument()] Invalid enum object for '${enumLabel}': enum values must be all strings or all numbers`);
-    }
-
     let matchedValue: string | number | undefined;
-
     if (isStringEnum) {
         // For string enums, check both keys and values with case-insensitive matching
         if (typeof valueToCheck === 'string') {
@@ -738,8 +749,7 @@ export function enumArgument(
             const matchingKey = enumKeys.find(key => key.toLowerCase() === lowerValueToCheck);
             if (matchingKey) {
                 matchedValue = enumObject[matchingKey] as string;
-            } else {
-                // Check if it matches a value (case-insensitive)
+            } else { // Check if it matches a value (case-insensitive)
                 const matchingValue = enumValues.find(val => 
                     typeof val === 'string' && val.toLowerCase() === lowerValueToCheck
                 );
@@ -747,8 +757,7 @@ export function enumArgument(
                     matchedValue = matchingValue as string;
                 }
             }
-        } else {
-            // For non-string input, only check exact value match
+        } else { // For non-string input, only check exact value match
             if (enumValues.includes(valueToCheck)) {
                 matchedValue = valueToCheck as string;
             }
@@ -766,19 +775,15 @@ export function enumArgument(
     }
 
     if (matchedValue === undefined) {
-        const validOptions = isStringEnum 
-            ? [...enumKeys, ...enumValues].map(v => `'${v}'`).join(', ')
-            : [...enumKeys, ...enumValues].join(', ');
-            
-        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: valid ${enumLabel} enum ${isStringEnum ? 'key or value' : 'key (string) or value (number)'}`,
-            `Received ${label} value: ${valueToCheck} (${typeof valueToCheck})`,
-            `Valid ${enumLabel} options: [${validOptions}]`
+        const msg = [`${bracketed(source)} Invalid argument: '${label}'`,
+            `Expected '${label}' to be: valid ${enumLabel} enum ${isStringEnum 
+                ? 'key (string) or value (string)' : 'key (string) or value (number)'
+            }`,
+            `Received '${label}' value: ${valueToCheck} (${typeof valueToCheck})`,
         ].join(TAB);
-        mlog.error(message);
-        throw new Error(message);
+        mlog.error(msg);
+        throw new Error(msg);
     }
-
     return matchedValue;
 }
 
@@ -790,7 +795,8 @@ export function enumArgument(
 export const bracketed = (s: string): string => {
     if (!isNonEmptyString(s)) s = 'argumentValidation'
     s = s.trim();
-    if (!/^\[.*\]$/.test(s)) {
+    const alreadyHasBrackets = /^\[.*\]$/.test(s);
+    if (!alreadyHasBrackets) {
         s = `[${s}()]`
     }
     return s;
@@ -804,25 +810,36 @@ export function existingPathArgument(
     value?: any,
     extension?: string
 ): void {
+    const vSource = `[argumentValidation.existingPathArgument()]`
     let label: string = '';
     if (typeof arg2 === 'object') {
         const keys = Object.keys(arg2);
         if (keys.length !== 1) {
-            throw new Error(`[argumentValidation.existingPathArgument()] Invalid argument: '${JSON.stringify(arg2)}' - expected a single key`);
+            let msg = [`${source} -> ${vSource} Invalid argument: '${JSON.stringify(arg2)}'`,
+                `Expected: object with a single key`,
+                `Received: ${keys.length}`
+            ].join(TAB);
+            mlog.error(msg);
+            throw new Error(msg);
         }
         label = keys[0];
         value = arg2[label];
     }
-    if (!isNonEmptyString(value) || !fs.existsSync(value) 
-        && (isNonEmptyString(extension) 
-            ? value.toLowerCase().endsWith(extension.toLowerCase()) 
-            : true)) {
-        const message = [`${bracketed(source)} Invalid argument: '${label}'`,
-            `Expected ${label} to be: existing path` 
+    let hasExpectedExtension = Boolean(!extension || (isNonEmptyString(extension) 
+        && value.toLowerCase().endsWith(extension.toLowerCase())
+    ));
+    if (!isNonEmptyString(value) || !hasExpectedExtension || !fs.existsSync(value)) {
+        const msg = [`${bracketed(source)} Invalid argument: '${label}'`,
+            `Expected '${label}' to be: existing path` 
             + (isNonEmptyString(extension) ? ` with extension '${extension}'` : ``),
-            `Received ${label} value: ${typeof value} = '${value}'`
-        ].join(TAB)
-        mlog.error(message);
-        throw new Error(message);
+            `Received '${label}' value: ${typeof value} = '${value}'`
+        ].join(TAB);
+        mlog.error(msg);
+        throw new Error(msg);
     }
 }
+
+// function logAndThrow(errorMsg: string): void {
+//     mlog.error(errorMsg);
+//     throw new Error(errorMsg);
+// }

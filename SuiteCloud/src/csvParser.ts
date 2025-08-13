@@ -3,17 +3,14 @@
  */
 import { 
     mainLogger as mlog, 
-    parseLogger as plog, 
+    parseLogger as plog,
+    simpleLogger as slog, 
     INDENT_LOG_LINE as TAB, 
-    NEW_LINE as NL, DEBUG_LOGS as DEBUG, INFO_LOGS as INFO,
-    SUPPRESSED_LOGS as SUP,
+    NEW_LINE as NL,
     STOP_RUNNING
 } from "./config";
 import {
     isNonEmptyArray, isEmptyArray, isNullLike as isNull,
-    BOOLEAN_TRUE_VALUES,
-    BOOLEAN_FALSE_VALUES,
-    isBooleanFieldId,
     areEquivalentObjects,
     isIntegerArray,
     hasKeys
@@ -44,34 +41,37 @@ import {
     SourceTypeEnum
 } from "./api";
 import { RecordTypeEnum } from "./utils/ns/Enums";
+import { BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES, isBooleanFieldId } from "./utils/ns/utils";
 /** use to set the field `"isinactive"` to false */
 const NOT_DYNAMIC = false;
 let rowIndex: number = 0;
 
 /**
- * @param source `string | Record<string, any>[]` {@link handleFileArgument}
+ * @param recordSource `string | Record<string, any>[]` {@link handleFileArgument}
  * @param parseOptions {@link ParseOptions}
  * @returns **`results`** `Promise<`{@link ParseResults}`>` 
  * = `{ [recordType: string]:` {@link RecordOptions}`[] }`
  */
 export async function parseRecordCsv(
-    source: string | Record<string, any>[],
+    recordSource: string | Record<string, any>[],
     parseOptions: ParseOptions,
     sourceType?: SourceTypeEnum
 ): Promise<ParseResults> {
-    if (isNull(source)) {
+    const source = `[csvParser.parseRecordCsv()]`;
+    if (isNull(recordSource)) {
         throw new Error([
-            `[csvParser.parseRecordCsv()] Invalid argument: 'arg1'`,
-            `expected 'arg1' to be string | Record<string, any>[]`,
-            `received: ${source}`
-        ].join(TAB))
+            `${source} Invalid argument: 'recordSource'`,
+            `Expected 'recordSource' to be: filePath (string) | rowArray (Record<string, any>[])`,
+            `Received: ${typeof recordSource} = ${recordSource}`
+        ].join(TAB));
     }
-    validate.objectArgument(`csvParser.parseRecordCsv`, {parseOptions});
-    INFO.push(`[START parseRecordCsv()]`,
-        TAB+`recordTypes: ${JSON.stringify(Object.keys(parseOptions))}`,
-        typeof source === 'string' ? TAB+`   filePath: '${source}'` : '',
-    );           
-    const rows = await handleFileArgument(source, 'csvParser.parseRecordCsv');
+    validate.objectArgument(source, {parseOptions});
+    mlog.info([`${source} START`,
+        ` recordTypes: ${JSON.stringify(Object.keys(parseOptions))}`,
+        `recordSource: ` + (typeof recordSource === 'string' 
+        ? `(filePath) '${recordSource}'` : `(rowArray).length ${recordSource.length}`),
+    ].join(TAB));           
+    const rows = await handleFileArgument(recordSource, 'csvParser.parseRecordCsv');
     const results: ParseResults = {};
     const intermediate: IntermediateParseResults = {};
     for (const recordType of Object.keys(parseOptions)) {
@@ -80,9 +80,7 @@ export async function parseRecordCsv(
     }
     rowIndex = 0;
     for (const row of rows) {
-        DEBUG.push(
-            (DEBUG.length > 0 ? NL : '')+`[START ROW] rowIndex: ${rowIndex}:`,
-        );
+        plog.debug(`[START ROW] rowIndex: ${rowIndex}:`,);
         for (const recordType of Object.keys(parseOptions)) {
             const { 
                 keyColumn, fieldOptions, sublistOptions 
@@ -92,11 +90,10 @@ export async function parseRecordCsv(
              * `if row` pertains to an existing record in `IntermediateParseResults` 
              * (e.g. recordType=salesorder and have already processed one of its rows) 
              * */
-            DEBUG.push(
-                NL+`recordType: '${recordType}', idColumn: '${keyColumn}',`,
-                `recordId: '${recordId}' -> isExistingRecord ? ${
-                    recordId in intermediate[recordType]
-                }`,
+            plog.debug(
+                `recordType: '${recordType}', keyColumn: '${keyColumn}', `,
+                `recordId: '${recordId}' `,
+                `-> isExistingRecord ? ${recordId in intermediate[recordType]}`,
             );
             let record = (intermediate[recordType][recordId]  
                 ? intermediate[recordType][recordId] 
@@ -107,16 +104,13 @@ export async function parseRecordCsv(
                     sublists: {} as SublistDictionary,
                 }
             ) as RecordOptions;
-            await updateRecordMeta(record, rowIndex, source, sourceType);
+            await updateRecordMeta(record, rowIndex, recordSource, sourceType);
             intermediate[recordType][recordId] = await processRow(row,
                 record, 
                 fieldOptions as FieldDictionaryParseOptions, 
                 sublistOptions as SublistDictionaryParseOptions
             );
         }
-        // mlog.debug(...DEBUG, NL+`[END ROW] rowIndex: ${rowIndex}:`,);
-        DEBUG.length = 0;
-        SUP.length = 0;
         rowIndex++;
     }
     
@@ -127,45 +121,37 @@ export async function parseRecordCsv(
         acc[recordType] = results[recordType].length;
         return acc;
     }, {} as Record<string, number>);
-    INFO.push(NL+`[END parseRecordCsv()]`,
-        typeof source === 'string' ? TAB+`   filePath: '${source}'` : '',
-        TAB + `  recordTypes:  ${JSON.stringify(Object.keys(parseOptions))}`,
-        TAB + `Last rowIndex:  ${rowIndex}`,
-        TAB + `Parse Summary:  ${indentedStringify(parseSummary)}`
-    );
-    mlog.info(...INFO);
-    INFO.length = 0;
+    slog.info([`${source} END`,
+        ` recordSource: ` + (typeof recordSource === 'string' 
+        ? `(filePath) '${recordSource}'` : `(rowArray).length ${recordSource.length}`),
+        `  recordTypes:  ${JSON.stringify(Object.keys(parseOptions))}`,
+        `Last rowIndex:  ${rowIndex}`,
+        `Parse Summary:  ${indentedStringify(parseSummary)}`
+    ].join(TAB));
     return results;
 }
 
 async function updateRecordMeta(
     record: RecordOptions, 
     rowIndex: number,
-    source: string | Record<string, any>[],
+    recordSource: string | Record<string, any>[],
     sourceType?: SourceTypeEnum
 ): Promise<void> {
-    if (typeof source === 'string') {
-        // mlog.debug([`[updateRecordMeta()]`,
-        //     `      sourceType: ${sourceType}  <-> typeof source === 'string' (filePath)`,
-        //     `current rowIndex: ${rowIndex}`,
-        //     `current record.meta: ${indentedStringify(record.meta || {})}`,
-        //     `isRowSourceMetaData(record.meta.dataSource) ? ${
-        //         record.meta && isRowSourceMetaData(record.meta.dataSource)
-        //     }`
-        // ].join(TAB));
+    const source = `[csvParser.updateRecordMeta()]`;
+    if (typeof recordSource === 'string') {
         if (!record.meta || !isRowSourceMetaData(record.meta.dataSource)) {
             record.meta = {
-                dataSource: { [source]: [rowIndex] } as RowSourceMetaData,
+                dataSource: { [recordSource]: [rowIndex] } as RowSourceMetaData,
                 sourceType: SourceTypeEnum.LOCAL_FILE
             };
-        } else if (!record.meta.dataSource[source].includes(rowIndex)) {
-            record.meta.dataSource[source].push(rowIndex);
+        } else if (!record.meta.dataSource[recordSource].includes(rowIndex)) {
+            record.meta.dataSource[recordSource].push(rowIndex);
         } else {
             throw new Error([
-                `[csvParser.updateRecordMeta()] Invalid RecordOptions.meta.dataSource`,
+                `${source} Invalid RecordOptions.meta.dataSource`,
             ].join(TAB));
         }
-    } else if (isNonEmptyArray(source)) { // source is array of rows
+    } else if (isNonEmptyArray(recordSource)) { // source is array of rows
         if (!record.meta || !isIntegerArray(record.meta.dataSource)) {
             record.meta = {
                 dataSource: [rowIndex],
@@ -174,13 +160,12 @@ async function updateRecordMeta(
         } else if (!record.meta.dataSource.includes(rowIndex)) {
             record.meta.dataSource.push(rowIndex);
         } else {
-            throw new Error([
-                `[csvParser.updateRecordMeta()] Invalid RecordOptions.meta.dataSource`,
+            throw new Error([`${source} Invalid RecordOptions.meta.dataSource`,
             ].join(TAB));
         }
     } else {
         throw new Error([
-            `[csvParser.updateRecordMeta()] Invalid type for param 'source'`,
+            `${source} Invalid type for param 'recordSource'`,
             `I didn't think we would ever end up here...`
         ].join(TAB));
     }
@@ -204,12 +189,12 @@ async function processRow(
     if (!row || !record) {
         return record;
     }
-    if (fieldOptions && isNonEmptyArray(Object.keys(fieldOptions))) {
+    if (fieldOptions && !isNull(fieldOptions)) {
         record.fields = await processFieldDictionaryParseOptions(
             row, record.fields as FieldDictionary, fieldOptions
         );
     }
-    if (sublistOptions && isNonEmptyArray(Object.keys(sublistOptions))) {
+    if (sublistOptions && !isNull(sublistOptions)) {
         record.sublists = await processSublistDictionaryParseOptions(
             row, record.sublists as SublistDictionary, sublistOptions
         );
@@ -259,16 +244,9 @@ async function processSublistDictionaryParseOptions(
     sublists: SublistDictionary,
     sublistOptions: SublistDictionaryParseOptions,
 ): Promise<SublistDictionary> {
-    SUP.push(
-        NL + `[START processSublistDictionaryParseOptions()]`,
-        TAB+`Object.keys(sublistOptions): ${JSON.stringify(Object.keys(sublistOptions))}`,
-    );
     if (!row || isNull(sublistOptions)) {
         return sublists;
     }
-    SUP.push(
-        NL+`sublists BEFORE processSublistLineParseOptions(): ${indentedStringify(sublists)}`
-    );
     for (const [sublistId, lineOptionsArray] of Object.entries(sublistOptions)) {
         const sublistLines = (isNonEmptyArray(sublists[sublistId]) 
             ? sublists[sublistId] : []
@@ -277,10 +255,6 @@ async function processSublistDictionaryParseOptions(
             row, sublistId, sublistLines, lineOptionsArray as SublistLineParseOptions[]
         );
     }
-    SUP.push(
-        NL+`sublists AFTER processSublistLineParseOptions(): ${indentedStringify(sublists)}`,
-        NL + `[END processSublistDictionaryParseOptions()]`
-    );
     return sublists;
 }
 
@@ -294,13 +268,14 @@ async function processSublistLineParseOptions(
         || !Array.isArray(sublistLines)) {
         return sublistLines;
     }
+    const source = `[csvParser.processSublistLineParseOptions()]`
     try {
-        validate.stringArgument(`csvParser.processSublistLineParseOptions`, {sublistId});
-        validate.objectArgument(`csvParser.processSublistLineParseOptions`, {row});
-        validate.arrayArgument(`csvParser.processSublistLineParseOptions`, {lineOptionsArray});
+        validate.stringArgument(source, {sublistId});
+        validate.objectArgument(source, {row});
+        validate.arrayArgument(source, {lineOptionsArray});
     } catch (error) {
-        mlog.error(`[csvParser.processSublistLineParseOptions()] caught arg validation error`,
-            TAB+`gonna throw it for now`, error
+        mlog.error(`${source} caught arg validation error`,
+            `gonna throw it for now`, error
         );
         throw error;
         // return sublistLines;
@@ -314,11 +289,11 @@ async function processSublistLineParseOptions(
         delete lineOptions.lineIdOptions;
         for (const sublistFieldId of Object.keys(lineOptions)) {
             const valueOptions = lineOptions[sublistFieldId];
-            SUP.push(NL+`[processSublistLineParseOptions()]`,
-                TAB+`sublistId: '${sublistId}', sublistFieldId: '${sublistFieldId}'`,
-                TAB+`sublistLines.length: ${sublistLines.length}`,
-                TAB+`valueOptions.keys(): ${Object.keys(valueOptions)}`,
-            );
+            plog.debug([`${source}`,
+                `sublistId: '${sublistId}', sublistFieldId: '${sublistFieldId}'`,
+                `sublistLines.length: ${sublistLines.length}`,
+                `valueOptions.keys(): ${Object.keys(valueOptions)}`,
+            ].join(TAB));
             const value = (isFieldParseOptions(valueOptions)
                 ? await parseFieldValue(row, 
                     sublistFieldId, valueOptions as FieldParseOptions
@@ -350,17 +325,13 @@ async function generateSublistSubrecordOptions(
     parentFieldId: string,
     subrecordOptions: SubrecordParseOptions,
 ): Promise<SetSublistSubrecordOptions> {
-    validate.multipleStringArguments(`csvParser.generateSublistSubrecordOptions`, 
+    const source = `[csvParser.generateSublistSubrecordOptions()]`
+    validate.multipleStringArguments(source, 
         { parentSublistId, parentFieldId }
     );
-    validate.objectArgument(`csvParser.generateSublistSubrecordOptions`, {row});
-    validate.objectArgument(`csvParser.generateSublistSubrecordOptions`, 
-        {subrecordOptions}, 'SubrecordParseOptions', isSubrecordValue
-    );
-    SUP.push(
-        NL + `[START generateSublistSubrecordOptions()]`, 
-        TAB+`parentSublistId: '${parentSublistId}'`,
-        TAB+`  parentFieldId: '${parentFieldId}'`,
+    validate.objectArgument(source, {row});
+    validate.objectArgument(source, 
+        {subrecordOptions, SubrecordParseOptions: isSubrecordValue}
     );
     const { subrecordType, fieldOptions, sublistOptions } = subrecordOptions;
     const result = {
@@ -374,7 +345,6 @@ async function generateSublistSubrecordOptions(
     if (sublistOptions && isNonEmptyArray(Object.keys(sublistOptions))) {
         result.sublists = await processSublistDictionaryParseOptions(row, {}, sublistOptions);
     }
-    SUP.push(NL + `[END generateSublistSubrecordOptions()]`,); 
     return result;
 }
 
@@ -420,52 +390,50 @@ async function parseFieldValue(
     fieldId: string,
     valueParseOptions: FieldParseOptions,
 ): Promise<FieldValue> {
-    SUP.push(NL +`[START parseFieldValue()] - fieldId: '${fieldId}'`,);
-    validate.stringArgument(`csvParser.parseFieldValue`, `fieldId`, fieldId);
-    validate.objectArgument(`csvParser.parseFieldValue`, `valueParseOptions`, 
-        valueParseOptions, 'FieldParseOptions', isFieldParseOptions
-    );
+    const source = `[csvParser.parseFieldValue()]`
+    validate.stringArgument(source, `fieldId`, fieldId);
+    validate.objectArgument(source,  {valueParseOptions, isFieldParseOptions});
     let value: FieldValue | undefined = undefined;
-    const { defaultValue: defaultValue, colName, evaluator, args } = valueParseOptions;
-    SUP.push(
-        TAB+`defaultValue: '${defaultValue}'`,
-        TAB+`     colName: '${colName}'`,
-        TAB+`   evlauator: '${evaluator ? evaluator.name+'()': undefined}'`,
-        // TAB+` args.length:  ${args ? args.length : 0}`,
-    );
+    const { defaultValue, colName, evaluator, args } = valueParseOptions;
+    plog.debug([`${source} unpacking FieldParseOptions`,
+        `defaultValue: '${defaultValue}'`,
+        `     colName: '${colName}'`,
+        `   evlauator: '${evaluator ? evaluator.name+'()': undefined}'`,
+        ` args.length:  ${args ? args.length : 0}`,
+    ].join(TAB));
     if (typeof evaluator === 'function') {
         try {
             value = await evaluator(row, ...(args || []));
-            SUP.push(NL+` -> value from evaluator(row) = '${value}'`);
+            plog.debug(` -> value from evaluator(row) = '${value}'`);
         } catch (error) {
-            mlog.error(`[csvParser.parseFieldValue()] Error in evaluator for field '${fieldId}':`, error);
+            mlog.error(`${source} Error in evaluator for field '${fieldId}':`, error);
             value = defaultValue !== undefined ? defaultValue : null;
-            SUP.push(NL+` -> error in evaluator, using fallback value: '${value}'`);
+            plog.debug(` -> error in evaluator, using fallback value: '${value}'`);
         }
     } else if (colName) {
         if (!hasKeys(row, colName)) {
-            mlog.error([`[csvParser.parseFieldValue()] Invalid FieldParseOptions.colName`,
+            mlog.error([`${source} Invalid FieldParseOptions.colName`,
                 `colName: '${colName}' is not in row's keys`,
                 `Object.keys(row): ${JSON.stringify(Object.keys(row))}`,
                 `rowIndex: ${rowIndex}`
             ].join(TAB));
-            throw new Error(`[csvParser.parseFieldValue()] Invalid FieldParseOptions.colName`);
+            throw new Error(`${source} Invalid FieldParseOptions.colName`);
         }
         value = await transformValue(clean(row[colName]), colName, fieldId, 
             isNonEmptyArray(args) ? args[0] as ValueMapping : undefined
         );
-        SUP.push(NL+` -> value from transformValue(row[colName]) = '${value}'`);
+        plog.debug(` -> value from transformValue(row[colName]) = '${value}'`);
     }
     if (defaultValue !== undefined && (value === undefined || value === '')) {
         value = defaultValue;
-        SUP.push(NL+` -> value from defaultValue ='${value}'`);
+        plog.debug(` -> value from defaultValue ='${value}'`);
     }   
-    SUP.push(NL+`[END parseFieldValue()] - fieldId: '${fieldId}' -> value: '${value}'`);
+    plog.debug(`${source} END - fieldId: '${fieldId}' -> value: '${value}'`);
     return value as FieldValue;
 }
 
 /**
- * @TODO could add a param called transformers (or something similar) 
+ * @consideration could add a param called transformers (or something similar) 
  * that is a list of functions to apply to trimmedValue that returns a FieldValue (the transformed value to return)
  * if the transformation is applicable (i.e. can parse as a date string or a number), 
  * otherwise returns `undefined`.
@@ -541,13 +509,10 @@ export async function isDuplicateSublistLine(
     newLine: SublistLine,
     lineIdOptions?: SublistLineIdOptions
 ): Promise<boolean> {
-    if (!isNonEmptyArray(existingLines)) { 
-        // existingLines isEmptyArray === true, or it's undefined
-        return false;
-    }
-    SUP.push(NL + `[START isDuplicateSublistLine()]`,);
+    if (!isNonEmptyArray(existingLines)) { return false }
+    plog.debug(NL + `[START isDuplicateSublistLine()]`,);
     const { lineIdProp, lineIdEvaluator, args } = lineIdOptions || {};
-    const isDuplicateSublistLine = existingLines.some((existingLine, sublistLineIndex) => {
+    const isDuplicate = existingLines.some((existingLine, sublistLineIndex) => {
         if (lineIdEvaluator && typeof lineIdEvaluator === 'function') {
             const existingLineId = lineIdEvaluator(existingLine, ...(args || []));
             const newLineId = lineIdEvaluator(newLine, ...(args || []));
@@ -560,12 +525,12 @@ export async function isDuplicateSublistLine(
             && typeof existingLine[lineIdProp] === 'string'
         );
         if (lineIdProp && canCompareUsingLineIdProp) {
-            SUP.push(NL + `canCompareUsingLineIdProp === true`,
-                TAB + ` existingLine.lineIdProp: '${existingLine.lineIdProp}'`,
-                TAB + `        param lineIdProp: '${lineIdProp}'`,
-                TAB + `existingLine['${lineIdProp}']: '${existingLine[lineIdProp]}'`,
-                TAB + `     newLine['${lineIdProp}']: '${newLine[lineIdProp]}'`,
-            );
+            plog.debug([`canCompareUsingLineIdProp === true`,
+                ` existingLine.lineIdProp: '${existingLine.lineIdProp}'`,
+                `        param lineIdProp: '${lineIdProp}'`,
+                `existingLine['${lineIdProp}']: '${existingLine[lineIdProp]}'`,
+                `     newLine['${lineIdProp}']: '${newLine[lineIdProp]}'`,
+            ].join(TAB));
             return equivalentAlphanumericStrings(
                 existingLine[lineIdProp] as string, newLine[lineIdProp] as string
             );
@@ -577,19 +542,17 @@ export async function isDuplicateSublistLine(
                 ? equivalentAlphanumericStrings(String(valA), String(valB))
                 : areEquivalentObjects(valA as SubrecordValue, valB as SubrecordValue)
             );
-            SUP.push(
-                TAB + `sublistLineIndex: ${sublistLineIndex}, fieldId: '${fieldId}'`,
-                TAB + `valA: '${valA}'`,
-                TAB + `valB: '${valB}'`,
-                TAB + `areFieldsEqual: ${areFieldsEqual}`,
-            );
+            plog.debug([
+                `sublistLineIndex: ${sublistLineIndex}, fieldId: '${fieldId}'`,
+                `valA: '${valA}'`,
+                `valB: '${valB}'`,
+                `areFieldsEqual: ${areFieldsEqual}`,
+            ].join(TAB));
             return areFieldsEqual;
         });
     });
-    SUP.push(
-        NL + `[END isDuplicateSublistLine()] -> returning ${isDuplicateSublistLine}`,
-    );
-    return isDuplicateSublistLine;
+    plog.debug(`[END isDuplicateSublistLine()] -> returning ${isDuplicate}`,);
+    return isDuplicate;
 }
 
 

@@ -13,9 +13,9 @@ import { AxiosContentTypeEnum } from "../server";
 import { 
     GetRecordRequest, GetRecordResponse, idSearchOptions, idPropertyEnum, 
     RecordResponseOptions,
+    isRecordResponseOptions,
 } from "../types";
 import { SB_REST_SCRIPTS } from "../configureRequests";
-import { anyNull } from "../../utils/typeValidation";
 import { getAccessToken } from "../configureAuth";
 import path from "node:path";
 import { RecordTypeEnum } from "../../utils/ns/record/Record";
@@ -53,21 +53,17 @@ export async function getRecordById(
  *  */
 export async function getRecordById(
     arg1: GetRecordRequest | RecordTypeEnum | string,
-    arg2?: string | number,
-    arg3?: idPropertyEnum,
-    arg4?: RecordResponseOptions
+    recordId?: string | number,
+    idProp?: idPropertyEnum,
+    responseOptions?: RecordResponseOptions
 ): Promise<GetRecordResponse> {
-    // mlog.info(`[Start getRecordById()]`);
+    const source = `[get.getRecordById()]`
     const request = {} as GetRecordRequest;
     if (typeof arg1 === 'string') {
-        if (anyNull(arg2, arg3)) {
-            mlog.error('[get.getRecordById()] recordType or idValue is undefined. Cannot call RESTlet.');
-            throw new Error('[get.getRecordById()] recordType or idValue is undefined. Cannot call RESTlet.');
-        }
+        validate.enumArgument(source, {recordType: arg1, RecordTypeEnum});
+        validate.stringArgument(source, {idProp})
+        validate.objectArgument(source, {responseOptions, isRecordResponseOptions})
         const recordType = arg1;
-        const recordId = arg2;
-        const idProp = arg3;
-        const responseOptions = arg4;
         const idValue = (idProp === idPropertyEnum.INTERNAL_ID 
             ? Number(recordId) 
             : String(recordId)
@@ -94,9 +90,15 @@ export async function getRecordById(
         );
         return response.data as GetRecordResponse;
     } catch (error) {
-        mlog.error('[ERROR get.getRecordById()]:', (error as any).data || error);
+        let e = error as any || {}
+        mlog.error([`${source} ERROR:`,
+            `   name: ${e.name}`,
+            `   code: ${e.code}`,
+            `message: ${e.message}`,
+            `  stack: ${e.stack}`
+        ].join(TAB));
         write(
-            {timestamp: getCurrentPacificTime(), caught: (error as any)}, 
+            {timestamp: getCurrentPacificTime(), caught: e}, 
             path.join(ERROR_DIR, 'ERROR_getRecordById.json')
         );
         throw new Error('Failed to call GET_Record RESTlet');
@@ -116,7 +118,7 @@ export async function GET(
     deployId: number,
     params: Record<string, any>,
 ): Promise<any> {
-    const source = `${__filename}.GET`;
+    const source = `[get.GET()]`;
     validate.stringArgument(source, {accessToken});
     validate.numberArgument(source, {scriptId}, true);
     validate.numberArgument(source, {deployId}, true);
@@ -135,7 +137,13 @@ export async function GET(
         });
         return response;
     } catch (error) {
-        mlog.error('[Error in get.GET()]:', error);
+        let e = error as any || {}
+        mlog.error([`${source} ERROR:`,
+            `   name: ${e.name}`,
+            `   code: ${e.code}`,
+            `message: ${e.message}`,
+            `  stack: ${e.stack}`
+        ].join(TAB));
         write(
             {timestamp: getCurrentPacificTime(), caught: error}, 
             path.join(ERROR_DIR, 'ERROR_GET.json')

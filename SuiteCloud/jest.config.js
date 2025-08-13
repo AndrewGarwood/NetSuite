@@ -1,13 +1,4 @@
-const SuiteCloudJestConfiguration = require("@oracle/suitecloud-unit-testing/jest-configuration/SuiteCloudJestConfiguration");
-const cliConfig = require("./suitecloud.config");
-
-const baseConfig = SuiteCloudJestConfiguration.build({
-	projectFolder: cliConfig.defaultProjectFolder,
-	projectType: SuiteCloudJestConfiguration.ProjectType.ACP,
-});
-
 module.exports = {
-	...baseConfig,
 	preset: 'ts-jest',
 	testEnvironment: 'node',
 	roots: ['<rootDir>/src', '<rootDir>/__tests__'],
@@ -16,26 +7,22 @@ module.exports = {
 		'**/*.(test|spec).(ts|tsx|js)'
 	],
 	transform: {
-		'^.+\\.(ts|tsx)$': 'ts-jest',
-		'^.+\\.(js|jsx)$': 'babel-jest',
+        '^.+\\.(ts|tsx)$': 'ts-jest'
 	},
 	moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-	moduleNameMapper: {
-		'^@utils/(.*)$': '<rootDir>/src/utils/$1',
-		'^@api/(.*)$': '<rootDir>/src/api/$1',
-		'^@config/(.*)$': '<rootDir>/src/config/$1',
-		'^src/(.*)$': '<rootDir>/src/$1',
-	},
-	transformIgnorePatterns: [
-		'node_modules/(?!(open|.*\\.mjs$))'
-	],
 	collectCoverageFrom: [
 		'src/**/*.{ts,tsx}',
 		'!src/**/*.d.ts',
 	],
-	// Add settings to handle async operations
-	testTimeout: 10000,
-	forceExit: true,
-	detectOpenHandles: true,
-	maxWorkers: 1
+	// Settings to handle ES modules and complex dependencies
+	testTimeout: 30000,
+	verbose: true,
+	// Transform ES modules in node_modules
+	transformIgnorePatterns: [
+		'node_modules/(?!(open|chalk|strip-ansi|ansi-regex|wrap-ansi|string-width|emoji-regex|is-fullwidth-code-point|cli-cursor|restore-cursor|onetime|mimic-fn|is-interactive|is-unicode-supported)/)'
+	],
+	// Mock common problematic modules
+	moduleNameMapper: {
+		'^open$': '<rootDir>/__tests__/__mocks__/open.js'
+	}
 };

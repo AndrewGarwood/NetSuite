@@ -3,8 +3,8 @@
  * @file src/utils/io/parsers/GroupedParser.ts
  * @description Hierarchical grouping CSV parsing strategy
  */
-import csv from 'csv-parser';
-import fs from 'fs';
+import csv from "csv-parser";
+import * as fs from "node:fs";
 import { BaseParser } from "./BaseParser";
 import { 
     ParseManagerContext, ParseStrategyEnum, 
@@ -32,7 +32,7 @@ import {
     isNonEmptyArray, isEmptyArray, anyNull, isNullLike as isNull,
 } from "../../typeValidation";
 import { 
-    getDelimiterFromFilePath, isValidCsv, NodeLeaves,
+    getDelimiterFromFilePath, isValidCsvSync, NodeLeaves,
     ParseOptions, RecordParseOptions, RecordRowGroup, 
     GroupReturnTypeEnum, GroupContext, Ancestor, HierarchyOptions, 
     SublistLineParseOptions
@@ -64,7 +64,7 @@ export class GroupedParser extends BaseParser {
     }
     validateInput(context: ParseManagerContext): void {
         const { filePath, parseOptions, groupOptions } = context;
-        if (!isValidCsv(filePath)) {
+        if (!isValidCsvSync(filePath)) {
             throw new Error(`[GroupedParser.validateInput()] Invalid CSV file: ${filePath}`);
         }
         

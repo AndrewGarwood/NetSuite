@@ -58,9 +58,8 @@ export async function processParseResults(
     initialResults: ParseResults,
     options?: ProcessParseResultsOptions,
 ): Promise<ValidatedParseResults> {
-    validate.objectArgument(
-        `parseResultsProcessor.processParseResults`, {initialResults}, `ParseResults`
-    );
+    const source = `[parseResultsProcessor.processParseResults()]`
+    validate.objectArgument(source, `initialResults`, initialResults, `ParseResults`);
     const results: ValidatedParseResults = {};
     for (const recordType of Object.keys(initialResults)) {
         const isInvalidParseResultsEntry = (!recordType 
@@ -71,7 +70,7 @@ export async function processParseResults(
             )
         );
         if (isInvalidParseResultsEntry) {
-            mlog.error([`processParseResults() Invalid argument: 'initialResults'`,
+            mlog.error([`${source} Invalid argument: 'initialResults'`,
                 `expected: 'initialResults' (ParseResults) to have keys as record type strings and values as non-empty array of RecordOptions.`,
                 `received: ${typeof recordType} = '${recordType}' with value: ${indentedStringify(initialResults[recordType])}`,
                 `returning empty results...`
@@ -92,7 +91,7 @@ export async function processParseResults(
     // Process each record type according to its operation order
     for (const recordType of Object.keys(options)) {
         if (!isNonEmptyString(recordType) || !hasKeys(initialResults, recordType)) {
-            mlog.error([`processParseResults() Invalid ProcessParseResultsOptions.recordType:`,
+            mlog.error([`${source} Invalid ProcessParseResultsOptions.recordType:`,
                 `expected: 'recordType' (string) to be a valid record type key in initialResults.`,
                 `received: ${typeof recordType} = '${recordType}'`,
                 `needed key in initialResults keys: ${JSON.stringify(Object.keys(initialResults))}`,

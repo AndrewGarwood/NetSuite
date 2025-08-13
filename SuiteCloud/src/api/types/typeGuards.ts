@@ -5,12 +5,9 @@
 import { hasKeys, isPrimitiveValue } from "../../utils/typeValidation";
 import { SubrecordValue, FieldValue } from "./InternalApi";
 import { RecordResponseOptions } from "../requests/types/Requests";
-
+import { RecordResponse } from "./RecordEndpoint";
 /**
  * - {@link SubrecordValue}
- * - {@link SetFieldSubrecordOptions}
- * - {@link SetSublistSubrecordOptions}
- * - {@link SubrecordParseOptions}
  * @param value `any`
  * @returns **`isSubrecordValue`** `boolean`
  * - `true` `if` `value` `isSubrecordParseOptions` or `isSetSubrecordOptions`,
@@ -33,7 +30,8 @@ export function isSubrecordValue(value: any): value is SubrecordValue {
 }
 
 /**
- * @param value 
+ * - {@link FieldValue}
+ * @param value `any`
  * @returns **`isFieldValue`** `boolean`
  * - `true` if the `value` is a primitive value (string, number, boolean, null, undefined),
  * - `true` if the `value` is a Date object,
@@ -53,8 +51,28 @@ export function isFieldValue(value: any): value is FieldValue {
     return false;
 }
 
+/**
+ * - {@link RecordResponseOptions}
+ * @param value `any`
+ * @returns **`isRecordResponseOptions`** `boolean`
+ */
 export function isRecordResponseOptions(value: any): value is RecordResponseOptions {
     return (value && typeof value === 'object'
         && hasKeys(value, ['responseFields', 'responseSublists'], false, true)
     )
+}
+
+/**
+ * - {@link RecordResponse}
+ * @param value `any`
+ * @returns **`isRecordResponse`** `boolean`
+ */
+export function isRecordResponse(value: any): value is RecordResponse {
+    return (value && typeof value === 'object'
+        && hasKeys(value, 
+            ['status', 'message', 'results', 'rejects', 'error', 'logArray'], 
+            false, true
+        )
+        && Array.isArray(value.logArray)
+    );
 }

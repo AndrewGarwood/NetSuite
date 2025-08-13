@@ -1,12 +1,16 @@
 {
     "name": "suitecloud-project",
     "version": "1.0.0",
+
     "scripts": {
         "test": "jest",
         "start": "ts-node -r tsconfig-paths/register --project tsconfig.node.json src/main.ts",
         "interactive": "ts-node -r tsconfig-paths/register --project tsconfig.node.json src/mainInteractive.ts",
+        "test-interactive": "ts-node -r tsconfig-paths/register --project tsconfig.node.json src/testInteractive.ts",
         "build": "tsc --project tsconfig.node.json",
         "build:check": "tsc --noEmit",
+        "lint": "eslint src/**/*.ts",
+        "lint:fix": "eslint src/**/*.ts --fix",
         "misc": "ts-node -r tsconfig-paths/register --project tsconfig.node.json src/misc.ts"
     },
     "devDependencies": {

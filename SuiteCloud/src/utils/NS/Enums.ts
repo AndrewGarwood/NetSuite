@@ -18,6 +18,21 @@ export {
 export { 
     NetSuiteFileTypeEnum, NetSuiteFileEncodingEnum 
 } from "./File";
+
+export enum LocationEnum {
+    HQ = 1,
+    A = 2,
+    B = 3,
+    C = 4,
+}
+export enum TaxScheduleEnum {
+    DEFAULT = 2
+}
+export enum PriceLevelEnum {
+    BASE_PRICE = 1
+}
+
+
 /**
  * @enum {string} **`UnitsTypeEnum`**
  * @description Enum for unit types in NetSuite. (defined by account user)

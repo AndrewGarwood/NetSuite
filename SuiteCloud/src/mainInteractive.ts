@@ -6,26 +6,24 @@ import * as fs from "node:fs";
 import path from "node:path";
 import inquirer from "inquirer";
 import {
-    readJsonFileAsObject as read,
-    writeObjectToJson as write,
-    writeRowsToCsv as writeRows,
-    trimFile, clearFile, getCurrentPacificTime,
+    trimFileSync, clearFile, getCurrentPacificTime,
     formatDebugLogFile, getDirectoryFiles,
     indentedStringify, isDirectory
 } from "./utils/io";
 import { 
     STOP_RUNNING, DATA_DIR, DELAY, 
-    mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
+    mainLogger as mlog, simpleLogger as slog,
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL,
     DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH,
     ERROR_LOG_FILEPATH, DataDomainEnum,
-    CLOUD_LOG_DIR, DEBUG_LOGS as DEBUG
+    CLOUD_LOG_DIR,
 } from "./config";
 import { instantiateAuthManager } from "./api";
 import { 
-    runItemPipeline, 
+    runMainItemPipeline, 
     ItemPipelineOptions, 
-    runTransactionPipeline, 
-    TransactionPipelineOptions, INVENTORY_ITEM_PIPELINE_CONFIG,
+    runMainTransactionPipeline, 
+    TransactionMainPipelineOptions, INVENTORY_ITEM_PIPELINE_CONFIG,
     NON_INVENTORY_ITEM_PIPELINE_CONFIG,
     SALES_ORDER_PIPELINE_CONFIG,
     MatchSourceEnum,
@@ -155,7 +153,7 @@ async function selectPipeline(): Promise<PipelineOptions> {
 /**
  * Prompt user for pipeline configuration options
  */
-async function promptTransactionPipeline(): Promise<TransactionPipelineOptions> {
+async function promptTransactionPipeline(): Promise<TransactionMainPipelineOptions> {
     console.log('\n=== Interactive Pipeline Configuration ===\n');
     
     // Start with the base config
@@ -234,7 +232,7 @@ async function promptTransactionPipeline(): Promise<TransactionPipelineOptions> 
                 type: 'input',
                 name: 'entityIdColumn',
                 message: 'Enter entity ID column name:',
-                default: DEFAULT_MATCH_OPTIONS.localFileOptions?.entityIdColumn 
+                default: DEFAULT_MATCH_OPTIONS.localFileOptions?.targetValueColumn 
                     || 'Name'
             },
             {
@@ -248,7 +246,7 @@ async function promptTransactionPipeline(): Promise<TransactionPipelineOptions> 
         
         matchOptions.localFileOptions = {
             filePath: fileOptions.filePath.trim(),
-            entityIdColumn: fileOptions.entityIdColumn.trim(),
+            targetValueColumn: fileOptions.entityIdColumn.trim(),
             internalIdColumn: fileOptions.internalIdColumn.trim()
         };
     }
@@ -505,16 +503,16 @@ async function promptItemPipeline(baseConfig: ItemPipelineOptions): Promise<Item
  * Display configuration summary and get final confirmation for Transaction Pipeline
  */
 async function confirmTransactionConfiguration(
-    config: TransactionPipelineOptions
+    config: TransactionMainPipelineOptions
 ): Promise<boolean> {
     console.log('\n=== Transaction Pipeline Configuration Summary ===');
-    console.log(`Parse Options: ${Object.keys(config.parseOptions).join(', ')}`);
+    console.log(`  Parse Options: ${Object.keys(config.parseOptions).join(', ')}`);
     console.log(`Post-Processing: ${config.postProcessingOptions ? Object.keys(config.postProcessingOptions).join(', ') : 'None'}`);
-    console.log(`Match Method: ${config.matchOptions?.matchMethod}`);
+    console.log(`   Match Method: ${config.matchOptions?.matchMethod}`);
     if (config.matchOptions?.matchMethod === MatchSourceEnum.LOCAL) {
-        console.log(`  File: ${config.matchOptions.localFileOptions?.filePath}`);
-        console.log(`  Entity Column: ${config.matchOptions.localFileOptions?.entityIdColumn}`);
-        console.log(`  Internal ID Column: ${config.matchOptions.localFileOptions?.internalIdColumn}`);
+        console.log(`      Match File Path: ${config.matchOptions.localFileOptions?.filePath}`);
+        console.log(`  Target Value Column: ${config.matchOptions.localFileOptions?.targetValueColumn}`);
+        console.log(`   Internal ID Column: ${config.matchOptions.localFileOptions?.internalIdColumn}`);
     }
     console.log(`Generate Missing Entities: ${config.generateMissingEntities}`);
     console.log(`Output Directory: ${config.outputDir}`);
@@ -561,7 +559,7 @@ async function confirmItemConfiguration(
 /**
  * Display configuration summary and get final confirmation (legacy function)
  */
-async function confirmConfiguration(config: TransactionPipelineOptions): Promise<boolean> {
+async function confirmConfiguration(config: TransactionMainPipelineOptions): Promise<boolean> {
     return confirmTransactionConfiguration(config);
 }
 
@@ -581,7 +579,7 @@ async function main() {
     console.log(`\n✅ Selected: ${selectedPipeline.name}`);
     
     // Step 2: Configure the selected pipeline
-    let config: TransactionPipelineOptions | ItemPipelineOptions;
+    let config: TransactionMainPipelineOptions | ItemPipelineOptions;
     let confirmed: boolean;
     
     if (selectedPipeline.type === PipelineTypeEnum.TRANSACTION) {
@@ -606,7 +604,7 @@ async function main() {
         const csvFiles = getDirectoryFiles(
             soConstants.UNVIABLE_SO_DIR, '.csv', '.tsv'
         );
-        filesToProcess = csvFiles.slice(0, 3); // handle subset for now
+        filesToProcess = csvFiles.slice(7, 10); // handle subset for now
         console.log(`\nFound ${csvFiles.length} transaction files, operating on ${filesToProcess.length} file(s)`);
     } else {
         // For item pipelines, prompt for file selection or use default
@@ -648,14 +646,14 @@ async function main() {
         await invokePipeline(
             selectedPipeline.recordType, 
             filesToProcess, 
-            runTransactionPipeline, 
-            config as TransactionPipelineOptions
+            runMainTransactionPipeline, 
+            config as TransactionMainPipelineOptions
         );
-    } else {
+    } else if (selectedPipeline.type === PipelineTypeEnum.ITEM) {
         await invokePipeline(
             selectedPipeline.recordType, 
             filesToProcess, 
-            runItemPipeline, 
+            runMainItemPipeline, 
             config as ItemPipelineOptions
         );
     }
@@ -664,7 +662,7 @@ async function main() {
         `handling logs...`
     ].join(TAB));
     
-    trimFile(5, ...LOG_FILES);
+    trimFileSync(5, ...LOG_FILES);
     for (const filePath of LOG_FILES) { 
         formatDebugLogFile(filePath);
     }

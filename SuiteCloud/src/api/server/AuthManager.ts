@@ -24,7 +24,7 @@ import {
 import { getCurrentPacificTime } from "../../utils/io/dateTime";
 import { 
     mainLogger as mlog, apiLogger as alog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
-    INFO_LOGS as INFO 
+    simpleLogger as slog
 } from "../../config/setupLog";
 
 export { AuthManager, TokenStatus, AuthState, type AuthOptions, type TokenMetadata };
@@ -473,7 +473,7 @@ class AuthManager {
     private closeServer(): void {
         if (this.server) {
             this.server.close(() => {
-                mlog.debug('[AuthManager.closeServer()] OAuth server closed');
+                slog.debug('[AuthManager.closeServer()] OAuth server closed');
             });
             this.server = null;
         }
@@ -504,7 +504,7 @@ class AuthManager {
     // ========================================================================
 
     private async performTokenRefresh(): Promise<TokenResponse> {
-        mlog.info('[AuthManager.performTokenRefresh()] Attempting token refresh...');
+        slog.info('[AuthManager.performTokenRefresh()] Attempting token refresh...');
         // Try to get existing tokens for refresh
         const step2Token = this.loadTokenFromFile(STEP2_TOKENS_PATH);
         const step3Token = this.loadTokenFromFile(STEP3_TOKENS_PATH);
@@ -518,7 +518,7 @@ class AuthManager {
         if (refreshToken) {
             try {
                 const refreshedTokens = await this.exchangeRefreshToken(refreshToken);
-                mlog.info('[AuthManager.performTokenRefresh()] Token refresh successful');
+                slog.info('[AuthManager.performTokenRefresh()] Token refresh successful');
                 return refreshedTokens;
             } catch (error) {
                 mlog.warn('[AuthManager.performTokenRefresh()] Token refresh failed, falling back to full authorization:', error);
@@ -536,7 +536,7 @@ class AuthManager {
         mlog.info('[AuthManager.performFullAuthorization()] Starting full OAuth authorization flow...');
         const authCode = await this.getAuthCode();
         const tokenResponse = await this.exchangeAuthCode(authCode);
-        mlog.info('[AuthManager.performFullAuthorization()] Full authorization flow completed successfully');
+        slog.info('[AuthManager.performFullAuthorization()] Full authorization flow completed successfully');
         return tokenResponse;
     }
 
@@ -613,7 +613,7 @@ class AuthManager {
                 this.state = AuthState.IDLE;
             }
             this.lastTokenResponse = tokenResponse;
-            mlog.info('[AuthManager.getAccessToken()] Token acquisition successful');
+            slog.info('[AuthManager.getAccessToken()] Token acquisition successful');
             this.resolvePendingRequests(tokenResponse.access_token);
             return tokenResponse.access_token;
             

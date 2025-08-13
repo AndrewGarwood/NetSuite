@@ -15,9 +15,8 @@
         // "outDir": "./dist/FileCabinet/SuiteScripts",
         "lib": ["ES7","ES6", "DOM.Iterable", "DOM", "es5", "es2015.promise", "dom", "ES2015"],
         "paths": {
-            "src/*": ["./src/*"],
             "@api/*": ["./src/api/*"],     
-            "@utils/*": ["./src/utils/*"],
+            "@utils/*": ["./src/utils/*"],  
             "@config/*": ["./src/config/*"],
             "@ns/*": ["./src/utils/ns/*"],
             "N": ["node_modules/@hitc/netsuite-types/N"],
@@ -25,8 +24,8 @@
         }
     },
     "include": [
-        "src/api/server/AuthManager.ts", 
-        "src/main.ts", 
+        "src/**/*",
+        "__tests__/**/*"
     ],
     "exclude": [
         "node_modules/**/*", 

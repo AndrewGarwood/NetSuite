@@ -4,9 +4,9 @@
  * a NetSuite Entity record type
  */
 import { Relationship, RelationshipSublists } from "./Relationship";
-import { RadioFieldBoolean } from "../../../typeValidation";
 import { RecordRef } from "../Record";
 import { AddressBook, AddressBookEntry, Address } from "./Address";
+import { RadioFieldBoolean } from "../../utils";
 
 /**
  * Intersection of `['customer', 'vendor', 'partner', 'lead', 'prospect']` fieldIds:

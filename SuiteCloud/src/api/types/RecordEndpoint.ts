@@ -12,9 +12,9 @@ import {
     SublistDictionary, 
     SublistLine, 
     SubrecordValue, 
-} from '.';
-import { EntityRecordTypeEnum, RecordTypeEnum } from '../../utils/ns/record/Record';
-import { RowSourceMetaData } from 'src/utils/io';
+} from ".";
+import { EntityRecordTypeEnum, RecordTypeEnum } from "../../utils/ns/record/Record";
+import { RowSourceMetaData } from "../../utils/io";
 /**
  * @typedefn **`RecordRequest`**
  * @property {RecordOptions | Array<RecordOptions>} recordOptions = {@link RecordOptions} | `Array<`{@link RecordOptions}`>`
@@ -90,6 +90,5 @@ export enum SourceTypeEnum {
     /** the {@link Buffer} object created from `Buffer.from(ENCODED_FILE_CONTENT_STRING, 'base64')` or `fs.readFileSync(filePath)` */
     BUFFER = 'BUFFER',
 }
-
 
 

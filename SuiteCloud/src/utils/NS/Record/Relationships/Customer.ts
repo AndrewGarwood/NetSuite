@@ -1,7 +1,7 @@
 /**
  * @file src/utils/ns/record/relationships/Customer.ts
  */
-import { RadioFieldBoolean } from "../../../typeValidation";
+import { RadioFieldBoolean } from "../../utils";
 import { RecordRef } from "../Record";
 import { AddressBook } from "./Address";
 

@@ -4,8 +4,7 @@
  */
 import { OUTPUT_DIR, CLOUD_LOG_DIR } from "./env";
 import { Logger, ISettingsParam, ISettings, ILogObj, 
-    ILogObjMeta, IPrettyLogStyles, IMeta 
-} from "tslog";
+    ILogObjMeta, IPrettyLogStyles, IMeta } from "tslog";
 import path from "node:path";
 import { appendFileSync, WriteFileOptions } from "node:fs";
 
@@ -44,7 +43,8 @@ const fileInfoTemplate =
     // "{{fileName}}:{{fileLine}}";
 /** 
  * use as value for {@link ISettingsParam.prettyLogTemplate} 
- * = {@link timestampTemplate} + {@link logNameTemplate} + {@link logLevelTemplate} + {@link fileInfoTemplate} + `\n\t{{logObjMeta}}`
+ * = {@link timestampTemplate} + {@link logNameTemplate} 
+ * + {@link logLevelTemplate} + {@link fileInfoTemplate} + `\n\t > {{logObjMeta}}`
  * - {@link timestampTemplate} = `({{yyyy}}-{{mm}}-{{dd}} {{hh}}:{{MM}}:{{ss}}.{{ms}})`
  * - {@link logNameTemplate} = `"[{{name}}]"`
  * - {@link logLevelTemplate} = `{{logLevelName}}:`
@@ -56,6 +56,8 @@ const LOG_TEMPLATE = [
     // logNameTemplate, 
     fileInfoTemplate,
 ].join(' ') + NEW_LINE;
+
+const SIMPLE_LOG_TEMPLATE = ` > `
 
 const errorInfoTemplate = "{{errorName}}: {{errorMessage}}\n\t{{errorStack}}";
 /** 
@@ -115,9 +117,31 @@ const MAIN_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
     ...COMMON_SETTINGS
 }
 
+/** `type: "pretty"`, `template` = `" > {{logObjMeta}}"` */
+const SIMPLE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
+    type: "pretty", // "pretty" | "hidden" | "json"
+    name: "NS_Simple",
+    minLevel: 0,
+    prettyLogTemplate: SIMPLE_LOG_TEMPLATE,
+    prettyErrorTemplate: ERROR_TEMPLATE,
+    prettyErrorStackTemplate: ERROR_STACK_TEMPLATE,
+    stylePrettyLogs: true,
+    prettyLogTimeZone: "local",
+    prettyLogStyles: PRETTY_LOG_STYLES,
+}
+
 /** `type: "pretty", name: "mainLogger"` */
 export const mainLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
 mainLogger.attachTransport((logObj: ILogObj) => {
+    appendFileSync(
+        DEFAULT_LOG_FILEPATH, formatLogObj(logObj), 
+        { encoding: "utf-8" } as WriteFileOptions
+    );
+});
+
+/** `type: "pretty"`, `template` = `" > {{logObjMeta}}"` */
+export const simpleLogger = new Logger<ILogObj>(SIMPLE_LOGGER_SETTINGS);
+simpleLogger.attachTransport((logObj: ILogObj) => {
     appendFileSync(
         DEFAULT_LOG_FILEPATH, formatLogObj(logObj), 
         { encoding: "utf-8" } as WriteFileOptions
@@ -167,7 +191,7 @@ miscLogger.attachTransport((logObj: ILogObj) => {
 })
 
 /**
- * compress metadata into `logObj['-1']` then return stringified `logObj`
+ * compress metadata
  * @param logObj {@link ILogObj}
  * @returns `string`
  */
@@ -180,11 +204,10 @@ function formatLogObj(logObj: ILogObj | (ILogObj & ILogObjMeta)): string {
     delete logObj['_meta'];
     logObj['meta0'] = `[${logLevelName}] (${timestamp})`;
     logObj['meta1'] = `${fileInfo} @ ${methodInfo}`;
-    // logObj['-1'] = `[${logLevelName}] (${timestamp})`;
-    // logObj['-2'] = `${fileInfo} @ ${methodInfo}`;
     return JSON.stringify(logObj, null, 4) + "\n" 
 }
 
+/**@TODO use hidden logs and simpleLogger instead of these arrays */
 /**suppress logs by putting them here (do not print to console) */
 export const SUPPRESSED_LOGS: any[] = []
 export const INFO_LOGS: any[] = []

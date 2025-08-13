@@ -7,3 +7,4 @@ export * from "./Enums";
 export * from "./File";
 export * from "./search";
 export * from "./SuiteScript";
+export * from "./utils";

@@ -1,7 +1,7 @@
 /**
  * @file src/utils/ns/record/transactions/SalesOrder.ts
  */
-import { RecordRef } from '../Record';
+import { RecordRef } from "../Record";
 /**
  * @enum {string} **`SalesOrderStatusEnum`**
  * @property {string} PENDING_APPROVAL `'A'` - Represents a sales order that is pending approval.

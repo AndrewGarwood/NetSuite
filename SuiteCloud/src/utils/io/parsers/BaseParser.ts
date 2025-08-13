@@ -22,7 +22,6 @@ import {
 } from "../../../api";
 import {
     isNonEmptyArray, anyNull,
-    BOOLEAN_TRUE_VALUES, BOOLEAN_FALSE_VALUES, isBooleanFieldId,
     areEquivalentObjects
 } from "../../typeValidation";
 import { 
@@ -37,6 +36,7 @@ import {
     DATE_STRING_PATTERN 
 } from "../../regex";
 import { indentedStringify } from "../writing";
+import { BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES, isBooleanFieldId } from "../../ns";
 
 /**
  * @abstract

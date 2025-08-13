@@ -15,12 +15,12 @@ import {
     SublistLine,
     SubrecordValue,
 } from "../api/types";
-import { hasKeys, isNullLike as isNull, RADIO_FIELD_FALSE, 
-    RADIO_FIELD_TRUE, anyNull, isNonEmptyArray, isNonEmptyString 
+import { hasKeys, isNullLike as isNull, isNonEmptyArray, isNonEmptyString 
 } from "../utils/typeValidation";
 import { clean, equivalentAlphanumericStrings as equivalentAlphanumeric, RegExpFlagsEnum } from "../utils/regex";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "../utils/ns/Enums";
 import { indentedStringify } from "../utils/io/writing";
+import { RADIO_FIELD_FALSE, RADIO_FIELD_TRUE } from "../utils/ns";
 
 /** `['entity', 'trandate']` */
 const SALES_ORDER_REQUIRED_FIELDS = ['entity', 'trandate'];

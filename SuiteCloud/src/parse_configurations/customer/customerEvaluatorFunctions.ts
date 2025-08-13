@@ -6,7 +6,7 @@ import {
 } from "../../api/types";
 import { mainLogger as mlog, parseLogger as plog, DEBUG_LOGS as DEBUG, INDENT_LOG_LINE as TAB, 
     NEW_LINE as NL } from "../../config";
-import { RADIO_FIELD_TRUE, RADIO_FIELD_FALSE, anyNull } from "../../utils/typeValidation";
+import { anyNull } from "../../utils/typeValidation";
 import {
     clean,
     STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION,
@@ -14,8 +14,9 @@ import {
 } from "../../utils/regex";
 import { isPerson, firstName, middleName, lastName, entityId, ENTITY_VALUE_OVERRIDES } from "../evaluatorFunctions";
 import { CustomerColumnEnum as C } from "./customerConstants";
-import { ValueMapping, checkForOverride } from "../../utils/io";
+import { ValueMapping } from "../../utils/io";
 import { SUPPRESS } from "../evaluators/common";
+import { checkForOverride, RADIO_FIELD_FALSE, RADIO_FIELD_TRUE } from "../../utils/ns";
 
 
 export const customerIsPerson = (
