@@ -1,4 +1,4 @@
-import { RecordOptions } from "@api/types/RecordEndpoint";
+import { RecordOptions } from "../../api/types/RecordEndpoint";
 
 
 

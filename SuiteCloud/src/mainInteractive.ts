@@ -9,7 +9,7 @@ import {
     trimFileSync, clearFile, getCurrentPacificTime,
     formatDebugLogFile, getDirectoryFiles,
     indentedStringify, isDirectory
-} from "./utils/io";
+} from "typeshi/dist/utils/io";
 import { 
     STOP_RUNNING, DATA_DIR, DELAY, 
     mainLogger as mlog, simpleLogger as slog,
@@ -23,7 +23,7 @@ import {
     runMainItemPipeline, 
     ItemPipelineOptions, 
     runMainTransactionPipeline, 
-    TransactionMainPipelineOptions, INVENTORY_ITEM_PIPELINE_CONFIG,
+    TransactionMainPipelineOptions, LN_INVENTORY_ITEM_PIPELINE_CONFIG,
     NON_INVENTORY_ITEM_PIPELINE_CONFIG,
     SALES_ORDER_PIPELINE_CONFIG,
     MatchSourceEnum,
@@ -78,7 +78,7 @@ const AVAILABLE_PIPELINES: PipelineOptions[] = [
         recordType: RecordTypeEnum.INVENTORY_ITEM,
         configFunction: promptItemPipeline,
         confirmFunction: confirmItemConfiguration,
-        baseConfig: INVENTORY_ITEM_PIPELINE_CONFIG
+        baseConfig: LN_INVENTORY_ITEM_PIPELINE_CONFIG
     },
     {
         type: PipelineTypeEnum.ITEM,

@@ -4,9 +4,6 @@
 import * as fs from "node:fs";
 import path from "node:path";
 import {
-    readJsonFileAsObject as read,
-    writeObjectToJson as write,
-    writeRowsToCsv as writeRows,
     clearFile, getCurrentPacificTime,
     formatDebugLogFile, getDirectoryFiles,
     getRows, RowSourceMetaData, isRowSourceMetaData,
@@ -14,7 +11,7 @@ import {
     getIndexedColumnValues, concatenateFiles,
     indentedStringify,
     trimFile
-} from "./utils/io";
+} from "typeshi/dist/utils/io";
 import { 
     STOP_RUNNING, DATA_DIR, DELAY, simpleLogger as slog,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
@@ -29,19 +26,15 @@ import {
     runEntityPipeline, 
     EntityPipelineOptions, 
     runMainTransactionPipeline, 
-    TransactionMainPipelineOptions, INVENTORY_ITEM_PIPELINE_CONFIG,
+    TransactionMainPipelineOptions, LN_INVENTORY_ITEM_PIPELINE_CONFIG,
     NON_INVENTORY_ITEM_PIPELINE_CONFIG,
     SALES_ORDER_PIPELINE_CONFIG
 } from "./pipelines";
 import * as soConstants from "./parse_configurations/salesorder/salesOrderConstants"
-import { validateFiles, extractTargetRows } from "./DataReconciler";
-import { hasKeys, isEmptyArray, isNonEmptyArray, isNonEmptyString, isNullLike } from "./utils/typeValidation";
-import * as validate from "./utils/argumentValidation";
+import { hasKeys, isEmptyArray, isNonEmptyArray, isNonEmptyString, isNullLike } from "typeshi/dist/utils/typeValidation";
+import * as validate from "typeshi/dist/utils/argumentValidation";
 import { getSkuDictionary, initializeData } from "./config/dataLoader";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "./utils/ns/Enums";
-import { CLEAN_ITEM_ID_OPTIONS } from "./parse_configurations/evaluators";
-import { CleanStringOptions, extractLeaf, clean } from "./utils/regex";
-import { SalesOrderColumnEnum } from "./parse_configurations/salesorder/salesOrderConstants";
 
 const LOG_FILES = [
     DEFAULT_LOG_FILEPATH, 
@@ -53,21 +46,25 @@ const LOG_FILES = [
 async function main() {
     await clearFile(...LOG_FILES);
     mlog.info(`[START main()] at ${getCurrentPacificTime()}`);
-    await instantiateAuthManager();
     await initializeData();
+    await instantiateAuthManager();
 
-    const csvFiles = getDirectoryFiles(
-        soConstants.UNVIABLE_SO_DIR, '.csv', '.tsv'
-    );
-    let soFiles = csvFiles.slice(14); // handle subset for now
-    slog.info([`csvFiles.length: ${csvFiles.length}`,
-        `operating on: ${soFiles.length} file(s)`
-    ].join(TAB));
-    await DELAY(1000, null);
-    await invokePipeline(RecordTypeEnum.SALES_ORDER, 
-        soFiles, runMainTransactionPipeline, SALES_ORDER_PIPELINE_CONFIG
-    );
+    // const itemFile = path.join(DATA_DIR, 'items', 'lot_numbered_inventory_item0.tsv');
+    const LN_itemFile = path.join(DATA_DIR, 'items', 'lnii_subset.tsv');
 
+    await invokePipeline(
+        RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM, 
+        LN_itemFile, 
+        runMainItemPipeline, 
+        LN_INVENTORY_ITEM_PIPELINE_CONFIG
+    )
+    // const nonInventoryFile = path.join(DATA_DIR, 'items', 'missing_non_inventory_item.tsv');
+    // await invokePipeline(
+    //     RecordTypeEnum.NON_INVENTORY_ITEM,
+    //     nonInventoryFile,
+    //     runMainItemPipeline,
+    //     NON_INVENTORY_ITEM_PIPELINE_CONFIG
+    // )
 
     mlog.info([`[END main()] at ${getCurrentPacificTime()}`,
         `handling logs...`
@@ -83,6 +80,17 @@ if (require.main === module) {
     });
 }
 
+    // const csvFiles = getDirectoryFiles(
+    //     soConstants.UNVIABLE_SO_DIR, '.csv', '.tsv'
+    // );
+    // let soFiles = csvFiles.slice(14); // handle subset for now
+    // slog.info([`csvFiles.length: ${csvFiles.length}`,
+    //     `operating on: ${soFiles.length} file(s)`
+    // ].join(TAB));
+    // await DELAY(1000, null);
+    // await invokePipeline(RecordTypeEnum.SALES_ORDER, 
+    //     soFiles, runMainTransactionPipeline, SALES_ORDER_PIPELINE_CONFIG
+    // );
 
 export async function invokePipeline(
     recordType: RecordTypeEnum,

@@ -2,7 +2,7 @@
  * @file src/api/requests/post.ts
  */
 import axios from "axios";
-import { writeObjectToJson as write, getCurrentPacificTime, indentedStringify } from "../../utils/io";
+import { writeObjectToJsonSync as write, getCurrentPacificTime, indentedStringify } from "typeshi/dist/utils/io";
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "../url";

@@ -3,35 +3,48 @@
  * @description Centralized data loading to avoid circular dependencies 
  * and ensure proper initialization order
  */
+import path from "node:path";
 import { DATA_DIR, STOP_RUNNING } from "./env";
 import { mainLogger as mlog, simpleLogger as slog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "./setupLog";
-import { readJsonFileAsObject as read, isValidCsvSync, getCsvRows, getOneToOneDictionary, isValidCsv } from "../utils/io/reading";
-import { writeObjectToJson as write } from "../utils/io";
-import { hasKeys, hasNonTrivialKeys, isNonEmptyArray, isNullLike as isNull } from "../utils/typeValidation";
-import * as validate from "../utils/argumentValidation"
-import path from "node:path";
+import { 
+    readJsonFileAsObject as read, 
+    isValidCsvSync,
+    getOneToOneDictionary, getRows, 
+    writeObjectToJsonSync as write 
+} from "typeshi/dist/utils/io";
+import {
+    hasKeys, hasNonTrivialKeys, isNonEmptyArray, isNonEmptyString, 
+    isNullLike as isNull, isStringArray 
+} from "typeshi/dist/utils/typeValidation";
 import { AccountTypeEnum, AccountDictionary } from "../utils/ns";
-
-
+import { WarehouseDictionary, WarehouseRow, WarehouseColumnEnum } from "src/pipelines";
+import { clean, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION } from "typeshi/dist/utils/regex";
+import * as validate from "typeshi/dist/utils/argumentValidation"
 // Global state to track if data has been loaded
 let dataInitialized = false;
-
+const F = path.basename(__filename).replace(/\.[a-z]{1,}$/, '');
 /**
  * @enum {string} **`DataDomainEnum`**
- * @property **`REGEX`** = `'REGEX'`
- * @property **`INVENTORY`** = `'INVENTORY'`
+ * @property **`REGEX`** = `'REGEX'` **can probably remove this since now handled by typeshi**
+ * @property **`ACCOUNTING`** = `'ACCOUNTING'`
+ * @property **`SUPPLY`** = `'SUPPLY'`
+ * @property **`RELATIONSHIPS`** = `'RELATIONSHIPS'`
  */
 export enum DataDomainEnum {
     REGEX = 'REGEX',
-    INVENTORY = 'INVENTORY',
+    ACCOUNTING = 'ACCOUNTING',
+    SUPPLY = 'SUPPLY',
+    RELATIONSHIPS = 'RELATIONSHIPS'
 }
-/* ----------------------- LOAD INVENTORY CONFIG --------------------------- */
+/* ----------------------- LOAD ACCOUNTING CONFIG --------------------------- */
 /** `DATA_DIR/items/SKU_TO_INTERNAL_ID_DICT.json` */
 const SKU_DICTIONARY_FILE = path.join(DATA_DIR, 'items', 'SKU_TO_INTERNAL_ID_DICT.json');
 /** `DATA_DIR/uploaded/inventory_item.tsv` */
 const ITEM_FILE = path.join(DATA_DIR, 'items', 'sb_all_item_export.tsv');
 /** `DATA_DIR, 'binnumbers', 'bins.tsv'` */
 const BIN_NUMBERS_FILE = path.join(DATA_DIR, 'binnumbers', 'bins.tsv');
+/** `DATA_DIR, 'binnumbers', 'warehouseData.tsv'` */
+const WAREHOUSE_DATA_FILE = path.join(DATA_DIR, 'binnumbers', 'warehouseData.tsv');
 /** `DATA_DIR, '.constants', 'classes.tsv'` */
 const CLASSES_FILE = path.join(DATA_DIR, '.constants', 'classes.tsv');
 /** `DATA_DIR/accounts/accountDictionary.json` */
@@ -40,17 +53,48 @@ const ACCOUNT_DICTIONARY_FILE = path.join(DATA_DIR, 'accounts', 'accountDictiona
 let skuDictionary: Record<string, string> | null = null;
 /** map `account` to `'internalid'` */
 let accountDictionary: Record<string, any> | null = null;
-
-/** map `binnumber` to `internalid` */
-let binDictionary: Record<string, string> | null = null;
-const BIN_NUMBER_COLUMN = 'Bin Number';
-// @TODO
-// import { WarehouseDictionary, BinContent, WarehouseBin } from "src/pipelines";
-// let warehouseDictionary: WarehouseDictionary | null = null;
-
+const ClASS_NAME_COLUMN = 'Name';
 /** map `className` to `'internalid'` */
 let classDictionary: Record<string, string> | null = null;
-const ClASS_NAME_COLUMN = 'Name';
+
+/* ----------------------- LOAD SUPPLY CONFIG --------------------------- */
+const BIN_NUMBER_COLUMN = 'Bin Number';
+/** map `binnumber` to `internalid` */
+let binDictionary: Record<string, string> | null = null;
+
+/** parent object to hold the dictionary and rows */
+let warehouseData: WarehouseData | null = null;
+/** heirarchical relationship of locations->bins->items->lot_numbers */
+let warehouseDictionary: WarehouseDictionary | null = null;
+/** `{ `{@link WarehouseColumnEnum}`: any }[]` */
+let warehouseRows: WarehouseRow[] | null = null;
+
+export interface WarehouseData {
+    dictionary: WarehouseDictionary;
+    rows: WarehouseRow[]
+}
+/* --------------------- LOAD RELATIONSHIPS CONFIG ------------------------- */
+/** `DATA_DIR, '.constants', 'customer_constants.json'` */
+const CUSTOMER_CONSTANTS_FILE = path.join(DATA_DIR, '.constants', 'customer_constants.json');
+/** `DATA_DIR, '.constants', 'vendor_constants.json'` */
+const VENDOR_CONSTANTS_FILE = path.join(DATA_DIR, '.constants', 'vendor_constants.json');
+/** `DATA_DIR, 'customers', 'entity_value_overrides.json'` */
+const ENTITY_VALUE_OVERRIDE_FILE = path.join(DATA_DIR, 'customers', 'entity_value_overrides.json');
+
+export interface CustomerData {
+    /** map `category` to corresponding netsuite category's `'internalid'` */
+    categoryDictionary: Record<string, number>;
+}
+let customerData: CustomerData | null = null;
+let customerCategoryDictionary: Record<string, number> | null = null;
+let entityValueOverrides: Record<string, string> | null = null;
+
+export interface VendorData {
+    humanVendors: string[]
+}
+let vendorData: VendorData | null = null;
+let humanVendorList: string[] | null = null;
+
 
 /* ------------------------- LOAD REGEX CONFIG ----------------------------- */
 /** `DATA_DIR/.constants/regex_constants.json` */
@@ -70,7 +114,9 @@ export interface RegexConstants {
 const DEFAULT_INTERNAL_ID_COLUMN = 'Internal ID';
 const DEFAULT_DOMAINS_TO_LOAD = [
     DataDomainEnum.REGEX, 
-    DataDomainEnum.INVENTORY,
+    DataDomainEnum.ACCOUNTING,
+    DataDomainEnum.SUPPLY,
+    DataDomainEnum.RELATIONSHIPS
 ];
 
 /**
@@ -99,15 +145,27 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
                 case DataDomainEnum.REGEX:
                     regexConstants = await loadRegexConstants();
                     break;
-                case DataDomainEnum.INVENTORY:
+                case DataDomainEnum.ACCOUNTING:
                     skuDictionary = await loadSkuDictionary();
                     accountDictionary = await loadAccountDictionary();
-                    binDictionary = await loadBinDictionary();
                     classDictionary = await loadClassDictionary();
+                    break;
+                case DataDomainEnum.SUPPLY:
+                    binDictionary = await loadBinDictionary();
+                    warehouseData = await loadWarehouseData();
+                    warehouseDictionary = warehouseData.dictionary;
+                    warehouseRows = warehouseData.rows;
+                    break;
+                case DataDomainEnum.RELATIONSHIPS:
+                    entityValueOverrides = await loadEntityValueOverrides();
+                    customerData = await loadCustomerData();
+                    customerCategoryDictionary = customerData.categoryDictionary;
+                    vendorData = await loadVendorData();
+                    humanVendorList = vendorData.humanVendors;
                     break;
                 default:
                     mlog.warn(
-                        `${source} Unrecognized data domain: '${d}'. Skipping...`
+                        `${source} Unrecognized/unsupported data domain: '${d}'. Skipping...`
                     );
                     continue;
             }
@@ -120,12 +178,108 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
     }
 }
 
+async function loadVendorData(
+    jsonPath: string = VENDOR_CONSTANTS_FILE
+): Promise<VendorData> {
+    const source = `[dataLoader.loadVendorData()]`
+    validate.existingFileArgument(source, '.json', {jsonPath});
+    const data = read(jsonPath);
+    if (!data || typeof data !== 'object' 
+        || !hasKeys(data, 'humanVendors') 
+        || !isStringArray(data.humanVendors)) {
+        let msg = [`${source} Invalid JSON file provided (either not found or missing required columns)`,
+            `json Path received: '${jsonPath}'`,
+            `json keys required: 'humanVendors' (string[])`
+        ].join(TAB);
+        mlog.error(msg)
+        throw new Error(msg);
+    }
+    humanVendorList = data.humanVendors.map(
+        (name: string) => clean(name, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
+    );
+    return data as VendorData;
+}
+
+async function loadCustomerData(
+    jsonPath: string = CUSTOMER_CONSTANTS_FILE
+): Promise<CustomerData> {
+    const source = `[${F}.loadCustomerData()]`
+    validate.existingFileArgument(source, '.json', {jsonPath});
+    const data = read(jsonPath);
+    if (!data || typeof data !== 'object' || !hasKeys(data, 'categoryDictionary')) {
+        let msg = [`${source} Invalid JSON file provided (either not found or missing required columns)`,
+            `json Path received: '${jsonPath}'`,
+            `json keys required: 'categoryDictionary' (Record<string, number>)`
+        ].join(TAB);
+        mlog.error(msg)
+        throw new Error(msg);
+    }
+    return data as CustomerData;
+}
+
+async function loadEntityValueOverrides(
+    jsonPath: string = ENTITY_VALUE_OVERRIDE_FILE
+): Promise<Record<string, string>> {
+    const source = `[${F}.loadEntityOverrides()]`;
+    validate.existingFileArgument(source, '.json', {jsonPath});
+    const data = read(jsonPath) as Record<string, string>;
+    if (!data || typeof data !== 'object') {
+        let msg = [`${source} Invalid JSON file provided (not found)`,
+            `json Path received: '${jsonPath}'`,
+            `   format expected: (Record<string, string>)`
+        ].join(TAB);
+        mlog.error(msg)
+        throw new Error(msg);
+    }
+    slog.debug(`${source} num override keys: ${Object.keys(data).length}`)
+    return data;
+}
+
+async function loadWarehouseData(
+    csvPath: string = WAREHOUSE_DATA_FILE
+): Promise<WarehouseData> {
+    const source = `[dataLoader.loadWarehouseData()]`;
+    if (!isValidCsvSync(csvPath, Object.values(WarehouseColumnEnum))) {
+        let msg = [`${source} Invalid CSV file provided (either not found or missing required columns)`,
+            `csvPath received: '${csvPath}'`,
+            `   keys required: ${Object.values(WarehouseColumnEnum).join(', ')}`
+        ].join(TAB);
+        mlog.error(msg)
+        throw new Error(msg);
+    }
+    const dict: WarehouseDictionary = {};
+    const rows = await getRows(csvPath) as WarehouseRow[];
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const locNumber = Number(row[WarehouseColumnEnum.LOCATION_INTERNAL_ID]);
+        if (!dict[locNumber]) {
+            dict[locNumber] = {};
+        }
+        const binId = String(row[WarehouseColumnEnum.BIN_INTERNAL_ID]);
+        if (!dict[locNumber][binId]) {
+            dict[locNumber][binId] = {};
+        }
+        const itemId = String(row[WarehouseColumnEnum.ITEM_ID]);
+        if (!dict[locNumber][binId][itemId]) {
+            dict[locNumber][binId][itemId] = {
+                description: String(row[WarehouseColumnEnum.ITEM_DESCRIPTION]),
+                lotNumbers: [],
+            };
+        }
+        const lotNumber = String(row[WarehouseColumnEnum.LOT_NUMBER]);
+        if (isNonEmptyString(lotNumber) 
+            && !dict[locNumber][binId][itemId].lotNumbers.includes(lotNumber)) {
+            dict[locNumber][binId][itemId].lotNumbers.push(lotNumber);
+        }
+    }
+    return { dictionary: dict, rows: rows } as WarehouseData
+}
 
 
 /**
  * @consideration could try reading json first and compare if all keys are in 
  * dictionary from return value of `getOneToOneDictionary`
- * @domain {@link DataDomainEnum.INVENTORY}
+ * @domain {@link DataDomainEnum.ACCOUNTING}
  * @param jsonPath `string` - Path to the JSON file `(default: SKU_DICTIONARY_FILE)`
  * @param csvPath `string` - Path to the CSV file `(default: ITEM_FILE)`
  * @param skuColumn `string` - Column name for SKU `(default: 'Name')`
@@ -143,16 +297,12 @@ async function loadSkuDictionary(
     lazyLoad: boolean = true
 ): Promise<Record<string, string>> {
     const source = `[dataLoader.loadSkuDictionary()]`
-    validate.multipleStringArguments(
-        `dataLoader.loadSkuDictionary`, 
-        {jsonPath, csvPath, skuColumn, internalIdColumn}
-    )
-    
+    validate.multipleStringArguments(source, {jsonPath, csvPath, skuColumn, internalIdColumn})
     if (lazyLoad) { // Try to load from JSON file first
         try {
             const jsonData = read(jsonPath);
             if (jsonData && hasNonTrivialKeys(jsonData.SKU_TO_INTERNAL_ID_DICT)) {
-                slog.info(`\t${source} Loaded SKU dictionary from JSON: ${Object.keys(jsonData.SKU_TO_INTERNAL_ID_DICT).length} entries`);
+                slog.info(`${source} Loaded SKU dictionary from JSON: ${Object.keys(jsonData.SKU_TO_INTERNAL_ID_DICT).length} entries`);
                 return jsonData.SKU_TO_INTERNAL_ID_DICT as Record<string, string>;
             }
         } catch (error) {
@@ -208,7 +358,7 @@ async function loadOneToOneDictionary(
 }
 
 /**
- * @domain {@link DataDomainEnum.INVENTORY}
+ * @domain {@link DataDomainEnum.ACCOUNTING}
  * @param jsonPath `string` - Defaults to {@link ACCOUNT_DICTIONARY_FILE}
  * @returns **`dictionary`** `Promise<`{@link AccountDictionary}`>` = `{ [accountType: string]: { [accountName: string]: string } }`
  * - `accountType` -> `accountName` -> `internalid (string)`
@@ -281,6 +431,17 @@ async function loadRegexConstants(
         JOB_TITLE_SUFFIX_LIST,
     };
 }
+
+
+/**
+ * `sync` Check if data has been initialized
+ * @returns **`dataInitialized`** `boolean`
+ */
+export function isDataInitialized(): boolean {
+    return dataInitialized;
+}
+
+
 /**
  * `sync` Get regex constants
  * @returns **`regexConstants`** {@link RegexConstants}
@@ -311,13 +472,6 @@ export function getJobTitleSuffixList(): string[] {
 }
 
 /**
- * `sync` Check if data has been initialized
- * @returns **`dataInitialized`** `boolean`
- */
-export function isDataInitialized(): boolean {
-    return dataInitialized;
-}
-/**
  * `Public API`: Gets the {@link AccountDictionary} = `{ [accountType: string]: Record<string, string> }` 
  * - = `{ [accountType: string]: { [accountName: string]: string } }` 
  * - - `accountName` mapped to `internalid`
@@ -331,18 +485,6 @@ export async function getAccountDictionary(): Promise<AccountDictionary> {
     return accountDictionary;
 }
 
-/**
- * `async`
- * `Public API`: Gets the Bin Number to Internal ID dictionary from {@link BIN_NUMBERS_FILE}
- * - Initializes the dictionary if it hasn't been loaded yet.
- * @returns **`binDictionary`** `Promise<Record<string, string>>`
- */
-export async function getBinDictionary(): Promise<Record<string, string>> {
-    if (!binDictionary) {
-        binDictionary = await loadBinDictionary();
-    }
-    return binDictionary;
-}
 
 /**
  * `async`
@@ -369,6 +511,98 @@ export async function getSkuDictionary(): Promise<Record<string, string>> {
         skuDictionary = await loadSkuDictionary();
     }
     return skuDictionary;
+}
+
+/**
+ * `async`
+ * `Public API`: Gets the Bin Number to Internal ID dictionary from {@link BIN_NUMBERS_FILE}
+ * - Initializes the dictionary if it hasn't been loaded yet.
+ * @returns **`binDictionary`** `Promise<Record<string, string>>`
+ */
+export async function getBinDictionary(): Promise<Record<string, string>> {
+    if (!binDictionary) {
+        binDictionary = await loadBinDictionary();
+    }
+    return binDictionary;
+}
+
+/**
+ * `async`
+ * @returns **`warehouseRows`**
+ */
+export async function getWarehouseRows(): Promise<WarehouseRow[]> {
+    if (!warehouseRows) {
+        warehouseRows = (await getWarehouseData()).rows;
+    }
+    return warehouseRows;
+}
+
+/**
+ * `async`
+ * @returns **`warehouseDictionary`**
+ */
+export async function getWarehouseDictionary(): Promise<WarehouseDictionary> {
+    if (!warehouseDictionary) {
+        warehouseDictionary = (await getWarehouseData()).dictionary;
+    }
+    return warehouseDictionary;
+}
+
+/**
+ * `async`
+ * @returns **`warehouseData`** 
+ */
+export async function getWarehouseData(): Promise<WarehouseData> {
+    if (!warehouseData) {
+        warehouseData =  await loadWarehouseData();
+    }
+    return warehouseData;
+}
+
+/**
+ * `async`
+ * @returns **`entityValueOverrides`** `Promise<Record<string, string>>`
+ */
+export async function getEntityValueOverrides(): Promise<Record<string, string>> {
+    if (!entityValueOverrides) {
+        entityValueOverrides = await loadEntityValueOverrides();
+    }
+    return entityValueOverrides;
+}
+/**
+ * `async`
+ * @returns **`customerData`** 
+ */
+export async function getCustomerData(): Promise<CustomerData> {
+    if (!customerData) {
+        customerData =  await loadCustomerData();
+    }
+    return customerData;
+}
+
+export async function getCustomerCategoryDictionary(): Promise<{[category: string]: number}> {
+    if (!customerCategoryDictionary) {
+        customerCategoryDictionary = (await getCustomerData()).categoryDictionary;
+    }
+    return customerCategoryDictionary;
+}
+
+/**
+ * `async`
+ * @returns **`customerData`** 
+ */
+export async function getVendorData(): Promise<VendorData> {
+    if (!vendorData) {
+        vendorData =  await loadVendorData();
+    }
+    return vendorData;
+}
+
+export async function getHumanVendorList(): Promise<string[]> {
+    if (!humanVendorList) {
+        humanVendorList = (await getVendorData()).humanVendors;
+    }
+    return humanVendorList;
 }
 
 /**

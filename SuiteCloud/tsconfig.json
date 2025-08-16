@@ -11,23 +11,30 @@
         "allowSyntheticDefaultImports": true,
         "experimentalDecorators": true,
         "skipLibCheck": true,
-        "baseUrl": "./src",
+        "baseUrl": ".",
         // "outDir": "./dist/FileCabinet/SuiteScripts",
         "lib": ["ES7","ES6", "DOM.Iterable", "DOM", "es5", "es2015.promise", "dom", "ES2015"],
         "paths": {
             "@api/*": ["./src/api/*"],     
-            "@utils/*": ["./src/utils/*"],  
+            "@utils/*": ["./src/utils/*"],
+            "@typeshi/*": ["./node_modules/typeshi/dist/*"],
+            "@typeshi": ["./node_modules/typeshi/dist/index"],
+            "typeshi:utils/*": ["./node_modules/typeshi/dist/utils/*"],
+            "@regex/*": ["./node_modules/typeshi/dist/utils/regex/*"],
+            "@io/*": ["./node_modules/typeshi/dist/utils/io/*"],
             "@config/*": ["./src/config/*"],
             "@ns/*": ["./src/utils/ns/*"],
-            "N": ["node_modules/@hitc/netsuite-types/N"],
-            "N/*": ["node_modules/@hitc/netsuite-types/N/*"]
+            "N": ["./node_modules/@hitc/netsuite-types/N"],
+            "N/*": ["./node_modules/@hitc/netsuite-types/N/*"]
         }
     },
     "include": [
+        "src/*",
         "src/**/*",
         "__tests__/**/*"
     ],
     "exclude": [
+        "*.bak",
         "node_modules/**/*", 
         "node_modules/**/**/*", 
         "src/api/endpoints/*.js"

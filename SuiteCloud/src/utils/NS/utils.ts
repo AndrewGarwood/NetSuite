@@ -3,9 +3,8 @@
  * @description NetSuite-project-specific utility functions and values
  */
 import { FieldValue } from "../../api/types";
-import { ValueMapping } from "../io/types";
-import { isValueMappingEntry } from "../io/types/typeGuards";
-import { isNullLike } from "../typeValidation";
+import { ValueMapping, isValueMappingEntry } from "../../services/parse/types/index";
+import { isNullLike } from "typeshi/dist/utils/typeValidation";
 
 
 export function encodeExternalId(externalId: string): string {

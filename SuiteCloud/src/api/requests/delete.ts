@@ -3,8 +3,8 @@
  */
 import axios from "axios";
 import { 
-    writeObjectToJson as write, getCurrentPacificTime, indentedStringify 
-} from "../../utils/io";
+    writeObjectToJsonSync as write, getCurrentPacificTime, indentedStringify 
+} from "typeshi/dist/utils/io";
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "../url";
@@ -15,7 +15,7 @@ import {
 import { SB_REST_SCRIPTS } from "../configureRequests";
 import { getAccessToken } from "../configureAuth";
 import path from "node:path";
-import * as validate from "../../utils/argumentValidation";
+import * as validate from "typeshi/dist/utils/argumentValidation";
 
 const DELETE_RECORD_BY_TYPE_SCRIPT_ID = 
     SB_REST_SCRIPTS.DELETE_DeleteRecordByType.scriptId as number;

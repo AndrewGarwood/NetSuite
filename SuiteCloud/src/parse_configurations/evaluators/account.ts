@@ -4,12 +4,11 @@
 import { 
     mainLogger as mlog, NEW_LINE as NL, INDENT_LOG_LINE as TAB, STOP_RUNNING 
 } from "../../config";
-import { extractLeaf, equivalentAlphanumericStrings } from "../../utils/regex";
+import { extractLeaf, equivalentAlphanumericStrings } from "typeshi/dist/utils/regex";
 import { getAccountDictionary } from "../../config/dataLoader";
 import { AccountDictionary, AccountTypeEnum } from "../../utils/ns";
-import * as validate from "../../utils/argumentValidation";
-import { isNonEmptyString, isNullLike } from "../../utils/typeValidation";
-import { indentedStringify } from "../../utils/io";
+import * as validate from "typeshi/dist/utils/argumentValidation";
+import { isNonEmptyString, isNullLike } from "typeshi/dist/utils/typeValidation";
 
 export const accountInternalId = async (
     row: Record<string, any>,
@@ -18,7 +17,7 @@ export const accountInternalId = async (
 ): Promise<number | undefined> => {
     const source = `evaluators.account.accountInternalId`
     validate.stringArgument(source, {accountColumn});
-    validate.arrayArgument(source, {accountTypes}, 'string', isNonEmptyString);
+    validate.arrayArgument(source, {accountTypes, isNonEmptyString});
     let accountName = extractLeaf(String(row[accountColumn]), true, ':');
     const accountDict = await getAccountDictionary() as AccountDictionary;
     const targetAccounts: { [accountName: string]: string } = {}

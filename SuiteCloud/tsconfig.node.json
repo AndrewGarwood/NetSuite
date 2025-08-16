@@ -2,7 +2,7 @@
     "extends": "./tsconfig.json",
     "compilerOptions": {
         "module": "commonjs",
-        "moduleResolution": "nodenext",
+        "moduleResolution": "node",
         "esModuleInterop": true,
         "target": "es2020",
         "sourceMap": true,
@@ -12,6 +12,11 @@
             "@api/*": ["./src/api/*"],
             "@utils/*": ["./src/utils/*"],
             "@config/*": ["./src/config/*"],
+            "@typeshi/*": ["./node_modules/typeshi/dist/*"],
+            "@typeshi": ["./node_modules/typeshi/dist/index"],
+            "typeshi:utils/*": ["./node_modules/typeshi/dist/utils/*"],
+            "@regex/*": ["./node_modules/typeshi/dist/utils/regex/*"], 
+            "@io/*": ["./node_modules/typeshi/dist/utils/io/*"], 
             "@ns/*": ["./src/utils/ns/*"]
         }
     },

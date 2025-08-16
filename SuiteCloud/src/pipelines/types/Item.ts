@@ -1,6 +1,10 @@
-import { RecordResponseOptions } from "@api/types";
-import { ParseOptions } from "@utils/io/types/ParseOptions";
-import { ProcessParseResultsOptions } from "@utils/io/types/PostProcessing";
+/**
+ * @file src/pipelines/types/Item.ts
+ */
+
+import { RecordResponseOptions } from "../../api/types";
+import { ParseDictionary } from "src/services/parse/types/index";
+import { PostProcessDictionary } from "src/services/post_process/types/PostProcessing";
 
 
 
@@ -19,8 +23,8 @@ export enum ItemPipelineStageEnum {
 }
 
 export type ItemPipelineOptions = {
-    parseOptions: ParseOptions;
-    postProcessingOptions?: ProcessParseResultsOptions;
+    parseOptions: ParseDictionary;
+    postProcessingOptions?: PostProcessDictionary;
     /** `RecordResponseOptions` for the item put request */
     responseOptions?: RecordResponseOptions;
     clearLogFiles?: string[];

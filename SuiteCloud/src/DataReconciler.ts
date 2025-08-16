@@ -3,20 +3,20 @@
  */
 import * as fs from "node:fs";
 import { EntityRecordTypeEnum, RecordTypeEnum, CustomerTaxItemEnum, CustomerStatusEnum } from "./utils/ns";
-import { isNonEmptyArray, isEmptyArray, hasKeys, isNullLike as isNull, anyNull, 
+import { isNonEmptyArray, isEmptyArray, hasKeys, isNullLike as isNull,
     isNonEmptyString, TypeOfEnum } from "./utils/typeValidation";
-import { DelimitedFileTypeEnum, DelimiterCharacterEnum, 
-    isValidCsvSync, isRecordOptions, indentedStringify 
-} from "./utils/io";
-import { DATA_DIR, mainLogger as mlog, parseLogger as plog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING, CLOUD_LOG_DIR } from "./config";
-import { getColumnValues, getRows, writeObjectToJson as write, readJsonFileAsObject as read, 
-    getIndexedColumnValues, handleFileArgument 
-} from "./utils/io";
+import { DATA_DIR, mainLogger as mlog, parseLogger as plog, simpleLogger as slog, 
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING, CLOUD_LOG_DIR 
+} from "./config";
+import { getColumnValues, getRows, writeObjectToJsonSync as write, readJsonFileAsObject as read, 
+    getIndexedColumnValues, handleFileArgument, 
+    isValidCsvSync
+} from "typeshi/dist/utils/io";
 import * as validate from "./utils/argumentValidation";
 import path from "node:path";
 import { 
     RecordOptions, SetFieldSubrecordOptions, SetSublistSubrecordOptions, SublistLine,
-    GetRecordRequest, GetRecordResponse, getRecordById 
+    GetRecordRequest, getRecordById 
 } from "./api";
 
 
@@ -53,11 +53,10 @@ export async function validateFiles(
         for (const originalValue of columnValues) {
             const extractedValue = await extractor(originalValue, ...extractorArgs);
             if (!isNonEmptyString(extractedValue)) {
-                plog.warn(`${source} extractor(value) returned null,`,
-                    `undefined, or empty string, or is not a string`,
-                    TAB+`originalValue: '${originalValue}'`, 
-                    TAB+`     filePath: '${csvPath}'`
-                );
+                plog.warn([`${source} extractor(value) returned invalid string`,
+                    `originalValue: '${originalValue}'`, 
+                    `     filePath: '${csvPath}'`
+                ].join(TAB));
                 if (!missingValues[csvPath].includes(originalValue)) {
                     missingValues[csvPath].push(originalValue);
                 }
@@ -91,7 +90,10 @@ export async function extractTargetRows(
     targetValues: string[],
     extractor?: (columnValue: string, ...args: any[]) => string | Promise<string>, 
     extractorArgs?: any[]
-): Promise<Record<string, any>[]> {
+): Promise<{
+    rows: Record<string, any>[];
+    remainingValues: string[]
+}> {
     const source = `[DataReconciler.extractTargetRows()]`
     if(!isNonEmptyString(rowSource) && !isNonEmptyArray(rowSource)) {
         throw new Error([`${source} Invalid param 'rowSource'`,
@@ -102,18 +104,20 @@ export async function extractTargetRows(
     validate.stringArgument(source, {targetColumn});
     if (extractor !== undefined) validate.functionArgument(source, {extractor});
     validate.arrayArgument(source, {targetValues, isNonEmptyString});
-    const rows = await handleFileArgument(
+    const sourceRows = await handleFileArgument(
         rowSource, extractTargetRows.name, [targetColumn]
     );
+    const remainingValues: string[] = []
+    let potentials: Record<string, number[]> = {}
     let valuesFound: string[] = [];
     const targetRows: Record<string, any>[] = [];
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
+    for (let i = 0; i < sourceRows.length; i++) {
+        const row = sourceRows[i];
         if (!hasKeys(row, targetColumn)) {
-            mlog.warn(`${source} row does not have provided targetColumn`,
-                TAB+`    targetColumn: '${targetColumn}'`,
-                TAB+`Object.keys(row):  ${JSON.stringify(Object.keys(row))}`,
-            );
+            mlog.warn([`${source} row does not have provided targetColumn`,
+                `    targetColumn: '${targetColumn}'`,
+                `Object.keys(row):  ${JSON.stringify(Object.keys(row))}`,
+            ].join(TAB));
             continue;
         }
         const originalValue = String(row[targetColumn]);
@@ -126,26 +130,42 @@ export async function extractTargetRows(
         if (!extractor) { continue }
         const extractedValue = await extractor(originalValue, extractorArgs);
         if (!isNonEmptyString(extractedValue)) {
-            plog.warn(`${source} extractor(value) returned null,`,
-                `undefined, or empty string, or is not a string`,
-                TAB+` originalValue: '${originalValue}'`, 
-                TAB+`rowSource type: '${typeof rowSource}'`
-            );
+            plog.warn([`${source} extractor(value) returned invalid string`,
+                ` originalValue: '${originalValue}'`, 
+                `rowSource type: '${typeof rowSource}'`
+            ].join(TAB));
             continue;
         }
         if (targetValues.includes(extractedValue)) {
-            if (!valuesFound.includes(extractedValue)) valuesFound.push(extractedValue);
             targetRows.push(row);
+            if (!valuesFound.includes(extractedValue)) valuesFound.push(extractedValue);
             continue;
         }
+        let targetMatch = targetValues.find(v=>{
+            v = v.toUpperCase();
+            return v.startsWith(extractedValue.toUpperCase())
+        });
+        if (targetMatch) {
+            if (!potentials[targetMatch]) {
+                potentials[targetMatch] = [i]
+            } else {
+                potentials[targetMatch].push(i)
+            }
+            // slog.debug([`${source} Found potentialMatch for a targetValue at rowIndex ${i}`,
+            //     ` originalValue: '${originalValue}'`, 
+            //     `extractedValue: '${extractedValue}'`, 
+            //     `potentialMatch: '${targetMatch}'`, 
+            // ].join(TAB));
+        }
     }
-    let missingValues = targetValues.filter(v=> !valuesFound.includes(v));
-    if (missingValues.length > 0) {
-        mlog.warn([`${source} ${missingValues.length} value(s) from targetValues did not have a matching row`,
-            indentedStringify(missingValues)
-        ].join(TAB))
-    }
-    return targetRows;
+    remainingValues.push(...targetValues.filter(v=> !valuesFound.includes(v)));
+    // if (remainingValues.length > 0) {
+    //     mlog.warn([`${source} ${remainingValues.length} value(s) from targetValues did not have a matching row`,
+    //         // indentedStringify(remainingValues)
+    //     ].join(TAB));
+    //     write({remainingValues}, path.join(CLOUD_LOG_DIR, `${getFileNameTimestamp()}_remainingValues.json`))
+    // }
+    return {rows: targetRows, remainingValues};
 }
 
 

@@ -8,14 +8,6 @@
  * @SB_DeployId 1
  */
 
-/**
- * @consideration because NetSuite RESTlet GET request bodies are sourced from request url search parameter and not an actual object payload,
- * maybe I should refactor GetRecordRequest to only have primitives or array of primitives as values.
- * - i.e. `Record<string, string | number | boolean | string[] | number[] | boolean[]>`
- * - or maybe make it a post request but just have functions that call it be named 'get..' on client side?
- */
-
-
 define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     /**
      * @type {LogStatement[]} - `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
@@ -26,7 +18,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     /**
      * Get a single record
      * @param {GetRecordRequest} reqParams {@link GetRecordRequest}
-     * @returns {GetRecordResponse} **`response`** {@link GetRecordResponse}
+     * @returns {RecordResponse} **`response`** {@link RecordResponse}
      */
     const get = (/**@type {GetRecordRequest}*/reqParams) => {
         if (!reqParams) {
@@ -38,8 +30,8 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
                 status: 400,
                 message: 'Bad Request',
                 error: 'Invalid request parameters: reqParams is empty or undefined',
-                logArray: logArray,
-                records: []
+                logs: logArray,
+                results: []
             }; // as `GetRecordResponse`
         }
         let { recordType } = reqParams;
@@ -57,8 +49,8 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
                 status: 400,
                 message: 'Bad Request',
                 error: `Invalid request parameters: reqParams.recordType. recordType must be a valid RecordTypeEnum string, received: '${reqParams.recordType}'`,
-                logArray: logArray,
-                records: []
+                logs: logArray,
+                results: []
             }; // as `GetRecordResponse`
         }
         if (idOptions && isNonEmptyArray(idOptions)) { 
@@ -70,8 +62,8 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
             status: 400,
             message: 'Bad Request',
             error: `Invalid request parameters: reqParams.idOptions; received: '${reqParams.idOptions}'`,
-            logArray: logArray,
-            records: []
+            logs: logArray,
+            results: []
         }; // as `GetRecordResponse`
     };
 
@@ -79,10 +71,10 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
      * @param {RecordTypeEnum | string} recordType 
      * @param {idSearchOptions[]} idOptions 
      * @param {RecordResponseOptions} responseOptions 
-     * @returns {GetRecordResponse}
+     * @returns {RecordResponse}
      */
     function getById(recordType, idOptions, responseOptions) {
-        /**@type {GetRecordResponse} {@link GetRecordResponse} */
+        /**@type {RecordResponse} {@link RecordResponse} */
         const response = {}
         /**@type {object | undefined} */
         let rec = undefined;
@@ -95,12 +87,14 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
             response.status = 404;
             response.error = 'Record Not Found';
             response.message = `No '${recordType}' record found with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`;
-            response.logArray = logArray;
+            response.logs = logArray;
+            response.results = [];
+            response.rejects = [{recordType, idOptions, responseOptions}];
             return response;
         }
         response.status = 200;
         response.message = `Found '${recordType}' record with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`;
-        response.records = [{
+        response.results = [{
             internalid: recId, 
             recordType, 
             fields: {}, 
@@ -111,12 +105,12 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
             `Loading Existing ${recordType} record with internalid: '${recId}'`, 
         );
         if (responseOptions && responseOptions.responseFields) {
-            response.records[0].fields = getResponseFields(rec, responseOptions.responseFields);
+            response.results[0].fields = getResponseFields(rec, responseOptions.responseFields);
         }
         if (responseOptions && responseOptions.responseSublists) {
-            response.records[0].sublists = getResponseSublists(rec, responseOptions.responseSublists);
+            response.results[0].sublists = getResponseSublists(rec, responseOptions.responseSublists);
         }
-        response.logArray = logArray;
+        response.logs = logArray;
         writeLog(LogTypeEnum.AUDIT, 
             `GET_Record.getById() Successfully retrieved record`, 
             `recordType: '${recordType}', internalid: '${recId}'`,
@@ -128,17 +122,17 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
      * @notimplemented
      * @param {RecordTypeEnum | string} recordType 
      * @param {RecordResponseOptions} responseOptions 
-     * @returns {GetRecordResponse}
+     * @returns {RecordResponse}
      */
     function getAll(recordType, responseOptions) {
         const records = [];
-        /**@type {GetRecordResponse} {@link GetRecordResponse} */
+        /**@type {RecordResponse} {@link RecordResponse} */
         const response = {
             status: 500,
             message: 'Internal Server Error',
             error: `getAll() not yet implemented`,
-            logArray: logArray,
-            records: records
+            logs: logArray,
+            results: records
         }
         return response;
     }
@@ -210,7 +204,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
             /**@type {string[]} */
             const responseFields = (typeof responseSublists[sublistId] === 'string'
                 ? [responseSublists[sublistId]]
-                : (!responseSublists[sublistId] || isEmptyArray(responseSublists[sublistId])
+                : (!isNonEmptyArray(responseSublists[sublistId])
                     ? rec.getSublistFields({ sublistId })
                     : responseSublists[sublistId]
             )); // as string[]
@@ -484,9 +478,10 @@ const NOT_DYNAMIC = false;
  * status: number;
  * message: string;
  * error?: string;
- * logArray: LogStatement[];
- * records: RecordResult[]; 
- * }} GetRecordResponse
+ * logs: LogStatement[];
+ * results?: RecordResult[];
+ * rejects?: any[]; 
+ * }} RecordResponse
  */
 
 /**

@@ -6,16 +6,14 @@ import { parseLogger as plog,
 } from "../../config";
 import { 
     CleanStringOptions,
-    STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
     clean, 
-    equivalentAlphanumericStrings as equivalentAlphanumeric,
-    extractLeaf, 
-} from "../../utils/regex";
+    isCleanStringOptions
+} from "typeshi/dist/utils/regex";
 import { SalesOrderColumnEnum as SO, } from "./salesOrderConstants";
-import { isNullLike as isNull, anyNull, hasKeys, hasNonTrivialKeys, isNonEmptyString } from "../../utils/typeValidation";
-import { getSkuDictionary, hasSkuInDictionary } from "../../config/dataLoader";
+import { 
+    isNonEmptyString 
+} from "typeshi/dist/utils/typeValidation";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
-import { isCleanStringOptions } from "../../utils/typeGuards";
 
 /**
  * @example
@@ -84,46 +82,15 @@ export const memo = (
     let result = isNonEmptyString(memoPrefix) ? memoPrefix : 'Summary';
     result = result.trim() + ': {'
     const summary: Record<string, any> = {
-        'Type': clean(row[typeColumn]) || 'UNDEFINED',
+        'Type': clean(row[typeColumn]) ?? 'UNDEFINED'
     }
     for (const col of idColumns) {
-        summary[col] = clean(row[col]) || 'UNDEFINED';
+        summary[col] = clean(row[col]) ?? 'UNDEFINED';
     }
     for (const [key, value] of Object.entries(summary)) {
         result += `${key}: ${value}, `;
     }
+    result = result.replace(/, $/, '');
     result += '} '
     return result;
 } 
-
-
-
-/**
- * @deprecated
- * @TODO **handle hasSkuExists logic in post processing instead of here.**
- * 
- * Gets the internal ID for an item SKU (asynchronous version).
- * Automatically loads the SKU dictionary if not already loaded.
- * 
- * @param row `Record<string, any>`
- * @param itemColumn `string`
- * @returns Promise that resolves to the **`internalId`** `string` of the item in the row, or an empty string if the item is null.
- */
-const itemSkuAsync = async (
-    row: Record<string, any>,
-    itemColumn: string = SO.ITEM
-): Promise<string> => {
-    if (anyNull(row, itemColumn, row[itemColumn])) {
-        return '';
-    }
-    const sku = extractLeaf(clean(row[itemColumn]));
-    if (!sku) {
-        throw new Error(`[itemSkuAsync()] Could not extract SKU from: '${row[itemColumn]}'`);
-    }
-    const hasSkuExists = await hasSkuInDictionary(sku);
-    if (!hasSkuExists) {
-        throw new Error(`[itemSkuAsync()] Unrecognized item sku: '${sku}' (from '${row[itemColumn]}')`);
-    }
-    const skuDict = await getSkuDictionary();
-    return skuDict[sku];
-}

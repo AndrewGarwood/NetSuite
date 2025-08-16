@@ -22,7 +22,8 @@ export enum ItemColumnEnum {
     COST = 'Cost',
     PRICE = 'Price',
     PREFERRED_VENDOR = 'Preferred Vendor',
-    MPN = 'MPN'
+    MPN = 'MPN',
+    LOT_NUMBER = 'Lot Number'
 }
 
 const ITEM_COLUMNS = [

@@ -9,17 +9,6 @@ import {
     FieldValue,
     FieldDictionary,
 } from "../../api/types";
-import { 
-    FieldDictionaryParseOptions,
-    FieldParseOptions,
-    RecordParseOptions,
-    SublistDictionaryParseOptions,
-    SublistLineParseOptions,
-    SubrecordParseOptions, RecordPostProcessingOptions, CloneOptions,
-    ProcessParseResultsOptions, ComposeOptions, PostProcessingOperationEnum as PostOp,
-    SublistLineIdOptions,
-    ColumnSliceOptions,
-} from "../../utils/io";
 import * as prune from "../pruneFunctions";
 import * as evaluate from "../evaluatorFunctions";
 import * as customerEval from "../customer/customerEvaluatorFunctions";
@@ -27,9 +16,19 @@ import * as soEval from "./salesOrderEvaluatorFunctions";
 import { SalesOrderColumnEnum as SO } from "./salesOrderConstants";
 import { CustomerStatusEnum, CustomerTaxItemEnum, RecordTypeEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
 import { getSkuDictionary } from "../../config/dataLoader";
-import { isNonEmptyString } from "../../utils/typeValidation";
+import { isNonEmptyString } from "typeshi/dist/utils/typeValidation";
 import { SB_TERM_DICTIONARY } from "../../utils/ns";
-import { CleanStringOptions, toTitleCase } from "../../utils/regex";
+import { CleanStringOptions, toTitleCase } from "typeshi/dist/utils/regex";
+import { 
+    SubrecordParseOptions, FieldDictionaryParseOptions, 
+    SublistDictionaryParseOptions, SublistLineParseOptions, RecordParseOptions, 
+    ColumnSliceOptions, 
+    SublistLineIdOptions 
+} from "../../services/parse/types/index";
+import {
+    ComposeOptions, RecordPostProcessingOptions, 
+    PostProcessingOperationEnum 
+} from "../../services/post_process/types/PostProcessing";
 
 /** 
  * @TODO decide if it is better to move value assignment of 
@@ -333,7 +332,7 @@ const SALES_ORDER_COMPOSE_OPTIONS: ComposeOptions = {
     }
 }
 export const SALES_ORDER_POST_PROCESSING_OPTIONS: RecordPostProcessingOptions = {
-    operationOrder: [PostOp.CLONE, PostOp.COMPOSE, PostOp.PRUNE],
+    operationOrder: [PostProcessingOperationEnum.CLONE, PostProcessingOperationEnum.COMPOSE, PostProcessingOperationEnum.PRUNE],
     composeOptions: SALES_ORDER_COMPOSE_OPTIONS,
     pruneFunc: prune.salesOrder,
 }

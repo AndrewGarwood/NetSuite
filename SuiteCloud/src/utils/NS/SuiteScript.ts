@@ -1,6 +1,5 @@
 /**
  * @file src/utils/ns/SuiteScript.ts
- * @description strucutres to define/hold the scripts one has uploaded/deployed to NetSuite.
  */
 
 export interface SuiteScriptError {

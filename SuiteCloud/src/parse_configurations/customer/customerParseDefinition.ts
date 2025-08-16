@@ -7,24 +7,25 @@ import {
     RecordOptions,
     idSearchOptions, 
 } from "../../api/types";
-import { 
-    ColumnSliceOptions,
-    FieldDictionaryParseOptions,
-    FieldParseOptions,
-    RecordParseOptions,
-    SublistDictionaryParseOptions,
-    SublistLineParseOptions,
-    SubrecordParseOptions, RecordPostProcessingOptions, CloneOptions,
-    ProcessParseResultsOptions, ComposeOptions,
-    SublistLineIdOptions,
-} from "../../utils/io";
-import { CustomerColumnEnum as C, CUSTOMER_CATEGORY_MAPPING as CATEGORY_DICT } from "./customerConstants";
+import { CustomerColumnEnum as C } from "./customerConstants";
 import * as evaluate from "../evaluatorFunctions";
 import * as prune from "../pruneFunctions";
 import * as customerEval from "./customerEvaluatorFunctions";
-import { ContactRoleEnum, CustomerTaxItemEnum, RecordTypeEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
+import { 
+    ContactRoleEnum, CustomerTaxItemEnum, RecordTypeEnum, SearchOperatorEnum 
+} from "../../utils/ns/Enums";
 import { SB_TERM_DICTIONARY } from "../../utils/ns/record/accounting/Term";
-import { isNonEmptyString } from "../../utils/typeValidation";
+import { isNonEmptyString } from "typeshi/dist/utils/typeValidation";
+import { 
+    ColumnSliceOptions, FieldDictionaryParseOptions, 
+    SublistDictionaryParseOptions, SublistLineIdOptions, SublistLineParseOptions, 
+    SubrecordParseOptions,
+    RecordParseOptions
+} from "../../services/parse/types/index";
+import {
+    CloneOptions, ComposeOptions,
+    PostProcessDictionary, RecordPostProcessingOptions
+} from "../../services/post_process/types/PostProcessing";
 
 /** use to set the field `"isinactive"` to false */
 const NOT_INACTIVE = false;
@@ -203,8 +204,8 @@ export const CUSTOMER_PARSE_OPTIONS: RecordParseOptions = {
                 C.ALT_PHONE, C.WORK_PHONE, C.SHIP_TO_FOUR, C.SHIP_TO_FIVE
             ] as Array<string | ColumnSliceOptions> 
         },
-        entitystatus: { evaluator: customerEval.customerStatus, args: [C.CATEGORY] },
-        category: { evaluator: customerEval.customerCategory, args: [C.CATEGORY, CATEGORY_DICT] },
+        // entitystatus: { evaluator: customerEval.customerStatus, args: [C.CATEGORY] },
+        category: { evaluator: customerEval.customerCategory, args: [C.CATEGORY] },
         companyname: { evaluator: customerEval.customerCompany, args: [C.ENTITY_ID, C.COMPANY] },
         accountnumber: { colName: C.ACCOUNT_NUMBER },
         terms: { evaluator: evaluate.terms, args: [C.TERMS, SB_TERM_DICTIONARY] },
@@ -289,7 +290,7 @@ const CUSTOMER_COMPOSE_OPTIONS: ComposeOptions = {
         }
     }
 }
-export const CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS: ProcessParseResultsOptions = {
+export const CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS: PostProcessDictionary = {
     [RecordTypeEnum.CONTACT]: {
         cloneOptions: CLONE_CUSTOMER_FIELDS_TO_CONTACT_OPTIONS,
         pruneFunc: prune.contact

@@ -7,13 +7,12 @@ import { parseLogger as plog, mainLogger as mlog,
 } from "../../config/setupLog";
 import { 
     clean,
-} from "../../utils/regex";
-import { ColumnSliceOptions } from "../../utils/io";
-import * as validate from "../../utils/argumentValidation";
+} from "typeshi/dist/utils/regex";
+import * as validate from "typeshi/dist/utils/argumentValidation";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
 import { SB_TERM_DICTIONARY, TermBase } from "../../utils/ns/record/accounting/Term";
+import { ColumnSliceOptions } from "src/services/parse/types/ParseOptions";
 
-export const SUPPRESS: any[] = [];
 /**
  * @param row - `Record<string, any>` the `row` of data
  * @param extractor - `(fieldValue: string) => RegExpMatchArray | null | string[]` - a function that extracts the field value from the `row` data
@@ -28,7 +27,7 @@ export const field = (
     if (!row || !extractor || !columnOptions || columnOptions.length === 0) {
         return '';
     }
-    SUPPRESS.push(NL + `[START evaluate.field()] - extractor: ${extractor.name}()`,
+    plog.debug(NL + `[START evaluate.field()] - extractor: ${extractor.name}()`,
         TAB+`columnOptions: ${JSON.stringify(columnOptions)}`
     );
     let result = '';
@@ -37,7 +36,7 @@ export const field = (
             ? colOption : colOption.colName
         );
         let initialVal = clean(row[col]);
-        SUPPRESS.push(NL + `colOption: ${JSON.stringify(colOption)}`,
+        plog.debug(NL + `colOption: ${JSON.stringify(colOption)}`,
             TAB+`col: '${col}', initialVal: '${initialVal}'`
         );
         if (!initialVal) { continue; }
@@ -45,12 +44,12 @@ export const field = (
             ? colOption.minIndex : 0
         );
         const matchResults = extractor(initialVal);
-        SUPPRESS.push(NL + `matchResults after ${extractor.name}('${initialVal}'): ${JSON.stringify(matchResults)}`,
+        plog.debug(NL + `matchResults after ${extractor.name}('${initialVal}'): ${JSON.stringify(matchResults)}`,
             TAB + `matchResults.length: ${matchResults ? matchResults.length : undefined}`,
             TAB + `matchResults[minIndex=${minIndex}]: '${matchResults ? matchResults[minIndex] : undefined}'`,        
         );
         if (!matchResults || matchResults.length <= minIndex || matchResults[minIndex] === null || matchResults[minIndex] === undefined) {
-            SUPPRESS.push(NL + `continue to next column option because at least one of the following is true:`,
+            plog.debug(NL + `continue to next column option because at least one of the following is true:`,
                 TAB+`   !matchResults === ${!matchResults}`,
                 TAB+`|| matchResults.length <= minIndex === ${matchResults && matchResults.length <= minIndex}`,
                 TAB+`|| !matchResults[${minIndex}] === ${matchResults && !matchResults[minIndex]}`,
@@ -60,7 +59,7 @@ export const field = (
         result = (matchResults[minIndex] as string);
         break;
     }
-    SUPPRESS.push(NL+`[END evaluate.field()] - extractor: ${extractor.name}(), RETURN result: '${result}'`,);
+    plog.debug(NL+`[END evaluate.field()] - extractor: ${extractor.name}(), RETURN result: '${result}'`,);
     return result
 }
 

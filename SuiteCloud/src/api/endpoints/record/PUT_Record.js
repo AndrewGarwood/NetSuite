@@ -32,7 +32,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         const { recordOptions, responseOptions } = reqBody;
         if (!recordOptions || !isNonEmptyArray(recordOptions)) {
             writeLog(LogTypeEnum.ERROR, '[put()] Invalid Request Parameter', 'non-empty recordOptions is required');
-            return { status: false, message: '[put()] Invalid Request Parameter', error: 'non-empty recordOptions is required', logArray };
+            return { status: false, message: '[put()] Invalid Request Parameter', error: 'non-empty recordOptions is required', logs: logArray };
         }
         if (!Array.isArray(recordOptions)) {
             recordOptions = [recordOptions];
@@ -58,14 +58,14 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 } catch (e) {
                     writeLog(LogTypeEnum.ERROR, 
                         `[put()] Error processing '${options.recordType}' RecordOptions at index ${i}:`, 
-                        e, // JSON.stringify(options)
+                        String(e), // JSON.stringify(options)
                     );
                     rejects.push(options);
                     continue;
                 }
             }
             
-            writeLog(LogTypeEnum.AUDIT, `End of PUT_UpsertRecord:`, { 
+            writeLog(LogTypeEnum.AUDIT, `End of PUT_Record:`, { 
                 numRecordsProcessed: results.length,
                 numRejects: rejects.length,
                 numErrorLogs: logArray.filter(log => log.type === LogTypeEnum.ERROR).length,
@@ -73,13 +73,13 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             /**@type {RecordResponse} */
             return {
                 status: 200,
-                message: `PUT_UpsertRecord completed, processed ${results.length} record(s)`,
+                message: `PUT_Record completed, processed ${results.length} record(s)`,
                 results: results,
                 rejects: rejects,
-                logArray: logArray,
+                logs: logArray,
             };
         } catch (e) {
-            writeLog(LogTypeEnum.ERROR, `Error in PUT_UpsertRecord:`, { 
+            writeLog(LogTypeEnum.ERROR, `Error in PUT_Record:`, { 
                 numRecordsProcessed: results.length,
                 numRejects: rejects.length,
                 numErrorLogs: logArray.filter(log => log.type === LogTypeEnum.ERROR).length,
@@ -87,9 +87,9 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             /**@type {RecordResponse} */
             return {
                 status: 500,
-                message: 'Error in PUT_UpsertRecord: upsert failed after processing ' + results.length + ` records.`,
+                message: 'Error in PUT_Record: upsert failed after processing ' + results.length + ` records.`,
                 error: String(e),
-                logArray: logArray,
+                logs: logArray,
                 results: results,
                 rejects: rejects
             }
@@ -137,7 +137,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         /**@type {object | undefined} */
         let rec = undefined;
         isDynamic = typeof isDynamic === 'boolean' ? isDynamic : NOT_DYNAMIC;
-        const recId = searchForRecordById(recordType, idOptions, fields);
+        const recId = searchForRecordById(recordType, idOptions, fields) ?? null;
         const isExistingRecord = typeof recId === 'number' && recId > 0;
         if (isExistingRecord && fields && isNonEmptyArray(Object.keys(fields))) { 
             // remove idPropertyEnum values from keys of fields to avoid DUP_ENTITY error.
@@ -165,10 +165,12 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         if (fields && isNonEmptyArray(Object.keys(fields))) {
             try {
                 rec = processFieldDictionary(rec, recordType, fields);
+                writeLog(LogTypeEnum.AUDIT, `[processRecordOptions()] Completed processFieldDictionary`)
+
             } catch (error) {
                 writeLog(LogTypeEnum.ERROR, `[processRecordOptions()] Error processing options.fields`,                `recordType: ${recordType}`,
                     `  recordId: '${recId}' (null/undefined if new record)`,
-                    `error: `, error
+                    `error: `, String(error)
                 );
                 return null;
             }
@@ -176,33 +178,44 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         if (sublists && isNonEmptyArray(Object.keys(sublists))) {
             try {
                 rec = processSublistDictionary(rec, recordType, sublists);
+                writeLog(LogTypeEnum.AUDIT, 
+                    `[processRecordOptions()] Completed processSublistDictionary`
+                );
+
             } catch (error) {
                 writeLog(LogTypeEnum.ERROR, `[processRecordOptions()] Error processing options.sublists`,                `recordType: ${recordType}`,
-                    `  recordId: '${recId}' (null/undefined if new record)`,
-                    `error: `, error
+                    `recordId: '${recId}' (null/undefined if new record)`,
+                    `error: `, String(error)
                 );
                 return null;
             }
         }
+
         /**@type {RecordResult} {@link RecordResult} */
         const result = { recordType };
         //(isExistingRecord ? recId : rec.save({ enableSourcing: true, ignoreMandatoryFields: true })), 
         //rec.save({ enableSourcing: true, ignoreMandatoryFields: true }), //
         
         try {
+            writeLog(LogTypeEnum.AUDIT, 
+                `[processRecordOptions()] Now trying to save record and store in result: ${JSON.stringify(result)}`,
+                // `String(rec.save()) = '${String(rec.save({ enableSourcing: true, ignoreMandatoryFields: true }))}'`
+            );
+            // result.internalid = rec.save();
             result.internalid = rec.save({ 
-                enableSourcing: true,
+                enableSourcing: false,
                 ignoreMandatoryFields: true 
             });
         } catch (error) {
             writeLog(LogTypeEnum.ERROR, `[processRecordOptions()] Error saving record`,
-                `an error occurred when calling the save() function.`
-                `recordType: ${recordType}`,
+                `an error occurred when calling the save() function.`,
+                `recordType: '${recordType}'`,
                 `  recordId: '${recId}' (null/undefined if new record)`,
-                `error: `, error
+                `error: ${JSON.stringify(error)}`,
             );
             return null;
         }
+        writeLog(LogTypeEnum.AUDIT, `[processRecordOptions()] Successfully saved record`);
         try {
             if (responseOptions && responseOptions.responseFields) {
                 result.fields = getResponseFields(rec, responseOptions.responseFields);
@@ -217,8 +230,9 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 `  recordId: '${recId}' (null/undefined if new record)`,
                 `error: `, error
             )
-            return null;
+            // return result;
         }
+        writeLog(LogTypeEnum.AUDIT, `[processRecordOptions()] Completed processResponseOptions`)
         return result;   
     }
 
@@ -458,10 +472,18 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         }
         for (const fieldId in fields) {
             const value = fields[fieldId];
-            if (isSubrecord(value)){
-                rec = processFieldSubrecordOptions(rec, recordType, value);
-            } else {
-                rec = upsertFieldValue(rec, recordType, fieldId, value);
+            let isSubrec = isSubrecord(value);
+            try {
+                rec = (isSubrec
+                    ? processFieldSubrecordOptions(rec, recordType, value) 
+                    : upsertFieldValue(rec, recordType, fieldId, value)
+                );
+            } catch (e) {
+                writeLog(LogTypeEnum.ERROR, 
+                `[ERROR processFieldDictionary()] Error processing value for fieldId: '${fieldId}'`,
+                `Caught error from ${isSubrec ? 'processFieldSubrecordOptions()' : 'upsertFieldValue()' }`,
+                );
+                continue;
             }
         }
         return rec;
@@ -522,19 +544,31 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 for (const lineIndex of lineIndices) {
                     for (const fieldId of remainingSublistFieldIds) {
                         const value = sublistLine[fieldId];
-                        if (isSubrecord(value)) {
-                            rec = processSublistSubrecordOptions(rec, 
-                                recordType, sublistId, fieldId, 
-                                validateSublistLineIndex(rec, sublistId, lineIndex), 
-                                value // as SetSublistSubrecordOptions
+                        let isSubrec = isSubrecord(value);
+                        try {
+                            rec = (isSubrec
+                                ? processSublistSubrecordOptions(rec, 
+                                    recordType, 
+                                    sublistId, 
+                                    fieldId, 
+                                    validateSublistLineIndex(rec, sublistId, lineIndex), 
+                                    value // as SetSublistSubrecordOptions
+                                ) : upsertSublistFieldValue(
+                                    rec, 
+                                    recordType, 
+                                    sublistId, 
+                                    fieldId, 
+                                    validateSublistLineIndex(rec, sublistId, lineIndex), 
+                                    value // as FieldValue
+                                )
+                            );
+                        } catch (e) {
+                            writeLog(LogTypeEnum.ERROR, 
+                            `[ERROR processSublistDictionary()] sublist: '${sublistId}' Error processing sublist fieldId: '${fieldId}'`,
+                            `Caught error from ${isSubrec ? 'processSublistSubrecordOptions()' : 'upsertSublistFieldValue()' }`,
                             );
                             continue;
                         }
-                        rec = upsertSublistFieldValue(
-                            rec, recordType, sublistId, fieldId, 
-                            validateSublistLineIndex(rec, sublistId, lineIndex), 
-                            value // as FieldValue
-                        );
                     }
                 }
             }
@@ -655,14 +689,22 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             : responseFields
         );
         for (let fieldId of responseFields) {
-            fieldId = fieldId.toLowerCase();
-            /**@type {FieldValue | SubrecordValue} */
-            const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSubrecord({fieldId}) 
-                ? rec.getSubrecord({fieldId}) // as Subrecord 
-                : rec.getValue({ fieldId }) // as FieldValue
-            );
-            if (value === undefined || value === null) { continue; }
-            fields[fieldId] = value;
+            try { 
+                fieldId = fieldId.toLowerCase();
+                /**@type {FieldValue | SubrecordValue} */
+                const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSubrecord({fieldId}) 
+                    ? rec.getSubrecord({fieldId}) // as Subrecord 
+                    : rec.getValue({ fieldId }) // as FieldValue
+                );
+                if (value === undefined || value === null) { continue; }
+                fields[fieldId] = value;
+            } catch (error) {
+                writeLog(LogTypeEnum.ERROR, 
+                    `[getResponseFields()] Error getting value for fieldId '${fieldId}'`, 
+                    `error: `, error
+                );
+                continue
+            }
         };
         return fields;
     }
@@ -675,17 +717,18 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     function getResponseSublists(rec, responseSublists) {
         if (!rec || !responseSublists || isEmptyArray(Object.keys(responseSublists))) {
             writeLog(LogTypeEnum.ERROR, 
-                'getResponseSublists() Invalid parameters', 
+                '[getResponseSublists()] Invalid parameters', 
                 'rec and responseSublists are required'
             );
             return {};
         }
         /**@type {SublistDictionary | {[sublistId: string]: SublistLine[]}} */
-        const sublists = {};    
+        const sublists = {};
+        sublistLoop:    
         for (const sublistId in responseSublists) {
             if (!rec.getSublist({ sublistId })) {
                 writeLog(LogTypeEnum.ERROR, 
-                    `getResponseSublists() Invalid sublistId:`, 
+                    `[getResponseSublists()] Invalid sublistId:`, 
                     `sublistId '${sublistId}' not found on record`
                 );
                 continue;
@@ -694,7 +737,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
             const lineCount = rec.getLineCount({ sublistId });
             if (lineCount === 0) {
                 writeLog(LogTypeEnum.DEBUG, 
-                    `getResponseSublists() No lines found for sublistId '${sublistId}'`, 
+                    `[getResponseSublists()] No lines found for sublistId '${sublistId}'`, 
                 );
                 continue;
             }
@@ -705,26 +748,37 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                     ? rec.getSublistFields({ sublistId }) // as string[]
                     : responseSublists[sublistId] // as string[]
             ));
-            for (let i = 0; i < lineCount; i++) {
+            sublistLineLoop:
+            for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
                 /**@type {SublistLine} sublistLine {@link SublistLine}*/
                 const sublistLine = {
-                    line: i,
+                    line: lineIndex,
                     id: rec.getSublistValue({
-                        sublistId, fieldId: 'id', line: i
+                        sublistId, fieldId: 'id', line: lineIndex
                     }),
                     internalid: rec.getSublistValue({ 
-                        sublistId, fieldId: idPropertyEnum.INTERNAL_ID, line: i 
+                        sublistId, fieldId: idPropertyEnum.INTERNAL_ID, line: lineIndex 
                     })
                 };
-                
+                sublistFieldIdLoop:
                 for (const fieldId of responseFields) {
-                    /**@type {FieldValue | SubrecordValue} */
-                    const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSublistSubrecord({ sublistId, fieldId, line: i }) 
-                        ? rec.getSublistSubrecord({ sublistId, fieldId, line: i }) // as Subrecord 
-                        : rec.getSublistValue({ sublistId, fieldId, line: i }) // as FieldValue
-                    ); 
-                    if (value === undefined || value === null) { continue; }
-                    sublistLine[fieldId] = value;
+                    try {
+                        /**@type {FieldValue | SubrecordValue} */
+                        const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSublistSubrecord({ sublistId, fieldId, line: i }) 
+                            ? rec.getSublistSubrecord({ sublistId, fieldId, line: lineIndex }) // as Subrecord 
+                            : rec.getSublistValue({ sublistId, fieldId, line: lineIndex }) // as FieldValue
+                        ); 
+                        if (value === undefined || value === null) { continue; }
+                        sublistLine[fieldId] = value;
+                    } catch(error) {
+                        writeLog(LogTypeEnum.ERROR, `[getResponseSublists] Error getting sublist field value`,
+                            `sublistId: '${sublistId}'`, 
+                            `fieldId: '${fieldId}'`,
+                            `lineIndex: ${lineIndex}.`,
+                            `error: ${error}`
+                        );
+                        continue sublistFieldIdLoop;
+                    }
                 }
                 sublists[sublistId].push(sublistLine);
             }
@@ -801,7 +855,7 @@ const logDict = {
  * @returns {void} 
  */
 function writeLog(type, title, ...details) {
-    if (!type || !title) {
+    if (!type || !title || typeof title !== 'string') {
         log.error('Invalid log', 'type and title are required');
         return;
     }
@@ -809,7 +863,7 @@ function writeLog(type, title, ...details) {
         log.error('Invalid log type', `type must be one of ${Object.values(LogTypeEnum).join(', ')}`);
         return;
     }
-    details = details && details.length > 0 ? details : [title];
+    details = isNonEmptyArray(details) ? details : [title];
     const payload = details
         .map(d => (typeof d === 'string' ? d : JSON.stringify(d, null, 4)))
         .join(' ');
@@ -818,7 +872,7 @@ function writeLog(type, title, ...details) {
             if (logDict[LogTypeEnum.DEBUG].count >= logDict[LogTypeEnum.DEBUG].limit) {
                 break;
             }
-            // log.debug(title, payload);
+            log.debug(title, payload);
             logDict[LogTypeEnum.DEBUG].count++;
             break;
         case LogTypeEnum.ERROR:
@@ -988,6 +1042,8 @@ const SubrecordFieldEnum = {
     BILLING_ADDRESS: 'billingaddress',
     /**from the `'shippingaddress'` body `field` on Transaction records */
     SHIPPING_ADDRESS: 'shippingaddress',
+    /**from the `'{internalid}'` {type} `field` on {recordType} records */
+    INVENTORY_DETAIL: 'inventorydetail'
 }
 
 /**Type: RecordRequest {@link RecordRequest} */
@@ -1006,7 +1062,7 @@ const SubrecordFieldEnum = {
  * @property {RecordResult[]} [results] - an `Array<`{@link RecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully upserted.
  * @property {RecordOptions[]} [rejects] - an `Array<`{@link RecordOptions}`>` containing the record options that were not successfully upserted.
  * @property {string} [error] - An error message if the request was not successful.
- * @property {LogStatement[]} logArray - an `Array<`{@link LogStatement}`>` generated during the request processing.
+ * @property {LogStatement[]} logs - an `Array<`{@link LogStatement}`>` generated during the request processing.
  */
 
 

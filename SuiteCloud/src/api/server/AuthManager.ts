@@ -16,12 +16,12 @@ import {
 import { createUrlWithParams } from "../url";
 import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from "./types";
 import { 
-    writeObjectToJson as write 
-} from "../../utils/io/writing";
+    writeObjectToJsonSync as write 
+} from "typeshi/dist/utils/io/writing";
 import { 
     readJsonFileAsObject as read
-} from "../../utils/io/reading";
-import { getCurrentPacificTime } from "../../utils/io/dateTime";
+} from "typeshi/dist/utils/io/reading";
+import { getCurrentPacificTime } from "typeshi/dist/utils/io/dateTime";
 import { 
     mainLogger as mlog, apiLogger as alog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
     simpleLogger as slog

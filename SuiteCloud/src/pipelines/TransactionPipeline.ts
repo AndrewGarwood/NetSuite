@@ -5,15 +5,14 @@ import path from "node:path";
 import * as fs from "node:fs";
 import {
     readJsonFileAsObject as read,
-    writeObjectToJson as write,
+    writeObjectToJsonSync as write,
     getCsvRows, getOneToOneDictionary,
-    ValidatedParseResults,
-    ProcessParseResultsOptions, ParseOptions, ParseResults,
     getCurrentPacificTime, 
     indentedStringify, clearFileSync,
     getFileNameTimestamp,
     clearFile,
-} from "../utils/io";
+    isRowSourceMetaData,
+} from "typeshi/dist/utils/io";
 import { 
     STOP_RUNNING, DELAY,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
@@ -26,32 +25,37 @@ import {
     RecordOptions, RecordRequest, RecordResponse, 
     RecordResult, idPropertyEnum,
     RecordResponseOptions, upsertRecordPayload,
-    GetRecordRequest, getRecordById, GetRecordResponse,
+    GetRecordRequest, getRecordById,
     FieldDictionary,
     idSearchOptions,
     FieldValue,
     SetFieldSubrecordOptions,
     SourceTypeEnum,
-    LogTypeEnum, 
+    LogTypeEnum,
+    isRecordOptions,
+    isRecordResponseOptions, 
 } from "../api";
-import { parseRecordCsv } from "../csvParser";
-import { processParseResults, getValidatedDictionaries } from "../parseResultsProcessor";
+import { 
+    processParseResults, getCompositeDictionaries 
+} from "src/services/post_process/parseResultsProcessor";
 import { 
     isNonEmptyArray, isNullLike as isNull, isEmptyArray, hasKeys, 
     TypeOfEnum, isNonEmptyString, isIntegerArray,
 } from "../utils/typeValidation";
-import { getColumnValues, getRows, isValidCsvSync, isFile, isDirectory } from "../utils/io/reading";
+import { getColumnValues, getRows, isValidCsvSync, isFile, isDirectory } from "typeshi/dist/utils/io";
 import * as validate from "../utils/argumentValidation";
 import { EntityRecordTypeEnum, RecordTypeEnum, SearchOperatorEnum } from "../utils/ns/Enums";
-import { extractTargetRows } from "../DataReconciler";
 import { entityId } from "../parse_configurations/evaluators";
 import { SalesOrderColumnEnum } from "../parse_configurations/salesorder/salesOrderConstants";
 import { SO_CUSTOMER_PARSE_OPTIONS, SO_CUSTOMER_POST_PROCESSING_OPTIONS } from "../parse_configurations/salesorder/salesOrderParseDefinition";
 import { putEntities } from "./EntityPipeline";
-import { isRecordOptions, isRecordResponseOptions, isRowSourceMetaData } from "../utils/typeGuards";
-import { RowSourceMetaData } from "../utils/io";
 import { isTransactionEntityMatchOptions, LocalFileMatchOptions, MatchErrorDetails, MatchSourceEnum, TransactionEntityMatchOptions, TransactionMainPipelineOptions, TransactionMainPipelineStageEnum } from "./types";
 import { encodeExternalId } from "../utils/ns/utils";
+import { parseRecordCsv } from "src/services/parse/csvParser";
+import { 
+    ParseDictionary, ParseResults, ValidatedParseResults 
+} from "src/services/parse/types/index";
+import { PostProcessDictionary } from "src/services/post_process/types/PostProcessing";
 
 /** 
  * `responseFields`: `[
@@ -162,7 +166,7 @@ export async function runMainTransactionPipeline(
             ].join(TAB));
             return;
         }
-        const { validDict, invalidDict } = getValidatedDictionaries(validatedResults);
+        const { validDict, invalidDict } = getCompositeDictionaries(validatedResults);
         const invalidTransactions = Object.values(invalidDict).flat();
         if (invalidTransactions.length > 0) {
             write(invalidDict, path.join(outputDir, 
@@ -248,7 +252,7 @@ export async function runMainTransactionPipeline(
                     message: res.message,
                     error: res.error,
                     rejects: res.rejects,
-                    logArray: res.logArray.filter(l => l.type === LogTypeEnum.ERROR)
+                    logs: res.logs.filter(l => l.type === LogTypeEnum.ERROR)
                 } as RecordResponse)
             }
             if (isNonEmptyArray(res.results)) successCount += res.results.length;
@@ -370,16 +374,16 @@ async function matchUsingApi(
             recordType: entityType,
             idOptions: generateIdOptions(txn, entityType, entityFieldId)
         }
-        const getRes = await getRecordById(getReq) as GetRecordResponse;
-        if (!getRes || !isNonEmptyArray(getRes.records)) {
+        const getRes = await getRecordById(getReq) as RecordResponse;
+        if (!getRes || !isNonEmptyArray(getRes.results)) {
             mlog.error([`${source} Error: getRecordById() returned undefined or has no records`,
                 ` entityValue: '${entityValue}'`,
                 `get response: `, getRes
             ].join(TAB))
             result.errors.push(txn);
         } else {
-            txn.fields[entityFieldId] = getRes.records[0].internalid;
-            entityHistory[entityValue] = getRes.records[0].internalid;
+            txn.fields[entityFieldId] = getRes.results[0].internalid;
+            entityHistory[entityValue] = getRes.results[0].internalid;
             result.matches.push(txn);
         }
         await DELAY(1200, null);
@@ -545,11 +549,11 @@ export async function resolveUnmatchedTransactions(
         mlog.error(`ayo the diff should be 0`)
     }
     const parseResults: ParseResults = await parseRecordCsv(
-        targetRows, { [entityType]: SO_CUSTOMER_PARSE_OPTIONS } as ParseOptions
+        targetRows, { [entityType]: SO_CUSTOMER_PARSE_OPTIONS } as ParseDictionary
     );
     const validatedResults = await processParseResults(
         parseResults, 
-        { [entityType]: SO_CUSTOMER_POST_PROCESSING_OPTIONS } as ProcessParseResultsOptions
+        { [entityType]: SO_CUSTOMER_POST_PROCESSING_OPTIONS } as PostProcessDictionary
     ) as ValidatedParseResults;
     if (isNonEmptyArray(validatedResults[entityType].invalid)) {
         throw new Error([`${source} invalid customer RecordOptions....`,

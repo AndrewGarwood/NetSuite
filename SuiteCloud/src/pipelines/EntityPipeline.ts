@@ -4,12 +4,10 @@
 import path from "node:path";
 import * as fs from "fs";
 import {
-    writeObjectToJson as write,
-    ValidatedParseResults,
-    ProcessParseResultsOptions, ParseOptions, ParseResults,
+    writeObjectToJsonSync as write,
     getCurrentPacificTime,
     indentedStringify, clearFileSync,
-} from "../utils/io";
+} from "typeshi/dist/utils/io";
 import { 
     STOP_RUNNING,  DELAY, 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
@@ -19,7 +17,6 @@ import {
     EntityRecordTypeEnum, RecordOptions, RecordRequest, RecordResponse, 
     RecordResult, idPropertyEnum,
     RecordResponseOptions, upsertRecordPayload, getRecordById, 
-    GetRecordResponse,
     SAMPLE_POST_CUSTOMER_OPTIONS as SAMPLE_CUSTOMER,
     RecordTypeEnum,
     FieldDictionary,
@@ -30,10 +27,16 @@ import { CUSTOMER_PARSE_OPTIONS, CONTACT_PARSE_OPTIONS,
     CONTACT_CUSTOMER_POST_PROCESSING_OPTIONS as POST_PROCESSING_OPTIONS 
 } from "../parse_configurations/customer/customerParseDefinition";
 import * as customerConstants from "../parse_configurations/customer/customerConstants";
-import { parseRecordCsv } from "../csvParser";
-import { processParseResults } from "../parseResultsProcessor";
-import { isNonEmptyArray, isNonEmptyString } from "../utils/typeValidation";
+import { parseRecordCsv } from "../services/parse/csvParser";
+import { processParseResults } from "../services/post_process/parseResultsProcessor";
+import { isNonEmptyArray, isNonEmptyString } from "typeshi/dist/utils/typeValidation";
 import { RadioFieldBoolean, RADIO_FIELD_TRUE, } from "../utils/ns/";
+import { 
+    ParseDictionary, ParseResults, ValidatedParseResults 
+} from "../services/parse/types/index";
+import {
+    PostProcessDictionary
+} from "../services/post_process/types/PostProcessing";
 /** 
  * {@link RecordResponseOptions}
  * - `responseFields: ['entityid', 'externalid', 'isperson', 'companyname', 'email'];` 
@@ -68,7 +71,7 @@ export type EntityPipelineOptions = {
      * - leave undefined to process all files in filePaths 
      * */
     stopAfter?: EntityPipelineStageEnum,
-    parseOptions?: ParseOptions,
+    parseOptions?: ParseDictionary,
     responseOptions?: RecordResponseOptions
 }
 /**
@@ -126,7 +129,7 @@ export async function runEntityPipeline(
     for (let i = 0; i < filePaths.length; i++) {
         const csvFilePath = filePaths[i];
         let fileName = path.basename(csvFilePath);
-        const parseOptions: ParseOptions = {
+        const parseOptions: ParseDictionary = {
             [entityType]: CUSTOMER_PARSE_OPTIONS,
             [RecordTypeEnum.CONTACT]: CONTACT_PARSE_OPTIONS
         };
@@ -136,7 +139,7 @@ export async function runEntityPipeline(
         if (await done(options, fileName, EntityPipelineStageEnum.PARSE, parseResults)) return;
         const validatedResults: ValidatedParseResults = await processParseResults(
             parseResults, 
-            POST_PROCESSING_OPTIONS as ProcessParseResultsOptions 
+            POST_PROCESSING_OPTIONS as PostProcessDictionary 
         );
         if (await done(options, fileName, EntityPipelineStageEnum.VALIDATE, validatedResults)) return;
         

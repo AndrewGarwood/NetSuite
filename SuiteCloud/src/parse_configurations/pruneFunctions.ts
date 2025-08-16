@@ -16,10 +16,13 @@ import {
     SubrecordValue,
 } from "../api/types";
 import { hasKeys, isNullLike as isNull, isNonEmptyArray, isNonEmptyString 
-} from "../utils/typeValidation";
-import { clean, equivalentAlphanumericStrings as equivalentAlphanumeric, RegExpFlagsEnum } from "../utils/regex";
+} from "typeshi/dist/utils/typeValidation";
+import { clean, 
+    equivalentAlphanumericStrings, 
+    RegExpFlagsEnum 
+} from "typeshi/dist/utils/regex";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "../utils/ns/Enums";
-import { indentedStringify } from "../utils/io/writing";
+import { indentedStringify } from "typeshi/dist/utils/io/writing";
 import { RADIO_FIELD_FALSE, RADIO_FIELD_TRUE } from "../utils/ns";
 
 /** `['entity', 'trandate']` */
@@ -100,7 +103,7 @@ export const address = (
         && isNonEmptyString(addressOptions.fields.addressee)
         && isNonEmptyString(addressOptions.fields.attention)
         && (
-            equivalentAlphanumeric(
+            equivalentAlphanumericStrings(
                 addressOptions.fields.addressee, 
                 addressOptions.fields.attention
             ) 
@@ -265,6 +268,27 @@ export const salesOrder = async (
             `options.sublists.item: ${JSON.stringify(options.sublists.item)}`,
             `options.fields.externalid: '${options.fields.externalid}'`,
             ` -> returning null`
+        ].join(TAB));
+        return null;
+    }
+    return options;
+}
+
+
+/** check `hasKeys(options.fields, accounts, requireAll)` */
+export const item = async (
+    options: RecordOptions,
+    accounts: string | string[],
+    requireAll: boolean = false
+): Promise<RecordOptions | null> => {
+    if (!options || !options.fields) {
+        return null;
+    }
+    if (!hasKeys(options.fields, accounts, requireAll)) {
+        mlog.warn([
+            `[prune.item()] options.fields is missing account field`,
+            `  accounts: ${JSON.stringify(accounts)}`,
+            `requireAll: ${requireAll}`
         ].join(TAB));
         return null;
     }

@@ -14,7 +14,7 @@ import {
     SubrecordValue, 
 } from ".";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "../../utils/ns/record/Record";
-import { RowSourceMetaData } from "../../utils/io";
+import { RowSourceMetaData } from "typeshi/dist/utils/io";
 /**
  * @typedefn **`RecordRequest`**
  * @property {RecordOptions | Array<RecordOptions>} recordOptions = {@link RecordOptions} | `Array<`{@link RecordOptions}`>`
@@ -30,18 +30,18 @@ export type RecordRequest = {
  * @typedefn **`RecordResponse`**
  * @property {string | number} status - Indicates status of the request.
  * @property {string} message - A message indicating the result of the request.
- * @property {RecordResult[]} [results] - an `Array<`{@link RecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully upserted.
- * @property {RecordOptions[]} [rejects] - an `Array<`{@link RecordOptions}`>` containing the record options that were not successfully upserted.
- * @property {string} [error] - An error message if the request was not successful.
- * @property {LogStatement[]} logArray - an `Array<`{@link LogStatement}`>` generated during the request processing.
+ * @property {RecordResult[]} results - `Array<`{@link RecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully upserted.
+ * @property {RecordOptions[]} rejects - `Array<`{@link RecordOptions}`>` containing the record options that were not successfully upserted.
+ * @property {string} [error] - error message if the request was not successful.
+ * @property {LogStatement[]} logArray - `Array<`{@link LogStatement}`>` generated during the request processing.
  */
 export type RecordResponse = {
     status: string | number;
     message: string;
     results?: RecordResult[];
-    rejects?: RecordOptions[];
-    error?: string;
-    logArray: LogStatement[];
+    rejects?: any[] | RecordOptions[];
+    error?: string; 
+    logs: LogStatement[];
 }
 
 

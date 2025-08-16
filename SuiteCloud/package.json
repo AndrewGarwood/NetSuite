@@ -6,7 +6,6 @@
         "test": "jest",
         "start": "ts-node -r tsconfig-paths/register --project tsconfig.node.json src/main.ts",
         "interactive": "ts-node -r tsconfig-paths/register --project tsconfig.node.json src/mainInteractive.ts",
-        "test-interactive": "ts-node -r tsconfig-paths/register --project tsconfig.node.json src/testInteractive.ts",
         "build": "tsc --project tsconfig.node.json",
         "build:check": "tsc --noEmit",
         "lint": "eslint src/**/*.ts",
@@ -69,7 +68,8 @@
         "ts-node": "^10.9.2",
         "tsconfig-paths": "^4.2.0",
         "tslog": "^4.9.3",
-        "typescript": "^5.9.0-beta"
+        "typescript": "^5.9.0-beta",
+        "typeshi": "github:AndrewGarwood/typeshi"
     },
     "dependencies": {
         "@hitc/netsuite-tools": "^3.0.6",
@@ -85,6 +85,6 @@
         "kill-port": "^2.0.1",
         "netsuite-api-client": "^1.0.3",
         "oauth-1.0a": "^2.2.6",
-        "xlsx": "^0.18.5"
+        "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz"
     }
 }

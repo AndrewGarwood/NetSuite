@@ -1,8 +1,12 @@
-import { RecordResponseOptions } from "@api/requests/types/Requests";
+/**
+ * @file src/pipelines/types/Transaction.ts
+ */
+
+import { RecordResponseOptions } from "../../api/requests/types/Requests";
 import { LocalFileMatchOptions, MatchSourceEnum } from "./Pipeline";
-import { EntityRecordTypeEnum } from "@utils/ns/Enums";
-import { ParseOptions } from "@utils/io/types/ParseOptions";
-import { ProcessParseResultsOptions } from "@utils/io/types/PostProcessing";
+import { EntityRecordTypeEnum } from "../../utils/ns/Enums";
+import { ParseDictionary } from "src/services/parse/types/index";
+import { PostProcessDictionary } from "src/services/post_process/types/PostProcessing";
 
 
 
@@ -31,8 +35,8 @@ export type TransactionEntityMatchOptions = {
 }
 
 export type TransactionMainPipelineOptions = {
-    parseOptions: ParseOptions;
-    postProcessingOptions?: ProcessParseResultsOptions;
+    parseOptions: ParseDictionary;
+    postProcessingOptions?: PostProcessDictionary;
     /** 
      * {@link TransactionEntityMatchOptions} = `{ 
      * entityType: EntityRecordTypeEnum | string; entityFieldId: string; 

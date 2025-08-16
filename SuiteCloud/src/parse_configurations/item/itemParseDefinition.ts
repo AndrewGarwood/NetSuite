@@ -8,21 +8,27 @@ import {
     SublistDictionaryParseOptions,
     SublistLineParseOptions,
     RecordParseOptions, 
+} from "../../services/parse/types/index";
+import {
     RecordPostProcessingOptions,
-    ComposeOptions
-} from "../../utils/io";
-import { getAccountDictionary } from "../../config/dataLoader";
+    ComposeOptions,
+} from "../../services/post_process/types/PostProcessing";
+import { getAccountDictionary, getWarehouseRows } from "../../config/dataLoader";
 import { ItemColumnEnum as C } from "./itemConstants";
 import * as evaluate from "../evaluators";
+import * as prune from "../pruneFunctions";
 import { RecordTypeEnum, AccountTypeEnum, AccountDictionary } from "../../utils/ns";
 import { RecordOptions } from "../../api/types/RecordEndpoint";
-import { hasKeys, isNonEmptyString, isNullLike } from "../../utils/typeValidation";
-import { FieldDictionary } from "../../api";
+import { hasKeys, isNonEmptyString, isNullLike } from "typeshi/dist/utils/typeValidation";
+import { FieldDictionary, SublistDictionary } from "../../api";
+import { WarehouseColumnEnum, WarehouseRow } from "src/pipelines/types/Warehouse";
+import { getIndexedColumnValues } from "typeshi/dist/utils/io/";
 
 enum LocationEnum {
     HQ = 1,
     A = 2,
-    C = 3,
+    B = 3,
+    C = 4,
 }
 enum TaxScheduleEnum {
     DEFAULT = 2
@@ -32,17 +38,19 @@ enum PriceLevelEnum {
 }
 const ITEM_ID_ARGS: any[] = [C.ITEM_ID, evaluate.CLEAN_ITEM_ID_OPTIONS];
 
-export const INVENTORY_ITEM_PARSE_OPTIONS: RecordParseOptions = {
+export const LN_INVENTORY_ITEM_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: C.ITEM_ID,
     fieldOptions: {
         externalid: { evaluator: evaluate.externalId, 
-            args: [RecordTypeEnum.INVENTORY_ITEM, evaluate.itemId, ...ITEM_ID_ARGS] 
+            args: [RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM, evaluate.itemId, ...ITEM_ID_ARGS] 
         },
         itemid: { evaluator: evaluate.itemId, args: ITEM_ID_ARGS },
         displayname: { evaluator: evaluate.displayName, args: [C.DESCRIPTION, ...ITEM_ID_ARGS] },
         salesdescription: { evaluator: evaluate.description, args: [C.DESCRIPTION] },
         purchasedescription: { evaluator: evaluate.description, args: [C.PURCHASE_DESCRIPTION] },
+        costingmethod: { defaultValue: 'FIFO' },
         cost: { colName: C.COST },
+        usebins: { defaultValue: true },
         location: { defaultValue: LocationEnum.HQ },
         taxschedule: { defaultValue: TaxScheduleEnum.DEFAULT },
         gainlossaccount: { evaluator: evaluate.accountInternalId, 
@@ -91,7 +99,7 @@ export const NON_INVENTORY_ITEM_PARSE_OPTIONS: RecordParseOptions = {
         mpn: { colName: C.MPN }
     } as FieldDictionaryParseOptions,
     sublistOptions: {
-        price1: [
+        price: [
             {
                 pricelevel: { defaultValue: PriceLevelEnum.BASE_PRICE },
                 price: { colName: C.PRICE } as FieldParseOptions
@@ -121,7 +129,7 @@ export const SERVICE_ITEM_PARSE_OPTIONS: RecordParseOptions = {
         },
     } as FieldDictionaryParseOptions,
     sublistOptions: {
-        price1: [
+        price: [
             {
                 pricelevel: { defaultValue: PriceLevelEnum.BASE_PRICE },
                 price: { colName: C.PRICE } as FieldParseOptions
@@ -189,10 +197,13 @@ export const nonInventoryItemComposer = async (
     return fields;
 }
 
-export const inventoryItemComposer = async (
+let wItems: Record<string, number[]> | null = null;
+
+export const inventoryItemFieldComposer = async (
     record: RecordOptions,
     fields: FieldDictionary
 ): Promise<FieldDictionary> => {
+    const source = `[inventoryItemFieldComposer()]`
     let acctDict = await getAccountDictionary() as AccountDictionary;
     let cogsDict = acctDict["Cost of Goods Sold"] ?? {};
     let assetDict = acctDict["Other Current Asset"] ?? {}
@@ -202,50 +213,58 @@ export const inventoryItemComposer = async (
     if (isNullLike(fields.assetaccount)) {
         fields.assetaccount = Number(assetDict["Inventory Part"]);
     }
-    // mlog.debug([`[itemParseDefinition.composeAccounts()] comparing acct values`,
-    //     ` fields.cogsaccount: '${fields.cogsaccount}'`,
-    //     `fields.assetaccount: '${fields.assetaccount}'`,
-    //     `fields.incomeaccunt: '${fields.incomeaccount}'`
-    // ].join(TAB));
-    // if (fields.cogsaccount === fields.assetaccount 
-    //     || fields.cogsaccount === fields.incomeaccount 
-    //     || fields.asseteaccount === fields.incomeaccount) {
-    //         throw new Error(`ummmm might be an issue here, there are same account vals for diff fields`)
-    // }
+    const itemId = fields.itemid as string;
+    if (!isNonEmptyString(itemId)) {
+        throw new Error(`${source} Invalid RecordOptions: fields.itemid is undefined`);
+    }
+    const wRows = await getWarehouseRows() as WarehouseRow[];
+    if (!wItems) wItems = await getIndexedColumnValues(wRows, WarehouseColumnEnum.ITEM_ID);
+    const indexedWarehouseItems = wItems;
+    if (hasKeys(indexedWarehouseItems, itemId)) {
+        let rowIndex = indexedWarehouseItems[itemId][0];
+        let loc = Number(wRows[rowIndex][WarehouseColumnEnum.LOCATION_INTERNAL_ID]);
+        if (Number.isInteger(loc)) fields.location = loc;
+    }
     return fields;
 }
 
-/** check `hasKeys(options.fields, accounts, requireAll)` */
-export const item = async (
-    options: RecordOptions,
-    accounts: string | string[],
-    requireAll: boolean = false
-): Promise<RecordOptions | null> => {
-    if (!options || !options.fields) {
-        return null;
+export const inventoryItemSublistComposer = async (
+    record: RecordOptions,
+    sublists: SublistDictionary
+): Promise<SublistDictionary> => {
+    const source = `[inventoryItemSublistComposer()]`;
+    const fields = record.fields ?? {} as FieldDictionary;
+    const itemId = fields.itemid as string;
+    if (!isNonEmptyString(itemId)) {
+        throw new Error(`${source} Invalid RecordOptions: fields.itemid is undefined`);
     }
-    if (!hasKeys(options.fields, accounts, requireAll)) {
-        mlog.warn([
-            `[prune.item()] options.fields is missing account field`,
-            `  accounts: ${JSON.stringify(accounts)}`,
-            `requireAll: ${requireAll}`
-        ].join(TAB));
-        return null;
+    const wRows = await getWarehouseRows() as WarehouseRow[];
+    if (!wItems) wItems = await getIndexedColumnValues(wRows, WarehouseColumnEnum.ITEM_ID);
+    const indexedWarehouseItems = wItems;
+    if (hasKeys(indexedWarehouseItems, itemId)) {
+        let rowIndex = indexedWarehouseItems[itemId][0];
+        // let loc = Number(wRows[rowIndex][WarehouseColumnEnum.LOCATION_INTERNAL_ID]);
+        let bin = Number(wRows[rowIndex][WarehouseColumnEnum.BIN_INTERNAL_ID]);
+        // if (Number.isInteger(loc)) sublists.locations = [{location: loc}];
+        if (Number.isInteger(bin)) sublists.binnumber = [{binnumber: bin}];
     }
-    return options;
+    return sublists;
 }
 
+
 export const SERVICE_ITEM_POST_PROCESSING_OPTIONS: RecordPostProcessingOptions = {
-    pruneFunc: item,
+    pruneFunc: prune.item,
     pruneArgs: [['expenseaccount', 'incomeaccount'], false]
 }
 
-export const INVENTORY_ITEM_POST_PROCESSING_OPTIONS: RecordPostProcessingOptions = {
+/** `recordType: RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM` */
+export const LN_INVENTORY_ITEM_POST_PROCESSING_OPTIONS: RecordPostProcessingOptions = {
     composeOptions: {
-        recordType: RecordTypeEnum.INVENTORY_ITEM,
-        fields: { composer: inventoryItemComposer }
+        recordType: RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM,
+        fields: { composer: inventoryItemFieldComposer },
+        sublists: { composer: inventoryItemSublistComposer }
     } as ComposeOptions,
-    pruneFunc: item,
+    pruneFunc: prune.item,
     pruneArgs: [['cogsaccount', 'assetaccount'], true]
 }
 export const NON_INVENTORY_ITEM_POST_PROCESSING_OPTIONS: RecordPostProcessingOptions = {
@@ -253,6 +272,6 @@ export const NON_INVENTORY_ITEM_POST_PROCESSING_OPTIONS: RecordPostProcessingOpt
         recordType: RecordTypeEnum.NON_INVENTORY_ITEM,
         fields: { composer: nonInventoryItemComposer }
     } as ComposeOptions,
-    pruneFunc: item,
+    pruneFunc: prune.item,
     pruneArgs: [['incomeaccount'], true]
 }

@@ -2,7 +2,8 @@
  * @file src/parse_configurations/evaluators/address.ts
  */
 import { parseLogger as plog, mainLogger as mlog, 
-    INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG, 
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG,
+    getEntityValueOverrides, 
 } from "../../config";
 import { 
     FieldValue, 
@@ -13,12 +14,11 @@ import {
     REMOVE_ATTN_SALUTATION_PREFIX, 
     equivalentAlphanumericStrings as equivalentAlphanumeric,
     JOB_TITLE_SUFFIX_PATTERN, KOREA_ADDRESS_LATIN_TEXT_PATTERN,
-} from "../../utils/regex";
-import { checkForOverride, } from "../../utils/io";
-import { ENTITY_VALUE_OVERRIDES, entityId, firstName, lastName, middleName, 
+} from "typeshi/dist/utils/regex";
+import { checkForOverride, } from "../../utils/ns";
+import { entityId, firstName, lastName, middleName, 
     salutation, jobTitleSuffix 
 } from "./entity";
-import { SUPPRESS } from "./common";
 import { CountryAbbreviationEnum, StateAbbreviationEnum } from "../../utils/ns/Enums";
 
 
@@ -43,14 +43,14 @@ export type AttentionArguments = {
  * @param args {@link AttentionArguments} - arguments of column names to look for the attention person name in the `row` data.
  * @returns **`result`** `string` - the name of the person expected to receive the parcel from the `row` data.
  */
-export const attention = (
+export const attention = async (
     row: Record<string, any>,
     args: AttentionArguments
-): string => {
+): Promise<string> => {
     if (!row || !args.entityIdColumn) {
         return '';
     }
-    const entity = entityId(row, args.entityIdColumn);
+    const entity = await entityId(row, args.entityIdColumn);
     const salutationValue = (args.salutationColumn 
         ? salutation(row, args.salutationColumn, ...(args.nameColumns || []))
         : ''
@@ -59,7 +59,7 @@ export const attention = (
     const middle = middleName(row, args.middleNameColumn, ...args.nameColumns || []);
     const last = lastName(row, args.lastNameColumn, ...args.nameColumns || []);
     const title = jobTitleSuffix(row, 'Job Title', ...args.nameColumns || []);
-    SUPPRESS.push(NL+`[evaluate.attention()]`,
+    plog.debug(NL+`[evaluate.attention()]`,
         TAB+ `salutationValue: '${salutationValue}'`,
         TAB+ `entity: '${entity}'`,
         TAB+ ` first: '${first}'`,
@@ -84,7 +84,7 @@ export const attention = (
     );
     fullName = clean(fullName, {strip: STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION});
     // const result = (fullName.includes(entity)) ? '' : fullName;
-    SUPPRESS.push(NL+`[END evaluate.attention]()`,
+    plog.debug(NL+`[END evaluate.attention]()`,
         // NL+`attention(entityIdColumn='${args.entityIdColumn}', salutationColumn='${args.salutationColumn}', nameColumns.length=${args.nameColumns?.length || 0})`,
         TAB + `    entity: '${entity}'`,
         TAB + `salutation: '${salutationValue}'`,
@@ -103,11 +103,11 @@ export const attention = (
  * @returns **`addressee`** `string` - the name of the addressee based on the `row` data.
  * - i.e. the entity/company's name
  */
-export const addressee = (
+export const addressee = async (
     row: Record<string, any>,
     entityIdColumn: string,
     companyNameColumn?: string
-): string => {
+): Promise<string> => {
     if (!row || !entityIdColumn) {
         mlog.error(`addressee() called with invalid parameters.`,
             TAB + `addressee() requires row, entityIdColumn, and companyNameColumn`,
@@ -119,7 +119,7 @@ export const addressee = (
         ? checkForOverride(
             clean(row[companyNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION), 
             companyNameColumn, 
-            ENTITY_VALUE_OVERRIDES
+            await getEntityValueOverrides()
         ) as string
         : ''
     );
@@ -130,7 +130,7 @@ export type StreetArguments = {
     streetLineOneColumn: string;
     streetLineTwoColumn: string;
     companyNameColumn?: string;
-    addresseeFunction: (row: Record<string, any>, entityIdColumn: string, companyNameColumn?: string) => string;
+    addresseeFunction: (row: Record<string, any>, entityIdColumn: string, companyNameColumn?: string) => string | Promise<string>;
 } & AttentionArguments;
 
 /**
@@ -145,11 +145,11 @@ export type StreetArguments = {
  * @param args {@link StreetArguments} - the arguments to use for the street evaluation
  * @returns **`streetLineValue`** `string` - the street line value based on the `streetLineNumber` and the content of the `row` object.
  */
-export const street = (
+export const street = async (
     row: Record<string, any>,
     streetLineNumber: 1 | 2,
     args: StreetArguments
-): string => {
+): Promise<string> => {
     const invalidStreetArguments = Boolean(!row || !args
         || ![1, 2].includes(streetLineNumber) 
         || !args.streetLineOneColumn 
@@ -163,8 +163,8 @@ export const street = (
         );
         return '';
     }        
-    const attentionValue = attention(row, args);
-    const addresseeValue = args.addresseeFunction(
+    const attentionValue = await attention(row, args);
+    const addresseeValue = await args.addresseeFunction(
         row, args.entityIdColumn, args.companyNameColumn
     );
     const streetLineOneValue = clean(row[args.streetLineOneColumn], {

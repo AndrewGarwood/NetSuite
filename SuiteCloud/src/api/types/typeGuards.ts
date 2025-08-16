@@ -2,10 +2,10 @@
  * @file src/api/types/typeGuards.ts
  */
 
-import { hasKeys, isPrimitiveValue } from "../../utils/typeValidation";
+import { hasKeys, isPrimitiveValue } from "typeshi/dist/utils/typeValidation";
 import { SubrecordValue, FieldValue } from "./InternalApi";
 import { RecordResponseOptions } from "../requests/types/Requests";
-import { RecordResponse } from "./RecordEndpoint";
+import { RecordOptions, RecordResponse } from "./RecordEndpoint";
 /**
  * - {@link SubrecordValue}
  * @param value `any`
@@ -49,6 +49,25 @@ export function isFieldValue(value: any): value is FieldValue {
         return value.every(item => isPrimitiveValue(item));
     }
     return false;
+}
+
+
+/**
+ * @param value `any`
+ * @returns **`isRecordOptions`** `boolean`
+ * - **`true`** if the `value` is an object with the key `recordType` 
+ * and at least key in `['fields', 'sublists']`,
+ * - **`false`** `otherwise`.
+ */
+export function isRecordOptions(value: any): value is RecordOptions {
+    return (value && typeof value === 'object' 
+        && hasKeys(value, 'recordType') 
+        && hasKeys(value, 
+            ['fields', 'sublists', 'recordType', 'isDynamic', 'idOptions', 'meta'], 
+            false, 
+            false
+        )
+    );
 }
 
 /**

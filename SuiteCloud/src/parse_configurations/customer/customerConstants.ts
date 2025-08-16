@@ -1,9 +1,7 @@
 /**
  * @file src/parse_configurations/customer/customerConstants.ts
  */
-import path from "node:path";
 import { DATA_DIR, CLOUD_LOG_DIR } from "../../config/env";
-import { ValueMapping, readJsonFileAsObject as read } from "../../utils/io";
 
 /** `${DATA_DIR}/customers` */
 export const CUSTOMER_DIR = `${DATA_DIR}/customers` as string;
@@ -80,19 +78,4 @@ export enum CustomerColumnEnum {
     COMMENTS = 'Note',
     TITLE = 'Job Title',
     CLASS = 'Class',
-}
-
-const filePath = path.join(DATA_DIR, '.constants', 'customer_constants.json');
-export const CUSTOMER_CONSTANTS = read(filePath);
-if (!CUSTOMER_CONSTANTS || typeof CUSTOMER_CONSTANTS !== 'object') {
-    throw new Error(
-        `Invalid or missing customer_constants.json file. received: '${filePath}'`
-    );
-}
-
-export const CUSTOMER_CATEGORY_MAPPING: ValueMapping = CUSTOMER_CONSTANTS.CUSTOMER_CATEGORY_MAPPING;
-if (!CUSTOMER_CATEGORY_MAPPING || typeof CUSTOMER_CATEGORY_MAPPING !== 'object') {
-    throw new Error(
-        `Invalid or missing 'CUSTOMER_CATEGORY_MAPPING' from file at '${filePath}'`
-    );
 }

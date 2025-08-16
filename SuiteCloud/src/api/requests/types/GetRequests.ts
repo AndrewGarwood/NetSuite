@@ -19,6 +19,7 @@ export type GetRecordRequest = {
     responseOptions?: RecordResponseOptions;
 };
 /**
+ * @deprecated
  * @typedefn **`GetRecordResponse`**
  */
 export type GetRecordResponse = {
@@ -26,5 +27,6 @@ export type GetRecordResponse = {
     message: string;
     error?: string;
     logArray: LogStatement[];
-    records?: RecordResult[];
+    results?: RecordResult[];
+    rejects?: GetRecordRequest[];
 };

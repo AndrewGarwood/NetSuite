@@ -5,14 +5,12 @@ import path from 'node:path';
 import * as fs from 'fs';
 import {
     readJsonFileAsObject as read,
-    writeObjectToJson as write,
+    writeObjectToJsonSync as write,
     getCsvRows, getOneToOneDictionary,
-    ValidatedParseResults,
-    ProcessParseResultsOptions, ParseOptions, ParseResults,
     getCurrentPacificTime, 
     indentedStringify, clearFileSync,
     getFileNameTimestamp, RowSourceMetaData
-} from "../utils/io";
+} from "typeshi/dist/utils/io";
 import { 
     STOP_RUNNING, DELAY, simpleLogger as slog,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
@@ -24,28 +22,34 @@ import {
     RecordOptions, RecordRequest, RecordResponse, 
     RecordResult, idPropertyEnum,
     RecordResponseOptions, upsertRecordPayload,
-    GetRecordRequest, getRecordById, GetRecordResponse,
+    GetRecordRequest, getRecordById,
     FieldDictionary,
     idSearchOptions,
     FieldValue,
     SetFieldSubrecordOptions,
     SourceTypeEnum,
-    LogTypeEnum, 
+    LogTypeEnum,
+    isRecordOptions,
+    isRecordResponseOptions, 
 } from "../api";
-import { parseRecordCsv } from "../csvParser";
-import { processParseResults, getValidatedDictionaries } from "../parseResultsProcessor";
 import { 
     isNonEmptyArray, isNullLike as isNull, isEmptyArray, hasKeys, 
     TypeOfEnum, isNonEmptyString, isIntegerArray,
-} from "../utils/typeValidation";
-import { getColumnValues, getRows, isValidCsvSync } from "../utils/io/reading";
-import * as validate from "../utils/argumentValidation";
+} from "typeshi/dist/utils/typeValidation";
+import * as validate from "typeshi/dist/utils/argumentValidation";
 import { RecordTypeEnum, SearchOperatorEnum } from "../utils/ns/Enums";
-import { isRecordOptions, isRecordResponseOptions, isRowSourceMetaData } from "../utils/typeGuards";
-import { WarehouseBin, ItemPipelineOptions, ItemPipelineStageEnum, WarehouseDictionary } from "./types";
-import { ITEM_RESPONSE_OPTIONS, BIN_RESPONSE_OPTIONS } from "./ItemConfig";
-import { clean, CleanStringOptions, extractLeaf } from "../utils/regex";
-import { CLEAN_ITEM_ID_OPTIONS } from "../parse_configurations/evaluators/item";
+import { 
+    WarehouseContent, ItemPipelineOptions, ItemPipelineStageEnum, 
+    WarehouseDictionary 
+} from "./types";
+import { DEFAULT_ITEM_RESPONSE_OPTIONS, BIN_RESPONSE_OPTIONS } from "./ItemConfig";
+import { clean, CleanStringOptions, extractLeaf } from "typeshi/dist/utils/regex";
+import { CLEAN_ITEM_ID_OPTIONS } from "src/parse_configurations/evaluators/item";
+import { parseRecordCsv } from 'src/services/parse';
+import { ParseResults, ValidatedParseResults } from 'src/services/parse/types/index';
+import { 
+    getCompositeDictionaries, processParseResults 
+} from 'src/services/post_process/parseResultsProcessor';
 
 
 /**
@@ -90,7 +94,7 @@ export async function runMainItemPipeline(
     filePaths: string | string[],
     options: ItemPipelineOptions
 ): Promise<void> {
-    const source = `ItemPipeline.runItemPipeline`;
+    const source = `ItemPipeline.runMainItemPipeline`;
     validate.enumArgument(source, {itemType, RecordTypeEnum})
     validate.objectArgument(source, {options});
     filePaths = isNonEmptyArray(filePaths) ? filePaths : [filePaths];
@@ -122,7 +126,7 @@ export async function runMainItemPipeline(
         if (await done(
             options, fileName, ItemPipelineStageEnum.VALIDATE, validatedResults
         )) return;
-        const { validDict, invalidDict } = getValidatedDictionaries(validatedResults);
+        const { validDict, invalidDict } = getCompositeDictionaries(validatedResults);
         const invalidItems = Object.values(invalidDict).flat();
         if (invalidItems.length > 0) {
             write(invalidDict, path.join(CLOUD_LOG_DIR, `items`, 
@@ -141,7 +145,7 @@ export async function runMainItemPipeline(
         const itemResponses = await putItems(validItems, responseOptions);
         let successCount = 0;
         let numRejects = 0;
-        const rejectResponses: any[] = [];
+        const rejectResponses: RecordResponse[] = [];
         for (const res of itemResponses) {
             if (isNonEmptyArray(res.rejects)) {
                 numRejects += res.rejects.length;
@@ -150,7 +154,9 @@ export async function runMainItemPipeline(
                     message: res.message,
                     error: res.error,
                     rejects: res.rejects,
-                    logs: res.logArray.filter(l => l.type === LogTypeEnum.ERROR)
+                    logs: res.logs.filter(l => 
+                        l.type === LogTypeEnum.ERROR || l.type === LogTypeEnum.AUDIT
+                    )
                 })
             }
             if (isNonEmptyArray(res.results)) successCount += res.results.length;
@@ -182,7 +188,7 @@ export async function runMainItemPipeline(
 
 export async function putItems(
     items: RecordOptions[],
-    responseOptions: RecordResponseOptions = ITEM_RESPONSE_OPTIONS
+    responseOptions: RecordResponseOptions = DEFAULT_ITEM_RESPONSE_OPTIONS
 ): Promise<RecordResponse[]> {
     const source = `[ItemPipeline.putItems()]`;
     try {
@@ -267,106 +273,11 @@ export async function generateBinOptions(
     return bins;
 }
 
-/**
- * @param filePath `string` `path.join(ONE_DRIVE_DIR, 'Bin Numbers.xlsx')`
- * @param locations `Record<string, number>`
- * @param idColumn `string`
- * @returns **`warehouseDictionary`** {@link WarehouseDictionary}
- */
-export async function generateWarehouseDictionary(
-    filePath: string,
-    locations: Record<string, number> = LOCATION_ID_DICT,
-    idColumn: string = 'Item #'
-): Promise<WarehouseDictionary> {
-    const wDict: WarehouseDictionary = {}
-    for (const [locName, locId] of Object.entries(locations)) {
-        let rows = await getRows(filePath, locName);
-        rows.forEach((r, index) => {
-            for (let k of Object.keys(r)) {
-                let v = String(r[k]).trim();
-                if (!v) { delete r[k] }
-            }
-        })
-        wDict[locId] = await getWarehouseBin(rows);
-        slog.info([`locName: '${locName}'`, 
-            `  rows.length: ${rows.length}`, 
-            `expected bins: ${rows.filter(r => 
-                Object.keys(r).length === 1 && hasKeys(r, idColumn)).length
-            }`,
-            `received bins: ${Object.keys(wDict[locId]).length}`
-        ].join(TAB));
-    }
-    return wDict;
-}
-
-export const LOCATION_ID_DICT = {
+export const LOCATION_ID_DICT: Record<string, number> = {
     A: 2,
     B: 3,
     C: 4
 }
-
-const BIN_OR_ITEM_ID_COLUMN = 'Item #';
-const DESC_COLUMN = 'Description';
-const LOT_COLUMN = 'Lot/Serial Number';
-
-export async function getWarehouseBin(
-    rows: Record<string, any>[],
-    idColumn: string=BIN_OR_ITEM_ID_COLUMN,
-    descriptionColumn: string=DESC_COLUMN,
-    lotColumn: string=LOT_COLUMN
-): Promise<WarehouseBin> {
-    const source = `[misc.getBinDictionary()]`
-    if (!isNonEmptyArray(rows)) {
-        mlog.error(`${source} Invalid Argument: 'rows' Record<string, any>[]`)
-        return {}
-    }
-    let currentBinId: string = (
-        await itemIdExtractor(String(rows[0][idColumn]))
-    ).replace(/N\/A/, '').trim();
-    if (!currentBinId) {
-        mlog.error(`${source} Unable to start process - first row is missing idColumn value`)
-        return {}
-    }
-    const binDict: WarehouseBin = { [currentBinId]: {} };
-    for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (!hasKeys(row, idColumn)) { continue }
-        let idValue = (await itemIdExtractor(String(row[idColumn])))
-            .replace(/N\/A/, '').trim();
-        if (!idValue) { continue }
-        let isNewBinNumber = (Object.keys(row).length === 1 
-            && hasKeys(row, idColumn)
-            && !hasKeys(binDict, idValue)
-        );
-        if (isNewBinNumber) {
-            binDict[idValue] = {};
-            currentBinId = idValue;
-            continue;
-        } // else idValue corresponds to itemId as key in BinContent dict[binNumber]
-        const oneOrTwoDigitPattern = /\d{1,2}/;
-        if (oneOrTwoDigitPattern.test(idValue)) {
-            idValue = idValue.padStart(3, '0');
-        }
-        let desc = String(row[descriptionColumn]).trim();
-        let lotNumber = String(row[lotColumn]).replace(/N\/A/i, '').trim();
-        if (!hasKeys(binDict[currentBinId], idValue)) {
-            binDict[currentBinId][idValue] = {
-                description: '',
-                lotNumbers: []
-            };
-        }
-        if (isNonEmptyString(lotNumber) 
-            && !binDict[currentBinId][idValue].lotNumbers.includes(lotNumber)) {
-            binDict[currentBinId][idValue].lotNumbers.push(lotNumber);
-        }
-        if (isNonEmptyString(desc) 
-            && !binDict[currentBinId][idValue].description) {
-            binDict[currentBinId][idValue].description = desc;
-        }
-    }
-    return binDict as WarehouseBin;
-}
-
 
 export const itemIdExtractor = async (
     value: string, 

@@ -6,7 +6,7 @@ import {
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG, 
     DATA_DIR
 } from "../../config";
-import { HUMAN_VENDORS_TRIMMED } from "../vendor/vendorConstants";
+import { getHumanVendorList } from "../../config";
 import { 
     FieldValue, 
 } from "../../api/types";
@@ -18,29 +18,22 @@ import {
     REMOVE_ATTN_SALUTATION_PREFIX, ENSURE_SPACE_AROUND_HYPHEN, REPLACE_EM_HYPHEN,
     stringContainsAnyOf, JOB_TITLE_SUFFIX_PATTERN, extractJobTitleSuffix,
     REMOVE_JOB_TITLE_SUFFIX, KOREA_ADDRESS_LATIN_TEXT_PATTERN
-} from "../../utils/regex";
-import { checkForOverride, ColumnSliceOptions, ValueMapping } from "../../utils/io";
-import { field, SUPPRESS } from "./common";
-import { readJsonFileAsObject as read } from "../../utils/io";
-import path from "node:path";
+} from "typeshi/dist/utils/regex";
+import { field } from "./common";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
+import { checkForOverride } from "../../utils/ns";
+import { ColumnSliceOptions } from "src/services/parse/types/index";
+import { getEntityValueOverrides } from "../../config";
 
-export const ENTITY_VALUE_OVERRIDES = {} as ValueMapping;
-Object.assign(ENTITY_VALUE_OVERRIDES, read(
-    path.join(DATA_DIR, 'customers', 'entity_value_overrides.json')
-));
-mlog.debug(`[evaluators.entity()]`,
-    `num override keys: ${Object.keys(ENTITY_VALUE_OVERRIDES).length}`
-);
 /** 
  * @param row `Record<string, any>` - the `row` of data
  * @param entityIdColumn `string`
  * @returns **`entity`** = {@link checkForOverride}`(`{@link clean}`(row[entityIdColumn],...),...)`
  * */
-export const entityId = (
+export const entityId = async (
     row: Record<string, any>, 
     entityIdColumn: string
-): string => {
+): Promise<string> => {
     let entity = clean(row[entityIdColumn], {
         strip: STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
         replace: [
@@ -53,13 +46,9 @@ export const entityId = (
             ENSURE_SPACE_AROUND_HYPHEN,
         ]
     });
-    if (Object.keys(ENTITY_VALUE_OVERRIDES).length === 0) {
-        Object.assign(ENTITY_VALUE_OVERRIDES, read(
-            path.join(DATA_DIR, 'customers', 'entity_value_overrides.json')
-        ));
-    }
+    let entOverrides = await getEntityValueOverrides();
     return checkForOverride(
-        entity, entityIdColumn, ENTITY_VALUE_OVERRIDES
+        entity, entityIdColumn, entOverrides
     ) as string;
 }
 
@@ -98,12 +87,12 @@ export const entityExternalId = (
  * - **`true`** `if` the entity is a person, 
  * - **`false`** `otherwise`
  */
-export const isPerson = (
+export const isPerson = async (
     row: Record<string, any>, 
     entityIdColumn: string, 
     companyColumn: string='Company'
-): boolean => {
-    let entity = entityId(row, entityIdColumn);
+): Promise<boolean> => {
+    let entity = await entityId(row, entityIdColumn);
     let company = (companyColumn 
         ? clean(row[companyColumn], {
             strip: STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
@@ -111,12 +100,13 @@ export const isPerson = (
         })
         : ''
     );
-    SUPPRESS.push(NL + `[START isPerson()]`,
+    plog.debug(NL + `[START isPerson()]`,
         TAB + `entityIdColumn = '${entityIdColumn}' -> entity = '${entity}'`,
         TAB + ` companyColumn = '${companyColumn}' -> company = '${company}'`,
     );
-    if (HUMAN_VENDORS_TRIMMED.includes(entity)) {
-        SUPPRESS.push(NL + `-> return true because entity '${entity}' is in HUMAN_VENDORS_TRIMMED`);
+    let humanVendorList = await getHumanVendorList();
+    if (humanVendorList.includes(entity)) {
+        plog.debug(NL + `-> return true because entity '${entity}' is in HUMAN_VENDORS_TRIMMED`);
         return true;
     }
     if (COMPANY_KEYWORDS_PATTERN.test(entity) 
@@ -129,14 +119,14 @@ export const isPerson = (
         // )
         || (company && COMPANY_KEYWORDS_PATTERN.test(company))
     ) {
-        SUPPRESS.push(
+        plog.debug(
             NL + `-> return false`);
         return false;
     }
-    SUPPRESS.push(
+    plog.debug(
         NL+ `[END isPerson()]:`,
         NL + `entityIdColumn = '${entityIdColumn}' -> entity = '${entity}'`,`companyColumn = '${companyColumn}'`, 
-        TAB + `HUMAN_VENDORS_TRIMMED.includes('${entity}') = ${HUMAN_VENDORS_TRIMMED.includes(entity)}`,
+        TAB + `humanVendorList.includes('${entity}') = ${humanVendorList.includes(entity)}`,
         TAB + `COMPANY_KEYWORDS_PATTERN.test('${entity}')  = ${COMPANY_KEYWORDS_PATTERN.test(entity)}`,
         TAB + `'${entity}' ends with company abbreviation  = ${stringEndsWithAnyOf(entity, COMPANY_ABBREVIATION_PATTERN, RegExpFlagsEnum.IGNORE_CASE)}`,
         TAB + `/[0-9@]+/.test('${entity}')                 = ${/[0-9@&]+/.test(entity)}`,
@@ -145,7 +135,7 @@ export const isPerson = (
         // TAB +`company is not of format lastName, firstName = ${!LAST_NAME_COMMA_FIRST_NAME_PATTERN.test(company)}`,
         TAB + `COMPANY_KEYWORDS_PATTERN.test('${company}') = ${company && COMPANY_KEYWORDS_PATTERN.test(company)}`, 
     );
-    SUPPRESS.push(NL + `[END isPerson()] -> return true`);
+    plog.debug(NL + `[END isPerson()] -> return true`);
     return true;
 }
 
@@ -173,7 +163,7 @@ export const email = (
     ...emailColumnOptions: Array<string | ColumnSliceOptions>
 ): string => {
     const emailValue: string = field(row, extractEmail, ...emailColumnOptions);
-    SUPPRESS.push(NL+`evaluatorFunctions.email()`,
+    plog.debug(NL+`evaluatorFunctions.email()`,
         TAB+`emailValue: '${emailValue}'`,
         TAB+`isValidEmail('${emailValue}') = ${isValidEmail(emailValue)}`,
         TAB+`-> return '${emailValue}'`
@@ -189,7 +179,7 @@ export const salutation = (
     let salutationValue = clean(row[salutationColumn]);
     if (salutationValue) return salutationValue;
     if (!nameColumns) return '';
-    SUPPRESS.push(
+    plog.debug(
         NL+`evaluate.salutation() clean(row['${salutationColumn}']) = '${salutationValue}'`,
     );
     for (const col of nameColumns) {
@@ -198,13 +188,13 @@ export const salutation = (
             strip: STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, 
             replace: [{searchValue: /^((attention|attn|atn):)?\s*/i, replaceValue: '' }]
         });
-        SUPPRESS.push(
+        plog.debug(
             TAB + `col: '${col}', initialVal: '${initialVal}'`,
         );
         if (!initialVal) { continue; } 
         if (SALUTATION_REGEX.test(initialVal)) {
             salutationValue = initialVal.match(SALUTATION_REGEX)?.[0] || '';
-            SUPPRESS.push(
+            plog.debug(
                 TAB + `SALUTATION_REGEX.test('${initialVal}') = true`,
                 TAB + `initialVal.match(SALUTATION_REGEX)?.[0] = '${initialVal.match(SALUTATION_REGEX)?.[0]}'`,
                 TAB + `-> RETURN salutationValue: '${salutationValue}'`
@@ -269,14 +259,14 @@ export const firstName = (
         ? clean(row[firstNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
         : ''
     );
-    SUPPRESS.push(NL + `clean(row[firstNameColumn]): '${first}'`);
+    plog.debug(NL + `clean(row[firstNameColumn]): '${first}'`);
     if (!first || first.split(' ').length > 1) {
         first = name(row, 
             ...(firstNameColumn ? [firstNameColumn] : []) //if data entry error when someone put whole name in firstNameColumn,
                 .concat(nameColumns)
         ).first;
     }
-    SUPPRESS.push(NL + `first after evaluate nameColumns: '${first}'`);
+    plog.debug(NL + `first after evaluate nameColumns: '${first}'`);
     return first.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');
 }
 
@@ -292,7 +282,7 @@ export const middleName = (
     if (!middle || middle.split(' ').length > 1) {
         middle = name(row, ...nameColumns).middle;
     }
-    SUPPRESS.push(NL + `[evaluators.entity.middleName()] after evaluate nameColumns: '${middle}'`);
+    plog.debug(NL + `[evaluators.entity.middleName()] after evaluate nameColumns: '${middle}'`);
     return middle.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');
 }
 
@@ -312,7 +302,7 @@ export const lastName = (
     if (!last) {
         last = name(row, ...nameColumns).last;
     }
-    SUPPRESS.push(NL + `last after evaluate nameColumns: '${last}'`);
+    plog.debug(NL + `last after evaluate nameColumns: '${last}'`);
     return last.replace(/^[-,;:]*/, '').replace(/[-,;:]*$/, '');
 }
 
@@ -338,7 +328,7 @@ export const jobTitleSuffix = (
         if (!nameValue) continue;
         jobTitle = extractJobTitleSuffix(nameValue);
         if (jobTitle) {
-            SUPPRESS.push(NL + `[evaluate.jobTitle()] found job title!`,
+            plog.debug(NL + `[evaluate.jobTitle()] found job title!`,
                 TAB + `jobTitle: '${jobTitle}'`,
                 TAB + `  column: '${col}'`
             );

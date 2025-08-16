@@ -1,9 +1,0 @@
-{
-    "accounts": [
-        {
-            "companyId": "YOUR_COMPANY_ID",
-            "tokenId": "YOUR_HITC_INTEGRATION_TOKEN_ID",
-            "tokenSecret": "YOUR_HITC_INTEGRATION_TOKEN_SECRET"
-        }
-    ]
-}

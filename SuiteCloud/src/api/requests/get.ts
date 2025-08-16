@@ -1,19 +1,19 @@
 /**
  * @file src/api/requests/get.ts
- * @TODO maybe rewrite the GET endpoint in GET_Record.js to have the request just be idProp, idVal, and recordType
  */
 import axios from "axios";
 import { 
-    writeObjectToJson as write, getCurrentPacificTime, indentedStringify 
-} from "../../utils/io";
+    writeObjectToJsonSync as write, getCurrentPacificTime, indentedStringify 
+} from "typeshi/dist/utils/io";
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "../url";
 import { AxiosContentTypeEnum } from "../server";
 import { 
-    GetRecordRequest, GetRecordResponse, idSearchOptions, idPropertyEnum, 
+    GetRecordRequest, idSearchOptions, idPropertyEnum, 
     RecordResponseOptions,
     isRecordResponseOptions,
+    RecordResponse,
 } from "../types";
 import { SB_REST_SCRIPTS } from "../configureRequests";
 import { getAccessToken } from "../configureAuth";
@@ -28,24 +28,24 @@ export const GET_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.GET_Record.deployId as numbe
 
 /**
  * @param request {@link GetRecordRequest}
- * @returns **`response`** - `Promise<`{@link GetRecordResponse}`>`
+ * @returns **`response`** - `Promise<`{@link RecordResponse}`>`
  */
 export async function getRecordById(
     request: GetRecordRequest
-): Promise<GetRecordResponse>
+): Promise<RecordResponse>
 /**
  * @param recordType {@link RecordTypeEnum} | {@link EntityRecordTypeEnum}
  * @param recordId `string | number`
  * @param idProp {@link idPropertyEnum} - defaults to {@link idPropertyEnum.INTERNAL_ID}
  * @param responseOptions {@link RecordResponseOptions} - defaults to `{}` (empty object)
- * @returns **`response`** - `Promise<`{@link GetRecordResponse}`>`
+ * @returns **`response`** - `Promise<`{@link RecordResponse}`>`
  */
 export async function getRecordById(
     recordType: RecordTypeEnum | string, 
     recordId: string | number, 
     idProp: idPropertyEnum,
     responseOptions: RecordResponseOptions
-): Promise<GetRecordResponse>
+): Promise<RecordResponse>
 
 /**
  * - {@link GET_RECORD_SCRIPT_ID} = `175`
@@ -56,7 +56,7 @@ export async function getRecordById(
     recordId?: string | number,
     idProp?: idPropertyEnum,
     responseOptions?: RecordResponseOptions
-): Promise<GetRecordResponse> {
+): Promise<RecordResponse> {
     const source = `[get.getRecordById()]`
     const request = {} as GetRecordRequest;
     if (typeof arg1 === 'string') {
@@ -88,7 +88,7 @@ export async function getRecordById(
             GET_RECORD_DEPLOY_ID,
             request
         );
-        return response.data as GetRecordResponse;
+        return response.data as RecordResponse;
     } catch (error) {
         let e = error as any || {}
         mlog.error([`${source} ERROR:`,
