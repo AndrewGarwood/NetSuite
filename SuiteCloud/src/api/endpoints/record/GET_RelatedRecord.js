@@ -1,72 +1,157 @@
 /**
- * @incomplete
  * @NApiVersion 2.1
  * @NScriptType Restlet
- * @NScriptName GET_RelatedRecordId
- * @PROD_ScriptId NOT_DEPLOYED
- * @PROD_DeployId NOT_DEPLOYED
- * @SB_ScriptId NOT_DEPLOYED
- * @SB_DeployId NOT_DEPLOYED
+ * @NScriptName GET_RelatedRecord
+ * @PROD_ScriptId 
+ * @PROD_DeployId 
+ * @SB_ScriptId 178
+ * @SB_DeployId 1
+ */
+
+
+/**
+ * @consideration maybe change `ChildSearchOptions.sublistId` back to boolean flag 
+ * 'isSublistField' boolean
+ * instead of the sublist id because search.createFilter was throwing error when trying 
+ * to prefix fieldId with sublistId. and when setting filterOptions.join = sublistId,
+ * or can keep sublistId and use some record module function to verify that it's a valid 
+ * sublist and sublist field id
+ * @concern got same results regardless of adding explicit filter `mainline is F` (when searching in item sublist)
+ * - maybe this is intentional because 'item' is a sublistid of transactions and is a fieldId of the 'item' sublist ?
  */
 
 
 define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     /**
-     * @type {LogStatement[]} - `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
+     * @type {LogStatement[]} `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
      * @see {@link writeLog}`(type, title, ...details)`
-     * @description return logArray in response so can process in client
      * */
     const logArray = [];
     /**`'endpoint'` */
-    const EP = `GET_RelatedRecordId`;
+    const EP = `GET_RelatedRecord`;
     /** keys of {@link RelatedRecordRequest} = `['parentRecordType', 'idOptions', 'childOptions']` */
     const REQUEST_KEYS = ['parentRecordType', 'idOptions', 'childOptions'];
-    const isSublistFieldFilter = ['mainline', SearchOperatorEnum.TEXT.IS, 'F'];
     /**
-     * @param {RelatedRecordRequest} reqParams 
-     * @returns {RecordResponse}
+     * @param {{parentRecordType: string; idOptions: string; childOptions: string}} reqParams
+     * - converts json string values to objects in {@link unpackRequestParameters}  
+     * @returns {RecordResponse} **`response`** {@link RecordResponse}
      */
-    const get = (
-        /**@type {{parentRecordType: string; idOptions: string; childOptions: string}} */
-        reqParams
-    ) => {
+    const get = (reqParams) => {
         const source = `[${EP}.get()]`;
         if (!reqParams
             || typeof reqParams !== 'object'
             || !hasKeys(reqParams, REQUEST_KEYS)) {
-            return handleError(reqParams, source, [
+            return handleParamError(reqParams, source, [
                 `Invalid Request Parameter(s)`,
                 `Expected param keys: ${JSON.stringify(REQUEST_KEYS)}`,
                 `Received ${typeof reqParams} = ${JSON.stringify(reqParams).slice(0, 100)}`
             ]);
         }
         let unpackResult = unpackRequestParameters(reqParams);
-        if (isRecordResponse(unpackResult)) {
+        if (isRecordResponse(unpackResult)) { // if error unpacking
             return unpackResult;
         }
         let request = unpackResult;
         const { parentRecordType, idOptions, childOptions } = request;
         const parentInternalId = searchForRecordById(parentRecordType, idOptions);
         if (typeof parentInternalId !== 'number') { // i.e. === null
-            return handleError(reqParams, source, [
+            return handleParamError(reqParams, source, [
                 `No '${parentRecordType}' record found with provided idOptions (idSearchOptions[])`,
+                `idOptions received: ${JSON.stringify(idOptions)}`,
                 `Unable to retrieve related records`
             ], 404, `Record not found`);
         }
-        let resultDictionary 
-            = searchForRelatedRecord(parentRecordType, parentInternalId, childOptions);
+        writeLog(LogTypeEnum.AUDIT, `Succesfully retrieved parentInternalId: '${parentInternalId}'`);
+        let resultDictionary = getRelatedRecordIds(parentRecordType, parentInternalId, childOptions);
+        writeLog(LogTypeEnum.AUDIT, `${source} Finished getRelatedRecordIds()`,
+            `num related records: ${Object.values(resultDictionary).flat().length}`
+        );
+        /**@type {RecordResult[]} */
+        const recordResults = [];
+        for (let i = 0; i < childOptions.length; i++) {
+            let child = childOptions[i];
+            const { childRecordType, responseOptions } = child;
+            if (!isNonEmptyArray(resultDictionary[childRecordType])) {
+                continue;
+            }
+            // should already have unique elements by construction, but doing this just in case for now 
+            const recordIds = Array.from(new Set(resultDictionary[childRecordType]));
+            for (let recordId of recordIds) {
+                recordResults.push(generateRecordResult(
+                    childRecordType, recordId, responseOptions
+                ));
+            }
+        }
+        writeLog(LogTypeEnum.AUDIT, 
+            `${source} END - generating response...`,
+            `${source}`,
+            `parentRecord: '${parentRecordType}' with internalid: '${parentInternalId}'`,
+            `recordResults.length: ${recordResults.length}`,
+        );
+        /**@type {RecordResponse} */
+        const response = {
+            status: 200,
+            message: `End of GET_RelatedRecord`,
+            logs: logArray,
+            results: recordResults
+        }
+        return response;
     };
     /**
-     * - validates `parentRecordType` is a RecordTypeEnum
+     * @param {string | RecordTypeEnum} recordType 
+     * @param {number} recordId 
+     * @param {RecordResponseOptions} responseOptions 
+     * @returns {RecordResult} **`result`** {@link RecordResult}
+     */
+    function generateRecordResult(recordType, recordId, responseOptions) {
+        /**@type {RecordResult} */
+        const result = {
+            recordType: recordType,
+            internalid: recordId
+        };
+        if (!isRecordResponseOptions(responseOptions)) { return result }
+        try {
+            let rec = record.load({
+                type: recordType, 
+                id: recordId, 
+                isDynamic: NOT_DYNAMIC
+            });
+            if (responseOptions.fields) {
+                result.fields = getResponseFields(
+                    rec, responseOptions.fields
+                );
+            }
+            if (responseOptions.sublists) {
+                result.sublists = getResponseSublists(
+                    rec, responseOptions.sublists
+                );
+            }
+        } catch (error) {
+            writeLog(LogTypeEnum.ERROR, `[generateRecordResult()] Error processing ResponseOptions`,
+                `recordType: ${recordType}`,
+                `  recordId: '${recId}' (null/undefined if new record)`,
+                `error: `, error
+            );
+        }
+        return result;
+    }
+
+    /**
+     * - validate/convert (when applicable) string values from `reqParams`
+     * - validates `parentRecordType` is enum member
+     * - {@link isIdSearchOptions} for elements of `JSON.parse(reqParams.idOptions)`
+     * - {@link isChildSearchOptions} for elements of `JSON.parse(reqParams.childOptions)`
      * @param {{parentRecordType: string; idOptions: string; childOptions: string}} reqParams
-     * @returns {RelatedRecordRequest | RecordResponse} 
+     * @returns {RelatedRecordRequest | RecordResponse}
+     * - {@link RelatedRecordRequest} `if` all params successfully unpacked
+     * - {@link RecordResponse} to return in get() with error message if unpacking failed
      */
     function unpackRequestParameters(reqParams) {
-        const source = `[${EP}.unpackRequestParameters()]`
+        const source = `[${EP}.${unpackRequestParameters.name}()]`
         let { parentRecordType } = reqParams;
         parentRecordType = validateRecordType(parentRecordType);
         if (!parentRecordType) {
-            return handleError(reqParams, source, [
+            return handleParamError(reqParams, source, [
                 `Invalid Request Parameter 'parentRecordType'`,
                 `Expected: RecordTypeEnum (string enum value)`,
                 `Received: '${parentRecordType}'`
@@ -81,17 +166,17 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
             } else if (!(isNonEmptyArray(idOptions) 
                 && idOptions.every(el=>isIdSearchOptions(el))
                 )) {
-                return handleError(reqParams, source, [
+                return handleParamError(reqParams, source, [
                     `reqParams.idOptions is not a valid Array<idSearchOptions>`,
                     `Expected: { idProp: string, idValue: any, searchOperator: string }[]`,
                     `Received: ${typeof idOptions} = ${JSON.stringify(idOptions)}`
                 ]);
             }
         } catch (error) {
-            return handleError(reqParams, source, [
+            return handleParamError(reqParams, source, [
                 `JSON.parse(reqParams.idOptions) failed`,
                 `param 'idOptions' is not valid JSON`,
-                `actual error: ${error}`
+                `caught: ${error}`
             ]);
         }
         /**@type {ChildSearchOptions[]} */
@@ -103,17 +188,17 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
             } else if (!(isNonEmptyArray(childOptions) 
                 && childOptions.every(el=> isChildSearchOptions(el))
                 )) {
-                return handleError(reqParams, source, [
+                return handleParamError(reqParams, source, [
                     `reqParams.childOptions is not a valid Array<ChildSearchOptions>`,
-                    `Expected: { childRecordType: string, isSublistField: boolean, fieldId: string }[]`,
+                    `Expected: { childRecordType: string, fieldId: string }[]`,
                     `Received: ${typeof childOptions} = ${JSON.stringify(childOptions)}`
                 ]);
             }
         } catch (error) {
-            return handleError(reqParams, source, [
+            return handleParamError(reqParams, source, [
                 `JSON.parse(reqParams.childOptions) failed`,
                 `param 'childOptions' is not valid JSON`,
-                `actual error: ${error}`
+                `caught: ${error}`
             ]);
         }
         /**@type {RelatedRecordRequest} */
@@ -129,7 +214,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
      * @param {string} message
      * @returns {RecordResponse} **`errorResponse`** {@link RecordResponse}
      */
-    function handleError(
+    function handleParamError(
         reqParams,
         source,
         errorDetails,
@@ -153,53 +238,173 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
         return errorResponse;
     }
 
-    // if isSublistField === true, add `and, ['mainline', 'is', 'F']`
     /**
      * @param {string | RecordTypeEnum} parentRecordType 
      * @param {number} parentInternalId 
      * @param {ChildSearchOptions[]} childOptions
-     * @returns {{[childRecordType: string]: RecordResult[]}} 
+     * @returns {{ [childRecordType: string]: number[] }} **`resultDictionary`** `{ [childRecordType: string]: number[] }`
      */
-    function searchForRelatedRecord(
+    function getRelatedRecordIds(
         parentRecordType, 
         parentInternalId, 
         childOptions
     ) {
-        const source = `[${EP}.searchForRelatedRecord()]`;
-        if (!isNonEmptyString(parentRecordType) // redundant checks just in case 
+        const source = `[${EP}.${getRelatedRecordIds.name}()]`;
+        if (!isNonEmptyString(parentRecordType) // redundant checks... 
             || typeof parentInternalId !== 'number'
-            || !(isNonEmptyArray(childOptions && childOptions.every(
-                el=>isChildSearchOptions(el)
-            )))) {
-            writeLog(LogTypeEnum.ERROR, `${source} Invalid Arguments`);
+            || !(isNonEmptyArray(childOptions) && childOptions.every(
+                    el=>isChildSearchOptions(el)
+                    )
+                )
+            ) {
+            writeLog(LogTypeEnum.ERROR, `${source} Invalid Arguments`,
+                `${source}`,
+                `Expected: parentRecordType (RecordTypeEnum), parentInternalId (number)`,
+                `childOptions (ChildSearchOptions[])`
+            );
             return {}
         }
-        /**@type {{[childRecordType: string]: RecordResult[]}} */
+        /**@type {{ [childRecordType: string]: number[] }} */
         const resultDictionary = {};
         for (let i = 0; i < childOptions.length; i++) {
             const searchOptions = childOptions[i];
-            const { isSublistField, fieldId, responseOptions } = searchOptions;
-            let { childRecordType } = searchOptions;
-            childRecordType = validateRecordType(childRecordType);
-            if (!childRecordType) {
-                writeLog(LogTypeEnum.ERROR, `${source} Invalid childRecordType`,
-                    `Invalid childRecordType (RecordTypeEnum) at childOptions index ${i}`
-                )
+            const childRecordSearch = createChildSearch(parentInternalId, searchOptions);
+            if (!childRecordSearch) {
+                writeLog(LogTypeEnum.ERROR, 
+                    `${source} Unable to create Search object`,
+                    `${source}`,
+                    `Unable to create Search from ChildSearchOptions at childOptions[${i}]`,
+                    (i < childOptions.length ? `continuing to next childOptions element` : ``)
+                );
                 continue;
             }
-            const fieldIsParentInternalId = [
-                fieldId, SearchOperatorEnum.RECORD.ANY_OF, parentInternalId
-            ];
-            /** @type {any[]} */
-            const filters = [fieldIsParentInternalId];
-            if (isSublistField) {
-                filters.push(FilterOperatorEnum.AND, isSublistFieldFilter)
+            let recordIds = runPagedSearch(childRecordSearch);
+            if (!resultDictionary[searchOptions.childRecordType]) {
+                resultDictionary[searchOptions.childRecordType] = []
             }
-            const childSearch = search.create({
-                type: childRecordType,
-                filters: filters
-            })
+            for (let recId of recordIds) {
+                if (!resultDictionary[searchOptions.childRecordType].includes(recId)) {
+                    resultDictionary[searchOptions.childRecordType].push(recId);
+                }
+            }
+            writeLog(LogTypeEnum.DEBUG, `${source} Search Completed!`,
+                `${source}`, 
+                `Completed child search ${i+1}/${childOptions.length}`,
+                ` parentRecordType: '${parentRecordType}'`,
+                `  childRecordType: '${searchOptions.childRecordType}'`,
+                `num records found: ${resultDictionary[searchOptions.childRecordType].length}`
+            );
         }
+        return resultDictionary;
+    }
+
+    /**
+     * @param {Search} searchObject {@link Search}
+     * @param {number} pageSize `number`
+     * - `integer 1 < pageSize < 1000`
+     * - overwrites built in default pageSize of `50` with `100`
+     * @returns {number[]} **`recordIds`** `number[]` array of internal ids
+     */
+    function runPagedSearch(searchObject, pageSize = 100) {
+        if (!searchObject) return [];
+        const source = `[${EP}.${runPagedSearch.name}()]`;
+        /**@type {PagedData} */
+        let pagedData = searchObject.runPaged({pageSize});
+        if (!pagedData || !isNonEmptyArray(pagedData.pageRanges)) {
+            writeLog(LogTypeEnum.DEBUG, `${source} pagedData.pageRanges is empty`,
+                `${source}`,
+                `searchObject: ${JSON.stringify(searchObject)}`,
+                `pagedData: ${JSON.stringify(pagedData)}`,
+            );
+            return [];
+        }
+        /**@type {number[]} */
+        const recordIds = [];
+        for (let pageRange of pagedData.pageRanges) {
+            let page = pagedData.fetch({index: pageRange.index});
+            recordIds.push(...page.data
+                .map(result=>Number(result.id)));
+        }
+        return recordIds;
+    }
+
+    /**
+     * @param {number} parentInternalId `number`
+     * @param {ChildSearchOptions} searchOptions
+     * @returns {Search | null} **`childRecordSearch`** 
+     * - {@link Search} `if` `searchOptions` generates a valid `Search` object;
+     * - `null` `if` `searchOptions` ran into an error while generating the `Search` object
+     */
+    function createChildSearch(parentInternalId, searchOptions) {
+        const source = `[${EP}.${createChildSearch.name}()]`;
+        if (typeof parentInternalId !== 'number' || !Number.isInteger(parentInternalId)) {
+            writeLog(LogTypeEnum.ERROR, `${source} Invalid param 'parentInternalId'`,
+                `${source} Expected parentInternalId to be integer`,
+                `Received: ${typeof parentInternalId} = '${parentInternalId}'`
+            )
+        }
+        const { fieldId, sublistId } = searchOptions;
+        let { childRecordType } = searchOptions;
+        childRecordType = validateRecordType(childRecordType);
+        if (!childRecordType) {
+            writeLog(LogTypeEnum.ERROR, `${source} Invalid childRecordType`,
+                `Invalid childRecordType (RecordTypeEnum)`
+            );
+            return null;
+        }
+        /**@type {CreateSearchFilterOptions} */
+        const filterOptions = {
+            name: fieldId,
+            operator: SearchOperatorEnum.RECORD.ANY_OF,
+            values: [parentInternalId]
+        }
+        /**@type {Filter | undefined} */
+        let filter = undefined;
+        try { 
+            filter = search.createFilter(filterOptions);
+        } catch (error) {
+            writeLog(LogTypeEnum.ERROR, 
+                `${source} Error creating Filter object: Invalid CreateSearchFilterOptions derived from ChildSearchOptions`,
+                ...[`${source} at childOptions[${i}]`,
+                `An error occurred when calling search.createFilter(CreateSearchFilterOptions)`,
+                `Check validity of fieldId and/or operator and/or sublistId.`,
+                `childSearchOptions: ${JSON.stringify(searchOptions)}`,
+                `derived CreateSearchFilterOptions: ${JSON.stringify(filterOptions)}`,
+                `Caught: ${error}`
+            ]);
+        }
+        if (!filter) { return null }
+        const filters = [filter];
+        if (isNonEmptyString(sublistId)) {
+            filters.push(search.createFilter({
+                name: 'mainline', 
+                operator: SearchOperatorEnum.TEXT.IS, 
+                values: ['F'] 
+            }));
+        }
+        /**@type {SearchCreateOptions} */
+        const searchCreateOptions = {
+            type: childRecordType,
+            filters: filters,
+            // columns: ['internalid']
+        }
+        /**@type {Search | undefined} */
+        let childRecordSearch = undefined;
+        try {
+            childRecordSearch = search.create(searchCreateOptions)
+        } catch (error) {
+            writeLog(LogTypeEnum.ERROR, 
+                `${source} Error creating Search object`,
+                ...[`${source} at childOptions[${i}]`,
+                `An error occurred when calling search.create(SearchCreateOptions)`,
+                `childSearchOptions: ${JSON.stringify(searchOptions)}`,
+                `-> FilterOptions: ${JSON.stringify(filterOptions)}`,
+                `-> searchCreateOptions ${JSON.stringify(searchCreateOptions)}`,
+                `Caught: ${error}`
+            ]);
+        }
+        if (!childRecordSearch) { return null }
+        return childRecordSearch;
     }
 
     /**
@@ -310,13 +515,16 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
         }
         return recordInternalId ? Number(recordInternalId) : null; // null if no record found
     }
-        /**
+    /**
      * @param {object} rec 
-     * @param {string | string[]} responseFields = {@link RecordResponseOptions.responseFields}
+     * @param {string | string[]} responseFields 
      * @returns {FieldDictionary} **`fields`** = {@link FieldDictionary}
      */
     function getResponseFields(rec, responseFields) {
-        if (!rec || !responseFields || (typeof responseFields !== 'string' && !isNonEmptyArray(responseFields))) {
+        if (!rec 
+            || !responseFields 
+            || (!isNonEmptyString(responseFields) 
+            && !isNonEmptyArray(responseFields))) {
             writeLog(LogTypeEnum.ERROR, 
                 'getResponseFields() Invalid parameters', 
                 'rec {object} and responseFields {string | string[]} are required'
@@ -326,42 +534,51 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
         /**@type {FieldDictionary} */
         const fields = {internalid: rec.getValue({ fieldId: idPropertyEnum.INTERNAL_ID })};
         /**@type {string[]} */
-        responseFields = (typeof responseFields === 'string'
+        responseFields = (isNonEmptyString(responseFields)
             ? [responseFields]
             : responseFields
         );
         for (let fieldId of responseFields) {
-            fieldId = fieldId.toLowerCase();
-            /**@type {FieldValue | SubrecordValue} */
-            const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSubrecord({fieldId}) 
-                ? rec.getSubrecord({fieldId}) // as Subrecord 
-                : rec.getValue({ fieldId }) // as FieldValue
-            );
-            if (value === undefined || value === null) { continue; }
-            fields[fieldId] = value;
+            try { 
+                fieldId = fieldId.toLowerCase();
+                /**@type {FieldValue | SubrecordValue} */
+                const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSubrecord({fieldId}) 
+                    ? rec.getSubrecord({ fieldId }) // as Subrecord 
+                    : rec.getValue({ fieldId }) // as FieldValue
+                );
+                if (value === undefined) { continue }
+                fields[fieldId] = value;
+            } catch (error) {
+                writeLog(LogTypeEnum.ERROR, 
+                    `[getResponseFields()] Error getting value for fieldId '${fieldId}'`, 
+                    `error: ${error}`
+                );
+                continue
+            }
         };
         return fields;
     }
     /**
      * `if` a value of responseSublists is empty or undefined, `return` all fields of the sublist
      * @param {object} rec 
-     * @param {{[sublistId: string]: string | string[]}} responseSublists = {@link RecordResponseOptions.responseSublists}
-     * @returns {SublistDictionary | {[sublistId: string]: SublistLine[]}} **`sublists`** = {@link SublistDictionary} = `{[sublistId: string]: `{@link SublistLine}`[]}`
+     * @param {{[sublistId: string]: string | string[]}} responseSublists
+     * @returns {SublistDictionary | {[sublistId: string]: SublistLine[]}} **`sublists`** = {@link SublistDictionary}
      */
     function getResponseSublists(rec, responseSublists) {
         if (!rec || !responseSublists || isEmptyArray(Object.keys(responseSublists))) {
             writeLog(LogTypeEnum.ERROR, 
-                'getResponseSublists() Invalid parameters', 
+                '[getResponseSublists()] Invalid parameters', 
                 'rec and responseSublists are required'
             );
             return {};
         }
         /**@type {SublistDictionary | {[sublistId: string]: SublistLine[]}} */
-        const sublists = {};    
+        const sublists = {};
+        sublistLoop:    
         for (const sublistId in responseSublists) {
             if (!rec.getSublist({ sublistId })) {
                 writeLog(LogTypeEnum.ERROR, 
-                    `getResponseSublists() Invalid sublistId:`, 
+                    `[getResponseSublists()] Invalid sublistId:`, 
                     `sublistId '${sublistId}' not found on record`
                 );
                 continue;
@@ -370,37 +587,48 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
             const lineCount = rec.getLineCount({ sublistId });
             if (lineCount === 0) {
                 writeLog(LogTypeEnum.DEBUG, 
-                    `getResponseSublists() No lines found for sublistId '${sublistId}'`, 
+                    `[getResponseSublists()] No lines found for sublistId '${sublistId}'`, 
                 );
                 continue;
             }
             /**@type {string[]} */
             const responseFields = (typeof responseSublists[sublistId] === 'string'
                 ? [responseSublists[sublistId]]
-                : (!isNonEmptyArray(responseSublists[sublistId])
-                    ? rec.getSublistFields({ sublistId })
-                    : responseSublists[sublistId]
-            )); // as string[]
-            for (let i = 0; i < lineCount; i++) {
+                : (!responseSublists[sublistId] || isEmptyArray(responseSublists[sublistId])
+                    ? rec.getSublistFields({ sublistId }) // as string[]
+                    : responseSublists[sublistId] // as string[]
+            ));
+            sublistLineLoop:
+            for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
                 /**@type {SublistLine} sublistLine {@link SublistLine}*/
                 const sublistLine = {
-                    line: i,
+                    line: lineIndex,
                     id: rec.getSublistValue({
-                        sublistId, fieldId: 'id', line: i
+                        sublistId, fieldId: 'id', line: lineIndex
                     }),
                     internalid: rec.getSublistValue({ 
-                        sublistId, fieldId: idPropertyEnum.INTERNAL_ID, line: i 
+                        sublistId, fieldId: idPropertyEnum.INTERNAL_ID, line: lineIndex 
                     })
                 };
-                
+                sublistFieldIdLoop:
                 for (const fieldId of responseFields) {
-                    /**@type {FieldValue | SubrecordValue} */
-                    const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSublistSubrecord({ sublistId, fieldId, line: i }) 
-                        ? rec.getSublistSubrecord({ sublistId, fieldId, line: i }) // as Subrecord 
-                        : rec.getSublistValue({ sublistId, fieldId, line: i }) // as FieldValue
-                    ); 
-                    if (value === undefined || value === null) { continue; }
-                    sublistLine[fieldId] = value;
+                    try {
+                        /**@type {FieldValue | SubrecordValue} */
+                        const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSublistSubrecord({ sublistId, fieldId, line: i }) 
+                            ? rec.getSublistSubrecord({ sublistId, fieldId, line: lineIndex }) // as Subrecord 
+                            : rec.getSublistValue({ sublistId, fieldId, line: lineIndex }) // as FieldValue
+                        ); 
+                        if (value === undefined || value === null) { continue; }
+                        sublistLine[fieldId] = value;
+                    } catch(error) {
+                        writeLog(LogTypeEnum.ERROR, `[getResponseSublists] Error getting sublist field value`,
+                            `sublistId: '${sublistId}'`, 
+                            `fieldId: '${fieldId}'`,
+                            `lineIndex: ${lineIndex}.`,
+                            `error: ${error}`
+                        );
+                        continue sublistFieldIdLoop;
+                    }
                 }
                 sublists[sublistId].push(sublistLine);
             }
@@ -429,7 +657,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
 
     const NL = '\n > ';
     const TAB = '\n\t• ';
-    /**max number of times allowed to call `log.debug(title, details)` per `get()` call */
+    /**max number of times allowed to call `log[LogTypeEnum](title, details)` per `get()` call */
     const MAX_LOGS_PER_LEVEL = 500;
     /**@type {{[logType: LogTypeEnum]: {count: number, limit: number}}} */
     const logDict = {
@@ -447,11 +675,11 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
      */
     function writeLog(type, title, ...details) {
         if (!type || !title) {
-            log.error('Invalid log', 'type and title are required');
+            log.error('[writeLog()] Invalid log args', 'type and title are required');
             return;
         }
         if (!Object.values(LogTypeEnum).includes(type)) {
-            log.error('Invalid log type', `type must be one of ${Object.values(LogTypeEnum).join(', ')}`);
+            log.error('[writeLog()] Invalid log type', `type must be one of ${Object.values(LogTypeEnum).join(', ')}`);
             return;
         }
         details = details && details.length > 0 ? details : [title];
@@ -525,7 +753,10 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
      * - **`false`** `otherwise`
      */
     function isEmptyArray(value) { return Array.isArray(value) && value.length === 0; }
-
+    function isStringArray(value) { 
+        return isNonEmptyArray(value) 
+        && value.every(el => typeof el === 'string') 
+    }
     /**
      * @param value `any`
      * @returns {value is string & { length: number }} **`isNonEmptyString`** `boolean`
@@ -564,17 +795,14 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
         for (const key of keys) {
             if (key in obj) {
                 numKeysFound++;
-                if (!requireAll) {
-                    return true; // If requireAll is false, we can return early if any key is found
+                if (!requireAll && !restrictKeys) {
+                    return true;
                 }
-            }
-            else if (requireAll) {
+            } else if (requireAll) { // and a key is not found
                 return false;
-                // If requireAll is true and a key is not found, return false
             }
         }
-        if (restrictKeys) {
-            // If restrictKeys is true, check that no other keys are present in the object
+        if (restrictKeys) { // then check that no other keys are present in the object
             const objKeys = Object.keys(obj);
             const extraKeys = objKeys.filter(k => !keys.includes(k));
             if (extraKeys.length > 0) {
@@ -584,50 +812,6 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
         return requireAll ? numKeysFound === keys.length : numKeysFound > 0;
     }
 
-    /**
-     * @param value `any` the value to check
-     * @returns {value is '' | (Array<any> & { length: 0 }) | null | undefined | Record<string, never>} 
-     * **`isNullLike`** `boolean` = `value is '' | (Array<any> & { length: 0 }) | null | undefined | Record<string, never>`
-     * - **`true`** `if` the `value` is null, undefined, empty object (no keys), empty array, or empty string
-     * - **`false`** `otherwise`
-     */
-    function isNullLike(value) {
-        if (value === null || value === undefined) {
-            return true;
-        }
-        if (typeof value === 'boolean' || typeof value === 'number') {
-            return false;
-        }
-        // Check for empty object or array
-        if (typeof value === 'object' && isEmptyArray(Object.keys(value))) {
-            return true;
-        }
-        const isNullLikeString = (typeof value === 'string'
-            && (value.trim() === ''
-                || value.toLowerCase() === 'undefined'
-                || value.toLowerCase() === 'null'));
-        if (isNullLikeString) {
-            return true;
-        }
-        return false;
-    }
-
-    // /**
-    //  * @param {any} value
-    //  * @returns {value is RelatedRecordRequest} 
-    //  */
-    // function isRelatedRecordRequest(value) {
-    //     return Boolean(value && typeof value === 'object'
-    //         && hasKeys(value, REQUEST_KEYS)
-    //         && validateRecordType(value.parentRecordType) !== null
-    //         && isNonEmptyArray(value.idOptions)
-    //         && (isChildSearchOptions(value.childOptions)
-    //             || (isNonEmptyArray(value.childOptions)
-    //                 && value.childOptions.every(v => isChildSearchOptions(v))
-    //             )
-    //         )
-    //     );
-    // }
 
     /**
      * @param {any} value 
@@ -635,10 +819,10 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
      */
     function isChildSearchOptions(value) {
         return Boolean(value && typeof value === 'object'
-            && hasKeys(value, ['childRecordType', 'isSublistField', 'fieldId'])
-            && isNonEmptyString(value.childRecordType) // isNonEmptyString(validateRecordType(value.childRecordType))
-            && typeof value.isSublistField === 'boolean'
+            && isNonEmptyString(value.childRecordType)
+            && Object.values(RecordTypeEnum).includes(value.childRecordType)
             && isNonEmptyString(value.fieldId)
+            && (!value.sublistId || isNonEmptyString(value.sublistId))
         )
     }
 
@@ -649,14 +833,14 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     function isRecordResponse(value) {
         return Boolean(value && typeof value === 'object'
             && hasKeys(value, 
-                ['status', 'message', 'error', 'logs','results', 'rejects'],
+                ['status', 'message', 'error', 'logs', 'results', 'rejects'],
                 false, true
             )
         )
     }
     /**
      * `isidSearchOptions`
-     * @param {*} value
+     * @param {any} value
      * @returns {value is idSearchOptions} 
      */
     function isIdSearchOptions(value) {
@@ -669,11 +853,44 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
             && isNonEmptyString(value.searchOperator) // validate it's a SearchOperatorEnum
         )
     }
-
+    /**
+     * @param {any} value
+     * @returns {value is RecordResponseOptions} 
+     */
+    function isRecordResponseOptions(value) {
+        return Boolean(value && typeof value === 'object'
+            && (!value.fields 
+                || (isNonEmptyString(value.fields) 
+                    || isStringArray(value.fields)
+                )
+            )
+            && (!value.sublists 
+                || (typeof value.sublists === 'object'
+                    && Object.keys(value.sublists).every(
+                        k=>isNonEmptyString(value.sublists[k]) 
+                            || isStringArray(value.sublists[k])
+                    )
+                )
+            )
+        )
+    }
     /*------------------------ [ Types, Enums, Constants ] ------------------------*/
     /** create/load a record in standard mode by setting `isDynamic` = `false` = `NOT_DYNAMIC`*/
     const NOT_DYNAMIC = false;
-
+    /**
+     * values are fieldIds or sublistFieldIds where hasSubrecord() is `true`
+     * @enum {string} **`SubrecordFieldEnum`**
+     */
+    const SubrecordFieldEnum = {
+        /**from the `'addressbook'` `sublist` on Relationship records */
+        ADDRESS_BOOK_ADDRESS: 'addressbookaddress',
+        /**from the `'billingaddress'` body `field` on Transaction records */
+        BILLING_ADDRESS: 'billingaddress',
+        /**from the `'shippingaddress'` body `field` on Transaction records */
+        SHIPPING_ADDRESS: 'shippingaddress',
+        /**from the `'{internalid}'` {type} `field` on {recordType} records */
+        INVENTORY_DETAIL: 'inventorydetail'
+    }
     /**
      * @typedef {{
      * parentRecordType: string | RecordTypeEnum;
@@ -684,8 +901,8 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     /**
      * @typedef {{
      * childRecordType: string | RecordTypeEnum;
-     * isSublistField: boolean;
      * fieldId: string;
+     * sublistId?: string;
      * responseOptions?: RecordResponseOptions
      * }} ChildSearchOptions
      */
@@ -708,8 +925,8 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
      */
     /**
      * @typedef {Object} RecordResponseOptions
-     * @property {string | string[]} [responseFields] - `fieldId(s)` of the main record to return in the response.
-     * @property {Record<string, string | string[]>} [responseSublists] `sublistId(s)` mapped to `sublistFieldId(s)` to return in the response.
+     * @property {string | string[]} [fields] - `fieldId(s)` of the main record to return in the response.
+     * @property {Record<string, string | string[]>} [sublists] `sublistId(s)` mapped to `sublistFieldId(s)` to return in the response.
      */
 
 
@@ -782,7 +999,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
      * searchType: RecordTypeEnum | string
      * searchId: number;
      * filters: Filter[];
-     * filterExpression: any[];
+     * filterExpression: object[];
      * columns: (SearchColumn | string)[];
      * title: string;
      * isPublic: boolean;
@@ -790,6 +1007,20 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
      * run(): ResultSet;
      * runPaged: SearchRunPagedFunction
      * }} Search
+     */
+
+    /**
+     * @typedef {{
+     * type: RecordTypeEnum | string;
+     * filters?: (CreateSearchFilterOptions[] | any[]);
+     * columns?: (SearchColumn | string)[];
+     * title?: string;
+     * id?: string;
+     * isPublic?: boolean;
+     * packageId?: string;
+     * settings?: any | any[];
+     * filterExpression?: object[];
+     * }} SearchCreateOptions
      */
     
     /**
@@ -801,6 +1032,14 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
      * pageSize?: number;
      * }} RunPagedOptions
      */
+    /**
+     * @typedef {{
+     * promise(options?: RunPagedOptions): Promise<PagedData>
+     * (options?: RunPagedOptions): PagedData
+     * }} SearchRunPagedFunction
+     */
+
+
     /**
      * The index of the page range that bounds the desired data.
      * @typedef {{
@@ -833,7 +1072,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
      */
     /**
      * @typedef {{
-     * fetch: PagedFetchFunction;
+     * fetch: PagedDataFetchFunction;
      * readonly count: number;
      * pageRanges: PageRange[];
      * readonly pageSize: number;
@@ -874,6 +1113,17 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
      * rightparens: number; 
      * }
      * }} Filter
+     */
+
+    /**
+     * @typedef {{
+     * name: string;
+     * join?: string;
+     * operator: SearchOperatorEnum | string;
+     * values?: FieldValue | FieldValue[] | string | Date | number | string[] | Date[] | number[] | boolean;
+     * formula?: string;
+     * summary?: ColumnSummaryEnum | string;
+     * }} CreateSearchFilterOptions
      */
 
 

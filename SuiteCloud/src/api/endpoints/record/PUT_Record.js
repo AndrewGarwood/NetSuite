@@ -14,6 +14,8 @@
  * @consideration make an enum for subrecord fieldIds so don't have to use less robust {@link isSubrecord}`()`
  * - see {@link SubrecordFieldEnum}
  * @consideration make an enum for sublistIds (of non static sublists) {@link https://stoic.software/articles/types-of-sublists/#:~:text=Lastly%2C%20the-,Static%20List,-sublists%20are%20read} 
+ * @TODO use Record.findSublistLineWithValue(options) when upserting sublists
+ * - https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273157398.html
  */
 define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
     /**
@@ -217,19 +219,19 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         }
         writeLog(LogTypeEnum.AUDIT, `[processRecordOptions()] Successfully saved record`);
         try {
-            if (responseOptions && responseOptions.responseFields) {
-                result.fields = getResponseFields(rec, responseOptions.responseFields);
+            if (responseOptions && responseOptions.fields) {
+                result.fields = getResponseFields(rec, responseOptions.fields);
                 result.fields.recordType = recordType;
             }
-            if (responseOptions && responseOptions.responseSublists) {
-                result.sublists = getResponseSublists(rec, responseOptions.responseSublists);
+            if (responseOptions && responseOptions.sublists) {
+                result.sublists = getResponseSublists(rec, responseOptions.sublists);
             } 
         } catch (error) {
             writeLog(LogTypeEnum.ERROR, `[processRecordOptions()] Error processing ResponseOptions`,
                 `recordType: ${recordType}`,
                 `  recordId: '${recId}' (null/undefined if new record)`,
                 `error: `, error
-            )
+            );
             // return result;
         }
         writeLog(LogTypeEnum.AUDIT, `[processRecordOptions()] Completed processResponseOptions`)
@@ -677,7 +679,7 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
         if (!rec || !responseFields || (typeof responseFields !== 'string' && !isNonEmptyArray(responseFields))) {
             writeLog(LogTypeEnum.ERROR, 
                 'getResponseFields() Invalid parameters', 
-                'rec {object} and responseFields {string | string[]} are required'
+                'rec (object) and responseFields (string | string[]) are required'
             );
             return {};
         }
@@ -693,10 +695,10 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
                 fieldId = fieldId.toLowerCase();
                 /**@type {FieldValue | SubrecordValue} */
                 const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSubrecord({fieldId}) 
-                    ? rec.getSubrecord({fieldId}) // as Subrecord 
+                    ? rec.getSubrecord({ fieldId }) // as Subrecord 
                     : rec.getValue({ fieldId }) // as FieldValue
                 );
-                if (value === undefined || value === null) { continue; }
+                if (value === undefined) { continue }
                 fields[fieldId] = value;
             } catch (error) {
                 writeLog(LogTypeEnum.ERROR, 
@@ -951,6 +953,8 @@ function validateRecordType(recordType) {
 }
 
 /**
+ * @TODO use Record.findSublistLineWithValue(options) 
+ * - https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4273157398.html
  * @param {object} rec `object`
  * @param {string} sublistId `string`
  * @param {SublistLine} sublistLine {@link SublistLine} `object`
@@ -1027,6 +1031,16 @@ function validateSublistLineIndex(rec, sublistId, line) {
     return line; // return the original line index because it is valid
 }
 
+    /**
+     * @param value `any`
+     * @returns {value is string & { length: number }} **`isNonEmptyString`** `boolean`
+     * - `true` `if` `value` is a non-empty string (not just whitespace),
+     * - `false` `otherwise`.
+     */
+    function isNonEmptyString(value) {
+        return typeof value === 'string' && value.trim() !== '';
+    }
+
 /*------------------------ [ Types, Enums, Constants ] ------------------------*/
 /** create/load a record in standard mode by setting `isDynamic` = `false` = `NOT_DYNAMIC`*/
 const NOT_DYNAMIC = false;
@@ -1068,8 +1082,8 @@ const SubrecordFieldEnum = {
 
 /**
  * @typedef {Object} RecordResponseOptions
- * @property {string | string[]} [responseFields] - `fieldId(s)` of the main record to return in the response.
- * @property {Record<string, string | string[]>} [responseSublists] `sublistId(s)` mapped to `sublistFieldId(s)` to return in the response.
+ * @property {string | string[]} [fields] - `fieldId(s)` of the main record to return in the response.
+ * @property {Record<string, string | string[]>} [sublists] `sublistId(s)` mapped to `sublistFieldId(s)` to return in the response.
  */
 
 /**

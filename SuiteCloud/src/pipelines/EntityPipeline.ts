@@ -43,13 +43,13 @@ import {
  * - `responseSublists: { 'addressbook': [...] }` 
  * */
 export const ENTITY_RESPONSE_OPTIONS: RecordResponseOptions = {
-    responseFields: ['entityid', 'externalid', 'isperson', 'companyname', 'email'],
-    responseSublists: { 'addressbook': [
+    fields: ['entityid', 'externalid', 'isperson', 'companyname', 'email'],
+    sublists: { 'addressbook': [
         'addressid', 'label', 'defaultbilling', 'defaultshipping', // 'addressbookaddress'
     ] }
 };
 export const CONTACT_RESPONSE_OPTIONS: RecordResponseOptions = {
-    responseFields: ['entityid', 'externalid', 'company', 'firstname', 'lastname', 'email']
+    fields: ['entityid', 'externalid', 'company', 'firstname', 'lastname', 'email']
 }
 
 const TWO_SECONDS = 2000;

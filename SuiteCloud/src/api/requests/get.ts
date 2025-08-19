@@ -1,5 +1,6 @@
 /**
  * @file src/api/requests/get.ts
+ * @TODO maybe rewrite the GET endpoint in GET_Record.js to have the request just be idProp, idVal, and recordType
  */
 import axios from "axios";
 import { 
@@ -10,19 +11,22 @@ import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT
 import { createUrlWithParams } from "../url";
 import { AxiosContentTypeEnum } from "../server";
 import { 
-    GetRecordRequest, idSearchOptions, idPropertyEnum, 
+    idSearchOptions, idPropertyEnum, 
     RecordResponseOptions,
     isRecordResponseOptions,
     RecordResponse,
+    RelatedRecordRequest,
+    isRelatedRecordRequest,
 } from "../types";
 import { SB_REST_SCRIPTS } from "../configureRequests";
 import { getAccessToken } from "../configureAuth";
 import path from "node:path";
 import { RecordTypeEnum } from "../../utils/ns/record/Record";
 import { SearchOperatorEnum } from "../../utils/ns/search/Search";
-import * as validate from "../../utils/argumentValidation";
+import * as validate from "typeshi/dist/utils/argumentValidation";
+import { GetRecordRequest } from "./types";
 
-
+const F = path.basename(__filename).replace(/\.[a-z]{1,}$/, '');
 export const GET_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.GET_Record.scriptId as number;
 export const GET_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.GET_Record.deployId as number;
 
@@ -89,27 +93,59 @@ export async function getRecordById(
             request
         );
         return response.data as RecordResponse;
-    } catch (error) {
-        let e = error as any || {}
+    } catch (error: any) {
         mlog.error([`${source} ERROR:`,
-            `   name: ${e.name}`,
-            `   code: ${e.code}`,
-            `message: ${e.message}`,
-            `  stack: ${e.stack}`
+            `   name: ${error.name}`,
+            `   code: ${error.code}`,
+            `message: ${error.message}`,
+            `  stack: ${error.stack}`
         ].join(TAB));
         write(
-            {timestamp: getCurrentPacificTime(), caught: e}, 
+            {timestamp: getCurrentPacificTime(), caught: error}, 
             path.join(ERROR_DIR, 'ERROR_getRecordById.json')
         );
         throw new Error('Failed to call GET_Record RESTlet');
     }
 }
 
+export async function getRelatedRecord(
+    request: RelatedRecordRequest
+): Promise<RecordResponse> {
+    const source = `[${F}.${getRelatedRecord.name}()]`;
+    validate.objectArgument(source, {request, isRelatedRecordRequest});
+    try {
+        const accessToken = await getAccessToken();
+        const response = await GET(
+            accessToken,
+            SB_REST_SCRIPTS.GET_RelatedRecord.scriptId,
+            SB_REST_SCRIPTS.GET_RelatedRecord.deployId,
+            request
+        );
+        return response.data as RecordResponse
+    } catch (error: any) {
+        mlog.error([`${source} ERROR:`,
+            `   name: ${error.name}`,
+            `   code: ${error.code}`,
+            `message: ${error.message}`,
+            `  stack: ${error.stack}`
+        ].join(TAB));
+        write(
+            {timestamp: getCurrentPacificTime(), caught: error}, 
+            path.join(ERROR_DIR, 'ERROR_getRelatedRecord.json')
+        );
+        throw new Error(`${source} Failed, unable to return RecordResponse`);
+    }
+}
+
+
+
+
 /**
  * @param accessToken `string`
  * @param scriptId `number`
  * @param deployId `number`
- * @param params `Record<string, any>` to pass as query parameters into the {@link URL}. constructed using {@link createUrlWithParams}
+ * @param params `Record<string, any>` to pass as query parameters into the {@link URL}. 
+ * - constructed using {@link createUrlWithParams}
  * @returns **`response`** - `Promise<any>`
  */
 export async function GET(

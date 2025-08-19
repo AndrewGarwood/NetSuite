@@ -64,7 +64,7 @@ import { PostProcessDictionary } from "src/services/post_process/types/PostProce
  * ]` 
  * */
 export const SALES_ORDER_RESPONSE_OPTIONS: RecordResponseOptions = {
-    responseFields: [
+    fields: [
         'tranid', 'trandate', 'entity', 'externalid', 'otherrefnum', 
         'orderstatus', 'total'
     ]
@@ -575,7 +575,7 @@ export async function resolveUnmatchedTransactions(
     const unresolved: RecordOptions[] = [];
     const entityRejects: RecordOptions[] = [];
     const responseOptions: RecordResponseOptions = {
-        responseFields: ['entityid', 'externalid', 'isperson', 'companyname', 'email'],
+        fields: ['entityid', 'externalid', 'isperson', 'companyname', 'email'],
     }
     const entityResponses = await putEntities(entities, responseOptions);
     let generatedEntities: Record<string, any> = {};

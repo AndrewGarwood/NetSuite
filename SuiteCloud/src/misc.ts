@@ -29,8 +29,9 @@ import {
     getDirectoryFiles,
     isRowSourceMetaData,
     isDirectory,
+    getFileNameTimestamp,
 } from "typeshi/dist/utils/io";
-import { getAccessToken, idSearchOptions, RecordResult } from "./api";
+import { getAccessToken, isRelatedRecordRequest } from "./api";
 import { 
     equivalentAlphanumericStrings, CleanStringOptions, clean, 
     stringContainsAnyOf, RegExpFlagsEnum, 
@@ -49,10 +50,10 @@ import {
 } from "typeshi/dist/utils/typeValidation";
 import { search as fuzzySearch, MatchData } from "fast-fuzzy";
 import { idPropertyEnum, LogTypeEnum, RecordOptions, 
-    RecordResponse, RecordTypeEnum, RecordResponseOptions,
+    RecordResponse, RecordTypeEnum, RecordResponseOptions, RecordResult,
     SearchOperatorEnum, getRecordById, 
-    instantiateAuthManager,
-    GetRecordRequest, RecordRequest
+    instantiateAuthManager, idSearchOptions, 
+    GetRecordRequest, RecordRequest, RelatedRecordRequest, ChildSearchOptions, getRelatedRecord
 } from "./api";
 import { SuiteScriptError, encodeExternalId } from "./utils/ns";
 import { CLEAN_ITEM_ID_OPTIONS } from "src/parse_configurations/evaluators/item";
@@ -69,74 +70,37 @@ import {
 import * as validate from "typeshi/dist/utils/argumentValidation";
 
 const F = path.basename(__filename).replace(/\.[a-z]{1,}$/, '');
-
 async function main(): Promise<void> {
-    const source = `[misc.main()]`
+    const source = `[${F}.main()]`
     await clearFile(MISC_LOG_FILEPATH, PARSE_LOG_FILEPATH);
     await initializeData();
     await instantiateAuthManager();
     mlog.info(`${source} START at ${getCurrentPacificTime()}`);
-    let sentItems = await getColumnValues(path.join(CLOUD_LOG_DIR, 'items', 'sent_items.tsv'), 'Item ID');
-    sentItems = Array.from(new Set(sentItems.map(itemId=> {
-        itemId = itemId.trim();
-        if (/^\d{1,2}$/.test(itemId)) {
-            return itemId.padStart(3, '0');
-        }
-        return itemId.toUpperCase();
-    })));
-    mlog.info(`${source} unique sentItems.length: ${sentItems.length}`)
-    let items = (
-        read(path.join(CLOUD_LOG_DIR, 'items', 'remaining_items.json')) ?? {}
-    ).remainingItems as RecordResult[] ?? [];
-    items = Array.from(new Set(items));
-    let itemDict: Record<string, number> = {};
-    for (let result of items) {
-        if (!result.fields || !result.fields.itemid) {
-            mlog.warn(`result with internalid '${result.internalid}' does not have fields.itemid`)
-            continue
-        }
-        itemDict[String(result.fields.itemid)] = result.internalid;
-    }
-    let dictKeys = Object.keys(itemDict)
-    let itemsNotInSent = dictKeys.filter(k=>!sentItems.includes(k));
-    let remainingAndConfirmedSentItems = dictKeys.filter(k=>sentItems.includes(k));
-    slog.info([`make sure all results had result.field.itemid:`,
-        `unique sentItems.length: ${items.length}`,
-        ` remaining Items.length: ${items.length}`,
-        `  item dict keys.length: ${dictKeys.length}`,
-        `  itemsNotInSent.length: ${itemsNotInSent.length}`,
-        `  confirmed sent length: ${remainingAndConfirmedSentItems.length}`
-    ].join(TAB));
-    mlog.info(`itemsNotInSent:`, JSON.stringify(itemsNotInSent));
-    let wRows = await getWarehouseRows();
-    let wItems = await getIndexedColumnValues(wRows, WarehouseColumnEnum.ITEM_ID);
-    let hasLotCount = 0;
-    for (let itemId in wItems) {
-        let rowIndex = wItems[itemId][0];
-        let wRow: WarehouseRow = wRows[rowIndex];
-        let lotNumber = wRow[WarehouseColumnEnum.LOT_NUMBER];
-        if (!isNonEmptyString(lotNumber)) continue
-        if (itemsNotInSent.includes(itemId)) {
-            hasLotCount++;
-            // slog.debug(`nonSentItem '${itemId}' has lot number '${lotNumber}'`);
-        }
-    }
-    slog.debug(`hasLotCount: ${hasLotCount}`);
-    let confirmed: Record<string, number> = {};
-    remainingAndConfirmedSentItems.forEach(item=> {
-        if (item in itemDict) {
-            confirmed[item] = itemDict[item]
-        }
-    });
-    slog.info(`confirmed keys.length: ${Object.keys(confirmed).length}`)
-    write({unsentItems: itemsNotInSent}, path.join(CLOUD_LOG_DIR, 'items', 'unsent_items.json'));
-    // write(confirmed, path.join(CLOUD_LOG_DIR, 'items', 'confirmed_sent.json'));
+    const idOptions: idSearchOptions[] = [{
+        idProp: idPropertyEnum.ITEM_ID,
+        idValue: 'ITEM_ID',
+        searchOperator: SearchOperatorEnum.TEXT.IS
+    }];
+    const parentRecordType = RecordTypeEnum.INVENTORY_ITEM;
+    const childOptions: ChildSearchOptions[] = [{
+        childRecordType: RecordTypeEnum.SALES_ORDER,
+        fieldId: 'item',
+        sublistId: 'item',
+        responseOptions: { fields: ['externalid', 'tranid', 'otherrefnum'] }
+    }];
+    const request: RelatedRecordRequest = { parentRecordType, idOptions, childOptions };
+    validate.objectArgument(source, {request, isRelatedRecordRequest});
+    const res: RecordResponse = await getRelatedRecord(request);
+    write(res, path.join(CLOUD_LOG_DIR, 'items', `${getFileNameTimestamp()}_RelatedRecordResponse.json`));
+
+
+
     await trimFile(5, MISC_LOG_FILEPATH, PARSE_LOG_FILEPATH);
     formatDebugLogFile(MISC_LOG_FILEPATH, PARSE_LOG_FILEPATH);
     STOP_RUNNING(0);
 }
 main().catch(error => {
-    mlog.error(`ERROR [misc.main()]:`, JSON.stringify(error as any));
+    mlog.error(`ERROR [${F}.main()]:`, JSON.stringify(error as any));
     STOP_RUNNING(1);
 });
 
@@ -199,7 +163,7 @@ async function extractLotNumberedItemRows(
     itemSourceFile: string,
     locationBins: WarehouseDictionary
 ): Promise<Record<string, any>[]> {
-    const source = `[misc.extractLotNumberedItemRows()]`;
+    const source = `[${F}.extractLotNumberedItemRows()]`;
     let itemRows = await getRows(itemSourceFile);
     let targetItems: string[] = [];
     for (let [locId, binDict] of Object.entries(locationBins)) {
@@ -251,7 +215,7 @@ async function isolateFailedRequests(
     targetSuffix: string,
     outputDir?: string
 ): Promise<void> {
-    const source = `[misc.isolateFailedRequests()]`
+    const source = `[${F}.isolateFailedRequests()]`
     validate.existingDirectoryArgument(source, {inputDir});
     validate.stringArgument(source, {targetSuffix});
     if (outputDir) validate.existingDirectoryArgument(source, {outputDir});
@@ -344,7 +308,7 @@ async function searchInCustomers(
     customerFile: string = path.join(DATA_DIR, 'customers', 'customer.tsv'),
     outputDir?: string
 ): Promise<void> {
-    const source = `[misc.searchInCustomers()]`
+    const source = `[${F}.searchInCustomers()]`
     validate.multipleExistingFileArguments(source, '.tsv', {customerFile, targetEntFile})
     
     const customerRows = await getRows(customerFile);
@@ -581,7 +545,7 @@ function addConcatenatedAddressColumn(
     addr: AddressColumns,
     separator: string = ' '
 ): void {
-    let source = `misc.addConcatenatedAddressColumn`;
+    let source = `[${F}.addConcatenatedAddressColumn]`;
     validate.objectArgument(source, {row});
     validate.stringArgument(source, {outputColumn});
     if (!row || !outputColumn) return;

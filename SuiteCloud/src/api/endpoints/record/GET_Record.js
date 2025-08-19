@@ -7,6 +7,13 @@
  * @SB_ScriptId 175
  * @SB_DeployId 1
  */
+/**
+ * @consideration because NetSuite RESTlet GET request bodies are sourced from request url search parameter and not an actual object payload,
+ * maybe I should refactor GetRecordRequest to only have primitives or array of primitives as values.
+ * - i.e. `Record<string, string | number | boolean | string[] | number[] | boolean[]>`
+ * - or maybe make it a post request but just have functions that call it be named 'get..' on client side?
+ */
+
 
 define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     /**
@@ -104,11 +111,11 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
         writeLog(LogTypeEnum.DEBUG, 
             `Loading Existing ${recordType} record with internalid: '${recId}'`, 
         );
-        if (responseOptions && responseOptions.responseFields) {
-            response.results[0].fields = getResponseFields(rec, responseOptions.responseFields);
+        if (responseOptions && responseOptions.fields) {
+            response.results[0].fields = getResponseFields(rec, responseOptions.fields);
         }
-        if (responseOptions && responseOptions.responseSublists) {
-            response.results[0].sublists = getResponseSublists(rec, responseOptions.responseSublists);
+        if (responseOptions && responseOptions.sublists) {
+            response.results[0].sublists = getResponseSublists(rec, responseOptions.sublists);
         }
         response.logs = logArray;
         writeLog(LogTypeEnum.AUDIT, 
@@ -139,7 +146,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     
     /**
      * @param {object} rec 
-     * @param {string | string[]} responseFields = {@link RecordResponseOptions.responseFields}
+     * @param {string | string[]} responseFields = {@link RecordResponseOptions.fields}
      * @returns {FieldDictionary} **`fields`** = {@link FieldDictionary}
      */
     function getResponseFields(rec, responseFields) {
@@ -172,7 +179,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     /**
      * `if` a value of responseSublists is empty or undefined, `return` all fields of the sublist
      * @param {object} rec 
-     * @param {{[sublistId: string]: string | string[]}} responseSublists = {@link RecordResponseOptions.responseSublists}
+     * @param {{[sublistId: string]: string | string[]}} responseSublists = {@link RecordResponseOptions.sublists}
      * @returns {SublistDictionary | {[sublistId: string]: SublistLine[]}} **`sublists`** = {@link SublistDictionary} = `{[sublistId: string]: `{@link SublistLine}`[]}`
      */
     function getResponseSublists(rec, responseSublists) {
@@ -493,8 +500,8 @@ const NOT_DYNAMIC = false;
  */
 /**
  * @typedef {Object} RecordResponseOptions
- * @property {string | string[]} [responseFields] - `fieldId(s)` of the main record to return in the response.
- * @property {Record<string, string | string[]>} [responseSublists] `sublistId(s)` mapped to `sublistFieldId(s)` to return in the response.
+ * @property {string | string[]} [fields] - `fieldId(s)` of the main record to return in the response.
+ * @property {Record<string, string | string[]>} [sublists] `sublistId(s)` mapped to `sublistFieldId(s)` to return in the response.
  */
 
 

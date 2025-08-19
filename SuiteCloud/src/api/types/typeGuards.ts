@@ -2,10 +2,12 @@
  * @file src/api/types/typeGuards.ts
  */
 
-import { hasKeys, isPrimitiveValue } from "typeshi/dist/utils/typeValidation";
+import { hasKeys, isPrimitiveValue, isObject, isNonEmptyString, isStringArray, isNonEmptyArray } from "typeshi/dist/utils/typeValidation";
 import { SubrecordValue, FieldValue } from "./InternalApi";
-import { RecordResponseOptions } from "../requests/types/Requests";
+import { RecordResponseOptions, ChildSearchOptions, RelatedRecordRequest, idSearchOptions } from "./RecordEndpoint";
 import { RecordOptions, RecordResponse } from "./RecordEndpoint";
+import { RecordTypeEnum } from "../../utils/ns/Enums";
+
 /**
  * - {@link SubrecordValue}
  * @param value `any`
@@ -23,7 +25,7 @@ export function isSubrecordValue(value: any): value is SubrecordValue {
     const isSetSubrecordOptions = (hasKeys(value, 'fieldId') 
         && hasKeys(value, ['fields', 'sublists'], false)
     );
-    return (value && typeof value === 'object' 
+    return (isObject(value)
         && 'subrecordType' in value 
         && (isSubrecordParseOptions || isSetSubrecordOptions)
     ); 
@@ -51,6 +53,11 @@ export function isFieldValue(value: any): value is FieldValue {
     return false;
 }
 
+export function isRecordTypeEnum(value: any): value is RecordTypeEnum {
+    return (isNonEmptyString(value)
+        && Object.values(RecordTypeEnum).includes(value as RecordTypeEnum)
+    );
+}
 
 /**
  * @param value `any`
@@ -60,13 +67,13 @@ export function isFieldValue(value: any): value is FieldValue {
  * - **`false`** `otherwise`.
  */
 export function isRecordOptions(value: any): value is RecordOptions {
-    return (value && typeof value === 'object' 
+    return (isObject(value)
         && hasKeys(value, 'recordType') 
         && hasKeys(value, 
             ['fields', 'sublists', 'recordType', 'isDynamic', 'idOptions', 'meta'], 
-            false, 
-            false
+            false, false
         )
+        && isRecordTypeEnum(value.recordType)
     );
 }
 
@@ -76,8 +83,20 @@ export function isRecordOptions(value: any): value is RecordOptions {
  * @returns **`isRecordResponseOptions`** `boolean`
  */
 export function isRecordResponseOptions(value: any): value is RecordResponseOptions {
-    return (value && typeof value === 'object'
-        && hasKeys(value, ['responseFields', 'responseSublists'], false, true)
+    return (isObject(value) 
+    && hasKeys(value, ['fields', 'sublists'], false, true))
+    && (!value.fields 
+        || (isNonEmptyString(value.fields) 
+            || isStringArray(value.fields)
+        )
+    )
+    && (!value.sublists 
+        || (isObject(value.sublists)
+            && Object.keys(value.sublists).every(
+                k=>isNonEmptyString(value.sublists[k]) 
+                    || isStringArray(value.sublists[k])
+            )
+        )
     )
 }
 
@@ -87,11 +106,43 @@ export function isRecordResponseOptions(value: any): value is RecordResponseOpti
  * @returns **`isRecordResponse`** `boolean`
  */
 export function isRecordResponse(value: any): value is RecordResponse {
-    return (value && typeof value === 'object'
+    return (isObject(value)
         && hasKeys(value, 
-            ['status', 'message', 'results', 'rejects', 'error', 'logArray'], 
+            ['status', 'message', 'results', 'rejects', 'error', 'logs'], 
             false, true
         )
-        && Array.isArray(value.logArray)
     );
+}
+
+/**
+ * @param value `any`
+ * @returns **`isChildSearchOptions`** `boolean`
+ */
+export function isChildSearchOptions(value: any): value is ChildSearchOptions {
+    return (isObject(value)
+        && isRecordTypeEnum(value.childRecordType)
+        && isNonEmptyString(value.fieldId)
+        && (!value.sublistId || isNonEmptyString(value.sublistId))
+        && (!value.responseOptions || isRecordResponseOptions(value.responseOptions))
+    );
+}
+
+export function isRelatedRecordRequest(value: any): value is RelatedRecordRequest {
+    return (isObject(value)
+        && hasKeys(value, ['parentRecordType', 'idOptions', 'childOptions'], true, true)
+        && isRecordTypeEnum(value.parentRecordType)
+        && isNonEmptyArray(value.idOptions) 
+        && value.idOptions.every((el: any)=>isIdSearchOptions(el))
+        && isNonEmptyArray(value.childOptions)
+        && value.childOptions.every((el: any)=>isChildSearchOptions(el))
+    );
+}
+
+
+export function isIdSearchOptions(value: any): value is idSearchOptions {
+    return (isObject(value) 
+        && hasKeys(value, ['idProp', 'idValue', 'searchOperator'], true, true) 
+        && isNonEmptyString(value.idProp)
+        && isNonEmptyString(value.searchOperator)
+    )
 }

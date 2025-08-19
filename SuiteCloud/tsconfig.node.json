@@ -22,6 +22,9 @@
     },
     "exclude": [
         "node_modules/**/*",
-        "node_modules/**/**/*"
+        "node_modules/**/**/*",
+        "node_modules/**/**/**/*", 
+        "node_modules/**/**/**/**/*", 
+        "src/api/endpoints/*.js"
     ]
 }

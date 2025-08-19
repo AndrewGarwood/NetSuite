@@ -139,6 +139,10 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
                 scriptId: 176,
                 deployId: 1,
             },
+            GET_RelatedRecord: {
+                scriptId: 178,
+                deployId: 1
+            }
         } as ScriptDictionary,
     }
 }

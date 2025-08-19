@@ -4,7 +4,7 @@
  * @reference ~\node_modules\@hitc\netsuite-types\N\record.d.ts
  */
 
-import { SetFieldSubrecordOptions, SetSublistSubrecordOptions } from "../requests/types/Requests";
+import { SetFieldSubrecordOptions, SetSublistSubrecordOptions } from "./RecordEndpoint";
 
 /**
  * @enum {string} **`LogTypeEnum`**

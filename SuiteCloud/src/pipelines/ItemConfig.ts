@@ -14,17 +14,17 @@ import {
 import { ItemPipelineOptions, ItemPipelineStageEnum } from "./types";
 
 export const DEFAULT_ITEM_RESPONSE_OPTIONS: RecordResponseOptions = {
-    responseFields: [
+    fields: [
         'itemid', 'externalid', 'displayname'
     ],
-    responseSublists: {
+    sublists: {
         price: ['pricelevel', 'price']
     }
 }
 
 
 export const BIN_RESPONSE_OPTIONS: RecordResponseOptions = {
-    responseFields: ['binnumber', 'location', 'externalid']
+    fields: ['binnumber', 'location', 'externalid']
 }
 
 export const DEFAULT_ITEM_STAGES_TO_WRITE = [

@@ -11,7 +11,7 @@ import { createUrlWithParams } from "../url";
 import { AxiosContentTypeEnum } from "../server";
 import { 
     DeleteRecordByTypeRequest, DeleteExcludeOptions, DeleteRecordByTypeResponse,
-} from "../types";
+} from "./types";
 import { SB_REST_SCRIPTS } from "../configureRequests";
 import { getAccessToken } from "../configureAuth";
 import path from "node:path";

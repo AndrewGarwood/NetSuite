@@ -2,7 +2,7 @@
  * @file src/pipelines/types/Transaction.ts
  */
 
-import { RecordResponseOptions } from "../../api/requests/types/Requests";
+import { RecordResponseOptions } from "../../api/types";
 import { LocalFileMatchOptions, MatchSourceEnum } from "./Pipeline";
 import { EntityRecordTypeEnum } from "../../utils/ns/Enums";
 import { ParseDictionary } from "src/services/parse/types/index";
