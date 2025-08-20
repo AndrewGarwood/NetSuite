@@ -2,10 +2,14 @@
  * @file src/api/types/typeGuards.ts
  */
 
-import { hasKeys, isPrimitiveValue, isObject, isNonEmptyString, isStringArray, isNonEmptyArray } from "typeshi/dist/utils/typeValidation";
+import { 
+    hasKeys, isPrimitiveValue, isObject, isNonEmptyString, isStringArray, isNonEmptyArray, 
+    isEmptyArray
+} from "typeshi:utils/typeValidation";
 import { SubrecordValue, FieldValue } from "./InternalApi";
-import { RecordResponseOptions, ChildSearchOptions, RelatedRecordRequest, idSearchOptions } from "./RecordEndpoint";
-import { RecordOptions, RecordResponse } from "./RecordEndpoint";
+import { RecordResponseOptions, ChildSearchOptions, RelatedRecordRequest, idSearchOptions, 
+    RecordOptions, RecordResponse, SingleRecordRequest
+} from "./RecordEndpoint";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
 
 /**
@@ -87,14 +91,16 @@ export function isRecordResponseOptions(value: any): value is RecordResponseOpti
     && hasKeys(value, ['fields', 'sublists'], false, true))
     && (!value.fields 
         || (isNonEmptyString(value.fields) 
+            || isEmptyArray(value.fields) 
             || isStringArray(value.fields)
         )
     )
     && (!value.sublists 
         || (isObject(value.sublists)
-            && Object.keys(value.sublists).every(
-                k=>isNonEmptyString(value.sublists[k]) 
-                    || isStringArray(value.sublists[k])
+            && Object.keys(value.sublists).every(k=>
+                isNonEmptyString(value.sublists[k])
+                || isEmptyArray(value.sublists[k]) 
+                || isStringArray(value.sublists[k])
             )
         )
     )
@@ -127,14 +133,26 @@ export function isChildSearchOptions(value: any): value is ChildSearchOptions {
     );
 }
 
+export function isChildOptions(value: any): value is ChildSearchOptions[] {
+    return (isNonEmptyArray(value) && value.every(el=>isChildSearchOptions(el)));
+}
+
 export function isRelatedRecordRequest(value: any): value is RelatedRecordRequest {
     return (isObject(value)
         && hasKeys(value, ['parentRecordType', 'idOptions', 'childOptions'], true, true)
         && isRecordTypeEnum(value.parentRecordType)
-        && isNonEmptyArray(value.idOptions) 
-        && value.idOptions.every((el: any)=>isIdSearchOptions(el))
+        && isIdOptions(value.idOptions)
         && isNonEmptyArray(value.childOptions)
         && value.childOptions.every((el: any)=>isChildSearchOptions(el))
+    );
+}
+
+export function isSingleRecordRequest(value: any): value is SingleRecordRequest {
+    return (isObject(value)
+        && hasKeys(value, ['recordType', 'idOptions', 'responseOptions'], false, true)
+        && isRecordTypeEnum(value.recordType)
+        && isIdOptions(value.idOptions)
+        && (!value.responseOptions || isRecordResponseOptions(value.responseOptions))
     );
 }
 
@@ -145,4 +163,10 @@ export function isIdSearchOptions(value: any): value is idSearchOptions {
         && isNonEmptyString(value.idProp)
         && isNonEmptyString(value.searchOperator)
     )
+}
+
+export function isIdOptions(value: any): value is idSearchOptions[] {
+    return (isNonEmptyArray(value) 
+        && value.every((el: any)=>isIdSearchOptions(el))
+    );
 }

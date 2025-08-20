@@ -18,7 +18,7 @@ import {
     REMOVE_ATTN_SALUTATION_PREFIX, ENSURE_SPACE_AROUND_HYPHEN, REPLACE_EM_HYPHEN,
     stringContainsAnyOf, JOB_TITLE_SUFFIX_PATTERN, extractJobTitleSuffix,
     REMOVE_JOB_TITLE_SUFFIX, KOREA_ADDRESS_LATIN_TEXT_PATTERN
-} from "typeshi/dist/utils/regex";
+} from "typeshi:utils/regex";
 import { field } from "./common";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
 import { checkForOverride } from "../../utils/ns";

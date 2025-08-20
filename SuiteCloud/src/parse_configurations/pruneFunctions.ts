@@ -16,13 +16,13 @@ import {
     SubrecordValue,
 } from "../api/types";
 import { hasKeys, isNullLike as isNull, isNonEmptyArray, isNonEmptyString 
-} from "typeshi/dist/utils/typeValidation";
+} from "typeshi:utils/typeValidation";
 import { clean, 
     equivalentAlphanumericStrings, 
     RegExpFlagsEnum 
-} from "typeshi/dist/utils/regex";
+} from "typeshi:utils/regex";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "../utils/ns/Enums";
-import { indentedStringify } from "typeshi/dist/utils/io/writing";
+import { indentedStringify } from "typeshi:utils/io/writing";
 import { RADIO_FIELD_FALSE, RADIO_FIELD_TRUE } from "../utils/ns";
 
 /** `['entity', 'trandate']` */

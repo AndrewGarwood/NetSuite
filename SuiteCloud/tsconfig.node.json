@@ -12,7 +12,7 @@
             "@api/*": ["./src/api/*"],
             "@utils/*": ["./src/utils/*"],
             "@config/*": ["./src/config/*"],
-            "@typeshi/*": ["./node_modules/typeshi/dist/*"],
+            "@typeshi/*": ["./node_modules/typeshi/dist/utils/*"],
             "@typeshi": ["./node_modules/typeshi/dist/index"],
             "typeshi:utils/*": ["./node_modules/typeshi/dist/utils/*"],
             "@regex/*": ["./node_modules/typeshi/dist/utils/regex/*"], 

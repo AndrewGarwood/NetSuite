@@ -8,11 +8,11 @@ import {
     CleanStringOptions,
     clean, 
     isCleanStringOptions
-} from "typeshi/dist/utils/regex";
+} from "typeshi:utils/regex";
 import { SalesOrderColumnEnum as SO, } from "./salesOrderConstants";
 import { 
     isNonEmptyString 
-} from "typeshi/dist/utils/typeValidation";
+} from "typeshi:utils/typeValidation";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
 
 /**

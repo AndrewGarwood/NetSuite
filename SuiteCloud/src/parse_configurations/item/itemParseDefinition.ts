@@ -19,10 +19,10 @@ import * as evaluate from "../evaluators";
 import * as prune from "../pruneFunctions";
 import { RecordTypeEnum, AccountTypeEnum, AccountDictionary } from "../../utils/ns";
 import { RecordOptions } from "../../api/types/RecordEndpoint";
-import { hasKeys, isNonEmptyString, isNullLike } from "typeshi/dist/utils/typeValidation";
+import { hasKeys, isNonEmptyString, isNullLike } from "typeshi:utils/typeValidation";
 import { FieldDictionary, SublistDictionary } from "../../api";
 import { WarehouseColumnEnum, WarehouseRow } from "src/pipelines/types/Warehouse";
-import { getIndexedColumnValues } from "typeshi/dist/utils/io/";
+import { getIndexedColumnValues } from "typeshi:utils/io/";
 
 enum LocationEnum {
     HQ = 1,

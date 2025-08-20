@@ -30,13 +30,13 @@ import {
     isRowSourceMetaData,
     isDirectory,
     getFileNameTimestamp,
-} from "typeshi/dist/utils/io";
+} from "typeshi:utils/io";
 import { getAccessToken, isRelatedRecordRequest } from "./api";
 import { 
     equivalentAlphanumericStrings, CleanStringOptions, clean, 
     stringContainsAnyOf, RegExpFlagsEnum, 
     extractLeaf
-} from "typeshi/dist/utils/regex";
+} from "typeshi:utils/regex";
 import { SalesOrderColumnEnum } from "./parse_configurations/salesorder/salesOrderConstants";
 import { CustomerColumnEnum } from "./parse_configurations/customer/customerConstants";
 import { ItemColumnEnum } from "./parse_configurations/item/itemConstants";
@@ -47,52 +47,43 @@ import {
 import { 
     hasKeys, isEmptyArray, isIntegerArray, isNonEmptyArray, 
     isNonEmptyString, isNullLike 
-} from "typeshi/dist/utils/typeValidation";
+} from "typeshi:utils/typeValidation";
 import { search as fuzzySearch, MatchData } from "fast-fuzzy";
 import { idPropertyEnum, LogTypeEnum, RecordOptions, 
     RecordResponse, RecordTypeEnum, RecordResponseOptions, RecordResult,
     SearchOperatorEnum, getRecordById, 
     instantiateAuthManager, idSearchOptions, 
-    GetRecordRequest, RecordRequest, RelatedRecordRequest, ChildSearchOptions, getRelatedRecord
+    SingleRecordRequest, RecordRequest, RelatedRecordRequest, ChildSearchOptions, getRelatedRecord
 } from "./api";
 import { SuiteScriptError, encodeExternalId } from "./utils/ns";
 import { CLEAN_ITEM_ID_OPTIONS } from "src/parse_configurations/evaluators/item";
 import {
-    WarehouseDictionary, itemIdExtractor, WarehouseColumnEnum, WarehouseRow,
+    WarehouseDictionary, WarehouseColumnEnum, WarehouseRow,
     putEntities, DEFAULT_ITEM_RESPONSE_OPTIONS
 } from "src/pipelines";
-import { extractTargetRows } from "src/DataReconciler";
+import { extractTargetRows, validateGetRelatedRecord } from "src/DataReconciler";
 import { 
     parseRecordCsv, processParseResults, 
     ParseResults, ValidatedParseResults, ParseDictionary, 
     PostProcessDictionary, getCompositeDictionaries 
 } from "src/services";
-import * as validate from "typeshi/dist/utils/argumentValidation";
+import * as validate from "typeshi:utils/argumentValidation";
 
 const F = path.basename(__filename).replace(/\.[a-z]{1,}$/, '');
+const itemIdExtractor = async (
+    value: string, 
+    cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
+): Promise<string> => {
+    return clean(extractLeaf(value), cleanOptions);
+}
 async function main(): Promise<void> {
     const source = `[${F}.main()]`
     await clearFile(MISC_LOG_FILEPATH, PARSE_LOG_FILEPATH);
     await initializeData();
     await instantiateAuthManager();
     mlog.info(`${source} START at ${getCurrentPacificTime()}`);
-    const idOptions: idSearchOptions[] = [{
-        idProp: idPropertyEnum.ITEM_ID,
-        idValue: 'ITEM_ID',
-        searchOperator: SearchOperatorEnum.TEXT.IS
-    }];
-    const parentRecordType = RecordTypeEnum.INVENTORY_ITEM;
-    const childOptions: ChildSearchOptions[] = [{
-        childRecordType: RecordTypeEnum.SALES_ORDER,
-        fieldId: 'item',
-        sublistId: 'item',
-        responseOptions: { fields: ['externalid', 'tranid', 'otherrefnum'] }
-    }];
-    const request: RelatedRecordRequest = { parentRecordType, idOptions, childOptions };
-    validate.objectArgument(source, {request, isRelatedRecordRequest});
-    const res: RecordResponse = await getRelatedRecord(request);
-    write(res, path.join(CLOUD_LOG_DIR, 'items', `${getFileNameTimestamp()}_RelatedRecordResponse.json`));
 
+    await validateGetRelatedRecord();
 
 
     await trimFile(5, MISC_LOG_FILEPATH, PARSE_LOG_FILEPATH);
@@ -135,7 +126,7 @@ async function getRemainingItems(): Promise<string[]> {
                 searchOperator: SearchOperatorEnum.TEXT.IS
             }
         ];
-        let getReq: GetRecordRequest = {
+        let getReq: SingleRecordRequest = {
             recordType: RecordTypeEnum.INVENTORY_ITEM,
             idOptions: idOptions,
             responseOptions: DEFAULT_ITEM_RESPONSE_OPTIONS

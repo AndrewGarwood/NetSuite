@@ -3,7 +3,7 @@
  */
 import axios from "axios";
 import { writeObjectToJsonSync as write, getCurrentPacificTime, indentedStringify, 
-    getFileNameTimestamp } from "typeshi/dist/utils/io";
+    getFileNameTimestamp } from "typeshi:utils/io";
 import { apiLogger as alog, mainLogger as mlog, INDENT_LOG_LINE as TAB, simpleLogger as slog,
     NEW_LINE as NL } from "../../config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, 
@@ -18,8 +18,8 @@ import {
 import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "../configureRequests";
 import { getAccessToken } from "../configureAuth";
 import path from "node:path";
-import * as validate from "typeshi/dist/utils/argumentValidation";
-import { isEmptyArray } from "typeshi/dist/utils/typeValidation";
+import * as validate from "typeshi:utils/argumentValidation";
+import { isEmptyArray } from "typeshi:utils/typeValidation";
 
 const UPSERT_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.PUT_Record.scriptId as number;
 const UPSERT_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.PUT_Record.deployId as number;

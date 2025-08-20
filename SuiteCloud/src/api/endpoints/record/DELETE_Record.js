@@ -1,96 +1,68 @@
 /**
  * @NApiVersion 2.1
  * @NScriptType Restlet
- * @NScriptName GET_RelatedRecord
- * @PROD_ScriptId 
- * @PROD_DeployId 
- * @SB_ScriptId 178
- * @SB_DeployId 1
- */
+ * @NScriptName DELETE_Record
+ * @ProdNScriptId 
+ * @ProdDeployId 
+ * @SbNScriptId 179
+ * @SbDeployId 1
+ * */
 
-
-/**
- * @consideration maybe change `ChildSearchOptions.sublistId` back to boolean flag 
- * 'isSublistField' boolean
- * instead of the sublist id because search.createFilter was throwing error when trying 
- * to prefix fieldId with sublistId. and when setting filterOptions.join = sublistId,
- * or can keep sublistId and use some record module function to verify that it's a valid 
- * sublist and sublist field id
- * @concern got same results regardless of adding explicit filter `mainline is F` (when searching in item sublist)
- * - maybe this is intentional because 'item' is a sublistid of transactions and is a fieldId of the 'item' sublist ?
- */
-
-
-define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
+define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
 /**
  * @type {LogStatement[]} `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
  * @see {@link writeLog}`(type, title, ...details)`
  * */
 const logArray = [];
 /**`'endpoint'` */
-const EP = `GET_RelatedRecord`;
-/** required keys of {@link RelatedRecordRequest} = `['parentRecordType', 'idOptions', 'childOptions']` */
-const REQUEST_KEYS = ['parentRecordType', 'idOptions', 'childOptions'];
+const EP = `DELETE_Record`;
+/** required keys of {@link DeleteRecordRequest} = `['recordType', 'idOptions']` */
+const REQUEST_KEYS = ['recordType', 'idOptions'];
+
+
 /**
- * @param {{parentRecordType: string; idOptions: string; childOptions: string}} reqParams
+ * - {@link DeleteRecordRequest}
+ * @param {{recordType: string; idOptions: string; responseOptions: string;}} reqParams 
  * - when applicable, converts json string values to objects in {@link unpackRequestParameters}  
  * @returns {RecordResponse} **`response`** {@link RecordResponse}
  */
-const get = (reqParams) => {
-    const source = `[${EP}.get()]`;
+const doDelete = (reqParams) => {
+    const source = `[${EP}.${doDelete.name}()]`;
     const unpackResult = unpackRequestParameters(reqParams);
     if (isRecordResponse(unpackResult)) { // if error unpacking
         return unpackResult;
     }
-    writeLog(LogTypeEnum.AUDIT, `${source} Successfully unpacked reqParams to RelatedRecordRequest`);
-    const { parentRecordType, idOptions, childOptions } = unpackResult;
-    const parentInternalId = searchForRecordById(parentRecordType, idOptions);
-    if (typeof parentInternalId !== 'number') { // i.e. === null
+    writeLog(LogTypeEnum.AUDIT, `${source} Successfully unpacked reqParams to DeleteRecordRequest`);
+    const { recordType, idOptions, responseOptions } = unpackResult;
+    const recordInternalId = searchForRecordById(recordType, idOptions);
+    if (typeof recordInternalId !== 'number') {
         return handleError(unpackResult, source, [
-            `No '${parentRecordType}' record found with provided idOptions (idSearchOptions[])`,
-            `idOptions received: ${JSON.stringify(idOptions)}`,
-            `Unable to retrieve related records`
+            `No '${recordType}' record found with provided idOptions: idSearchOptions[]`,
+            `idOptions Received: ${JSON.stringify(idOptions)}`,
+            `Unable to delete record`
         ], 404, `Record not found`);
     }
-    writeLog(LogTypeEnum.AUDIT, 
-        `Finished searchForRecordById(parentRecord)`,
-        `Succesfully retrieved '${parentRecordType}' record with internalId: '${parentInternalId}'`
-    );
-    let resultDictionary = getRelatedRecordIds(parentRecordType, parentInternalId, childOptions);
-    writeLog(LogTypeEnum.AUDIT, `${source} Finished getRelatedRecordIds()`,
-        `num related records: ${Object.values(resultDictionary).flat().length}`
-    );
-    /**@type {RecordResult[]} */
-    const recordResults = [];
-    for (let i = 0; i < childOptions.length; i++) {
-        let child = childOptions[i];
-        const { childRecordType, responseOptions } = child;
-        if (!isNonEmptyArray(resultDictionary[childRecordType])) {
-            continue;
-        }
-        // should already have unique elements by construction, but doing this just in case for now 
-        const recordIds = Array.from(new Set(resultDictionary[childRecordType]));
-        for (let recordId of recordIds) {
-            recordResults.push(generateRecordResult(
-                childRecordType, recordId, responseOptions
-            ));
-        }
+    writeLog(LogTypeEnum.AUDIT, `${source} Succesfully retrieved recordInternalId: '${recordInternalId}', generating RecordResult before deleting...`);
+    /**@type {RecordResult} */
+    const recordResult = generateRecordResult(recordType, recordInternalId, responseOptions);
+    try {
+        record.delete({type: recordType, id: recordInternalId});
+        writeLog(LogTypeEnum.AUDIT, `${source} END - Successfully deleted '${recordType}' record with internalId '${recordInternalId}'`)
+        /** @type {RecordResponse}*/
+        let response = {
+            status: 200,
+            message: `${source} END - Successfully deleted '${recordType}' record with internalId '${recordInternalId}'`,
+            logs: logArray,
+            results: [recordResult]
+        };
+        return response;
+    } catch (error) {
+        return handleError(unpackResult, source, [`An error occurred when calling record.delete({type, id})`,
+            `Attempted: record.delete({type: ${recordType}, id: ${recordInternalId}})`,
+            `Caught: ${error}`
+        ], 500, `Unable to delete '${recordType}' record with internalId '${recordInternalId}'`);
     }
-    writeLog(LogTypeEnum.AUDIT, 
-        `${source} END - generating response...`,
-        `${source}`,
-        `parentRecord: '${parentRecordType}' with internalid: '${parentInternalId}'`,
-        `recordResults.length: ${recordResults.length}`,
-    );
-    /**@type {RecordResponse} */
-    const response = {
-        status: 200,
-        message: `End of GET_RelatedRecord`,
-        logs: logArray,
-        results: recordResults
-    }
-    return response;
-};
+}
 /**
  * @param {string | RecordTypeEnum} recordType 
  * @param {number} recordId 
@@ -119,38 +91,33 @@ function generateRecordResult(recordType, recordId, responseOptions) {
     } catch (error) {
         writeLog(LogTypeEnum.ERROR, `[generateRecordResult()] Error processing ResponseOptions`,
             `recordType: ${recordType}`,
-            `recordId: '${recordId}'`,
-            `error: ${error}`
+            `  recordId: '${recId}' (null/undefined if new record)`,
+            `error: `, error
         );
     }
     return result;
 }
-
 /**
- * - validate/convert (when applicable) string values from `reqParams`
- * - validates `parentRecordType` is enum member
- * - {@link isIdSearchOptions} for elements of `JSON.parse(reqParams.idOptions)`
- * - {@link isChildSearchOptions} for elements of `JSON.parse(reqParams.childOptions)`
- * @param {{parentRecordType: string; idOptions: string; childOptions: string}} reqParams
- * @returns {RelatedRecordRequest | RecordResponse}
- * - {@link RelatedRecordRequest} `if` all params successfully unpacked
- * - {@link RecordResponse} to return in get() with error message if unpacking failed
+ * - parses reqParams.idOptions to idSearchOptions[]
+ * - (if defined) parses reqParams.responseOptions to RecordResponseOptions
+ * @param {{recordType: string; idOptions: string; responseOptions?: string;}} reqParams
+ * @returns {DeleteRecordRequest | RecordResponse} **`unpackResult`** `DeleteRecordRequest | RecordResponse`
  */
 function unpackRequestParameters(reqParams) {
     const source = `[${EP}.${unpackRequestParameters.name}()]`;
     if (!isObject(reqParams) || !hasKeys(reqParams, REQUEST_KEYS)) {
         return handleError(reqParams, source, [
             `Invalid Request Parameters Object: reqParams undefined or is not an object or is missing required keys`,
-            `Expected: object with keys ['parentRecordType', 'idOptions', 'childOptions']`,
-            `Received: ${typeof reqParams} = '${reqParams}'`
+            `Expected: object with keys ['recordType', 'idOptions']`,
+            `Received: ${typeof recordType} = '${recordType}'`
         ]);
     }
-    let parentRecordType = reqParams.parentRecordType;
-    if (!isRecordTypeEnum(parentRecordType)) {
+    let recordType = reqParams.recordType;
+    if (!recordType) {
         return handleError(reqParams, source, [
-            `Invalid Request Parameter 'parentRecordType'`,
+            `Invalid Request Parameter 'recordType'`,
             `Expected: RecordTypeEnum (string enum value)`,
-            `Received: '${parentRecordType}'`
+            `Received: ${typeof recordType} = '${recordType}'`
         ]);
     }
     /**@type {idSearchOptions[]} */
@@ -175,31 +142,30 @@ function unpackRequestParameters(reqParams) {
             `caught: ${error}`
         ]);
     }
-    /**@type {ChildSearchOptions[]} */
-    let childOptions = [];
+    /**@type {DeleteRecordRequest} */
+    const request = {recordType, idOptions};
+    if (!reqParams.responseOptions) { return request }
+    /**@type {RecordResponseOptions} */
+    let responseOptions = {}
     try {
-        childOptions = JSON.parse(reqParams.childOptions);
-        if (isChildSearchOptions(childOptions)) {
-            childOptions = [childOptions]
-        } else if (!(isNonEmptyArray(childOptions) 
-            && childOptions.every(el=> isChildSearchOptions(el))
-            )) {
+        responseOptions = JSON.parse(reqParams.responseOptions);
+        if (!isRecordResponseOptions(responseOptions)) {
             return handleError(reqParams, source, [
-                `reqParams.childOptions is not a valid Array<ChildSearchOptions>`,
-                `Expected: { childRecordType: string, fieldId: string }[]`,
-                `Received: ${typeof childOptions} = ${JSON.stringify(childOptions)}`
+                `reqParams.responseOptions is not a valid RecordResponseOptions object`,
+                `Expected: { fields?: string | string[] | undefined; sublists?: Record<string, string | string[]> | undefined; }[]`,
+                `Received: ${typeof idOptions} = ${JSON.stringify(idOptions)}`
             ]);
         }
+        request.responseOptions = responseOptions;
     } catch (error) {
         return handleError(reqParams, source, [
-            `JSON.parse(reqParams.childOptions) failed`,
-            `param 'childOptions' is not valid JSON string`,
+            `JSON.parse(reqParams.responseOptions) failed`,
+            `param 'responseOptions' is not valid JSON string`,
             `caught: ${error}`
         ]);
     }
-    /**@type {RelatedRecordRequest} */
-    const request = { parentRecordType, idOptions, childOptions}
     return request;
+    
 }
 
 /**
@@ -215,7 +181,7 @@ function handleError(
     source,
     errorDetails,
     status = 400,
-    message = `Bad Request: Invalid Parameter(s)`,
+    message = `${EP} Bad Request: Invalid Parameter(s)`,
 ) {
     writeLog(LogTypeEnum.ERROR,
         `${source} -> ${message}`,
@@ -233,175 +199,6 @@ function handleError(
     }
     return errorResponse;
 }
-
-/**
- * @param {string | RecordTypeEnum} parentRecordType 
- * @param {number} parentInternalId 
- * @param {ChildSearchOptions[]} childOptions
- * @returns {{ [childRecordType: string]: number[] }} **`resultDictionary`** `{ [childRecordType: string]: number[] }`
- */
-function getRelatedRecordIds(
-    parentRecordType, 
-    parentInternalId, 
-    childOptions
-) {
-    const source = `[${EP}.${getRelatedRecordIds.name}()]`;
-    if (!isNonEmptyString(parentRecordType) // redundant checks... 
-        || typeof parentInternalId !== 'number'
-        || !(isNonEmptyArray(childOptions) && childOptions.every(
-                el=>isChildSearchOptions(el)
-                )
-            )
-        ) {
-        writeLog(LogTypeEnum.ERROR, `${source} Invalid Arguments`,
-            `${source}`,
-            `Expected: parentRecordType (RecordTypeEnum), parentInternalId (number)`,
-            `childOptions (ChildSearchOptions[])`
-        );
-        return {}
-    }
-    /**@type {{ [childRecordType: string]: number[] }} */
-    const resultDictionary = {};
-    for (let i = 0; i < childOptions.length; i++) {
-        const searchOptions = childOptions[i];
-        const childRecordSearch = createChildSearch(parentInternalId, searchOptions);
-        if (!childRecordSearch) {
-            writeLog(LogTypeEnum.ERROR, 
-                `${source} Unable to create Search object`,
-                `${source}`,
-                `Unable to create Search from ChildSearchOptions at childOptions[${i}]`,
-                (i < childOptions.length ? `continuing to next childOptions element` : ``)
-            );
-            continue;
-        }
-        let recordIds = runPagedSearch(childRecordSearch);
-        if (!resultDictionary[searchOptions.childRecordType]) {
-            resultDictionary[searchOptions.childRecordType] = []
-        }
-        for (let recId of recordIds) {
-            if (!resultDictionary[searchOptions.childRecordType].includes(recId)) {
-                resultDictionary[searchOptions.childRecordType].push(recId);
-            }
-        }
-        writeLog(LogTypeEnum.DEBUG, `${source} Search Completed!`,
-            `${source}`, 
-            `Completed child search ${i+1}/${childOptions.length}`,
-            ` parentRecordType: '${parentRecordType}'`,
-            `  childRecordType: '${searchOptions.childRecordType}'`,
-            `num records found: ${resultDictionary[searchOptions.childRecordType].length}`
-        );
-    }
-    return resultDictionary;
-}
-
-/**
- * @param {Search} searchObject {@link Search}
- * @param {number} pageSize `number`
- * - `integer 1 < pageSize < 1000`
- * - overwrites built in default pageSize of `50` with `100`
- * @returns {number[]} **`recordIds`** `number[]` array of internal ids
- */
-function runPagedSearch(searchObject, pageSize = 100) {
-    if (!searchObject) return [];
-    const source = `[${EP}.${runPagedSearch.name}()]`;
-    /**@type {PagedData} */
-    let pagedData = searchObject.runPaged({pageSize});
-    if (!pagedData || !isNonEmptyArray(pagedData.pageRanges)) {
-        writeLog(LogTypeEnum.DEBUG, `${source} pagedData.pageRanges is empty`,
-            `${source}`,
-            `searchObject: ${JSON.stringify(searchObject)}`,
-            `pagedData: ${JSON.stringify(pagedData)}`,
-        );
-        return [];
-    }
-    /**@type {number[]} */
-    const recordIds = [];
-    for (let pageRange of pagedData.pageRanges) {
-        let page = pagedData.fetch({index: pageRange.index});
-        recordIds.push(...page.data
-            .map(result=>Number(result.id)));
-    }
-    return recordIds;
-}
-
-/**
- * @param {number} parentInternalId `number`
- * @param {ChildSearchOptions} searchOptions
- * @returns {Search | null} **`childRecordSearch`** 
- * - {@link Search} `if` `searchOptions` generates a valid `Search` object;
- * - `null` `if` `searchOptions` ran into an error while generating the `Search` object
- */
-function createChildSearch(parentInternalId, searchOptions) {
-    const source = `[${EP}.${createChildSearch.name}()]`;
-    if (typeof parentInternalId !== 'number' || !Number.isInteger(parentInternalId)) {
-        writeLog(LogTypeEnum.ERROR, `${source} Invalid param 'parentInternalId'`,
-            `${source} Expected parentInternalId to be integer`,
-            `Received: ${typeof parentInternalId} = '${parentInternalId}'`
-        )
-    }
-    const { fieldId, sublistId } = searchOptions;
-    let { childRecordType } = searchOptions;
-    if (!isRecordTypeEnum(childRecordType)) {
-        writeLog(LogTypeEnum.ERROR, `${source} Invalid childRecordType`,
-            `Invalid childRecordType (RecordTypeEnum)`
-        );
-        return null;
-    }
-    /**@type {CreateSearchFilterOptions} */
-    const filterOptions = {
-        name: fieldId,
-        operator: SearchOperatorEnum.RECORD.ANY_OF,
-        values: [parentInternalId]
-    }
-    /**@type {Filter | undefined} */
-    let filter = undefined;
-    try { 
-        filter = search.createFilter(filterOptions);
-    } catch (error) {
-        writeLog(LogTypeEnum.ERROR, 
-            `${source} Error creating Filter object: Invalid CreateSearchFilterOptions derived from ChildSearchOptions`,
-            ...[`${source} at childOptions[${i}]`,
-            `An error occurred when calling search.createFilter(CreateSearchFilterOptions)`,
-            `Check validity of fieldId and/or operator and/or sublistId.`,
-            `childSearchOptions: ${JSON.stringify(searchOptions)}`,
-            `derived CreateSearchFilterOptions: ${JSON.stringify(filterOptions)}`,
-            `Caught: ${error}`
-        ]);
-    }
-    if (!filter) { return null }
-    const filters = [filter];
-    if (isNonEmptyString(sublistId)) {
-        filters.push(search.createFilter({
-            name: 'mainline', 
-            operator: SearchOperatorEnum.TEXT.IS, 
-            values: ['F'] 
-        }));
-    }
-    /**@type {SearchCreateOptions} */
-    const searchCreateOptions = {
-        type: childRecordType,
-        filters: filters,
-        // columns: ['internalid']
-    }
-    /**@type {Search | undefined} */
-    let childRecordSearch = undefined;
-    try {
-        childRecordSearch = search.create(searchCreateOptions)
-    } catch (error) {
-        writeLog(LogTypeEnum.ERROR, 
-            `${source} Error creating Search object`,
-            ...[`${source} at childOptions[${i}]`,
-            `An error occurred when calling search.create(SearchCreateOptions)`,
-            `childSearchOptions: ${JSON.stringify(searchOptions)}`,
-            `-> FilterOptions: ${JSON.stringify(filterOptions)}`,
-            `-> searchCreateOptions ${JSON.stringify(searchCreateOptions)}`,
-            `Caught: ${error}`
-        ]);
-    }
-    if (!childRecordSearch) { return null }
-    return childRecordSearch;
-}
-
 /**
  * @note does not yet handle searching for multiple records and returning their ids
  * @param {RecordTypeEnum | string} recordType 
@@ -411,15 +208,16 @@ function createChildSearch(parentInternalId, searchOptions) {
  * `if` found in the search, or `null` `if` no record was found.
  */
 function searchForRecordById(recordType, idOptions, fields) {
-    if (!isRecordTypeEnum(recordType) || (!idOptions && !fields)) {
+    const source = `[${EP}.${searchForRecordById.name}()]`;
+    if (isRecordTypeEnum(recordType) || (!idOptions && !fields)) {
         writeLog(LogTypeEnum.ERROR,
-            `ERROR: searchForRecordById() Invalid Parameters:`,
+            `${source} Invalid Parameters:`,
             `recordType must be a valid RecordTypeEnum or string, and idOptions or fields (with idProps) must be provided`,
         );
         return null;
     }
     // if no idOptions provided, extract idProperty values from fields
-    if (fields && (!idOptions || isEmptyArray(idOptions))) {
+    if (fields && !isNonEmptyArray(idOptions)) {
         /**@type {idSearchOptions[]} */
         idOptions = [];
         for (const idPropFieldId of Object.values(idPropertyEnum)) {
@@ -452,7 +250,7 @@ function searchForRecordById(recordType, idOptions, fields) {
         const { idProp, searchOperator, idValue } = idOptions[i];
         if (!idProp || !searchOperator || !idValue) {
             writeLog(LogTypeEnum.ERROR,
-                `ERROR: searchForRecordById() Invalid idOptions element.`,
+                `${source} Invalid idOptions element.`,
                 `Invalid idSearchOptions element at idOptions[${i}]`,
             )
             continue;
@@ -470,7 +268,7 @@ function searchForRecordById(recordType, idOptions, fields) {
             const resultRange = resultSet.getRange({ start: 0, end: 10 });
             if (resultRange.length === 0) {
                 writeLog(LogTypeEnum.DEBUG,
-                    `searchForRecordById() 0 records found for idSearchOption ${i + 1}/${idOptions.length}`,
+                    `${source} 0 records found for idSearchOption ${i + 1}/${idOptions.length}`,
                     `0 '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                 );
                 continue;
@@ -486,7 +284,7 @@ function searchForRecordById(recordType, idOptions, fields) {
              */
             if (resultRange.length > 1 && expectSingleResult) {
                 writeLog(LogTypeEnum.ERROR,
-                    'WARNING: searchForRecordById() Multiple records found.',
+                    `WARNING: ${source} Multiple records found.`,
                     `${resultRange.length} '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                     `tentatively storing id of first record found,'${recordInternalId}' then continuing to next idOptions element`
                 );
@@ -494,14 +292,14 @@ function searchForRecordById(recordType, idOptions, fields) {
                 continue;
             } else if (resultRange.length === 1) {
                 writeLog(LogTypeEnum.DEBUG,
-                    'searchForRecordById() Record found!',
+                    `${source} searchForRecordById() Record found!`,
                     `1 '${recordType}' record found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                 );
                 return Number(resultRange[0].id);
             }
         } catch (e) {
             writeLog(LogTypeEnum.ERROR,
-                `ERROR: searchForRecordById() idOptions for loop`,
+                `${source} idOptions for loop`,
                 `error occurred while searching for '${recordType}' record with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                 JSON.stringify(e)
             );
@@ -517,8 +315,9 @@ function searchForRecordById(recordType, idOptions, fields) {
  */
 function getResponseFields(rec, responseFields) {
     if (!rec 
+        || !responseFields 
         || (!isNonEmptyString(responseFields) 
-            && !isNonEmptyArray(responseFields))) {
+        && !isNonEmptyArray(responseFields))) {
         writeLog(LogTypeEnum.ERROR, 
             'getResponseFields() Invalid parameters', 
             'rec {object} and responseFields {string | string[]} are required'
@@ -629,15 +428,15 @@ function getResponseSublists(rec, responseSublists) {
     }
     return sublists;
 }
-/*---------------------------- [ Utilities ] ----------------------------*/
+
+/*---------------------------- [ Utilities ] ----------------------------*/    
 /**
- * @enum {string} **`LogTypeEnum`**
- * @property {string} DEBUG - `debug`
- * @property {string} ERROR - `error`
- * @property {string} AUDIT - `audit`
- * @property {string} EMERGENCY - `emergency`
- * @readonly
- */
+* @enum {string} **`LogTypeEnum`**
+* @property {string} DEBUG - `debug`
+* @property {string} ERROR - `error`
+* @property {string} AUDIT - `audit`
+* @property {string} EMERGENCY - `emergency`
+*/
 const LogTypeEnum = {
     /** = `'debug'` */
     DEBUG: 'debug',
@@ -648,11 +447,10 @@ const LogTypeEnum = {
     /** = `'emergency'` */
     EMERGENCY: 'emergency',
 };
-
 const NL = '\n > ';
 const TAB = '\n\t• ';
 /**max number of times allowed to call `log[LogTypeEnum](title, details)` per `get()` call */
-const MAX_LOGS_PER_LEVEL = 5;
+const MAX_LOGS_PER_LEVEL = 500;
 /**@type {{[logType: LogTypeEnum]: {count: number, limit: number}}} */
 const logDict = {
     [LogTypeEnum.DEBUG]: { count: 0, limit: MAX_LOGS_PER_LEVEL },
@@ -699,7 +497,7 @@ function writeLog(type, title, ...details) {
             if (logDict[LogTypeEnum.AUDIT].count >= logDict[LogTypeEnum.AUDIT].limit) {
                 break;
             }
-            // log.audit(title, payload);
+            log.audit(title, payload);
             logDict[LogTypeEnum.AUDIT].count++;
             break;
         case LogTypeEnum.EMERGENCY:
@@ -713,25 +511,10 @@ function writeLog(type, title, ...details) {
     logArray.push({ timestamp: getCurrentPacificTime(), type, title, details });//, message: payload });
 }
 /**
- * Gets the current date and time in Pacific Time
  * @returns {string} The current date and time in Pacific Time
  */
 function getCurrentPacificTime() {
     return new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
-}
-/**
- * @param {RecordTypeEnum | string} recordType {@link RecordTypeEnum} | `string`
- * @returns {RecordTypeEnum | null} **`recordType`** - the validated record type as a `RecordTypeEnum` value, or `null` if the record type is invalid.
- */
-function validateRecordType(recordType) {
-    if (!isNonEmptyString(recordType)) {
-        return null;
-    }
-    const isKey = Object.keys(RecordTypeEnum).includes(recordType.toUpperCase());
-    const isValue = Object.values(RecordTypeEnum).includes(recordType.toLowerCase());
-    if (isKey) { return RecordTypeEnum[recordType.toUpperCase()]; }
-    if (isValue) { return recordType.toLowerCase(); }
-    return null;
 }
 /**
  * @param {any} value 
@@ -806,7 +589,6 @@ function hasKeys(obj, keys, requireAll = true, restrictKeys = false) {
     }
     return requireAll ? numKeysFound === keys.length : numKeysFound > 0;
 }
-
 /**
  * @param value `any`
  * @param allowEmpty `boolean` `default = true`
@@ -823,35 +605,12 @@ function isObject(value, allowEmpty = true, allowArray = false) {
         && (allowEmpty || Object.keys(value).length > 0)
     );
 }
-
-/**
- * @param {any} value
- * @return {value is RecordTypeEnum} 
- */
-function isRecordTypeEnum(value) {
-    return (isNonEmptyString(value) 
-        && Object.values(RecordTypeEnum).includes(value)
-    );
-}
-
-/**
- * @param {any} value 
- * @returns {value is ChildSearchOptions}
- */
-function isChildSearchOptions(value) {
-    return Boolean(isObject(value)
-        && isRecordTypeEnum(value.childRecordType)
-        && isNonEmptyString(value.fieldId)
-        && (!value.sublistId || isNonEmptyString(value.sublistId))
-    )
-}
-
 /**
  * @param {any} value 
  * @returns {value is RecordResponse}
  */
 function isRecordResponse(value) {
-    return Boolean(isObject(value)
+    return (isObject(value)
         && hasKeys(value, 
             ['status', 'message', 'error', 'logs', 'results', 'rejects'],
             false, true
@@ -859,26 +618,11 @@ function isRecordResponse(value) {
     )
 }
 /**
- * `isidSearchOptions`
- * @param {any} value
- * @returns {value is idSearchOptions} 
- */
-function isIdSearchOptions(value) {
-    return Boolean(isObject(value)
-        && hasKeys(value, 
-            ['idProp', 'idValue', 'searchOperator'], 
-            true, true
-        )
-        && isNonEmptyString(value.idProp) // && Object.values(idPropertyEnum).includes(idProp)
-        && isNonEmptyString(value.searchOperator) // validate it's a SearchOperatorEnum
-    )
-}
-/**
  * @param {any} value
  * @returns {value is RecordResponseOptions} 
  */
 function isRecordResponseOptions(value) {
-    return Boolean(isObject(value)
+    return Boolean(value && typeof value === 'object'
         && (!value.fields 
             || (isNonEmptyString(value.fields)
                 || isEmptyArray(value.fields) 
@@ -886,7 +630,7 @@ function isRecordResponseOptions(value) {
             )
         )
         && (!value.sublists 
-            || (isObject(value.sublists)
+            || (typeof value.sublists === 'object'
                 && Object.keys(value.sublists).every(k=>
                     isNonEmptyString(value.sublists[k]) 
                     || isEmptyArray(value.sublists[k])
@@ -896,38 +640,48 @@ function isRecordResponseOptions(value) {
         )
     )
 }
+/**
+ * `isidSearchOptions`
+ * @param {any} value
+ * @returns {value is idSearchOptions} 
+ */
+function isIdSearchOptions(value) {
+    return (isObject(value)
+        && hasKeys(value, 
+            ['idProp', 'idValue', 'searchOperator'], 
+            true, true
+        )
+        && isNonEmptyString(value.idProp) // && Object.values(idPropertyEnum).includes(idProp)
+        && isNonEmptyString(value.searchOperator) // validate it's a SearchOperatorEnum
+    )
+}
+
+/**
+ * @param {any} value
+ * @returns {value is RecordTypeEnum} **`isRecordTypeEnum`** `boolean` 
+ * - `true` `if Object.values(`{@link RecordTypeEnum}`).includes(value)`
+ * - `false` `otherwise`
+ */
+function isRecordTypeEnum(value) {
+    return (isNonEmptyString(value)
+        && Object.values(RecordTypeEnum).includes(value)
+    );
+}
+
+
+
 /*------------------------ [ Types, Enums, Constants ] ------------------------*/
 /** create/load a record in standard mode by setting `isDynamic` = `false` = `NOT_DYNAMIC`*/
 const NOT_DYNAMIC = false;
-/**
- * values are fieldIds or sublistFieldIds where hasSubrecord() is `true`
- * @enum {string} **`SubrecordFieldEnum`**
- */
-const SubrecordFieldEnum = {
-    /**from the `'addressbook'` `sublist` on Relationship records */
-    ADDRESS_BOOK_ADDRESS: 'addressbookaddress',
-    /**from the `'billingaddress'` body `field` on Transaction records */
-    BILLING_ADDRESS: 'billingaddress',
-    /**from the `'shippingaddress'` body `field` on Transaction records */
-    SHIPPING_ADDRESS: 'shippingaddress',
-    /**from the `'{internalid}'` {type} `field` on {recordType} records */
-    INVENTORY_DETAIL: 'inventorydetail'
-}
+
 /**
  * @typedef {{
- * parentRecordType: string | RecordTypeEnum;
+ * recordType: RecordTypeEnum;
  * idOptions: idSearchOptions[];
- * childOptions: ChildSearchOptions[];
- * }} RelatedRecordRequest
+ * responseOptions: RecordResponseOptions;
+ * }} DeleteRecordRequest
  */
-/**
- * @typedef {{
- * childRecordType: string | RecordTypeEnum;
- * fieldId: string;
- * sublistId?: string;
- * responseOptions?: RecordResponseOptions
- * }} ChildSearchOptions
- */
+
 /**
  * @typedef {{
  * status: number;
@@ -939,20 +693,18 @@ const SubrecordFieldEnum = {
  * }} RecordResponse
  */
 /**
- * @typedef {Object} RecordResult
- * @property {number} internalid
- * @property {string | RecordTypeEnum} recordType
- * @property {FieldDictionary | { [fieldId: string]: FieldValue | SubrecordValue } } fields
- * @property {SublistDictionary | { [sublistId: string]: Array<SublistLine | {[sublistFieldId: string]: FieldValue | SubrecordValue}> } } sublists
+ * @typedef {{
+ * internalid: number;
+ * recordType: RecordTypeEnum | string;
+ * fields: FieldDictionary | { [fieldId: string]: FieldValue | SubrecordValue };
+ * sublists: SublistDictionary | { [sublistId: string]: Array<SublistLine> | {[sublistFieldId: string]: FieldValue | SubrecordValue}[] }
+ * }} RecordResult
  */
 /**
  * @typedef {Object} RecordResponseOptions
  * @property {string | string[]} [fields] - `fieldId(s)` of the main record to return in the response.
  * @property {Record<string, string | string[]>} [sublists] `sublistId(s)` mapped to `sublistFieldId(s)` to return in the response.
  */
-
-
-/** Type: **`idSearchOptions`** {@link idSearchOptions} */
 /**
  * options to search for an existing record 
  * @typedef {Object} idSearchOptions
@@ -961,6 +713,16 @@ const SubrecordFieldEnum = {
  * @property {RecordOperatorEnum} searchOperator - The operator to use for the search. See {@link RecordOperatorEnum}
  */
 
+/** Type: **`FieldValue`** {@link FieldValue} */
+/**
+ * The value type must correspond to the field type being set. For example:
+ * - **`Text`**, **`Radio`** and **`Select`** fields accept `string` values.
+ * - **`Checkbox`** fields accept `Boolean` values.
+ * - **`Date`** and **`DateTime`** fields accept `Date` values.
+ * - **`Integer`**, **`Float`**, **`Currency`** and **`Percent`** fields accept `number` values.
+ * @typedef {Date | number | number[] | string | string[] | boolean | null
+ * } FieldValue 
+ */
 /** Type: **`FieldDictionary`** {@link FieldDictionary} */
 /**
  * body fields a record.
@@ -992,17 +754,6 @@ const SubrecordFieldEnum = {
  * with defined value at `SublistLine[sublistFieldId]` that you want to use to search for existing lines
  */
 
-
-/** Type: **`FieldValue`** {@link FieldValue} */
-/**
- * The value type must correspond to the field type being set. For example:
- * - **`Text`**, **`Radio`** and **`Select`** fields accept `string` values.
- * - **`Checkbox`** fields accept `Boolean` values.
- * - **`Date`** and **`DateTime`** fields accept `Date` values.
- * - **`Integer`**, **`Float`**, **`Currency`** and **`Percent`** fields accept `number` values.
- * @typedef {Date | number | number[] | string | string[] | boolean | null
- * } FieldValue 
- */
 /** Type: **`LogStatement`** {@link LogStatement} */
 /**
  * @typedef {Object} LogStatement
@@ -1013,6 +764,17 @@ const SubrecordFieldEnum = {
  * @property {string} [message] - The message of the log entry = concatenated string of details's contents (if details is an array).
  * @description typedef for elements of the {@link logArray} array
  */
+/**
+ * @enum {string} **`ColumnSummaryEnum`**
+ */
+const ColumnSummaryEnum = {
+    GROUP: 'group',
+    COUNT: 'count',
+    SUM: 'sum',
+    AVG: 'avg',
+    MIN: 'min',
+    MAX: 'max',
+}
 
 /** Type: **`Search`** {@link Search} */
 /**
@@ -1029,7 +791,6 @@ const SubrecordFieldEnum = {
  * runPaged: SearchRunPagedFunction
  * }} Search
  */
-
 /**
  * @typedef {{
  * type: RecordTypeEnum | string;
@@ -1042,6 +803,53 @@ const SubrecordFieldEnum = {
  * settings?: any | any[];
  * filterExpression?: object[];
  * }} SearchCreateOptions
+ */
+/**
+ * @typedef {{
+ * readonly name: string;
+ * readonly join: string;
+ * readonly operator: SearchOperatorEnum;
+ * readonly summary: ColumnSummaryEnum;
+ * formula: string;
+ * toString(): string;
+ * toJson(): {
+ * name: string; 
+ * join: string | null | undefined; 
+ * operator: string; 
+ * summary: keyof typeof ColumnSummaryEnum | null | undefined;
+ * formula: string | null | undefined;
+ * values: string[];
+ * isor: boolean;
+ * isnot: boolean;
+ * leftparens: number;
+ * rightparens: number; 
+ * }
+ * }} Filter
+ */
+/**
+ * @typedef {{
+ * name: string;
+ * join?: string;
+ * operator: SearchOperatorEnum | string;
+ * values?: FieldValue | FieldValue[] | string | Date | number | string[] | Date[] | number[] | boolean;
+ * formula?: string;
+ * summary?: ColumnSummaryEnum | string;
+ * }} CreateSearchFilterOptions
+ */
+/** Type: **`Column | SearchColumn`** {@link SearchColumn} */
+/**
+ * - `name` = Name of a search column as a string.
+ * - `join` = Join id for the search column as a string.
+ * @typedef {Object} SearchColumn
+ * @property {function(SearchColumnSetWhenOrderedByOptions): SearchColumn} [setWhenOrderedBy]
+ * @property {string} name - Name of a search column as a string.
+ * @property {string} [join] - Join id for the search column as a string.
+ * @property {typeof ColumnSummaryEnum} [summary] - Returns the summary type for a search column see {@link ColumnSummaryEnum}.
+ * @property {string} [formula] - Formula used for a search column as a string. To set this value, you must use formulatext, formulanumeric, formuladatetime, formulapercent, or formulacurrency.
+ * @property {string} [label] - Label used for the search column. You can only get or set custom labels with this property
+ * @property {string} [function] - Special function applied to values in a search column. See Help for Supported Functions.
+ * @property {typeof SearchSortEnum} [sort] - The sort order of the column.
+ * @property {function(): string} toString
  */
 
 /**
@@ -1113,77 +921,17 @@ const SubrecordFieldEnum = {
  */
 
 
+/** Type: **`ResultSet`** {@link ResultSet} */
 /**
- * @typedef {{
- * readonly name: string;
- * readonly join: string;
- * readonly operator: SearchOperatorEnum;
- * readonly summary: ColumnSummaryEnum;
- * formula: string;
- * toString(): string;
- * toJson(): {
- * name: string; 
- * join: string | null | undefined; 
- * operator: string; 
- * summary: keyof typeof ColumnSummaryEnum | null | undefined;
- * formula: string | null | undefined;
- * values: string[];
- * isor: boolean;
- * isnot: boolean;
- * leftparens: number;
- * rightparens: number; 
- * }
- * }} Filter
+ * @typedef {Object} ResultSet
+ * @property {SearchResultSetEachFunction} each 
+ * - `ResultSet.each(callback)`: Use a developer-defined function to invoke on each row in the search results, up to 4000 results at a time.
+ * - `ResultSet.each.promise(callback)`
+ * @property {SearchResultSetGetRangeFunction} getRange 
+ * - `ResultSet.getRange(options)`: Retrieve a slice of the search result as an `Array<`{@link SearchResult}`>`
+ * - `ResultSet.getRange.promise(options)`
+ * @property {SearchColumn[]} columns - An `Array<`{@link SearchColumn}`>` objects that represent the columns returned in the search results.
  */
-
-/**
- * @typedef {{
- * name: string;
- * join?: string;
- * operator: SearchOperatorEnum | string;
- * values?: FieldValue | FieldValue[] | string | Date | number | string[] | Date[] | number[] | boolean;
- * formula?: string;
- * summary?: ColumnSummaryEnum | string;
- * }} CreateSearchFilterOptions
- */
-
-
-/** Type: **`Column | SearchColumn`** {@link SearchColumn} */
-/**
- * - `name` = Name of a search column as a string.
- * - `join` = Join id for the search column as a string.
- * @typedef {Object} SearchColumn
- * @property {function(SearchColumnSetWhenOrderedByOptions): SearchColumn} [setWhenOrderedBy]
- * @property {string} name - Name of a search column as a string.
- * @property {string} [join] - Join id for the search column as a string.
- * @property {ColumnSummaryEnum} [summary] - Returns the summary type for a search column see {@link ColumnSummaryEnum}.
- * @property {string} [formula] - Formula used for a search column as a string. To set this value, you must use formulatext, formulanumeric, formuladatetime, formulapercent, or formulacurrency.
- * @property {string} [label] - Label used for the search column. You can only get or set custom labels with this property
- * @property {string} [function] - Special function applied to values in a search column. See Help for Supported Functions.
- * @property {SearchSortEnum} [sort] - The sort order of the column.
- * @property {function(): string} toString
- */
-
-/** Type: **`SearchResult`** {@link SearchResult} */
-/**
- * @typedef {Object} SearchResult
- * @property {function(SearchColumn | string): (boolean | string | string[])} getValue
- * - `Result.getValue(SearchColumn)` Used on formula and non-formula (standard) fields. Returns the string value of a specified search result column. For convenience, this method takes a single search.Column Object.
- * - {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_46917053222.html}
- * - `Result.getValue(options)` Used on formula fields and non-formula (standard) fields to get the value of a specified search return column.
- * - {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_46917053222.html}
- * @property {function(SearchColumn | string): string} getText 
- * - `SearchResult.getText(SearchColumn)` The text value for a search.Column if it is a stored select field.
- * @property {function(): Record<string, boolean | string | LookupValueObject[]>} getAllValues
- * @property {function(): { recordType?: string, id?: string, values: Record<string, string | boolean> }} toJSON
- * @property {RecordTypeEnum | string} recordType - The type of record returned in a search result row.
- * @property {string} id - The internal ID for the record returned in a search result row.
- * @property {SearchColumn[]} columns
- * - `Array<`{@link SearchColumn}`>` objects that encapsulate the columns returned in the search result row.
- */
-
-/**@typedef {{ value: string, text: string }} LookupValueObject */
-
 /** Type: **`SearchColumnSetWhenOrderedByOptions`** {@link SearchColumnSetWhenOrderedByOptions} */
 /**
  * - `name` = The name of the search column for which the minimal or maximal value should be found.
@@ -1215,18 +963,45 @@ const SubrecordFieldEnum = {
  * @property {function(function(SearchResult): boolean): void} [sync]
  */
 
-/** Type: **`ResultSet`** {@link ResultSet} */
+/** Type: **`SearchResult`** {@link SearchResult} */
 /**
- * @typedef {Object} ResultSet
- * @property {SearchResultSetEachFunction} each 
- * - `ResultSet.each(callback)`: Use a developer-defined function to invoke on each row in the search results, up to 4000 results at a time.
- * - `ResultSet.each.promise(callback)`
- * @property {SearchResultSetGetRangeFunction} getRange 
- * - `ResultSet.getRange(options)`: Retrieve a slice of the search result as an `Array<`{@link SearchResult}`>`
- * - `ResultSet.getRange.promise(options)`
- * @property {SearchColumn[]} columns - An `Array<`{@link SearchColumn}`>` objects that represent the columns returned in the search results.
+ * @typedef {Object} SearchResult
+ * @property {function(SearchColumn | string): (boolean | string | string[])} getValue
+ * - `Result.getValue(SearchColumn)` Used on formula and non-formula (standard) fields. Returns the string value of a specified search result column. For convenience, this method takes a single search.Column Object.
+ * - {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_46917053222.html}
+ * - `Result.getValue(options)` Used on formula fields and non-formula (standard) fields to get the value of a specified search return column.
+ * - {@link https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_46917053222.html}
+ * @property {function(SearchColumn | string): string} getText 
+ * - `SearchResult.getText(SearchColumn)` The text value for a search.Column if it is a stored select field.
+ * @property {function(): Record<string, boolean | string | LookupValueObject[]>} getAllValues
+ * @property {function(): { recordType?: string, id?: string, values: Record<string, string | boolean> }} toJSON
+ * @property {RecordTypeEnum | string} recordType - The type of record returned in a search result row.
+ * @property {string} id - The internal ID for the record returned in a search result row.
+ * @property {SearchColumn[]} columns
+ * - `Array<`{@link SearchColumn}`>` objects that encapsulate the columns returned in the search result row.
  */
 
+/**@typedef {{ value: string, text: string }} LookupValueObject */
+
+
+
+
+
+
+/**
+ * @values are fieldIds or sublistFieldIds where hasSubrecord() is `true`
+ * @enum {string} **`SubrecordFieldEnum`**
+ */
+const SubrecordFieldEnum = {
+    /**from the `'addressbook'` `sublist` on Relationship records */
+    ADDRESS_BOOK_ADDRESS: 'addressbookaddress',
+    /**from the `'billingaddress'` body `field` on Transaction records */
+    BILLING_ADDRESS: 'billingaddress',
+    /**from the `'shippingaddress'` body `field` on Transaction records */
+    SHIPPING_ADDRESS: 'shippingaddress',
+    /**from the `'{internalid}'` {type} `field` on {recordType} records */
+    INVENTORY_DETAIL: 'inventorydetail'
+}
 /**
  * @enum {string} **`idPropertyEnum`**
  * @property {string} INTERNAL_ID - The `'internalid'` (for all records).
@@ -1248,25 +1023,6 @@ const idPropertyEnum = {
     /** `'tranid'` (for transaction records) */
     TRANSACTION_ID: 'tranid',
 };
-
-/**
- * @enum {string} **`ColumnSummaryEnum`**
- */
-const ColumnSummaryEnum = {
-    GROUP: 'group',
-    COUNT: 'count',
-    SUM: 'sum',
-    AVG: 'avg',
-    MIN: 'min',
-    MAX: 'max',
-}
-/**
- * @enum {string} **`FilterOperatorEnum`**
- */
-const FilterOperatorEnum = {
-    AND: 'and',
-    OR: 'or'
-}
 /**
  * @enum {string} **`SearchSortEnum`**
  */
@@ -1277,22 +1033,7 @@ const SearchSortEnum = {
 }
 
 /**
- * @description operations for Date fields
  * @enum {string} **`DateOperatorEnum`**
- * @property {string} AFTER - The date is after the specified date.
- * @property {string} NOT_AFTER - The date is not after the specified date.
- * @property {string} BEFORE - The date is before the specified date.
- * @property {string} NOT_BEFORE - The date is not before the specified date.
- * @property {string} IS_EMPTY - The date field is empty.
- * @property {string} IS_NOT_EMPTY - The date field is not empty.
- * @property {string} ON - The date is on the specified date.
- * @property {string} NOT_ON - The date is not on the specified date.
- * @property {string} ON_OR_AFTER - The date is on or after the specified date.
- * @property {string} NOT_ON_OR_AFTER - The date is not on or after the specified date.
- * @property {string} ON_OR_BEFORE - The date is on or before the specified date.
- * @property {string} NOT_ON_OR_BEFORE - The date is not on or before the specified date.
- * @property {string} WITHIN - The date is within the specified date range.
- * @property {string} NOT_WITHIN - The date is not within the specified date range.
  */
 const DateOperatorEnum = {
     AFTER: 'after',
@@ -1409,13 +1150,10 @@ const SearchOperatorEnum = {
     TEXT: TextOperatorEnum,
     MULTI_SELECT: MultiSelectOperatorEnum
 };
-
 /**
  * @enum {string} **`RecordTypeEnum`**
- * @readonly
- * @description supported NetSuite API record types As of 4 June 2024
  */
-const RecordTypeEnum = {
+const RecordTypeEnum = { // As of 4 June 2024
     ACCOUNT: 'account',
     ACCOUNTING_BOOK: 'accountingbook',
     ACCOUNTING_CONTEXT: 'accountingcontext',
@@ -1700,5 +1438,5 @@ const RecordTypeEnum = {
     WORKPLACE: 'workplace',
     ZONE: 'zone'
 };
-return { get };
+    return { delete: doDelete };
 });

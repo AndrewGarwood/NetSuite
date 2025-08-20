@@ -17,18 +17,18 @@ import {
 } from "../../../api";
 import {
     isNonEmptyArray,
-} from "typeshi/dist/utils/typeValidation";
+} from "typeshi:utils/typeValidation";
 import { 
     getDelimiterFromFilePath, 
     isValidCsvSync
-} from "typeshi/dist/utils/io";
+} from "typeshi:utils/io";
 import { 
     mainLogger as mlog, 
     parseLogger as plog, 
     INDENT_LOG_LINE as TAB, 
     NEW_LINE as NL,
 } from "../../../config";
-import { clean } from "typeshi/dist/utils/regex";
+import { clean } from "typeshi:utils/regex";
 import { 
     FieldDictionaryParseOptions, 
     IntermediateParseResults, ParseDictionary, 

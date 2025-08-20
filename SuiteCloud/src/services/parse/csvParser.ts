@@ -13,12 +13,12 @@ import {
     areEquivalentObjects,
     isIntegerArray,
     hasKeys
-} from "typeshi/dist/utils/typeValidation";
+} from "typeshi:utils/typeValidation";
 import { isRowSourceMetaData, RowSourceMetaData, 
     handleFileArgument, indentedStringify, 
     isFileData, FileData 
-} from "typeshi/dist/utils/io";
-import * as validate from "typeshi/dist/utils/argumentValidation";
+} from "typeshi:utils/io";
+import * as validate from "typeshi:utils/argumentValidation";
 import { 
     ValueMapping,
     FieldDictionaryParseOptions,
@@ -35,7 +35,7 @@ import {
 } from "./types/index";
 import {
     clean, equivalentAlphanumericStrings, DATE_STRING_PATTERN
-} from "typeshi/dist/utils/regex";
+} from "typeshi:utils/regex";
 import { 
     FieldValue, FieldDictionary, SublistDictionary, SublistLine, 
     SubrecordValue, SetFieldSubrecordOptions, SetSublistSubrecordOptions, 

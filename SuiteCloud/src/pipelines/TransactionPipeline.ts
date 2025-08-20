@@ -12,7 +12,7 @@ import {
     getFileNameTimestamp,
     clearFile,
     isRowSourceMetaData,
-} from "typeshi/dist/utils/io";
+} from "typeshi:utils/io";
 import { 
     STOP_RUNNING, DELAY,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
@@ -25,7 +25,7 @@ import {
     RecordOptions, RecordRequest, RecordResponse, 
     RecordResult, idPropertyEnum,
     RecordResponseOptions, upsertRecordPayload,
-    GetRecordRequest, getRecordById,
+    SingleRecordRequest, getRecordById,
     FieldDictionary,
     idSearchOptions,
     FieldValue,
@@ -41,9 +41,9 @@ import {
 import { 
     isNonEmptyArray, isNullLike as isNull, isEmptyArray, hasKeys, 
     TypeOfEnum, isNonEmptyString, isIntegerArray,
-} from "../utils/typeValidation";
-import { getColumnValues, getRows, isValidCsvSync, isFile, isDirectory } from "typeshi/dist/utils/io";
-import * as validate from "../utils/argumentValidation";
+} from "typeshi:utils/typeValidation";
+import { getColumnValues, getRows, isValidCsvSync, isFile, isDirectory } from "typeshi:utils/io";
+import * as validate from "typeshi:utils/argumentValidation";
 import { EntityRecordTypeEnum, RecordTypeEnum, SearchOperatorEnum } from "../utils/ns/Enums";
 import { entityId } from "../parse_configurations/evaluators";
 import { SalesOrderColumnEnum } from "../parse_configurations/salesorder/salesOrderConstants";
@@ -56,19 +56,8 @@ import {
     ParseDictionary, ParseResults, ValidatedParseResults 
 } from "src/services/parse/types/index";
 import { PostProcessDictionary } from "src/services/post_process/types/PostProcessing";
+import { DEFAULT_SALES_ORDER_RESPONSE_OPTIONS } from "./TransactionConfig";
 
-/** 
- * `responseFields`: `[
- * 'tranid', 'trandate', 'entity', 'externalid', 
- * 'otherrefnum', 'orderstatus', 'total'
- * ]` 
- * */
-export const SALES_ORDER_RESPONSE_OPTIONS: RecordResponseOptions = {
-    fields: [
-        'tranid', 'trandate', 'entity', 'externalid', 'otherrefnum', 
-        'orderstatus', 'total'
-    ]
-};
 
 /**
  * @param options 
@@ -236,7 +225,7 @@ export async function runMainTransactionPipeline(
             NL+` -> final payload length: ${payload.length}`
         );
         const transactionResponses = await putTransactions(
-            payload, responseOptions || SALES_ORDER_RESPONSE_OPTIONS
+            payload, responseOptions || DEFAULT_SALES_ORDER_RESPONSE_OPTIONS
         ) as RecordResponse[];
         slog.info(`Back in pipeline loop after putTransactions()`);
         await DELAY(1000);
@@ -327,7 +316,7 @@ export async function matchTransactionEntity(
 
 
 /**
- * - uses: {@link getRecordById}`(`{@link GetRecordRequest}`)`
+ * - uses: {@link getRecordById}`(`{@link SingleRecordRequest}`)`
  * @param transactions {@link RecordOptions}`[]`
  * @param entityType `string`
  * @param entityFieldId `string`
@@ -370,7 +359,7 @@ async function matchUsingApi(
             result.matches.push(txn);
             continue;
         }
-        const getReq: GetRecordRequest = {
+        const getReq: SingleRecordRequest = {
             recordType: entityType,
             idOptions: generateIdOptions(txn, entityType, entityFieldId)
         }
@@ -442,7 +431,7 @@ function generateIdOptions(
  */
 export async function putTransactions(
     transactions: RecordOptions[],
-    responseOptions: RecordResponseOptions = SALES_ORDER_RESPONSE_OPTIONS
+    responseOptions: RecordResponseOptions = DEFAULT_SALES_ORDER_RESPONSE_OPTIONS
 ): Promise<RecordResponse[]> {
     const source = `[TransactionPipeline.putTransactions()]`
     slog.info(`${source} START, transactions.length: ${transactions.length}`);

@@ -11,10 +11,10 @@ import { clean,
     StringReplaceParams, StringCaseOptions, 
     extractLeaf, REPLACE_EM_HYPHEN,
     isCleanStringOptions, UNCONDITIONAL_STRIP_DOT_OPTIONS
-} from "typeshi/dist/utils/regex";
-import { getIndexedColumnValues, getRows } from "typeshi/dist/utils/io";
-import * as validate from "typeshi/dist/utils/argumentValidation"
-import { hasKeys, isNonEmptyArray, isNonEmptyString } from "typeshi/dist/utils/typeValidation";
+} from "typeshi:utils/regex";
+import { getIndexedColumnValues, getRows } from "typeshi:utils/io";
+import * as validate from "typeshi:utils/argumentValidation"
+import { hasKeys, isNonEmptyArray, isNonEmptyString } from "typeshi:utils/typeValidation";
 
 /**
  * - convert to upper case

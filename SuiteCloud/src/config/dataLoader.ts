@@ -11,15 +11,15 @@ import {
     isValidCsvSync,
     getOneToOneDictionary, getRows, 
     writeObjectToJsonSync as write 
-} from "typeshi/dist/utils/io";
+} from "typeshi:utils/io";
 import {
     hasKeys, hasNonTrivialKeys, isNonEmptyArray, isNonEmptyString, 
     isNullLike as isNull, isStringArray 
-} from "typeshi/dist/utils/typeValidation";
+} from "typeshi:utils/typeValidation";
 import { AccountTypeEnum, AccountDictionary } from "../utils/ns";
 import { WarehouseDictionary, WarehouseRow, WarehouseColumnEnum } from "src/pipelines";
-import { clean, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION } from "typeshi/dist/utils/regex";
-import * as validate from "typeshi/dist/utils/argumentValidation"
+import { clean, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION } from "typeshi:utils/regex";
+import * as validate from "typeshi:utils/argumentValidation"
 // Global state to track if data has been loaded
 let dataInitialized = false;
 const F = path.basename(__filename).replace(/\.[a-z]{1,}$/, '');
@@ -113,7 +113,7 @@ export interface RegexConstants {
 /* ------------------------- MAIN FUNCTION ----------------------------- */
 const DEFAULT_INTERNAL_ID_COLUMN = 'Internal ID';
 const DEFAULT_DOMAINS_TO_LOAD = [
-    DataDomainEnum.REGEX, 
+    // DataDomainEnum.REGEX, 
     DataDomainEnum.ACCOUNTING,
     DataDomainEnum.SUPPLY,
     DataDomainEnum.RELATIONSHIPS
@@ -143,7 +143,7 @@ export async function initializeData(...domains: DataDomainEnum[]): Promise<void
         for (const d of domains) {
             switch (d) {
                 case DataDomainEnum.REGEX:
-                    regexConstants = await loadRegexConstants();
+                    // regexConstants = await loadRegexConstants();
                     break;
                 case DataDomainEnum.ACCOUNTING:
                     skuDictionary = await loadSkuDictionary();
@@ -443,10 +443,11 @@ export function isDataInitialized(): boolean {
 
 
 /**
+ * @deprecated - use typeshi library's dataLoader.getRegexConstants()
  * `sync` Get regex constants
  * @returns **`regexConstants`** {@link RegexConstants}
  */
-export function getRegexConstants(): RegexConstants {
+function getRegexConstants(): RegexConstants {
     if (!dataInitialized || !regexConstants) {
         throw new Error('[getRegexConstants()] Regex constants not initialized. Call initializeData() first.');
     }
@@ -454,19 +455,21 @@ export function getRegexConstants(): RegexConstants {
 }
 
 /**
+ * @deprecated - use typeshi library's dataLoader.getRegexConstants()
  * `sync` Get company keyword list
  * @returns **`COMPANY_KEYWORD_LIST`** `string[]`
  */
-export function getCompanyKeywordList(): string[] {
+function getCompanyKeywordList(): string[] {
     const constants = getRegexConstants();
     return constants.COMPANY_KEYWORD_LIST;
 }
 
 /**
+ * @deprecated - use typeshi library's dataLoader.getRegexConstants()
  * Get job title suffix list
  * @returns **`JOB_TITLE_SUFFIX_LIST`** `string[]`
  */
-export function getJobTitleSuffixList(): string[] {
+function getJobTitleSuffixList(): string[] {
     const constants = getRegexConstants();
     return constants.JOB_TITLE_SUFFIX_LIST;
 }

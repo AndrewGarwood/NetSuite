@@ -5,7 +5,7 @@
 import { 
     CloneOptions, ComposeOptions, CompositeSublistComposer 
 } from "./PostProcessing";
-import { hasKeys } from "typeshi/dist/utils/typeValidation";
+import { hasKeys } from "typeshi:utils/typeValidation";
 
 /**
  * @param value `any`

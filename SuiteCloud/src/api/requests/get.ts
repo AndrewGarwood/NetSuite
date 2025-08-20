@@ -5,7 +5,7 @@
 import axios from "axios";
 import { 
     writeObjectToJsonSync as write, getCurrentPacificTime, indentedStringify 
-} from "typeshi/dist/utils/io";
+} from "typeshi:utils/io";
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
 import { createUrlWithParams } from "../url";
@@ -23,19 +23,19 @@ import { getAccessToken } from "../configureAuth";
 import path from "node:path";
 import { RecordTypeEnum } from "../../utils/ns/record/Record";
 import { SearchOperatorEnum } from "../../utils/ns/search/Search";
-import * as validate from "typeshi/dist/utils/argumentValidation";
-import { GetRecordRequest } from "./types";
+import * as validate from "typeshi:utils/argumentValidation";
+import { SingleRecordRequest } from "../types";
 
 const F = path.basename(__filename).replace(/\.[a-z]{1,}$/, '');
 export const GET_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.GET_Record.scriptId as number;
 export const GET_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.GET_Record.deployId as number;
 
 /**
- * @param request {@link GetRecordRequest}
+ * @param request {@link SingleRecordRequest}
  * @returns **`response`** - `Promise<`{@link RecordResponse}`>`
  */
 export async function getRecordById(
-    request: GetRecordRequest
+    request: SingleRecordRequest
 ): Promise<RecordResponse>
 /**
  * @param recordType {@link RecordTypeEnum} | {@link EntityRecordTypeEnum}
@@ -56,13 +56,13 @@ export async function getRecordById(
  * - {@link GET_RECORD_DEPLOY_ID} = `1`
  *  */
 export async function getRecordById(
-    arg1: GetRecordRequest | RecordTypeEnum | string,
+    arg1: SingleRecordRequest | RecordTypeEnum | string,
     recordId?: string | number,
     idProp?: idPropertyEnum,
     responseOptions?: RecordResponseOptions
 ): Promise<RecordResponse> {
     const source = `[get.getRecordById()]`
-    const request = {} as GetRecordRequest;
+    const request = {} as SingleRecordRequest;
     if (typeof arg1 === 'string') {
         validate.enumArgument(source, {recordType: arg1, RecordTypeEnum});
         validate.stringArgument(source, {idProp})
@@ -80,7 +80,7 @@ export async function getRecordById(
             recordType,
             idOptions: [{ idProp, idValue, searchOperator }] as idSearchOptions[],
             responseOptions,
-        } as GetRecordRequest);
+        } as SingleRecordRequest);
     } else {
         Object.assign(request, arg1);
     }

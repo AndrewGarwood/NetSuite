@@ -127,10 +127,6 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
                 scriptId: 167,
                 deployId: 1,
             },
-            DELETE_DeleteRecordByType: {
-                scriptId: 173,
-                deployId: 1,
-            },
             GET_Record: {
                 scriptId: 175,
                 deployId: 1,
@@ -142,7 +138,11 @@ export const SCRIPT_ENVIRONMENT: SuiteScriptEnvironment = {
             GET_RelatedRecord: {
                 scriptId: 178,
                 deployId: 1
-            }
+            },
+            DELETE_Record: {
+                scriptId: 179,
+                deployId: 1
+            },
         } as ScriptDictionary,
     }
 }

@@ -14,7 +14,7 @@ import {
     REMOVE_ATTN_SALUTATION_PREFIX, 
     equivalentAlphanumericStrings as equivalentAlphanumeric,
     JOB_TITLE_SUFFIX_PATTERN, KOREA_ADDRESS_LATIN_TEXT_PATTERN,
-} from "typeshi/dist/utils/regex";
+} from "typeshi:utils/regex";
 import { checkForOverride, } from "../../utils/ns";
 import { entityId, firstName, lastName, middleName, 
     salutation, jobTitleSuffix 

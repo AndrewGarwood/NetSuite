@@ -9,7 +9,7 @@ import {
     trimFileSync, clearFile, getCurrentPacificTime,
     formatDebugLogFile, getDirectoryFiles,
     indentedStringify, isDirectory
-} from "typeshi/dist/utils/io";
+} from "typeshi:utils/io";
 import { 
     STOP_RUNNING, DATA_DIR, DELAY, 
     mainLogger as mlog, simpleLogger as slog,

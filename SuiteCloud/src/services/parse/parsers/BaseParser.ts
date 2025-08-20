@@ -16,7 +16,7 @@ import {
 import {
     isNonEmptyArray, anyNull,
     areEquivalentObjects
-} from "typeshi/dist/utils/typeValidation";
+} from "typeshi:utils/typeValidation";
 import { 
     mainLogger as mlog, 
     parseLogger as plog, 
@@ -27,8 +27,8 @@ import {
     clean, 
     equivalentAlphanumericStrings as equivalentAlphanumeric, 
     DATE_STRING_PATTERN 
-} from "typeshi/dist/utils/regex";
-import { indentedStringify } from "typeshi/dist/utils/io/writing";
+} from "typeshi:utils/regex";
+import { indentedStringify } from "typeshi:utils/io/writing";
 import { 
     BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES, isBooleanFieldId 
 } from "../../../utils/ns";
@@ -39,6 +39,7 @@ import {
     SubrecordParseOptions, ValueMapping, 
     isFieldParseOptions, isValueMappingEntry 
 } from "../types/index";
+
 /**
  * @abstract
  * @class **`BaseParser`**

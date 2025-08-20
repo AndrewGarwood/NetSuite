@@ -10,7 +10,7 @@ import {
     getCurrentPacificTime, 
     indentedStringify, clearFileSync,
     getFileNameTimestamp, RowSourceMetaData
-} from "typeshi/dist/utils/io";
+} from "typeshi:utils/io";
 import { 
     STOP_RUNNING, DELAY, simpleLogger as slog,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
@@ -19,10 +19,10 @@ import {
     CLOUD_LOG_DIR
 } from "../config";
 import { 
-    RecordOptions, RecordRequest, RecordResponse, 
+    RecordOptions, RecordResponse, 
     RecordResult, idPropertyEnum,
     RecordResponseOptions, upsertRecordPayload,
-    GetRecordRequest, getRecordById,
+    SingleRecordRequest, getRecordById,
     FieldDictionary,
     idSearchOptions,
     FieldValue,
@@ -30,20 +30,21 @@ import {
     SourceTypeEnum,
     LogTypeEnum,
     isRecordOptions,
-    isRecordResponseOptions, 
+    isRecordResponseOptions,
+    RecordRequest, 
 } from "../api";
 import { 
     isNonEmptyArray, isNullLike as isNull, isEmptyArray, hasKeys, 
     TypeOfEnum, isNonEmptyString, isIntegerArray,
-} from "typeshi/dist/utils/typeValidation";
-import * as validate from "typeshi/dist/utils/argumentValidation";
+} from "typeshi:utils/typeValidation";
+import * as validate from "typeshi:utils/argumentValidation";
 import { RecordTypeEnum, SearchOperatorEnum } from "../utils/ns/Enums";
 import { 
     WarehouseContent, ItemPipelineOptions, ItemPipelineStageEnum, 
     WarehouseDictionary 
 } from "./types";
 import { DEFAULT_ITEM_RESPONSE_OPTIONS, BIN_RESPONSE_OPTIONS } from "./ItemConfig";
-import { clean, CleanStringOptions, extractLeaf } from "typeshi/dist/utils/regex";
+import { clean, CleanStringOptions, extractLeaf } from "typeshi:utils/regex";
 import { CLEAN_ITEM_ID_OPTIONS } from "src/parse_configurations/evaluators/item";
 import { parseRecordCsv } from 'src/services/parse';
 import { ParseResults, ValidatedParseResults } from 'src/services/parse/types/index';
@@ -145,7 +146,7 @@ export async function runMainItemPipeline(
         const itemResponses = await putItems(validItems, responseOptions);
         let successCount = 0;
         let numRejects = 0;
-        const rejectResponses: RecordResponse[] = [];
+        const rejectResponses: any[] = [];
         for (const res of itemResponses) {
             if (isNonEmptyArray(res.rejects)) {
                 numRejects += res.rejects.length;
@@ -271,17 +272,4 @@ export async function generateBinOptions(
         }
     }
     return bins;
-}
-
-export const LOCATION_ID_DICT: Record<string, number> = {
-    A: 2,
-    B: 3,
-    C: 4
-}
-
-export const itemIdExtractor = async (
-    value: string, 
-    cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
-): Promise<string> => {
-    return clean(extractLeaf(value), cleanOptions);
 }

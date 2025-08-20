@@ -4,11 +4,11 @@
 import { 
     mainLogger as mlog, NEW_LINE as NL, INDENT_LOG_LINE as TAB, STOP_RUNNING 
 } from "../../config";
-import { extractLeaf, equivalentAlphanumericStrings } from "typeshi/dist/utils/regex";
+import { extractLeaf, equivalentAlphanumericStrings } from "typeshi:utils/regex";
 import { getAccountDictionary } from "../../config/dataLoader";
 import { AccountDictionary, AccountTypeEnum } from "../../utils/ns";
-import * as validate from "typeshi/dist/utils/argumentValidation";
-import { isNonEmptyString, isNullLike } from "typeshi/dist/utils/typeValidation";
+import * as validate from "typeshi:utils/argumentValidation";
+import { isNonEmptyString, isNullLike } from "typeshi:utils/typeValidation";
 
 export const accountInternalId = async (
     row: Record<string, any>,

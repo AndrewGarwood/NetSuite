@@ -2,7 +2,7 @@
  * @file src/pipelines/types/Transaction.typeGuards.ts
  */
 
-import { hasKeys } from "typeshi/dist/utils/typeValidation";
+import { hasKeys } from "typeshi:utils/typeValidation";
 import { TransactionEntityMatchOptions } from "./Transaction";
 import { MatchSourceEnum } from "./Pipeline";
 

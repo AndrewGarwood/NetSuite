@@ -11,7 +11,7 @@ import {
     getIndexedColumnValues, concatenateFiles,
     indentedStringify,
     trimFile
-} from "typeshi/dist/utils/io";
+} from "typeshi:utils/io";
 import { 
     STOP_RUNNING, DATA_DIR, DELAY, simpleLogger as slog,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
@@ -31,8 +31,8 @@ import {
     SALES_ORDER_PIPELINE_CONFIG
 } from "./pipelines";
 import * as soConstants from "./parse_configurations/salesorder/salesOrderConstants"
-import { hasKeys, isEmptyArray, isNonEmptyArray, isNonEmptyString, isNullLike } from "typeshi/dist/utils/typeValidation";
-import * as validate from "typeshi/dist/utils/argumentValidation";
+import { hasKeys, isEmptyArray, isNonEmptyArray, isNonEmptyString, isNullLike } from "typeshi:utils/typeValidation";
+import * as validate from "typeshi:utils/argumentValidation";
 import { getSkuDictionary, initializeData } from "./config/dataLoader";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "./utils/ns/Enums";
 

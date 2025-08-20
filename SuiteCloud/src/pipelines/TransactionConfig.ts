@@ -3,7 +3,7 @@
  */
 
 import path from "node:path";
-import { EntityRecordTypeEnum, RecordTypeEnum } from "../api";
+import { EntityRecordTypeEnum, RecordResponseOptions, RecordTypeEnum } from "../api";
 import { DATA_DIR } from "../config/env";
 import * as soConstants from "../parse_configurations/salesorder/salesOrderConstants";
 import { SALES_ORDER_POST_PROCESSING_OPTIONS, SALES_ORDER_PARSE_OPTIONS } from "../parse_configurations/salesorder/salesOrderParseDefinition";
@@ -16,6 +16,18 @@ import { ParseDictionary } from "src/services/parse/types/index";
 import { PostProcessDictionary } from "src/services/post_process/types/PostProcessing";
 
 
+/** 
+ * `responseFields`: `[
+ * 'tranid', 'trandate', 'entity', 'externalid', 
+ * 'otherrefnum', 'orderstatus', 'total'
+ * ]` 
+ * */
+export const DEFAULT_SALES_ORDER_RESPONSE_OPTIONS: RecordResponseOptions = {
+    fields: [
+        'tranid', 'trandate', 'entity', 'externalid', 'otherrefnum', 
+        'orderstatus', 'total'
+    ]
+};
 export const DEFAULT_TRANSACTION_STAGES_TO_WRITE = [
     TransactionMainPipelineStageEnum.PUT_SALES_ORDERS
 ];

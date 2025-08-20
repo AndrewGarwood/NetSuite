@@ -29,7 +29,7 @@ import {
     isNodeLeaves,
     isRowDictionary,
     isNodeStructure
-} from "typeshi/dist/utils/io/types/typeGuards";
+} from "typeshi:utils/io/types/typeGuards";
 import { 
     FieldDictionary, SublistDictionary, SublistLine, RecordOptions,
     RecordTypeEnum, FieldValue, SubrecordValue,
@@ -39,15 +39,15 @@ import {
 } from "../../../api";
 import {
     isNonEmptyArray, isEmptyArray, isNullLike as isNull,
-} from "typeshi/dist/utils/typeValidation";
+} from "typeshi:utils/typeValidation";
 import { 
     mainLogger as mlog, 
     parseLogger as plog, 
     INDENT_LOG_LINE as TAB, 
     NEW_LINE as NL,
 } from "../../../config";
-import { clean } from "typeshi/dist/utils/regex";
-import { getDelimiterFromFilePath, isValidCsvSync, NodeLeaves } from "typeshi/dist/utils/io";
+import { clean } from "typeshi:utils/regex";
+import { getDelimiterFromFilePath, isValidCsvSync, NodeLeaves } from "typeshi:utils/io";
 import { ParseDictionary, RecordParseOptions } from "src/services/parse/types/ParseOptions";
 
 

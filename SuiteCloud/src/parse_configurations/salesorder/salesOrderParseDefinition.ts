@@ -16,9 +16,9 @@ import * as soEval from "./salesOrderEvaluatorFunctions";
 import { SalesOrderColumnEnum as SO } from "./salesOrderConstants";
 import { CustomerStatusEnum, CustomerTaxItemEnum, RecordTypeEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
 import { getSkuDictionary } from "../../config/dataLoader";
-import { isNonEmptyString } from "typeshi/dist/utils/typeValidation";
+import { isNonEmptyString } from "typeshi:utils/typeValidation";
 import { SB_TERM_DICTIONARY } from "../../utils/ns";
-import { CleanStringOptions, toTitleCase } from "typeshi/dist/utils/regex";
+import { CleanStringOptions, toTitleCase } from "typeshi:utils/regex";
 import { 
     SubrecordParseOptions, FieldDictionaryParseOptions, 
     SublistDictionaryParseOptions, SublistLineParseOptions, RecordParseOptions, 

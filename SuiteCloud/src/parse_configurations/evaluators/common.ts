@@ -7,8 +7,8 @@ import { parseLogger as plog, mainLogger as mlog,
 } from "../../config/setupLog";
 import { 
     clean,
-} from "typeshi/dist/utils/regex";
-import * as validate from "typeshi/dist/utils/argumentValidation";
+} from "typeshi:utils/regex";
+import * as validate from "typeshi:utils/argumentValidation";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
 import { SB_TERM_DICTIONARY, TermBase } from "../../utils/ns/record/accounting/Term";
 import { ColumnSliceOptions } from "src/services/parse/types/ParseOptions";

@@ -7,15 +7,15 @@ import {
     writeObjectToJsonSync as write,
     getCurrentPacificTime,
     indentedStringify, clearFileSync,
-} from "typeshi/dist/utils/io";
+} from "typeshi:utils/io";
 import { 
     STOP_RUNNING,  DELAY, 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
     ERROR_DIR
 } from "../config";
 import { 
-    EntityRecordTypeEnum, RecordOptions, RecordRequest, RecordResponse, 
-    RecordResult, idPropertyEnum,
+    EntityRecordTypeEnum, RecordOptions, SingleRecordRequest, RecordResponse, 
+    RecordResult, idPropertyEnum, RecordRequest, 
     RecordResponseOptions, upsertRecordPayload, getRecordById, 
     SAMPLE_POST_CUSTOMER_OPTIONS as SAMPLE_CUSTOMER,
     RecordTypeEnum,
@@ -29,7 +29,7 @@ import { CUSTOMER_PARSE_OPTIONS, CONTACT_PARSE_OPTIONS,
 import * as customerConstants from "../parse_configurations/customer/customerConstants";
 import { parseRecordCsv } from "../services/parse/csvParser";
 import { processParseResults } from "../services/post_process/parseResultsProcessor";
-import { isNonEmptyArray, isNonEmptyString } from "typeshi/dist/utils/typeValidation";
+import { isNonEmptyArray, isNonEmptyString } from "typeshi:utils/typeValidation";
 import { RadioFieldBoolean, RADIO_FIELD_TRUE, } from "../utils/ns/";
 import { 
     ParseDictionary, ParseResults, ValidatedParseResults 

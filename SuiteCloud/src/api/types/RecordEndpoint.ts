@@ -1,14 +1,16 @@
 /**
  * @file src/api/types/RecordEndpoint.ts
  */
-import { NumericOperatorEnum, RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum } from "@utils/ns/Enums";
+import { 
+    NumericOperatorEnum, RecordOperatorEnum, SearchOperatorEnum, TextOperatorEnum 
+} from "../../utils/ns/Enums";
 import { 
     FieldValue, 
     LogStatement, 
     SubrecordValue, 
 } from ".";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "../../utils/ns/record/Record";
-import { RowSourceMetaData } from "typeshi/dist/utils/io";
+import { RowSourceMetaData } from "typeshi:utils/io";
 /**
  * @typedefn **`RecordRequest`**
  * @property {RecordOptions | Array<RecordOptions>} recordOptions = {@link RecordOptions} | `Array<`{@link RecordOptions}`>`
@@ -19,7 +21,14 @@ export type RecordRequest = {
     recordOptions: RecordOptions | Array<RecordOptions>;
     responseOptions?: RecordResponseOptions;
 }
-
+/**
+ * @typedefn **`SingleRecordRequest`**
+ */
+export type SingleRecordRequest = {
+    recordType: string | RecordTypeEnum;
+    idOptions: idSearchOptions[];
+    responseOptions?: RecordResponseOptions;
+};
 /**
  * @typedefn **`RecordResponse`**
  * @property {string | number} status - Indicates status of the request.

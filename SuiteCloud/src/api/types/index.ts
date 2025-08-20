@@ -3,6 +3,5 @@
  */
 export * from "./InternalApi";
 export * from "./RecordEndpoint";
-export * from "./typeGuards";
-export * from "../requests/types";
+export * from "./RecordEndpoint.TypeGuards";
 export * from "../server/types";

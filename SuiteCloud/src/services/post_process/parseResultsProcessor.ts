@@ -16,7 +16,7 @@ import {
     areEquivalentObjects,
     hasKeys,
     isNonEmptyString
-} from "typeshi/dist/utils/typeValidation";
+} from "typeshi:utils/typeValidation";
 import { 
     FieldValue, FieldDictionary, SublistDictionary, SublistLine, 
     SubrecordValue, SetFieldSubrecordOptions, SetSublistSubrecordOptions, 
@@ -30,9 +30,9 @@ import {
     PostProcessDictionary, 
     PostProcessingOperationEnum as OperationEnum, 
 } from "./types/PostProcessing";
-import * as validate from "typeshi/dist/utils/argumentValidation";
+import * as validate from "typeshi:utils/argumentValidation";
 import { cloneDeep } from "lodash";
-import { indentedStringify } from "typeshi/dist/utils/io";
+import { indentedStringify } from "typeshi:utils/io";
 import { ParseResults, ValidatedParseResults } from "../parse/types/index";
 import { isParseResults } from "../parse/types/index";
 import { isCloneOptions, isComposeOptions, isCompositeSublistComposer } from "src/services/post_process/types/PostProcessing.typeGuards";

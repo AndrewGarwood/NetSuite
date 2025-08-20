@@ -19,7 +19,6 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     /**
      * @type {LogStatement[]} - `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
      * @see {@link writeLog}`(type, title, ...details)`
-     * @description return logArray in response so can process in client
      * */
     const logArray = [];
     /**
