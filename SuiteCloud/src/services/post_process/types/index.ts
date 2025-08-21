@@ -3,4 +3,4 @@
  */
 
 export * from "./PostProcessing";
-export * from "./PostProcessing.typeGuards";
+export * from "./PostProcessing.TypeGuards";

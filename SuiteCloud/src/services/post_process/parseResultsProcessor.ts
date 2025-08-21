@@ -35,7 +35,7 @@ import { cloneDeep } from "lodash";
 import { indentedStringify } from "typeshi:utils/io";
 import { ParseResults, ValidatedParseResults } from "../parse/types/index";
 import { isParseResults } from "../parse/types/index";
-import { isCloneOptions, isComposeOptions, isCompositeSublistComposer } from "src/services/post_process/types/PostProcessing.typeGuards";
+import { isCloneOptions, isComposeOptions, isCompositeSublistComposer } from "src/services/post_process/types/PostProcessing.TypeGuards";
 import path from "node:path";
 
 const F = path.basename(__filename);

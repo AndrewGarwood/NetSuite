@@ -3,4 +3,4 @@
  */
 
 export * from "./ParseOptions";
-export * from "./ParseOptions.typeGuards";
+export * from "./ParseOptions.TypeGuards";

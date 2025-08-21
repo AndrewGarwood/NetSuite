@@ -144,3 +144,10 @@ export type SubrecordValue = ({
     }
 );
 
+
+export interface FindSublistLineWithValueOptions {
+    sublistId: string;
+    fieldId: string;
+    value: FieldValue;
+}
+

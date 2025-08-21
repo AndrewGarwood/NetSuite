@@ -7,9 +7,12 @@ import {
     CustomerStatusEnum, SearchOperatorEnum 
 } from "./utils/ns";
 import { isNonEmptyArray, isEmptyArray, hasKeys, isNullLike as isNull,
-    isNonEmptyString 
+    isNonEmptyString, 
+    isStringArray,
+    isIntegerArray
 } from "typeshi:utils/typeValidation";
-import { DATA_DIR, mainLogger as mlog, parseLogger as plog, simpleLogger as slog, 
+import { 
+    DATA_DIR, mainLogger as mlog, parseLogger as plog, simpleLogger as slog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING, CLOUD_LOG_DIR, 
     getSkuDictionary,
     DELAY
@@ -19,7 +22,8 @@ import { getColumnValues, getRows,
     getIndexedColumnValues, handleFileArgument, 
     isValidCsvSync,
     getFileNameTimestamp,
-    indentedStringify
+    indentedStringify,
+    isFile
 } from "typeshi:utils/io";
 import * as validate from "typeshi:utils/argumentValidation";
 import path from "node:path";
@@ -36,7 +40,8 @@ import {
     isChildOptions,
     isIdSearchOptions,
     RecordResult,
-    partitionArrayBySize
+    partitionArrayBySize,
+    RecordResponseOptions
 } from "./api";
 import { CleanStringOptions, clean, extractLeaf } from "typeshi:utils/regex"
 import { CLEAN_ITEM_ID_OPTIONS } from "src/parse_configurations/evaluators";
@@ -197,101 +202,166 @@ const itemIdExtractor = async (
 ): Promise<string> => {
     return clean(extractLeaf(value), cleanOptions);
 }
-export async function validateGetRelatedRecord(): Promise<any> {
-    const source = `[${F}.${validateGetRelatedRecord.name}()]`;
-    const dictPath = path.join(CLOUD_LOG_DIR, 'items', 'related_record_dict.json');
-    validate.existingFileArgument(source, '.json', {dictPath});
-    let itemToRecords = read(dictPath) as { [itemId: string]: RecordResult[] };
-    let keys = Object.keys(itemToRecords);
-    let targetKeys = keys.filter(k=>isNonEmptyArray(itemToRecords[k]));
-    let endpointFailed: boolean = false;
-    let errorItems: string[] = [];
-    let expectedNumProcessed = Object.values(itemToRecords).flat().length;
-    let numProcessed = 0;
-    let processed: RecordResult[] = [];
-    let skuDictionary = await getSkuDictionary();
-    let maxResultsLength = Math.max(
-        ...Object.values(itemToRecords).map(results=>results.length)
-    );
-    let indexCharLength = String(targetKeys.length).length;
-    let numResultsCharLength = String(maxResultsLength).length;
-    mlog.debug([`${source} START`,
-        `total num keys: ${keys.length}`,
-        `non-empty keys: ${targetKeys.length}`,
-        
-    ].join(TAB), NL+`maxResultsLength: ${maxResultsLength}`);
-    itemLoop:
-    for (let i = 0; i < targetKeys.length; i++) {
-        let itemId = targetKeys[i];
-        if (!(itemId in skuDictionary)) {
-            mlog.warn([`${source} at lnItems[${i}], itemId: '${itemId}'`,
-                `found itemId not in skuDictionary -> need to check that it's in NS`,
-            ].join(TAB));
-            errorItems.push(itemId);
-            continue itemLoop;
-        }
-        const itemInternalId = skuDictionary[itemId]
-        let soRecords = itemToRecords[itemId];
-        slog.debug([
-            `Starting records from keyIndex ${String(i).padEnd(indexCharLength, ' ')} with itemId '${itemId}'`,
-            `num records to process: ${soRecords.length}`
-        ].join(TAB));
-        for (let result of soRecords) {
-            const { recordType, internalid: salesOrderInternalId } = result;
-            const idOptions = [{
-                idProp: idPropertyEnum.INTERNAL_ID,
-                idValue: Number(salesOrderInternalId),
-                searchOperator: SearchOperatorEnum.RECORD.ANY_OF
-            }] as idSearchOptions[];
-            const responseOptions = {
-                fields: ['externalid'],
-                sublists: { item: ['item'] }
-            }
-            const req: SingleRecordRequest = {recordType, idOptions, responseOptions};
-            const res = await getRecordById(req);
-            await DELAY(1000, null);
-            if (!res.results) {
-                mlog.error([`${source} at targetKeys[${i}], itemId: '${itemId}'`,
-                    `results is undefined but we filtered by non empty ones from GET_RelatedRecord results...`,
-                    `how is dat possible`
-                ].join(TAB));
-                errorItems.push(itemId);
-                continue itemLoop;
-            }
-            if (isNonEmptyArray(res.results) && res.results.some(result=>isNull(result.sublists) || isNull(result.fields))) {
-                mlog.error([`${source} at targetKeys[${i}], itemId: '${itemId}'`,
-                    `there exists a result in res.results that is missing expected property: 'fields' or 'sublists'`,
-                ].join(TAB));
-                errorItems.push(itemId);
-                continue itemLoop;
-            }
-            let recordResults = res.results as Required<RecordResult>[];
-            for (let rec of recordResults) {
-                let itemSublist = rec.sublists.item;
-                if (!itemSublist.some(lineItem=>
-                    hasKeys(lineItem, 'item') && Number(lineItem.item) === Number(itemInternalId))) {
-                    mlog.error([`${source} at targetKeys[${i}], itemId: '${itemId}'`,
-                        `PROBLEM!!!!!!!!`,
-                        `There does not exist a SublistLine with SublistLine[item]=== internalid of current itemId`
-                    ].join(TAB));
-                    endpointFailed = true;
-                    errorItems.push(itemId);
-                    continue itemLoop;
-                }
-            }
-        }
-        numProcessed += soRecords.length;
-        processed.push(...soRecords);
-        slog.debug(` > Processed ${String(soRecords.length).padEnd(numResultsCharLength, ' ')} recordResult(s)`,
-        `at keyIndex ${String(i).padEnd(indexCharLength, ' ')} with itemId '${itemId}'`)
-    }
-    mlog.info(`Finished processing itemIds in targetKeys... endpointFailed ? ${endpointFailed}`);
-    slog.info(`expected numProcessed: ${expectedNumProcessed}`);
-    slog.info(`  actual numProcessed: ${numProcessed}`);
-    slog.info(`    errorItems.length: ${errorItems.length}`);
-    write({errorItems}, path.join(CLOUD_LOG_DIR, 'items', 'related_record_errorItems.json'));
+
+export async function reconcile(): Promise<any> {
+    const source = `[${F}.${reconcile.name}()]`;
 }
 
+
+const completedBatches: number[] = [];
+const validatedSalesOrders: any[] = [];
+const errors: any[] = [];
+let endpointFailed: boolean = false;
+/**
+ * tested on 2500 sales orders, and all passed
+ * @TODO parameterize
+ */
+export async function validateRelatedRecordEndpoint(): Promise<any> {
+    const source = `[${F}.${validateRelatedRecordEndpoint.name}()]`;
+    const statePath = path.join(CLOUD_LOG_DIR, 'salesorder_reconcile_state.json');
+    if (isFile(statePath)) {
+        let previousState = read(statePath);
+        if (isStringArray(previousState.processed)) {
+            validatedSalesOrders.push(...previousState.processed)
+        }
+        if (isIntegerArray(previousState.completedbatches, true)) {
+            completedBatches.push(...previousState.completedBatches)
+        }
+    }
+    const dictPath = path.join(CLOUD_LOG_DIR, 'salesorder_targetItems.json');
+    validate.existingFileArgument(source, '.json', {dictPath});
+    
+    const soTargetItems = read(dictPath) as { [soInternalId: string]: string[] };
+    const keys = Object.keys(soTargetItems);
+    const allBatches = partitionArrayBySize(keys, 50) as string[][]; // 839 batches for like 41906 sales order Ids
+    const keyBatches = allBatches.slice(0, 50); // let's just test on first 50
+    mlog.info([`${source} START`,
+        // `num sales orders to process: ${keys.length}`,
+        `num processed: ${validatedSalesOrders.length}`,
+        `  num batches: ${keyBatches.length}`,
+        `completed batches: [${completedBatches.join(', ')}]`
+    ].join(TAB));
+    slog.info(` >   num batches: ${keyBatches.length}`);
+    slog.info(` > num completed: ${completedBatches.length}`);
+    slog.info(` > >   completed: ${completedBatches.join(', ') || 'NONE'}`);
+    await DELAY(2000, `starting batchLoop...`);
+    batchLoop:
+    for (let i = 0; i < keyBatches.length; i++) {
+        if (completedBatches.includes(i)) {
+            slog.info(`${source} > already processed batch ${i} (${i+1}/${keyBatches.length}), continuing`);
+            continue;
+        }
+        await validateSalesOrderBatch(soTargetItems, keyBatches, i);
+        if (endpointFailed) {
+            mlog.error([`${source} Endpoint Failure detected at batch (${i+1}/${keyBatches.length})`])
+            break batchLoop;
+        }
+        slog.info(`${source} Finished batch (${i+1}/${keyBatches.length})`);
+        completedBatches.push(i);
+        await DELAY(2000);
+    }
+    write({errors}, 
+        path.join(CLOUD_LOG_DIR, `${getFileNameTimestamp()}_reconcile_errors.json`)
+    );
+    write({completedBatches, processed: validatedSalesOrders}, statePath);
+    if (endpointFailed) {
+        slog.debug(`oh no, endpoint failed...`)
+    } else {
+        slog.debug(`endpointFailed still false, so we might be okay`)
+    }
+}
+
+async function validateSalesOrderBatch(
+    /**map salesorder internalid to list of itemIds to verify existence in salesorder's item sublist */
+    dict: { [key: string]: string[] }, 
+    batches: string[][],
+    batchIndex: number
+): Promise<any> {
+    const source = 
+        `[${F}.${validateSalesOrderBatch.name}( ${batchIndex+1}/${batches.length} )]`;
+    const batchKeys = batches[batchIndex];
+    let skuDictionary = await getSkuDictionary();
+    let indexCharLength = String(batchKeys.length).length;
+    salesOrderLoop:
+    for (let i = 0; i < batchKeys.length; i++) {
+        const soInternalId = batchKeys[i];
+        if (validatedSalesOrders.includes(soInternalId)) {
+            slog.info(`${source} > Skipping processed salesorder from batch (${batchIndex+1}/${batches.length})`);
+            continue salesOrderLoop;
+        }
+        const targetItemInternalIds = (dict[soInternalId] ?? []).map(itemId=>skuDictionary[itemId]);
+        const req = generateSingleRecordRequest(RecordTypeEnum.SALES_ORDER, soInternalId);
+        const res = await getRecordById(req) as RecordResponse;
+        await DELAY(1000, null);
+        if (!res || !isNonEmptyArray(res.results)) {
+            mlog.error([`${source} Invalid Response: `,
+                `getRecordById() response was undefined or had undefined results`,
+                `sales order internalid: '${soInternalId}'`
+            ].join(TAB));
+            errors.push({soInternalId, message: 'getRecordById() response was undefined or had undefined results'})
+            continue;
+        }
+        let soResults = res.results as Required<RecordResult>[];
+        if (soResults.length > 1) {
+            mlog.warn(`multiple results returned from get single record request...`);
+            errors.push({soInternalId, message: 'multiple RecordResults returned from getRecordById()'})
+            break;
+        }
+        let so = soResults[0];
+        let itemSublist = so.sublists.item ?? [];
+        let itemsFound: string[] = [];
+        sublistLoop:
+        for (let j = 0; j < itemSublist.length; j++) {
+            let sublistLine = itemSublist[j];
+            if (!hasKeys(sublistLine, 'item' )) {
+                mlog.error([`${source} Invalid SublistLine in RecordResult`,
+                    `salesorder RecordResult.sublists.item[${j}] does not have key 'item'`
+                ].join(TAB));
+                errors.push({
+                    soInternalId, subllistLineIndex: j, 
+                    message: `salesorder RecordResult.sublists.item[${j}] does not have key 'item'`
+                });
+                break salesOrderLoop;
+            }
+            let currentItem = String(sublistLine.item);
+            if (targetItemInternalIds.includes(currentItem) && !itemsFound.includes(currentItem)) {
+                itemsFound.push(currentItem);
+            }
+        }
+        if (itemsFound.length !== targetItemInternalIds.length) {
+            const message = [
+                `${source} endpoint failed. salesorder item sublist is missing ${
+                    targetItemInternalIds.length - itemsFound.length
+                } expected item(s)`,
+                `sales order internalid: '${soInternalId}'`,
+                `missingItems: ${targetItemInternalIds
+                    .filter(id=>!itemsFound.includes(id))
+                    .join(', ')
+                }`,
+                ` itemSublist: ${indentedStringify(itemSublist)}`,
+            ].join(TAB);
+            mlog.error(message);
+            errors.push({
+                soInternalId,
+                message
+            })
+            endpointFailed = true;
+            break salesOrderLoop;
+        }
+        slog.info(`salesorder ${
+            String(i+1).padStart(indexCharLength, ' ')}/${batchKeys.length
+            } has all expected items! salesorder: '${soInternalId}'`
+        );
+        validatedSalesOrders.push(soInternalId);
+    }
+
+
+}
+
+/**
+ * @TODO parameterize
+ * @returns **`relatedRecordDictionary`** `Promise<{ [id: string]: RecordResult[] }>`
+ */
 async function retrieveRelatedRecords(): Promise<{ [itemId: string]: RecordResult[] }> {
     const source = `[${F}.${retrieveRelatedRecords.name}()]`;
     const filePath = path.join(DATA_DIR, 'items', 'lot_numbered_inventory_item0.tsv');
@@ -302,19 +372,23 @@ async function retrieveRelatedRecords(): Promise<{ [itemId: string]: RecordResul
     /** `relatedRecordDictionary` */
     let dict: { [itemId: string]: RecordResult[] } = {};
     for (let i = 0; i < itemBatches.length; i++) {
-        dict = await handleBatch(dict, i+1, itemBatches[i], skuDictionary);
+        dict = await handleItemBatch(dict, i+1, itemBatches[i], skuDictionary);
         slog.debug(`${source} END batch ${i+1}/${itemBatches.length} ${'-'.repeat(16)}`);
     }
     return dict;
 }
 
-async function handleBatch(
+/**
+ * @TODO parameterize
+ * @returns 
+ */
+async function handleItemBatch(
     relatedRecordDictionary: { [itemId: string]: RecordResult[] },
     batchIndex: number,
     lnItems: string[], 
     skuDictionary: Record<string, string>
 ): Promise<{ [itemId: string]: RecordResult[] }> {
-    const source = `[${F}.${handleBatch.name}( ${batchIndex} )]`;
+    const source = `[${F}.${handleItemBatch.name}( ${batchIndex} )]`;
     let numRelatedRecords = 0;
     let errorItems: string[] = [];
     itemLoop:
@@ -354,34 +428,53 @@ async function handleBatch(
     return relatedRecordDictionary
 }
 
+/**
+ * @TODO parameterize
+ * @returns 
+ */
 async function generateRelatedRecordRequest(
     itemId: string,
-    idOptions: idSearchOptions[] = [],
 ): Promise<RelatedRecordRequest> {
-    const source = `[${F}.${generateRelatedRecordRequest.name}()]`
+    const source = `[${F}.${generateRelatedRecordRequest.name}()]`;
     validate.stringArgument(source, {itemId});
     const parentRecordType = RecordTypeEnum.INVENTORY_ITEM;
-    let skuDictionary = await getSkuDictionary();
-    if (isNonEmptyString(skuDictionary[itemId])) {
-        idOptions.push({
-            idProp: idPropertyEnum.INTERNAL_ID,
-            idValue: Number(skuDictionary[itemId]),
-            searchOperator: SearchOperatorEnum.RECORD.ANY_OF
-        });
-    }
-    idOptions.push({
-        idProp: idPropertyEnum.ITEM_ID,
-        idValue: itemId,
-        searchOperator: SearchOperatorEnum.TEXT.IS
-    });
     const childOptions: ChildSearchOptions[] = [{
         childRecordType: RecordTypeEnum.SALES_ORDER,
         fieldId: 'item',
         sublistId: 'item',
     }];
-    const request = { parentRecordType, idOptions, childOptions } as RelatedRecordRequest;
-    return request;
+    let idOptions: idSearchOptions[];
+    let skuDictionary = await getSkuDictionary();
+    if (isNonEmptyString(skuDictionary[itemId])) {
+        idOptions = [{
+            idProp: idPropertyEnum.INTERNAL_ID,
+            idValue: Number(skuDictionary[itemId]),
+            searchOperator: SearchOperatorEnum.RECORD.ANY_OF
+        }]
+    } else {
+        idOptions = [{
+            idProp: idPropertyEnum.ITEM_ID,
+            idValue: itemId,
+            searchOperator: SearchOperatorEnum.TEXT.IS
+        }]
+    }
+    return { parentRecordType, idOptions, childOptions } as RelatedRecordRequest;
 }
 
 
+function generateSingleRecordRequest(
+    recordType: string | RecordTypeEnum,
+    recordInternalId: string,
+    responseOptions: RecordResponseOptions = {
+        fields: ['externalid'],
+        sublists: { item: ['item', 'line'] }
+    }
+): SingleRecordRequest {
+    const idOptions = [{
+        idProp: idPropertyEnum.INTERNAL_ID,
+        idValue: Number(recordInternalId),
+        searchOperator: SearchOperatorEnum.RECORD.ANY_OF
+    }] as idSearchOptions[];
+    return { recordType, idOptions, responseOptions } as SingleRecordRequest;
 
+}

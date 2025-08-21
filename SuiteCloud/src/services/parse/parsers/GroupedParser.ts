@@ -24,7 +24,7 @@ import {
 } from "../types/ParseOptions";
 import {
     isFieldParseOptions
-} from "../types/ParseOptions.typeGuards";
+} from "../types/ParseOptions.TypeGuards";
 import { 
     isNodeLeaves,
     isRowDictionary,

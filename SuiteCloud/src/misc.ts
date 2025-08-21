@@ -11,7 +11,8 @@ import {
     DELAY, simpleLogger as slog,
     miscLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
     MISC_LOG_FILEPATH, 
-    PARSE_LOG_FILEPATH, getWarehouseRows
+    PARSE_LOG_FILEPATH, getWarehouseRows,
+    getAccountDictionary
 } from "./config";
 import {
     readJsonFileAsObject as read,
@@ -31,7 +32,7 @@ import {
     isDirectory,
     getFileNameTimestamp,
 } from "typeshi:utils/io";
-import { getAccessToken, isRelatedRecordRequest } from "./api";
+import { FindSublistLineWithValueOptions, getAccessToken, isRecordOptions, isRelatedRecordRequest, partitionArrayBySize, SublistFieldValueUpdate, SublistLine } from "./api";
 import { 
     equivalentAlphanumericStrings, CleanStringOptions, clean, 
     stringContainsAnyOf, RegExpFlagsEnum, 
@@ -45,7 +46,7 @@ import {
     LN_INVENTORY_ITEM_POST_PROCESSING_OPTIONS 
 } from "src/parse_configurations/item/itemParseDefinition";
 import { 
-    hasKeys, isEmptyArray, isIntegerArray, isNonEmptyArray, 
+    hasKeys, isEmptyArray, isInteger, isIntegerArray, isNonEmptyArray, 
     isNonEmptyString, isNullLike 
 } from "typeshi:utils/typeValidation";
 import { search as fuzzySearch, MatchData } from "fast-fuzzy";
@@ -55,13 +56,14 @@ import { idPropertyEnum, LogTypeEnum, RecordOptions,
     instantiateAuthManager, idSearchOptions, 
     SingleRecordRequest, RecordRequest, RelatedRecordRequest, ChildSearchOptions, getRelatedRecord
 } from "./api";
-import { SuiteScriptError, encodeExternalId } from "./utils/ns";
+import { SuiteScriptError, TaxScheduleEnum, encodeExternalId } from "./utils/ns";
 import { CLEAN_ITEM_ID_OPTIONS } from "src/parse_configurations/evaluators/item";
 import {
     WarehouseDictionary, WarehouseColumnEnum, WarehouseRow,
-    putEntities, DEFAULT_ITEM_RESPONSE_OPTIONS
+    putEntities, DEFAULT_ITEM_RESPONSE_OPTIONS,
+    putItems
 } from "src/pipelines";
-import { extractTargetRows, validateGetRelatedRecord } from "src/DataReconciler";
+import { extractTargetRows, reconcile } from "src/DataReconciler";
 import { 
     parseRecordCsv, processParseResults, 
     ParseResults, ValidatedParseResults, ParseDictionary, 
@@ -69,6 +71,10 @@ import {
 } from "src/services";
 import * as validate from "typeshi:utils/argumentValidation";
 
+/**
+ * @TODO test if PUT_Record still works with findSublistLineWithValue() changes...
+ * need to see if it works with string or number for item internalid
+ */
 const F = path.basename(__filename).replace(/\.[a-z]{1,}$/, '');
 const itemIdExtractor = async (
     value: string, 
@@ -76,6 +82,10 @@ const itemIdExtractor = async (
 ): Promise<string> => {
     return clean(extractLeaf(value), cleanOptions);
 }
+
+let replacementDictionary: {
+    [soInternalId: string]: {itemId: string, placeholderId: number}[]
+} = {}
 async function main(): Promise<void> {
     const source = `[${F}.main()]`
     await clearFile(MISC_LOG_FILEPATH, PARSE_LOG_FILEPATH);
@@ -83,7 +93,71 @@ async function main(): Promise<void> {
     await instantiateAuthManager();
     mlog.info(`${source} START at ${getCurrentPacificTime()}`);
 
-    await validateGetRelatedRecord();
+    const lnOptionsPath = path.join(CLOUD_LOG_DIR, 'items', 'lnii_options.json');
+    validate.existingFileArgument(source, '.json', {lnOptionsPath});
+
+    const dictPath = path.join(CLOUD_LOG_DIR, 'salesorder_targetItems.json');
+    validate.existingFileArgument(source, '.json', {dictPath});
+
+    const placeholderPath = path.join(CLOUD_LOG_DIR, 'items', 'item_placeholders.json');
+    validate.existingFileArgument(source, '.json', {placeholderPath});
+
+    let data = read(lnOptionsPath);
+    let itemOptionsList = (data.items ?? []) as Required<RecordOptions>[];
+    validate.arrayArgument(source, {itemOptionsList, isRecordOptions});
+    slog.info(`itemOptionsList.length: ${itemOptionsList.length}`)
+    
+
+
+
+    const placeholderResults = (
+        (read(placeholderPath) ?? {}).placeholders ?? []
+    ) as RecordResult[];
+    const placeholders = placeholderResults.map(r=>r.internalid);
+    const soTargetItems = read(dictPath) as { [soInternalId: string]: string[] };
+
+    const completedBatches: number[] = [];
+    const processedSalesOrders: any[] = [];
+
+    const keyBatches = partitionArrayBySize(
+        Object.keys(soTargetItems), 50
+    ) as string[][];
+    for (let i = 0; i < keyBatches.length; i++) {
+        let initialReplacementLength = Object.keys(replacementDictionary).length;
+        mlog.debug([`${source} START batch ${i}`,
+            `initialReplacementLength: ${initialReplacementLength}`
+        ].join(TAB))
+        try {
+            await handleSalesOrderBatch(soTargetItems, keyBatches, i, placeholders);
+        } catch (error: any) {
+            mlog.error([`${source} error when handling batch ${i}`, 
+                `caught: ${error}`].join(TAB)
+            );
+            break;
+        }
+        let newReplacementLength = Object.keys(replacementDictionary).length;
+        let expectedLength = initialReplacementLength + keyBatches[i].length;
+        slog.debug([`Handled batch ${i}... (${i+1}/${keyBatches.length})`,
+            `newReplacementLength: ${newReplacementLength}`,
+            `expected keys length: ${expectedLength}`
+        ].join(TAB));
+        if (newReplacementLength !== expectedLength) {
+            mlog.error(`${source} newReplacementLength !== expectedLength`);
+            break;
+        }
+    }
+    write(replacementDictionary, path.join(CLOUD_LOG_DIR, `${getFileNameTimestamp()}_replacement_dict.json`));
+
+
+    
+    // const itemDict: { [itemId: string]: RecordOptions } = {};
+    // for (let i = 0; i < itemOptionsList.length; i++) {
+    //     let record = itemOptionsList[i];
+    //     let itemId = record.fields.itemid as string;
+    //     itemDict[itemId] = record;
+    // }
+    // slog.info(`itemDict.keys.length: ${Object.keys(itemDict).length}`)
+    // write(itemDict, path.join(CLOUD_LOG_DIR, 'items', 'lnii_options_dict.json'));
 
 
     await trimFile(5, MISC_LOG_FILEPATH, PARSE_LOG_FILEPATH);
@@ -95,6 +169,129 @@ main().catch(error => {
     STOP_RUNNING(1);
 });
 
+
+
+async function handleSalesOrderBatch(
+    /**map salesorder internalid to list of itemIds to replace with placeholders */
+    soDict: { [salesOrderInternalId: string]: string[] },
+    batches: string[][],
+    batchIndex: number, 
+    placeholderIds: number[]
+): Promise<{
+    [soInternalId: string]: { itemId: string, placeholderId: number }[]
+}> {
+    const source = `[${F}.${handleSalesOrderBatch.name}( ${batchIndex+1}/${batches.length} )]`;
+    validate.arrayArgument(source, {placeholderIds, isInteger});
+    mlog.info(`${source} START`);
+    let salesOrderIds = batches[batchIndex];
+    let skuDictionary = await getSkuDictionary();
+    for (let soId of salesOrderIds) {
+        const recordOptions: Required<RecordOptions> = {
+            recordType: RecordTypeEnum.INVENTORY_ITEM,
+            isDynamic: false,
+            idOptions: [{
+                idProp: idPropertyEnum.INTERNAL_ID,
+                idValue: Number(soId),
+                searchOperator: SearchOperatorEnum.RECORD.ANY_OF
+            }] as idSearchOptions[],
+            fields: {},
+            sublists: {item: []},
+            meta: {
+                dataSource: 'misc.ts',
+                sourceType: 'PUT_PLACEHOLDER'
+            }
+        }
+        /**@consideration alt shape: {itemId: string; placeholderId: number}[] = []; */
+        const replacements: { itemId: string; placeholderId: number }[] = [];
+        const itemIdsToReplace = soDict[soId];
+        for (let j = 0; j < itemIdsToReplace.length; j++) {
+            let itemId = itemIdsToReplace[j];
+            let itemInternalId = skuDictionary[itemId];
+            if (!isNonEmptyString(itemInternalId)) {
+                throw new Error(`${source} encountered itemId not in skuDictionary`)
+            }
+            replacements.push({itemId, placeholderId: placeholderIds[j]});
+            // @TODO finish replacement logic and make api call to put endpoint after testing...
+            recordOptions.sublists.item.push({
+                item: { 
+                    newValue: placeholderIds[j],
+                    lineIdOptions: {
+                        sublistId: 'item',
+                        fieldId: 'item',
+                        value: itemInternalId
+                    } as FindSublistLineWithValueOptions
+                } as SublistFieldValueUpdate
+            } as SublistLine);
+            
+        }
+        replacementDictionary[soId] = replacements;
+    }
+    return replacementDictionary;
+
+}
+
+/**
+ * @TODO parameterize
+ * @returns 
+ */
+async function makePlaceholders(): Promise<any> {
+    const source = `[${F}.${makePlaceholders.name}()]`
+    const accountDict = await getAccountDictionary();
+    let cogsDict = accountDict["Cost of Goods Sold"] ?? {};
+    let assetDict = accountDict["Other Current Asset"] ?? {};
+    const DEFAULT_COGS = cogsDict["Testing"];
+    const DEFAULT_ASSET = assetDict["Inventory"];
+    validate.multipleStringArguments(source, {DEFAULT_COGS, DEFAULT_ASSET});
+    const responseOptions = { fields: ['itemid'] }
+
+    const dictPath = path.join(CLOUD_LOG_DIR, 'salesorder_targetItems.json');
+    validate.existingFileArgument(source, '.json', {dictPath});
+    const soTargetItems = read(dictPath) as { [soInternalId: string]: string[] };
+    let numPlaceholdersToMake = Math.max(...Object.values(soTargetItems).map(items=>items.length));
+    mlog.info(`numPlaceholdersToMake: ${numPlaceholdersToMake}`); // 33
+    const placeholders: any[] = [];
+    for (let i = 0; i < numPlaceholdersToMake; i++) {
+        let record: Required<RecordOptions> = {
+            recordType: RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM,
+            isDynamic: false,
+            idOptions: [],
+            fields: {
+            },
+            sublists: {},
+            meta: {
+                dataSource: 'misc.ts',
+                sourceType: 'DUMMY_TEMPLATE'
+            }
+        };
+        record.fields.itemid = `PLACEHOLDER_${i}`;
+        record.fields.cogsaccount = Number(DEFAULT_COGS);
+        record.fields.assetaccount = Number(DEFAULT_ASSET);
+        record.fields.taxschedule = TaxScheduleEnum.DEFAULT;
+        try {
+            const [response] = await putItems([record], responseOptions);
+            if (!isNonEmptyArray(response.results)) {
+                mlog.error(`response undefined or has empty results...`);
+                break;
+            }
+            const [recordResult] = response.results;
+            placeholders.push(recordResult);
+        } catch (error: any) {
+            mlog.error([`${source} Error occurred when calling putItems()`, 
+                `caught: ${error}`
+            ].join(TAB));
+            break;
+        }
+        await DELAY(1000, null);
+    }
+    mlog.info(`placeholders.length: ${placeholders.length}`)
+    write({placeholders}, path.join(CLOUD_LOG_DIR, 'items', `item_placeholders.json`));
+
+}
+
+/**
+ * @TODO parameterize
+ * @returns 
+ */
 async function getRemainingItems(): Promise<string[]> {
     const source = `[${F}.getRemainingItems()]`
     let items = (
@@ -150,6 +347,10 @@ async function getRemainingItems(): Promise<string[]> {
     return remainingItems;
 }
 
+/**
+ * @TODO parameterize
+ * @returns 
+ */
 async function extractLotNumberedItemRows(
     itemSourceFile: string,
     locationBins: WarehouseDictionary
@@ -271,6 +472,10 @@ async function isolateFailedRequests(
     }
 }
 
+/**
+ * @TODO parameterize
+ * @returns 
+ */
 async function storeReadableErrors(): Promise<void> {
     const errorResolutionDir = path.join(CLOUD_LOG_DIR, 'salesorders', 'error_resolution');
     const jsonData = read(

@@ -19,6 +19,7 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
     /**
      * @type {LogStatement[]} - `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
      * @see {@link writeLog}`(type, title, ...details)`
+     * @description return logArray in response so can process in client
      * */
     const logArray = [];
     /**
@@ -299,7 +300,17 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
                 const recSearch = search.create({
                     type: recordType,
                     filters: [
-                        [idProp, searchOperator, idValue],
+                        // [idProp, searchOperator, idValue],
+                        search.createFilter({
+                            name: idProp,
+                            operator: searchOperator,
+                            values: isNonEmptyArray(idValue) ? idValue : [idValue]
+                        }),
+                        // search.createFilter({
+                        //     name: 'mainline',
+                        //     operator: SearchOperatorEnum.TEXT.IS,
+                        //     values: ['T']
+                        // })
                     ],
                 });
                 /** @type {ResultSet} */
@@ -606,6 +617,17 @@ const NOT_DYNAMIC = false;
  * @description typedef for elements of the {@link logArray} array
  */
 
+/**
+ * @typedef {{
+ * name: string;
+ * join?: string;
+ * operator: SearchOperatorEnum | string;
+ * values?: FieldValue | FieldValue[] | string | Date | number | string[] | Date[] | number[] | boolean;
+ * formula?: string;
+ * summary?: ColumnSummaryEnum | string;
+ * }} CreateSearchFilterOptions
+ */
+
 
 
 /** Type: **`SearchColumn`** {@link SearchColumn} */
@@ -731,22 +753,7 @@ const SearchSortEnum = {
 }
 
 /**
- * @description operations for Date fields
  * @enum {string} **`DateOperatorEnum`**
- * @property {string} AFTER - The date is after the specified date.
- * @property {string} NOT_AFTER - The date is not after the specified date.
- * @property {string} BEFORE - The date is before the specified date.
- * @property {string} NOT_BEFORE - The date is not before the specified date.
- * @property {string} IS_EMPTY - The date field is empty.
- * @property {string} IS_NOT_EMPTY - The date field is not empty.
- * @property {string} ON - The date is on the specified date.
- * @property {string} NOT_ON - The date is not on the specified date.
- * @property {string} ON_OR_AFTER - The date is on or after the specified date.
- * @property {string} NOT_ON_OR_AFTER - The date is not on or after the specified date.
- * @property {string} ON_OR_BEFORE - The date is on or before the specified date.
- * @property {string} NOT_ON_OR_BEFORE - The date is not on or before the specified date.
- * @property {string} WITHIN - The date is within the specified date range.
- * @property {string} NOT_WITHIN - The date is not within the specified date range.
  */
 const DateOperatorEnum = {
     AFTER: 'after',
@@ -865,10 +872,18 @@ const SearchOperatorEnum = {
 };
 
 /**
+ * values are fieldIds or sublistFieldIds where hasSubrecord() is `true`
  * @enum {string} **`SubrecordFieldEnum`**
  */
 const SubrecordFieldEnum = {
-    ADDRESS: 'addressbookaddress'
+    /**from the `'addressbook'` `sublist` on Relationship records */
+    ADDRESS_BOOK_ADDRESS: 'addressbookaddress',
+    /**from the `'billingaddress'` body `field` on Transaction records */
+    BILLING_ADDRESS: 'billingaddress',
+    /**from the `'shippingaddress'` body `field` on Transaction records */
+    SHIPPING_ADDRESS: 'shippingaddress',
+    /**from the `'{internalid}'` {type} `field` on {recordType} records */
+    INVENTORY_DETAIL: 'inventorydetail'
 }
 /**
  * @enum {string} **`RecordTypeEnum`**

@@ -1,5 +1,5 @@
 /**
- * @file src/api/types/typeGuards.ts
+ * @file src/api/types/RecordEndpoint.TypeGuards.ts
  */
 
 import { 
@@ -7,8 +7,9 @@ import {
     isEmptyArray
 } from "typeshi:utils/typeValidation";
 import { SubrecordValue, FieldValue } from "./InternalApi";
+import { isFindSublistLineWithValueOptions } from "./InternalApi.TypeGuards";
 import { RecordResponseOptions, ChildSearchOptions, RelatedRecordRequest, idSearchOptions, 
-    RecordOptions, RecordResponse, SingleRecordRequest
+    RecordOptions, RecordResponse, SingleRecordRequest, SublistFieldValueUpdate
 } from "./RecordEndpoint";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
 
@@ -168,5 +169,12 @@ export function isIdSearchOptions(value: any): value is idSearchOptions {
 export function isIdOptions(value: any): value is idSearchOptions[] {
     return (isNonEmptyArray(value) 
         && value.every((el: any)=>isIdSearchOptions(el))
+    );
+}
+
+export function isSublistFieldValueUpdate(value: any): value is SublistFieldValueUpdate {
+    return (isObject(value)
+        && hasKeys(value, ['newValue', 'lineIdOptions'], true, true)
+        && isFindSublistLineWithValueOptions(value.lineIdOptions)
     );
 }

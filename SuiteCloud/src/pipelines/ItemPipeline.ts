@@ -194,7 +194,7 @@ export async function putItems(
     const source = `[ItemPipeline.putItems()]`;
     try {
         validate.arrayArgument(source, {items , isRecordOptions});
-        validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
+        if (responseOptions) validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
     } catch (error) {
         mlog.error(`${source} Invalid parameters:`, JSON.stringify(error as any));
         write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 

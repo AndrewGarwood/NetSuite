@@ -1,5 +1,7 @@
-
-import { hasKeys, isNonEmptyArray, isNonEmptyString } from "typeshi/dist/utils/typeValidation";
+/**
+ * @file src/services/parse/types/ParseOptions.TypeGuards.ts
+ */
+import { hasKeys, isNonEmptyArray, isNonEmptyString } from "typeshi:utils/typeValidation";
 import { FieldParseOptions, ParseResults, ValueMappingEntry } from "./ParseOptions";
 import { isRecordOptions } from "../../../api/types";
 

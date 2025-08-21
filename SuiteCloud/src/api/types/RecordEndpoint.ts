@@ -7,15 +7,13 @@ import {
 import { 
     FieldValue, 
     LogStatement, 
-    SubrecordValue, 
+    SubrecordValue,
+    FindSublistLineWithValueOptions 
 } from ".";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "../../utils/ns/record/Record";
 import { RowSourceMetaData } from "typeshi:utils/io";
 /**
  * @typedefn **`RecordRequest`**
- * @property {RecordOptions | Array<RecordOptions>} recordOptions = {@link RecordOptions} | `Array<`{@link RecordOptions}`>`
- * - {@link RecordOptions} = `{ recordType: `{@link RecordTypeEnum}`, isDynamic?: boolean, idOptions?: `{@link idSearchOptions}`[], fields?: `{@link FieldDictionary}`, sublists?: `{@link SublistDictionary}` }`
- * @property {RecordResponseOptions} [responseOptions] = {@link RecordResponseOptions} = `{ responseFields: string | string[], responseSublists: Record<string, string | string[]> }`
  */
 export type RecordRequest = {
     recordOptions: RecordOptions | Array<RecordOptions>;
@@ -31,12 +29,6 @@ export type SingleRecordRequest = {
 };
 /**
  * @typedefn **`RecordResponse`**
- * @property {string | number} status - Indicates status of the request.
- * @property {string} message - A message indicating the result of the request.
- * @property {RecordResult[]} results - `Array<`{@link RecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully upserted.
- * @property {RecordOptions[]} rejects - `Array<`{@link RecordOptions}`>` containing the record options that were not successfully upserted.
- * @property {string} [error] - error message if the request was not successful.
- * @property {LogStatement[]} logArray - `Array<`{@link LogStatement}`>` generated during the request processing.
  */
 export type RecordResponse = {
     status: string | number;
@@ -49,21 +41,13 @@ export type RecordResponse = {
 
 /**
  * @typedefn **`RecordOptions`**
- * @property {RecordTypeEnum | EntityRecordTypeEnum} recordType - The record type to post, see {@link RecordTypeEnum}
- * @property {boolean} [isDynamic=false] - Indicates if the record should be created/loaded in dynamic mode. (defaults to false)
- * @property {idSearchOptions[]} [idOptions] - = `Array<`{@link idSearchOptions}`>` 
- * - = `{ idProp`: {@link idPropertyEnum}, `idValue`: string | number, `searchOperator`: {@link RecordOperatorEnum}` }[]`
- * - options specifying how to search for an existing record.
  */
 export type RecordOptions = {
     recordType: RecordTypeEnum | EntityRecordTypeEnum;
     isDynamic?: boolean;
     idOptions?: idSearchOptions[];
-    fields?: FieldDictionary | { [fieldId: string]: FieldValue | SubrecordValue };
-    sublists?: SublistDictionary | { 
-        [sublistId: string]: Array<SublistLine> 
-            | Array<{[sublistFieldId: string]: FieldValue | SubrecordValue}> 
-    };
+    fields?: FieldDictionary;
+    sublists?: SublistDictionary;
     meta?: {
         /** 
          * info about what generated this RecordOptions object
@@ -119,16 +103,12 @@ export type RecordResponseOptions = {
 
 /**
  * @typedefn **`RecordResult`**
- * @property {number} internalid
- * @property {string | RecordTypeEnum} recordType
- * @property {FieldDictionary | { [fieldId: string]: FieldValue | SubrecordValue } } fields
- * @property {SublistDictionary | { [sublistId: string]: Array<SublistLine | {[sublistFieldId: string]: FieldValue | SubrecordValue}> } } sublists
  */
 export type RecordResult = { 
     internalid: number;
     recordType: RecordTypeEnum | string; 
-    fields?: FieldDictionary | { [fieldId: string]: FieldValue | SubrecordValue };
-    sublists?: SublistDictionary | { [sublistId: string]: Array<SublistLine | {[sublistFieldId: string]: FieldValue | SubrecordValue}> }; 
+    fields?: FieldDictionary;
+    sublists?: SublistDictionary; 
 };
 
 
@@ -166,21 +146,6 @@ export enum idPropertyEnum {
     TRANSACTION_ID = 'tranid',
 }
 
-/** Type: **`SubrecordDictionary`** {@link SubrecordDictionary} */
-/**
- * @deprecated
- * - each key in SubrecordDictionary is the fieldId (`body` or `sublist`) of a field that holds a subrecord object
- * - distinguish between body subrecords and sublist subrecords by checking if the mapped object has property `'sublistId'`
- * - - i.e. `mappedObject = SubrecordDictionary[fieldId]; `
- * - - `if 'sublistId' in mappedObject.keys()`, `then` it's a `sublist` subrecord and vice versa
- * - {@link SetFieldSubrecordOptions} for body subrecords
- * - {@link SetSublistSubrecordOptions} for sublist subrecords
- * @typedefn **`SubrecordDictionary`**
- */
-export type SubrecordDictionary = {
-    [fieldId: string]: SetFieldSubrecordOptions | SetSublistSubrecordOptions;
-};
-
 
 /**
  * @typedefn **`FieldDictionary`**
@@ -193,7 +158,7 @@ export type FieldDictionary = {
  * @typedefn **`SublistDictionary`**
  */
 export type SublistDictionary = {
-    [sublistId: string]: Array<SublistLine> | Array<{[sublistFieldId: string]: FieldValue | SubrecordValue}>
+    [sublistId: string]: Array<SublistLine>
 };
 
 /**
@@ -207,20 +172,15 @@ export type SublistDictionary = {
  * @typedefn **`SublistLine`**
  */
 export type SublistLine = {
-    [sublistFieldId: string]: FieldValue | SubrecordValue;
-} & {
-    line?: number;
-    /**`string` - the `'sublistFieldId'` of the list entry with defined value at `SublistLine[sublistFieldId]` 
-     * that you want to use to search for existing lines */
-    lineIdProp?: string;
+    [fieldId: string]: SublistFieldValueUpdate | FieldValue | SubrecordValue;
 }
 
 /**
  * @typedefn **`SetFieldSubrecordOptions`**
  * @property {string} fieldId `'internalid'` of the main record field that is a subrecord.
  * -  use `rec.getSubrecord({fieldId})` = `getSubrecord(options: GetFieldOptions): Omit<Record, 'save'>`;
- * @property {FieldDictionary} [fields] {@link FieldDictionary}
- * @property {SublistDictionary} [sublists] {@link SublistDictionary}
+ * @property {FieldDictionary} fields {@link FieldDictionary}
+ * @property {SublistDictionary} sublists {@link SublistDictionary}
  * @property {string} subrecordType - The record type of the subrecord.
  */
 export type SetFieldSubrecordOptions = {
@@ -235,8 +195,8 @@ export type SetFieldSubrecordOptions = {
  * @property {string} sublistId `string` the `parentSublistId` (The `internalid` of the main record's sublist)
  * @property {string} fieldId (i.e. `parentFieldId`) The `internalid` of the sublist field that holds a subrecord
  * - use `rec.getSublistSubrecord({sublistId, fieldId})`
- * @property {FieldDictionary} [fields] {@link FieldDictionary}
- * @property {SublistDictionary} [sublists] {@link SublistDictionary}
+ * @property {FieldDictionary} fields {@link FieldDictionary}
+ * @property {SublistDictionary} sublists {@link SublistDictionary}
  * @property {string} subrecordType - The record type of the subrecord.
  */
 export type SetSublistSubrecordOptions = {
@@ -248,3 +208,7 @@ export type SetSublistSubrecordOptions = {
 }
 
 
+export type SublistFieldValueUpdate = {
+    newValue: FieldValue;
+    lineIdOptions: FindSublistLineWithValueOptions;
+}

@@ -1,5 +1,5 @@
 /**
- * @file src/services/post_process/types/PostProcessing.typeGuards.ts
+ * @file src/services/post_process/types/PostProcessing.TypeGuards.ts
  */
 
 import { 

@@ -259,7 +259,17 @@ function searchForRecordById(recordType, idOptions, fields) {
             const recSearch = search.create({
                 type: recordType,
                 filters: [
-                    [idProp, searchOperator, idValue],
+                    // [idProp, searchOperator, idValue],
+                    search.createFilter({
+                        name: idProp,
+                        operator: searchOperator,
+                        values: isNonEmptyArray(idValue) ? idValue : [idValue]
+                    }),
+                    // search.createFilter({
+                    //     name: 'mainline',
+                    //     operator: SearchOperatorEnum.TEXT.IS,
+                    //     values: ['T']
+                    // })
                 ],
             });
             /** @type {ResultSet} */

@@ -303,7 +303,7 @@ async function processSublistLineParseOptions(
         const newSublistLine: SublistLine = {};
         const lineIdOptions = lineOptions.lineIdOptions || {} as SublistLineIdOptions;
         if (lineIdOptions.lineIdProp) {
-            newSublistLine.lineIdProp = lineIdOptions.lineIdProp;
+            newSublistLine.idFields = lineIdOptions.lineIdProp;
         }
         delete lineOptions.lineIdOptions;
         for (const sublistFieldId of Object.keys(lineOptions)) {
@@ -511,7 +511,7 @@ export async function isDuplicateSublistLine(
             return equivalentAlphanumericStrings(existingLineId, newLineId);
         }
         const canCompareUsingLineIdProp = Boolean(lineIdProp
-            && existingLine.lineIdProp === lineIdProp
+            && existingLine.idFields === lineIdProp
             && Boolean(newLine[lineIdProp])
             && typeof newLine[lineIdProp] === 'string' 
             && typeof existingLine[lineIdProp] === 'string'

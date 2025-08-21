@@ -11,11 +11,11 @@ import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE,
 import { createUrlWithParams } from "../url";
 import { AxiosContentTypeEnum } from "../server";
 import { 
-    RecordRequest, RecordResponse, RecordOptions, RecordResponseOptions,
+    RecordRequest, RecordResponse, RecordOptions,
     RecordResult,
     isRecordOptions,
 } from "../types";
-import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS, TWO_SECONDS } from "../configureRequests";
+import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS } from "../configureRequests";
 import { getAccessToken } from "../configureAuth";
 import path from "node:path";
 import * as validate from "typeshi:utils/argumentValidation";
@@ -81,7 +81,7 @@ export async function upsertRecordPayload(
                 `${source} finished batch ${i+1} of ${batches.length};`,
                 ( summary.numFailed > 0 ? TAB+`summary: ${indentedStringify(summary)}` : '')
             );
-            await DELAY(TWO_SECONDS, null);
+            await DELAY(2000, null);
             continue;
         } catch (error) {
             mlog.error(`${source} Error in put payload (batchIndex=${i}):`, 

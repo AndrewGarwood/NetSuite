@@ -219,7 +219,7 @@ export abstract class BaseParser implements ParseStrategy {
         for (const lineOptions of lineOptionsArray) {
             const newSublistLine: SublistLine = {};
             if (lineOptions?.lineIdOptions?.lineIdProp) {
-                newSublistLine.lineIdProp = lineOptions.lineIdOptions.lineIdProp;
+                newSublistLine.idFields = lineOptions.lineIdOptions.lineIdProp;
             }
             /** filter out parse field-value pairs so they don't get put in the SublistLine */
             const sublistFieldIds = Object.keys(lineOptions).filter((key) => 
@@ -229,7 +229,7 @@ export abstract class BaseParser implements ParseStrategy {
                 ...this.rowContext,
                 sublistId,
                 currentFieldId: '',
-                fields: newSublistLine,
+                fields: newSublistLine as FieldDictionary,
             };
             for (const sublistFieldId of sublistFieldIds) {
                 context.currentFieldId = sublistFieldId;
@@ -354,14 +354,14 @@ export abstract class BaseParser implements ParseStrategy {
                 return equivalentAlphanumeric(existingLineId, newLineId);
             }
             const canCompareUsingLineIdProp = Boolean(lineIdProp
-                && existingLine.lineIdProp === lineIdProp
+                && existingLine.idFields === lineIdProp
                 && Boolean(newLine[lineIdProp])
                 && typeof newLine[lineIdProp] === 'string' 
                 && typeof existingLine[lineIdProp] === 'string'
             );
             if (lineIdProp && canCompareUsingLineIdProp) {
                 this.debug.push(NL + `canCompareUsingLineIdProp === true`,
-                    TAB + ` existingLine.lineIdProp: '${existingLine.lineIdProp}'`,
+                    TAB + ` existingLine.lineIdProp: '${existingLine.idFields}'`,
                     TAB + `        param lineIdProp: '${lineIdProp}'`,
                     TAB + `existingLine[lineIdProp]: '${existingLine[lineIdProp]}'`,
                     TAB + `     newLine[lineIdProp]: '${newLine[lineIdProp]}'`,
