@@ -48,11 +48,11 @@ export type TransactionMainPipelineOptions = {
     responseOptions?: RecordResponseOptions;
     clearLogFiles?: string[];
     /**
-     * if `outputDir` is a valid directory, 
+     * if `outDir` is a valid directory, 
      * `entityProcessor` will write output data from stages in `stagesToWrite` here. 
      * */
-    outputDir: string;
-    /** specify at which stage(s) that data being processed should be written to `outputDir` */
+    outDir?: string;
+    /** specify at which stage(s) that data being processed should be written to `outDir` */
     stagesToWrite?: TransactionMainPipelineStageEnum[];
     /**
      * - stop after specific stage for the first file in filePaths. 

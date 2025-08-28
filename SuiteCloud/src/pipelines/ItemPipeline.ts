@@ -9,14 +9,13 @@ import {
     getCsvRows, getOneToOneDictionary,
     getCurrentPacificTime, 
     indentedStringify, clearFileSync,
-    getFileNameTimestamp, RowSourceMetaData
+    getFileNameTimestamp, RowSourceMetaData,
+    getSourceString
 } from "typeshi:utils/io";
 import { 
     STOP_RUNNING, DELAY, simpleLogger as slog,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
-    INFO_LOGS, DEBUG_LOGS as DEBUG, SUPPRESSED_LOGS as SUP, 
-    ERROR_DIR,
-    CLOUD_LOG_DIR
+    getProjectFolders
 } from "../config";
 import { 
     RecordOptions, RecordResponse, 
@@ -44,7 +43,7 @@ import {
     WarehouseDictionary 
 } from "./types";
 import { DEFAULT_ITEM_RESPONSE_OPTIONS, BIN_RESPONSE_OPTIONS } from "./ItemConfig";
-import { clean, CleanStringOptions, extractLeaf } from "typeshi:utils/regex";
+import { clean, CleanStringOptions, extractFileName, extractLeaf } from "typeshi:utils/regex";
 import { CLEAN_ITEM_ID_OPTIONS } from "src/parse_configurations/evaluators/item";
 import { parseRecordCsv } from 'src/services/parse';
 import { ParseResults, ValidatedParseResults } from 'src/services/parse/types/index';
@@ -52,7 +51,7 @@ import {
     getCompositeDictionaries, processParseResults 
 } from 'src/services/post_process/parseResultsProcessor';
 
-
+const F = extractFileName(__filename);
 /**
  * @param options 
  * @param fileName 
@@ -70,7 +69,7 @@ async function done(
         ? options.stagesToWrite
         : []
     );
-    const { stopAfter, outputDir } = options;
+    const { stopAfter, outDir: outputDir } = options;
     fileName = fileName.trim().replace(/(\.([a-z]+))$/i, '');
     if (outputDir && fs.existsSync(outputDir) 
         && Object.values(stagesToWrite).includes(stage)) {
@@ -95,7 +94,7 @@ export async function runMainItemPipeline(
     filePaths: string | string[],
     options: ItemPipelineOptions
 ): Promise<void> {
-    const source = `ItemPipeline.runMainItemPipeline`;
+    const source = getSourceString(F, runMainItemPipeline.name);
     validate.enumArgument(source, {itemType, RecordTypeEnum})
     validate.objectArgument(source, {options});
     filePaths = isNonEmptyArray(filePaths) ? filePaths : [filePaths];
@@ -130,7 +129,7 @@ export async function runMainItemPipeline(
         const { validDict, invalidDict } = getCompositeDictionaries(validatedResults);
         const invalidItems = Object.values(invalidDict).flat();
         if (invalidItems.length > 0) {
-            write(invalidDict, path.join(CLOUD_LOG_DIR, `items`, 
+            write(invalidDict, path.join(getProjectFolders().logDir, `items`, 
                 `${getFileNameTimestamp()}_${fileName}_${itemType}_invalidOptions.json`)
             );
         }
@@ -170,7 +169,7 @@ export async function runMainItemPipeline(
                     numRejects,
                     rejectResponses,
                 }, 
-                path.join(CLOUD_LOG_DIR, 'items', 
+                path.join(getProjectFolders().logDir, 'items', 
                     `${getFileNameTimestamp()}_${fileName}_${itemType}_putRejects.json`
                 )
             );
@@ -198,7 +197,7 @@ export async function putItems(
     } catch (error) {
         mlog.error(`${source} Invalid parameters:`, JSON.stringify(error as any));
         write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 
-            path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_putItems.json`)
+            path.join(getProjectFolders().logDir, 'errors', `${getFileNameTimestamp()}_ERROR_putItems.json`)
         );
         return [];
     }
@@ -211,7 +210,7 @@ export async function putItems(
     } catch (error) {
         mlog.error(`${source} Error putting items:`, (error as any));
         write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 
-            path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_putItems.json`)
+            path.join(getProjectFolders().logDir, 'errors', `${getFileNameTimestamp()}_ERROR_putItems.json`)
         );
     }
     return [];
@@ -228,7 +227,7 @@ export async function putBins(
     } catch (error) {
         mlog.error(`${source} Invalid parameters:`, error);
         write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 
-            path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_putBins.json`)
+            path.join(getProjectFolders().logDir, 'errors', `${getFileNameTimestamp()}_ERROR_putBins.json`)
         );
         return [];
     }
@@ -241,7 +240,7 @@ export async function putBins(
     } catch (error) {
         mlog.error(`${source} Error putting bins:`, error);
         write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 
-            path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_putBins.json`)
+            path.join(getProjectFolders().logDir, 'errors', `${getFileNameTimestamp()}_ERROR_putBins.json`)
         );
     }
     return []

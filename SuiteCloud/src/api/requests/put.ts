@@ -3,11 +3,17 @@
  */
 import axios from "axios";
 import { writeObjectToJsonSync as write, getCurrentPacificTime, indentedStringify, 
-    getFileNameTimestamp } from "typeshi:utils/io";
+    getFileNameTimestamp, 
+    getSourceString
+} from "typeshi:utils/io";
 import { apiLogger as alog, mainLogger as mlog, INDENT_LOG_LINE as TAB, simpleLogger as slog,
-    NEW_LINE as NL } from "../../config/setupLog";
-import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, 
-    DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
+    NEW_LINE as NL 
+} from "../../config/setupLog";
+import { RESTLET_URL_STEM, STOP_RUNNING,
+    DELAY, getScripts,  
+    getSandboxRestScript,
+    getProjectFolders
+} from "../../config/env";
 import { createUrlWithParams } from "../url";
 import { AxiosContentTypeEnum } from "../server";
 import { 
@@ -15,14 +21,14 @@ import {
     RecordResult,
     isRecordOptions,
 } from "../types";
-import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS } from "../configureRequests";
+import { BATCH_SIZE, partitionArrayBySize } from "../configureRequests";
 import { getAccessToken } from "../configureAuth";
 import path from "node:path";
 import * as validate from "typeshi:utils/argumentValidation";
 import { isEmptyArray } from "typeshi:utils/typeValidation";
+import { extractFileName } from "@typeshi/regex";
 
-const UPSERT_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.PUT_Record.scriptId as number;
-const UPSERT_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.PUT_Record.deployId as number;
+const F = extractFileName(__filename);
 
 /**
  * enforces a max number of records per post call (see {@link BATCH_SIZE}) 
@@ -35,12 +41,12 @@ const UPSERT_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.PUT_Record.deployId as number;
  */
 export async function upsertRecordPayload(
     payload: RecordRequest,
-    scriptId: number=UPSERT_RECORD_SCRIPT_ID, 
-    deployId: number=UPSERT_RECORD_DEPLOY_ID,
+    scriptId?: number, 
+    deployId?: number,
 ): Promise<RecordResponse[]> {
-    const source = `[put.upsertRecordPayload()]`;
-    validate.numberArgument(source, {scriptId}, true);
-    validate.numberArgument(source, {deployId}, true);
+    const source = getSourceString(F, upsertRecordPayload.name);
+    scriptId = scriptId ?? getSandboxRestScript("PUT_Record").scriptId;
+    deployId = deployId ?? getSandboxRestScript("PUT_Record").deployId;
     validate.objectArgument(source, {payload});
     const { recordOptions, responseOptions } = payload;
     const upsertRecordArray = (Array.isArray(recordOptions) 
@@ -89,7 +95,7 @@ export async function upsertRecordPayload(
             );
             write(
                 {timestamp: getCurrentPacificTime(), batchIndex: i, caught: (error as any)}, 
-                path.join(ERROR_DIR, `ERROR_upsertRecordPayload_batch_${i}.json`)
+                path.join(getProjectFolders().logDir, 'errors', `ERROR_upsertRecordPayload_batch_${i}.json`)
             );
             continue;
         }
@@ -113,7 +119,7 @@ export async function PUT(
     payload: Record<string, any> | any,
     contentType: AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN_TEXT = AxiosContentTypeEnum.JSON,
 ): Promise<any> {
-    const source = `put.PUT`;
+    const source = getSourceString(F, PUT.name);
     validate.multipleStringArguments(source, {accessToken, contentType});
     validate.numberArgument(source, {scriptId}, true);
     validate.numberArgument(source, {deployId}, true);
@@ -131,15 +137,15 @@ export async function PUT(
         });
         return response;
     } catch (error) {
-        mlog.error(`[${source}()] ERROR: ${(error as any).message 
+        mlog.error(`${source} ERROR: ${(error as any).message 
                 ? (error as any).message 
                 : JSON.stringify(error as any)
             }`
         );
         write(
             {timestamp: getCurrentPacificTime(), caught: (error as any)}, 
-            path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_${source}.json`)
+            path.join(getProjectFolders().logDir, 'errors', `${getFileNameTimestamp()}_ERROR_${source}.json`)
         );
-        throw new Error(`[${source}()] Failed to call RESTlet with payload`);
+        throw new Error(`${source} Failed to call RESTlet with payload`);
     }
 }

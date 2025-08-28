@@ -3,8 +3,9 @@
  */
 import path from "node:path";
 import { mainLogger as mlog, 
-    INDENT_LOG_LINE as TAB, NEW_LINE as NL, DATA_DIR, 
-    simpleLogger as slog
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL,
+    simpleLogger as slog,
+    getProjectFolders
 } from "../../config";
 import { clean, 
     CleanStringOptions, 
@@ -90,7 +91,7 @@ export const displayName = async (
     const itemIdExtractor = async (value: string,): Promise<string> => {
         return clean(extractLeaf(value), cleanOptions);
     }
-    let cacheRows = await getRows(path.join(DATA_DIR, 'uploaded', 'inventory_item.tsv'));
+    let cacheRows = await getRows(path.join(getProjectFolders().dataDir, 'uploaded', 'inventory_item.tsv'));
     let itemIdCache = await getIndexedColumnValues(cacheRows, 'Name', itemIdExtractor);
     let itemIdValue = await itemId(row, itemIdColumn, cleanOptions);
     if (hasKeys(itemIdCache, itemIdValue) && isNonEmptyArray(itemIdCache[itemIdValue])) {

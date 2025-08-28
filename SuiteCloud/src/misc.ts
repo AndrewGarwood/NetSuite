@@ -2,17 +2,18 @@
  * @file src/misc.ts
  * @description separate workspace script
  */
-import * as fs from "fs";
+import * as fs from "node:fs";
 import path from "node:path";
-import { 
-    CLOUD_LOG_DIR, DATA_DIR, 
+import {
     getBinDictionary, getSkuDictionary, initializeData, 
-    LOCAL_LOG_DIR, ONE_DRIVE_DIR, STOP_RUNNING, 
+    STOP_RUNNING, 
     DELAY, simpleLogger as slog,
     miscLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
-    MISC_LOG_FILEPATH, 
-    PARSE_LOG_FILEPATH, getWarehouseRows,
-    getAccountDictionary
+    getWarehouseRows,
+    getLogFiles,
+    getAccountDictionary,
+    initializeEnvironment,
+    getProjectFolders
 } from "./config";
 import {
     readJsonFileAsObject as read,
@@ -31,12 +32,18 @@ import {
     isRowSourceMetaData,
     isDirectory,
     getFileNameTimestamp,
+    autoFormatLogsOnExit,
+    getSourceString,
 } from "typeshi:utils/io";
-import { FindSublistLineWithValueOptions, getAccessToken, isRecordOptions, isRelatedRecordRequest, partitionArrayBySize, SublistFieldValueUpdate, SublistLine } from "./api";
+import { 
+    FindSublistLineWithValueOptions, getAccessToken, isRecordOptions, 
+    isRelatedRecordRequest, partitionArrayBySize, SublistFieldValueUpdate, SublistLine 
+} from "./api";
 import { 
     equivalentAlphanumericStrings, CleanStringOptions, clean, 
     stringContainsAnyOf, RegExpFlagsEnum, 
-    extractLeaf
+    extractLeaf,
+    extractFileName
 } from "typeshi:utils/regex";
 import { SalesOrderColumnEnum } from "./parse_configurations/salesorder/salesOrderConstants";
 import { CustomerColumnEnum } from "./parse_configurations/customer/customerConstants";
@@ -75,7 +82,7 @@ import * as validate from "typeshi:utils/argumentValidation";
  * @TODO test if PUT_Record still works with findSublistLineWithValue() changes...
  * need to see if it works with string or number for item internalid
  */
-const F = path.basename(__filename).replace(/\.[a-z]{1,}$/, '');
+const F = extractFileName(__filename);
 const itemIdExtractor = async (
     value: string, 
     cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
@@ -85,83 +92,45 @@ const itemIdExtractor = async (
 
 let replacementDictionary: {
     [soInternalId: string]: {itemId: string, placeholderId: number}[]
-} = {}
+} = {};
 async function main(): Promise<void> {
-    const source = `[${F}.main()]`
-    await clearFile(MISC_LOG_FILEPATH, PARSE_LOG_FILEPATH);
+    const source = getSourceString(F, main.name)
+    await initializeEnvironment();
+    let logFiles = getLogFiles();
+    await clearFile(...logFiles);
     await initializeData();
     await instantiateAuthManager();
     mlog.info(`${source} START at ${getCurrentPacificTime()}`);
 
-    const lnOptionsPath = path.join(CLOUD_LOG_DIR, 'items', 'lnii_options.json');
-    validate.existingFileArgument(source, '.json', {lnOptionsPath});
-
-    const dictPath = path.join(CLOUD_LOG_DIR, 'salesorder_targetItems.json');
-    validate.existingFileArgument(source, '.json', {dictPath});
-
-    const placeholderPath = path.join(CLOUD_LOG_DIR, 'items', 'item_placeholders.json');
-    validate.existingFileArgument(source, '.json', {placeholderPath});
-
-    let data = read(lnOptionsPath);
-    let itemOptionsList = (data.items ?? []) as Required<RecordOptions>[];
-    validate.arrayArgument(source, {itemOptionsList, isRecordOptions});
-    slog.info(`itemOptionsList.length: ${itemOptionsList.length}`)
-    
-
-
-
-    const placeholderResults = (
-        (read(placeholderPath) ?? {}).placeholders ?? []
-    ) as RecordResult[];
-    const placeholders = placeholderResults.map(r=>r.internalid);
-    const soTargetItems = read(dictPath) as { [soInternalId: string]: string[] };
-
-    const completedBatches: number[] = [];
-    const processedSalesOrders: any[] = [];
-
-    const keyBatches = partitionArrayBySize(
-        Object.keys(soTargetItems), 50
-    ) as string[][];
-    for (let i = 0; i < keyBatches.length; i++) {
-        let initialReplacementLength = Object.keys(replacementDictionary).length;
-        mlog.debug([`${source} START batch ${i}`,
-            `initialReplacementLength: ${initialReplacementLength}`
-        ].join(TAB))
-        try {
-            await handleSalesOrderBatch(soTargetItems, keyBatches, i, placeholders);
-        } catch (error: any) {
-            mlog.error([`${source} error when handling batch ${i}`, 
-                `caught: ${error}`].join(TAB)
-            );
-            break;
-        }
-        let newReplacementLength = Object.keys(replacementDictionary).length;
-        let expectedLength = initialReplacementLength + keyBatches[i].length;
-        slog.debug([`Handled batch ${i}... (${i+1}/${keyBatches.length})`,
-            `newReplacementLength: ${newReplacementLength}`,
-            `expected keys length: ${expectedLength}`
-        ].join(TAB));
-        if (newReplacementLength !== expectedLength) {
-            mlog.error(`${source} newReplacementLength !== expectedLength`);
-            break;
-        }
+    let { logDir, dataDir } = getProjectFolders();
+    let wDir = path.join(dataDir, 'workspace');
+    const relatedRecordResults = read(
+        path.join(logDir, 'items', 'related_record_dict.json')
+    ) as { [itemId: string]: RecordResult[] };
+    const safeToDelete: string[] = Object.keys(relatedRecordResults).filter(
+        k=>!isNonEmptyArray(relatedRecordResults[k])
+    ).sort();
+    const itemsToProcess = (Object.keys(relatedRecordResults)
+        .filter(k=>!safeToDelete.includes(k))
+        .sort()
+    );
+    const targetItemDict: { [itemId: string]: RecordResult[] } = {}    
+    for (let itemId of itemsToProcess) {
+        targetItemDict[itemId] = relatedRecordResults[itemId];
     }
-    write(replacementDictionary, path.join(CLOUD_LOG_DIR, `${getFileNameTimestamp()}_replacement_dict.json`));
+    let minLen = Math.min(...Object.values(targetItemDict).map(v=>v.length))
+    mlog.info(`minLength RecordResult[] = ${minLen}`);
+    write({itemIds: safeToDelete}, path.join(wDir, 'safe_to_delete.json'));
+    write(targetItemDict, path.join(wDir, 'items_to_salesorders.json'));
+    mlog.info([`${source} let's check real quick`,
+        `relatedRecordResults.keys.length ${Object.keys(relatedRecordResults).length}`,
+        `  safeToDelete.length: ${safeToDelete.length}`,
+        `itemsToProcess.length: ${itemsToProcess.length}`
+    ].join(TAB));
 
 
-    
-    // const itemDict: { [itemId: string]: RecordOptions } = {};
-    // for (let i = 0; i < itemOptionsList.length; i++) {
-    //     let record = itemOptionsList[i];
-    //     let itemId = record.fields.itemid as string;
-    //     itemDict[itemId] = record;
-    // }
-    // slog.info(`itemDict.keys.length: ${Object.keys(itemDict).length}`)
-    // write(itemDict, path.join(CLOUD_LOG_DIR, 'items', 'lnii_options_dict.json'));
-
-
-    await trimFile(5, MISC_LOG_FILEPATH, PARSE_LOG_FILEPATH);
-    formatDebugLogFile(MISC_LOG_FILEPATH, PARSE_LOG_FILEPATH);
+    await trimFile(5, ...logFiles);
+    autoFormatLogsOnExit(logFiles)
     STOP_RUNNING(0);
 }
 main().catch(error => {
@@ -170,7 +139,9 @@ main().catch(error => {
 });
 
 
-
+/**
+ * @deprecated
+ */
 async function handleSalesOrderBatch(
     /**map salesorder internalid to list of itemIds to replace with placeholders */
     soDict: { [salesOrderInternalId: string]: string[] },
@@ -180,11 +151,11 @@ async function handleSalesOrderBatch(
 ): Promise<{
     [soInternalId: string]: { itemId: string, placeholderId: number }[]
 }> {
-    const source = `[${F}.${handleSalesOrderBatch.name}( ${batchIndex+1}/${batches.length} )]`;
+    const source = getSourceString(F, handleSalesOrderBatch.name, `${batchIndex+1}/${batches.length}`);
     validate.arrayArgument(source, {placeholderIds, isInteger});
     mlog.info(`${source} START`);
     let salesOrderIds = batches[batchIndex];
-    let skuDictionary = await getSkuDictionary();
+    let skuDictionary = getSkuDictionary();
     for (let soId of salesOrderIds) {
         const recordOptions: Required<RecordOptions> = {
             recordType: RecordTypeEnum.INVENTORY_ITEM,
@@ -234,9 +205,13 @@ async function handleSalesOrderBatch(
  * @TODO parameterize
  * @returns 
  */
-async function makePlaceholders(): Promise<any> {
-    const source = `[${F}.${makePlaceholders.name}()]`
-    const accountDict = await getAccountDictionary();
+async function makePlaceholders(
+    salesOrderToItemDictPath: string,
+    /**where to send response from making the placeholders */
+    outputDir: string
+): Promise<any> {
+    const source = getSourceString(F, makePlaceholders.name);
+    const accountDict = getAccountDictionary();
     let cogsDict = accountDict["Cost of Goods Sold"] ?? {};
     let assetDict = accountDict["Other Current Asset"] ?? {};
     const DEFAULT_COGS = cogsDict["Testing"];
@@ -244,9 +219,8 @@ async function makePlaceholders(): Promise<any> {
     validate.multipleStringArguments(source, {DEFAULT_COGS, DEFAULT_ASSET});
     const responseOptions = { fields: ['itemid'] }
 
-    const dictPath = path.join(CLOUD_LOG_DIR, 'salesorder_targetItems.json');
-    validate.existingFileArgument(source, '.json', {dictPath});
-    const soTargetItems = read(dictPath) as { [soInternalId: string]: string[] };
+    validate.existingFileArgument(source, '.json', {salesOrderToItemDictPath});
+    const soTargetItems = read(salesOrderToItemDictPath) as { [soInternalId: string]: string[] };
     let numPlaceholdersToMake = Math.max(...Object.values(soTargetItems).map(items=>items.length));
     mlog.info(`numPlaceholdersToMake: ${numPlaceholdersToMake}`); // 33
     const placeholders: any[] = [];
@@ -284,7 +258,7 @@ async function makePlaceholders(): Promise<any> {
         await DELAY(1000, null);
     }
     mlog.info(`placeholders.length: ${placeholders.length}`)
-    write({placeholders}, path.join(CLOUD_LOG_DIR, 'items', `item_placeholders.json`));
+    if (outputDir) write({placeholders}, path.join(outputDir, `item_placeholders.json`));
 
 }
 
@@ -292,11 +266,10 @@ async function makePlaceholders(): Promise<any> {
  * @TODO parameterize
  * @returns 
  */
-async function getRemainingItems(): Promise<string[]> {
-    const source = `[${F}.getRemainingItems()]`
-    let items = (
-        read(path.join(CLOUD_LOG_DIR, 'items', 'lnii_options.json')) ?? {}
-    ).items as RecordOptions[] ?? [];
+async function getRemainingItems(
+    items: RecordOptions[]
+): Promise<string[]> {
+    const source = getSourceString(F, getRemainingItems.name);
     let itemIds = items
         .map(record => (record.fields ?? {}).itemid)
         .filter(idValue=>isNonEmptyString(idValue))
@@ -355,7 +328,7 @@ async function extractLotNumberedItemRows(
     itemSourceFile: string,
     locationBins: WarehouseDictionary
 ): Promise<Record<string, any>[]> {
-    const source = `[${F}.extractLotNumberedItemRows()]`;
+    const source = getSourceString(F, extractLotNumberedItemRows.name);
     let itemRows = await getRows(itemSourceFile);
     let targetItems: string[] = [];
     for (let [locId, binDict] of Object.entries(locationBins)) {
@@ -407,7 +380,7 @@ async function isolateFailedRequests(
     targetSuffix: string,
     outputDir?: string
 ): Promise<void> {
-    const source = `[${F}.isolateFailedRequests()]`
+    const source = getSourceString(F, isolateFailedRequests.name);
     validate.existingDirectoryArgument(source, {inputDir});
     validate.stringArgument(source, {targetSuffix});
     if (outputDir) validate.existingDirectoryArgument(source, {outputDir});
@@ -476,10 +449,12 @@ async function isolateFailedRequests(
  * @TODO parameterize
  * @returns 
  */
-async function storeReadableErrors(): Promise<void> {
-    const errorResolutionDir = path.join(CLOUD_LOG_DIR, 'salesorders', 'error_resolution');
+async function storeReadableErrors(
+    errorResolutionDir: string,
+    fileName: string,
+): Promise<void> {
     const jsonData = read(
-        path.join(errorResolutionDir, 'viable_reject_reasons.json')
+        path.join(errorResolutionDir, fileName)
     ) as { rejectReasons: SuiteScriptError[] }; 
     const errors = jsonData.rejectReasons ?? [];
     const errorDict: Record<string, any> = {};
@@ -500,11 +475,11 @@ enum SourceColumnEnum {
 }
 
 async function searchInCustomers(
-    targetEntFile: string = path.join(DATA_DIR, 'reports', 'client_entity_list.tsv'),
-    customerFile: string = path.join(DATA_DIR, 'customers', 'customer.tsv'),
-    outputDir?: string
+    targetEntFile: string,
+    customerFile: string,
+    outputDir?: string,
 ): Promise<void> {
-    const source = `[${F}.searchInCustomers()]`
+    const source = getSourceString(F, searchInCustomers.name);
     validate.multipleExistingFileArguments(source, '.tsv', {customerFile, targetEntFile})
     
     const customerRows = await getRows(customerFile);
@@ -543,18 +518,18 @@ async function searchInCustomers(
 }
 
 async function searchInSalesOrders(
-    targetEntFile: string = path.join(DATA_DIR, 'reports', 'client_entity_list.tsv'),
-    soDirectory: string = path.join(DATA_DIR, 'salesorders', 'all'),
+    targetEntFile: string,// = path.join(DATA_DIR, 'reports', 'client_entity_list.tsv'),
+    soDirectory: string,// = path.join(DATA_DIR, 'salesorders', 'all'),
     entTolerance: number = 0.9,
     addrTolerance: number = 0.8,
     outputDir?: string,
 ): Promise<void> {
-    const source = `[${F}.searchInSalesOrders]`
+    const source = getSourceString(F, searchInSalesOrders.name);
     validate.existingFileArgument(source, '.tsv', {targetEntFile});
     validate.existingDirectoryArgument(source, {soDirectory});
 
     const stateToAbbreviation = read(
-        path.join(DATA_DIR, 'reports', 'state_to_abbreviation.json')
+        path.join(getProjectFolders().dataDir, 'reports', 'state_to_abbreviation.json')
     );
     validate.objectArgument(`misc.main`, {stateToAbbreviation});
     // const abbreviationToState: Record<string, string> = {};

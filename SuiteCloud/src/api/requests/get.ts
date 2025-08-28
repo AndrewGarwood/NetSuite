@@ -7,7 +7,9 @@ import {
     writeObjectToJsonSync as write, getCurrentPacificTime, indentedStringify 
 } from "typeshi:utils/io";
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
-import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
+import { RESTLET_URL_STEM, STOP_RUNNING, DELAY, getScripts, 
+    getSandboxRestScript, getProjectFolders 
+} from "../../config/env";
 import { createUrlWithParams } from "../url";
 import { AxiosContentTypeEnum } from "../server";
 import { 
@@ -18,17 +20,17 @@ import {
     RelatedRecordRequest,
     isRelatedRecordRequest,
 } from "../types";
-import { SB_REST_SCRIPTS } from "../configureRequests";
 import { getAccessToken } from "../configureAuth";
 import path from "node:path";
 import { RecordTypeEnum } from "../../utils/ns/record/Record";
 import { SearchOperatorEnum } from "../../utils/ns/search/Search";
 import * as validate from "typeshi:utils/argumentValidation";
+import { extractFileName } from "@typeshi/regex";
+import { getSourceString } from "typeshi:utils/io";
 import { SingleRecordRequest } from "../types";
+import { AccountEnvironmentEnum, ScriptTypeEnum } from "@utils/ns";
 
-const F = path.basename(__filename).replace(/\.[a-z]{1,}$/, '');
-export const GET_RECORD_SCRIPT_ID = SB_REST_SCRIPTS.GET_Record.scriptId as number;
-export const GET_RECORD_DEPLOY_ID = SB_REST_SCRIPTS.GET_Record.deployId as number;
+const F = extractFileName(__filename);
 
 /**
  * @param request {@link SingleRecordRequest}
@@ -88,8 +90,8 @@ export async function getRecordById(
         const accessToken = await getAccessToken();
         const response = await GET(
             accessToken,
-            GET_RECORD_SCRIPT_ID,
-            GET_RECORD_DEPLOY_ID,
+            getSandboxRestScript("GET_Record").scriptId,
+            getSandboxRestScript("GET_Record").deployId,
             request
         );
         return response.data as RecordResponse;
@@ -102,7 +104,7 @@ export async function getRecordById(
         ].join(TAB));
         write(
             {timestamp: getCurrentPacificTime(), caught: error}, 
-            path.join(ERROR_DIR, 'ERROR_getRecordById.json')
+            path.join(getProjectFolders().logDir, 'errors', 'ERROR_getRecordById.json')
         );
         throw new Error('Failed to call GET_Record RESTlet');
     }
@@ -117,8 +119,8 @@ export async function getRelatedRecord(
         const accessToken = await getAccessToken();
         const response = await GET(
             accessToken,
-            SB_REST_SCRIPTS.GET_RelatedRecord.scriptId,
-            SB_REST_SCRIPTS.GET_RelatedRecord.deployId,
+            getSandboxRestScript("GET_RelatedRecord").scriptId,
+            getSandboxRestScript("GET_RelatedRecord").deployId,
             request
         );
         return response.data as RecordResponse
@@ -131,14 +133,11 @@ export async function getRelatedRecord(
         ].join(TAB));
         write(
             {timestamp: getCurrentPacificTime(), caught: error}, 
-            path.join(ERROR_DIR, 'ERROR_getRelatedRecord.json')
+            path.join(getProjectFolders().logDir, 'errors', 'ERROR_getRelatedRecord.json')
         );
         throw new Error(`${source} Failed, unable to return RecordResponse`);
     }
 }
-
-
-
 
 /**
  * @param accessToken `string`
@@ -182,7 +181,7 @@ export async function GET(
         ].join(TAB));
         write(
             {timestamp: getCurrentPacificTime(), caught: error}, 
-            path.join(ERROR_DIR, 'ERROR_GET.json')
+            path.join(getProjectFolders().logDir, 'errors', 'ERROR_GET.json')
         );
         throw new Error('[get.GET()] Failed to call RESTlet with params');
     }

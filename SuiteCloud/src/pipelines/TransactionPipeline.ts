@@ -17,9 +17,8 @@ import {
     STOP_RUNNING, DELAY,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
     SUPPRESSED_LOGS as SUP, 
-    ERROR_DIR,
-    CLOUD_LOG_DIR,
-    simpleLogger as slog, apiLogger as alog
+    simpleLogger as slog, apiLogger as alog,
+    getProjectFolders
 } from "../config";
 import { 
     RecordOptions, RecordRequest, RecordResponse, 
@@ -77,11 +76,11 @@ async function done(
         ? options.stagesToWrite
         : []
     );
-    const { stopAfter, outputDir } = options;
+    const { stopAfter, outDir } = options;
     fileName = fileName.trim().replace(/(\.([a-z]+))$/i, '');
-    if (isDirectory(outputDir) && stagesToWrite.includes(stage)) {
+    if (isNonEmptyString(outDir) && isDirectory(outDir) && stagesToWrite.includes(stage)) {
         const outputPath = path.join(
-            outputDir, `${getFileNameTimestamp()}_${fileName}_${stage}.json`
+            outDir, `${getFileNameTimestamp()}_${fileName}_${stage}.json`
         );
         write(stageData, outputPath);
     }
@@ -111,8 +110,9 @@ export async function runMainTransactionPipeline(
     validate.enumArgument(source, {transactionType, RecordTypeEnum})
     validate.objectArgument(source, {options});
     const {
-        clearLogFiles, outputDir, parseOptions, postProcessingOptions, responseOptions 
+        clearLogFiles, parseOptions, postProcessingOptions, responseOptions 
     } = options as TransactionMainPipelineOptions;
+    const outDir = options.outDir ?? path.join(getProjectFolders().logDir);
     if (!parseOptions) {
         throw new Error([`${source} Invalid TransactionMainPipelineOptions`,
             `(missing parseOptions)`,
@@ -158,7 +158,7 @@ export async function runMainTransactionPipeline(
         const { validDict, invalidDict } = getCompositeDictionaries(validatedResults);
         const invalidTransactions = Object.values(invalidDict).flat();
         if (invalidTransactions.length > 0) {
-            write(invalidDict, path.join(outputDir, 
+            write(invalidDict, path.join(outDir, 
                 `${getFileNameTimestamp()}_${fileName}_invalidOptions.json`)
             );
         }
@@ -195,7 +195,7 @@ export async function runMainTransactionPipeline(
                         numMatchErrors: matchResults.errors.length, 
                         errors: matchResults.errors
                     } as MatchErrorDetails, 
-                    path.join(outputDir, `${getFileNameTimestamp()}_${fileName}_matchErrors.json`)
+                    path.join(outDir, `${getFileNameTimestamp()}_${fileName}_matchErrors.json`)
                 );
             }
         }
@@ -257,7 +257,7 @@ export async function runMainTransactionPipeline(
                     numRejects,
                     rejectResponses,
                 }, 
-                path.join(outputDir, 
+                path.join(outDir, 
                     `${getFileNameTimestamp()}_${fileName}_putRejects.json`
                 )
             );
@@ -271,7 +271,7 @@ export async function runMainTransactionPipeline(
     slog.info(`${source} Finished pipeline for loop, exiting function.`);
     if (processedFiles.length > 0) {
         slog.info(`${source} processedFiles.length: ${processedFiles.length}`);
-        write({processedFiles}, path.join(outputDir, 
+        write({processedFiles}, path.join(outDir, 
             `${getFileNameTimestamp()}_${transactionType}_processedFiles.json`)
         );
     }
@@ -453,7 +453,7 @@ export async function putTransactions(
     } catch (error) {
         mlog.error(`${source} Error putting transactions:`, error);
         write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 
-            path.join(ERROR_DIR, `ERROR_putTransactions.json`)
+            path.join(getProjectFolders().logDir, `ERROR_putTransactions.json`)
         );
         return [];
     }
@@ -586,7 +586,7 @@ export async function resolveUnmatchedTransactions(
             `   num rejects: ${entityRejects.length}`,
         ].join(TAB));
         write({entityRejects, timestamp: getCurrentPacificTime()},
-            path.join(ERROR_DIR, `${getFileNameTimestamp()}_ERROR_resolveUnmatchedTransactions_entityRejects.json`)
+            path.join(getProjectFolders().logDir, `${getFileNameTimestamp()}_ERROR_resolveUnmatchedTransactions_entityRejects.json`)
         );
     }
     slog.debug([`${source} Sanity Check 3`,

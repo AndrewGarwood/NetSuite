@@ -3,7 +3,7 @@
  * @description evaluators to use across multiple record types
  */
 import { parseLogger as plog, mainLogger as mlog, 
-    INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG 
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL,
 } from "../../config/setupLog";
 import { 
     clean,

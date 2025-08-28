@@ -11,12 +11,11 @@ import {
     indentedStringify, isDirectory
 } from "typeshi:utils/io";
 import { 
-    STOP_RUNNING, DATA_DIR, DELAY, 
+    STOP_RUNNING, DELAY, 
     mainLogger as mlog, simpleLogger as slog,
     INDENT_LOG_LINE as TAB, NEW_LINE as NL,
-    DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH,
-    ERROR_LOG_FILEPATH, DataDomainEnum,
-    CLOUD_LOG_DIR,
+    getLogFiles, initializeEnvironment,
+    getProjectFolders
 } from "./config";
 import { instantiateAuthManager } from "./api";
 import { 
@@ -38,12 +37,6 @@ import * as soConstants from "./parse_configurations/salesorder/salesOrderConsta
 import { getSkuDictionary, initializeData } from "./config/dataLoader";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "./utils/ns/Enums";
 import { invokePipeline } from "./main";
-
-const LOG_FILES = [
-    DEFAULT_LOG_FILEPATH, 
-    PARSE_LOG_FILEPATH, 
-    ERROR_LOG_FILEPATH
-];
 
 // Pipeline selection options
 enum PipelineTypeEnum {
@@ -272,7 +265,7 @@ async function promptTransactionPipeline(): Promise<TransactionMainPipelineOptio
         {
             type: 'input',
             name: 'directory',
-            message: `Correct output directory?\n    Current value: '${config.outputDir}'\n    (press Enter to confirm, or enter new path):`,
+            message: `Correct output directory?\n    Current value: '${config.outDir}'\n    (press Enter to confirm, or enter new path):`,
             default: CLI_TruthyStringEnum.ENTER,
             validate: (input) => {
                 if (!input.trim()) return true; // Using default
@@ -283,7 +276,7 @@ async function promptTransactionPipeline(): Promise<TransactionMainPipelineOptio
     ]);
     
     if (outputDirAnswer.directory.trim()) {
-        config.outputDir = outputDirAnswer.directory.trim();
+        config.outDir = outputDirAnswer.directory.trim();
     }
     
     // 6. Stages to write
@@ -410,7 +403,7 @@ async function promptItemPipeline(baseConfig: ItemPipelineOptions): Promise<Item
         {
             type: 'input',
             name: 'directory',
-            message: `Correct output directory?\n    Current value: '${config.outputDir}'\n    (press Enter to confirm, or enter new path):`,
+            message: `Correct output directory?\n    Current value: '${config.outDir}'\n    (press Enter to confirm, or enter new path):`,
             default: '',
             validate: (input) => {
                 if (!input.trim()) return true; // Using default
@@ -421,7 +414,7 @@ async function promptItemPipeline(baseConfig: ItemPipelineOptions): Promise<Item
     ]);
     
     if (outputDirAnswer.directory.trim()) {
-        config.outputDir = outputDirAnswer.directory.trim();
+        config.outDir = outputDirAnswer.directory.trim();
     }
     
     // 4. Stages to write
@@ -515,7 +508,7 @@ async function confirmTransactionConfiguration(
         console.log(`   Internal ID Column: ${config.matchOptions.localFileOptions?.internalIdColumn}`);
     }
     console.log(`Generate Missing Entities: ${config.generateMissingEntities}`);
-    console.log(`Output Directory: ${config.outputDir}`);
+    console.log(`Output Directory: ${config.outDir}`);
     console.log(`Stages to Write: ${config.stagesToWrite?.join(', ') || 'None'}`);
     console.log(`Stop After: ${config.stopAfter}`);
     
@@ -540,7 +533,7 @@ async function confirmItemConfiguration(
     console.log('\n=== Item Pipeline Configuration Summary ===');
     console.log(`Parse Options: ${Object.keys(config.parseOptions).join(', ')}`);
     console.log(`Post-Processing: ${config.postProcessingOptions ? Object.keys(config.postProcessingOptions).join(', ') : 'None'}`);
-    console.log(`Output Directory: ${config.outputDir}`);
+    console.log(`Output Directory: ${config.outDir}`);
     console.log(`Stages to Write: ${config.stagesToWrite?.join(', ') || 'None'}`);
     console.log(`Stop After: ${config.stopAfter}`);
     
@@ -567,12 +560,13 @@ async function confirmConfiguration(config: TransactionMainPipelineOptions): Pro
  * Main interactive function
  */
 async function main() {
-    await clearFile(...LOG_FILES);
     await DELAY(1000, null);
     mlog.info(`[START mainInteractive.main()] at ${getCurrentPacificTime()}`);
-    
-    await instantiateAuthManager();
+    await initializeEnvironment();
+    let logFiles = getLogFiles();
+    await clearFile(...logFiles);
     await initializeData();
+    await instantiateAuthManager();
     
     // Step 1: Select pipeline type
     const selectedPipeline = await selectPipeline();
@@ -601,9 +595,7 @@ async function main() {
     
     if (selectedPipeline.type === PipelineTypeEnum.TRANSACTION) {
         // For transaction pipelines, get sales order files
-        const csvFiles = getDirectoryFiles(
-            soConstants.UNVIABLE_SO_DIR, '.csv', '.tsv'
-        );
+        const csvFiles: string[] = [];
         filesToProcess = csvFiles.slice(7, 10); // handle subset for now
         console.log(`\nFound ${csvFiles.length} transaction files, operating on ${filesToProcess.length} file(s)`);
     } else {
@@ -626,7 +618,7 @@ async function main() {
             filesToProcess = [filePrompt.filePath.trim()];
         } else {
             // Use a default item file path based on the selected pipeline
-            const defaultItemFile = path.join(DATA_DIR, 'items', 'remaining_inventory.tsv');
+            const defaultItemFile = path.join(getProjectFolders().dataDir, 'items', 'remaining_inventory.tsv');
             if (fs.existsSync(defaultItemFile)) {
                 filesToProcess = [defaultItemFile];
                 console.log(`\nUsing default item file: ${defaultItemFile}`);
@@ -662,10 +654,8 @@ async function main() {
         `handling logs...`
     ].join(TAB));
     
-    trimFileSync(5, ...LOG_FILES);
-    for (const filePath of LOG_FILES) { 
-        formatDebugLogFile(filePath);
-    }
+    trimFileSync(5, ...logFiles);
+    for (const filePath of logFiles) { formatDebugLogFile(filePath) }
     console.log('\n=== Pipeline Complete ===');
 }
 

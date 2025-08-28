@@ -9,7 +9,7 @@ import bodyParser from "body-parser";
 import path from "node:path";
 import fs from "node:fs";
 import { 
-    TOKEN_DIR, SERVER_PORT, REDIRECT_URI, AUTH_URL, TOKEN_URL, 
+    SERVER_PORT, REDIRECT_URI, AUTH_URL, TOKEN_URL, 
     REST_CLIENT_ID as CLIENT_ID, REST_CLIENT_SECRET as CLIENT_SECRET,
     SCOPE, STATE
 } from "../../config/env";
@@ -17,11 +17,11 @@ import { createUrlWithParams } from "../url";
 import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from "./types";
 import { 
     writeObjectToJsonSync as write 
-} from "typeshi:utils/io/writing";
+} from "typeshi/dist/utils/io/writing";
 import { 
     readJsonFileAsObject as read
-} from "typeshi:utils/io/reading";
-import { getCurrentPacificTime } from "typeshi:utils/io/dateTime";
+} from "typeshi/dist/utils/io/reading";
+import { getCurrentPacificTime } from "typeshi/dist/utils/io/dateTime";
 import { 
     mainLogger as mlog, apiLogger as alog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
     simpleLogger as slog
@@ -122,6 +122,7 @@ const DEFAULT_AUTH_OPTIONS: Required<AuthOptions> = {
     validationIntervalMs: 30 * 1000, // 30 seconds
     enableQueueing: true
 };
+const TOKEN_DIR = path.join(__dirname, 'tokens');
 /** = `'src/server/tokens/STEP2_tokens.json'`  */
 const STEP2_TOKENS_PATH = path.join(TOKEN_DIR, 'STEP2_tokens.json');
 /** = `'src/server/tokens/STEP3_tokens.json'` */

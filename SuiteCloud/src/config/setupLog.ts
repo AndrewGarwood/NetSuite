@@ -2,22 +2,9 @@
  * @file src/config/setupLog.ts
  * @reference https://tslog.js.org/#/?id=pretty-templates-and-styles-color-settings
  */
-import { OUTPUT_DIR, CLOUD_LOG_DIR } from "./env";
 import { Logger, ISettingsParam, ISettings, ILogObj, 
     ILogObjMeta, IPrettyLogStyles, IMeta } from "tslog";
 import path from "node:path";
-import { appendFileSync, WriteFileOptions } from "node:fs";
-
-/** LOCAL_LOG_DIR (in onedrive) or `OUTPUT_DIR/logs` */
-export const LOCAL_LOG_DIR = path.join(OUTPUT_DIR, "logs");  
-/**`OUTPUT_DIR/logs/DEBUG.txt` */
-export const DEFAULT_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, "DEBUG.txt");
-/**`CLOUD_LOG_DIR/ERROR.txt` */
-export const ERROR_LOG_FILEPATH = path.join(CLOUD_LOG_DIR, "ERROR.txt");
-/**`CLOUD_LOG_DIR/PARSE_LOG.txt` */
-export const PARSE_LOG_FILEPATH = path.join(CLOUD_LOG_DIR, 'PARSE_LOG.txt');
-/**`OUTPUT_DIR/logs/MISC.txt` */
-export const MISC_LOG_FILEPATH = path.join(LOCAL_LOG_DIR, 'MISC.txt'); 
 
 /** 
  * `INDENT_LOG_LINE =  '\n\t• '` = newLine + tab + bullet + space
@@ -59,7 +46,10 @@ const LOG_TEMPLATE = [
 
 const SIMPLE_LOG_TEMPLATE = ` > `
 
-const errorInfoTemplate = "{{errorName}}: {{errorMessage}}\n\t{{errorStack}}";
+const errorInfoTemplate = [
+    "{{errorName}}: {{errorMessage}}", 
+    "{{errorStack}}"
+].join(INDENT_LOG_LINE);
 /** 
  * use as value for {@link ISettingsParam.prettyErrorTemplate} 
  * @description template string for error message. 
@@ -72,33 +62,33 @@ const ERROR_TEMPLATE = `${errorInfoTemplate}`; //`${timestampTemplate} ${logName
 const ERROR_STACK_TEMPLATE = `${fileInfoTemplate}:{{method}} {{stack}}`;
 
 const PRETTY_LOG_STYLES: IPrettyLogStyles = {
-        yyyy: "green",
-        mm: "green",
-        dd: "green",
-        hh: "greenBright",
-        MM: "greenBright",
-        ss: "greenBright",
-        ms: "greenBright",
-        dateIsoStr: ["redBright", "italic"], //dateIsoStr is = Shortcut for {{yyyy}}.{{mm}}.{{dd}} {{hh}}:{{MM}}:{{ss}}:{{ms}}
-        logLevelName:  {
-            "*": ["bold", "black", "bgWhiteBright", "dim"],
-            SILLY: ["bold", "white"],
-            TRACE: ["bold", "whiteBright"],
-            DEBUG: ["bold", "green"],
-            INFO: ["bold", "cyan"],
-            WARN: ["bold", "yellow"],
-            ERROR: ["bold", "red"],
-            FATAL: ["bold", "redBright"],
-        },
-        fileName: "cyan",
-        filePath: "blue",
-        fileLine: ["cyanBright", "bold"],
-        filePathWithLine: ["blueBright", "italic"],
-        name: "blue",
-        nameWithDelimiterPrefix: ["whiteBright", "bold", "bgBlackBright"],
-        nameWithDelimiterSuffix: ["whiteBright", "bold", "bgBlack"],
-        errorName: ["red", "bold"],
-        errorMessage: "redBright",
+    yyyy: "green",
+    mm: "green",
+    dd: "green",
+    hh: "greenBright",
+    MM: "greenBright",
+    ss: "greenBright",
+    ms: "greenBright",
+    dateIsoStr: ["redBright", "italic"], //dateIsoStr is = Shortcut for {{yyyy}}.{{mm}}.{{dd}} {{hh}}:{{MM}}:{{ss}}:{{ms}}
+    logLevelName:  {
+        "*": ["bold", "black", "bgWhiteBright", "dim"],
+        SILLY: ["bold", "white"],
+        TRACE: ["bold", "whiteBright"],
+        DEBUG: ["bold", "green"],
+        INFO: ["bold", "cyan"],
+        WARN: ["bold", "yellow"],
+        ERROR: ["bold", "red"],
+        FATAL: ["bold", "redBright"],
+    },
+    fileName: "cyan",
+    filePath: "blue",
+    fileLine: ["cyanBright", "bold"],
+    filePathWithLine: ["blueBright", "italic"],
+    name: "blue",
+    nameWithDelimiterPrefix: ["whiteBright", "bold", "bgBlackBright"],
+    nameWithDelimiterSuffix: ["whiteBright", "bold", "bgBlack"],
+    errorName: ["red", "bold"],
+    errorMessage: "redBright",
 };
 
 const COMMON_SETTINGS: { [settingsParamKey: string]: any } = {
@@ -112,14 +102,14 @@ const COMMON_SETTINGS: { [settingsParamKey: string]: any } = {
 }
 /** `type: "pretty"` */
 const MAIN_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
-    type: "pretty", // "pretty" | "hidden" | "json"
+    type: "pretty",
     name: "NS_Main",
     ...COMMON_SETTINGS
 }
 
 /** `type: "pretty"`, `template` = `" > {{logObjMeta}}"` */
 const SIMPLE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
-    type: "pretty", // "pretty" | "hidden" | "json"
+    type: "pretty",
     name: "NS_Simple",
     minLevel: 0,
     prettyLogTemplate: SIMPLE_LOG_TEMPLATE,
@@ -132,30 +122,12 @@ const SIMPLE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
 
 /** `type: "pretty", name: "mainLogger"` */
 export const mainLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
-mainLogger.attachTransport((logObj: ILogObj) => {
-    appendFileSync(
-        DEFAULT_LOG_FILEPATH, formatLogObj(logObj), 
-        { encoding: "utf-8" } as WriteFileOptions
-    );
-});
 
 /** `type: "pretty"`, `template` = `" > {{logObjMeta}}"` */
 export const simpleLogger = new Logger<ILogObj>(SIMPLE_LOGGER_SETTINGS);
-simpleLogger.attachTransport((logObj: ILogObj) => {
-    appendFileSync(
-        DEFAULT_LOG_FILEPATH, formatLogObj(logObj), 
-        { encoding: "utf-8" } as WriteFileOptions
-    );
-});
 
 /** `type: "pretty", name: "errorLogger"` */ //logObj: ILogObj & ILogObjMeta
 export const errorLogger = new Logger<ILogObj>(MAIN_LOGGER_SETTINGS);
-errorLogger.attachTransport((logObj: ILogObj) => {
-    appendFileSync(
-        ERROR_LOG_FILEPATH, formatLogObj(logObj), 
-        { encoding: "utf-8" } as WriteFileOptions
-    );
-});
 
 /** `type: "hidden"` -> suppress logs from being sent to console */
 const PARSE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
@@ -165,12 +137,6 @@ const PARSE_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
 }
 /** `type: "hidden", name: "parseLogger"` */
 export const parseLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
-parseLogger.attachTransport((logObj: ILogObj) => {
-    appendFileSync(
-        PARSE_LOG_FILEPATH, formatLogObj(logObj), 
-        { encoding: "utf-8" } as WriteFileOptions
-    );
-});
 
 /** `type: "hidden", name: "pruneLogger"` */
 export const pruneLogger = new Logger<ILogObj>(PARSE_LOGGER_SETTINGS);
@@ -183,19 +149,13 @@ const MISC_LOGGER_SETTINGS: ISettingsParam<ILogObj> = {
     ...COMMON_SETTINGS
 }
 export const miscLogger = new Logger<ILogObj>(MISC_LOGGER_SETTINGS);
-miscLogger.attachTransport((logObj: ILogObj) => {
-    appendFileSync(
-        MISC_LOG_FILEPATH, formatLogObj(logObj), 
-        { encoding: "utf-8" } as WriteFileOptions
-    );
-})
 
 /**
  * compress metadata
  * @param logObj {@link ILogObj}
  * @returns `string`
  */
-function formatLogObj(logObj: ILogObj | (ILogObj & ILogObjMeta)): string {
+export function formatLogObj(logObj: ILogObj | (ILogObj & ILogObjMeta)): string {
     const meta = logObj['_meta'] as IMeta;
     const { logLevelName, date, path } = meta;
     const timestamp = date ? date.toLocaleString() : '';

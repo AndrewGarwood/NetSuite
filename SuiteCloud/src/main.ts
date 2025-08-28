@@ -10,14 +10,14 @@ import {
     getColumnValues, isFile,
     getIndexedColumnValues, concatenateFiles,
     indentedStringify,
-    trimFile
+    trimFile,
+    getSourceString
 } from "typeshi:utils/io";
 import { 
-    STOP_RUNNING, DATA_DIR, DELAY, simpleLogger as slog,
+    STOP_RUNNING, DELAY, simpleLogger as slog,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
-    DEFAULT_LOG_FILEPATH, PARSE_LOG_FILEPATH,
-    ERROR_LOG_FILEPATH, DataDomainEnum,
-    CLOUD_LOG_DIR, DEBUG_LOGS as DEBUG
+    getLogFiles,
+    initializeEnvironment
 } from "./config";
 import { instantiateAuthManager, RecordOptions, RecordResponse, idSearchOptions } from "./api";
 import { 
@@ -35,42 +35,26 @@ import { hasKeys, isEmptyArray, isNonEmptyArray, isNonEmptyString, isNullLike } 
 import * as validate from "typeshi:utils/argumentValidation";
 import { getSkuDictionary, initializeData } from "./config/dataLoader";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "./utils/ns/Enums";
+import { extractFileName } from "@typeshi/regex";
 
-const LOG_FILES = [
-    DEFAULT_LOG_FILEPATH, 
-    PARSE_LOG_FILEPATH, 
-    ERROR_LOG_FILEPATH
-];
-
+const F = extractFileName(__filename);
 
 async function main() {
-    await clearFile(...LOG_FILES);
-    mlog.info(`[START main()] at ${getCurrentPacificTime()}`);
+    const source = getSourceString(F, main.name);
+    mlog.info(`${source} START at ${getCurrentPacificTime()}`);
+    await initializeEnvironment();
+    let logFiles = getLogFiles();
+    await clearFile(...logFiles);
     await initializeData();
     await instantiateAuthManager();
 
-    // const itemFile = path.join(DATA_DIR, 'items', 'lot_numbered_inventory_item0.tsv');
-    const LN_itemFile = path.join(DATA_DIR, 'items', 'lnii_subset.tsv');
+    // stuff
 
-    await invokePipeline(
-        RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM, 
-        LN_itemFile, 
-        runMainItemPipeline, 
-        LN_INVENTORY_ITEM_PIPELINE_CONFIG
-    )
-    // const nonInventoryFile = path.join(DATA_DIR, 'items', 'missing_non_inventory_item.tsv');
-    // await invokePipeline(
-    //     RecordTypeEnum.NON_INVENTORY_ITEM,
-    //     nonInventoryFile,
-    //     runMainItemPipeline,
-    //     NON_INVENTORY_ITEM_PIPELINE_CONFIG
-    // )
-
-    mlog.info([`[END main()] at ${getCurrentPacificTime()}`,
+    mlog.info([`${source} END at ${getCurrentPacificTime()}`,
         `handling logs...`
     ].join(TAB));
-    await trimFile(5, ...LOG_FILES);
-    for (const filePath of LOG_FILES) { formatDebugLogFile(filePath) }
+    await trimFile(5, ...logFiles);
+    for (const filePath of logFiles) { formatDebugLogFile(filePath) }
     STOP_RUNNING(0);
 }
 if (require.main === module) {
@@ -80,25 +64,13 @@ if (require.main === module) {
     });
 }
 
-    // const csvFiles = getDirectoryFiles(
-    //     soConstants.UNVIABLE_SO_DIR, '.csv', '.tsv'
-    // );
-    // let soFiles = csvFiles.slice(14); // handle subset for now
-    // slog.info([`csvFiles.length: ${csvFiles.length}`,
-    //     `operating on: ${soFiles.length} file(s)`
-    // ].join(TAB));
-    // await DELAY(1000, null);
-    // await invokePipeline(RecordTypeEnum.SALES_ORDER, 
-    //     soFiles, runMainTransactionPipeline, SALES_ORDER_PIPELINE_CONFIG
-    // );
-
 export async function invokePipeline(
     recordType: RecordTypeEnum,
     filePaths: string | string[],
     pipeline: (recordType: string, filePaths: string[], options: any) => Promise<void>,
     pipelineOptions: TransactionMainPipelineOptions | ItemPipelineOptions | EntityPipelineOptions
 ): Promise<void> {
-    const source = `[main.invokePipeline()]`;
+    const source = getSourceString(F, invokePipeline.name);
     filePaths = isNonEmptyArray(filePaths) ? filePaths : [filePaths]
     validate.arrayArgument(source, {filePaths, filePath: isFile});
     recordType = validate.enumArgument(source, {recordType, RecordTypeEnum}) as RecordTypeEnum;

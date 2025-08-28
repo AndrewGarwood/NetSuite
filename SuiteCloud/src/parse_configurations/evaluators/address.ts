@@ -2,7 +2,7 @@
  * @file src/parse_configurations/evaluators/address.ts
  */
 import { parseLogger as plog, mainLogger as mlog, 
-    INDENT_LOG_LINE as TAB, NEW_LINE as NL, DEBUG_LOGS as DEBUG,
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL,
     getEntityValueOverrides, 
 } from "../../config";
 import { 

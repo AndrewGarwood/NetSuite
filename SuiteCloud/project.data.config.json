@@ -1,0 +1,40 @@
+{
+    "accounting": {
+        "options": {
+            "internalIdColumn": "Internal ID",
+            "itemIdColumn": "Name",
+            "classNameColumn": "Name",
+            "useCache": true,
+            "overwriteCache": false
+        },
+        "accounts": {
+            "accountDictionary": "fileName.ext",
+            "coaExport": "fileName.ext"
+        },
+        "items": {
+            "inventoryExport": "fileName.ext",
+            "inventoryCache": "fileName.ext"
+        },
+        "classDictionary": "fileName.ext"
+    },
+    "relationships": {
+        "vendors": {
+            "humanVendors": "fileName.ext"
+        },
+        "customers": {
+            "categoryDictionary": "fileName.ext",
+            "entityOverrides": "fileName.ext"
+            
+        }
+    },
+    "supply": {
+        "options": {
+            "internalIdColumn": "Internal ID",
+            "binNumberColumn": "Bin Number"
+        },
+        "binnumbers": {
+            "binDictionary": "fileName.ext",
+            "warehouseData": "fileName.ext"
+        }
+    }
+}

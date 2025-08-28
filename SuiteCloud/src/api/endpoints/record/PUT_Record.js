@@ -523,38 +523,39 @@ function processSublistDictionary(rec, recordType, sublists) {
             continue;
         }
         const sublistLines = sublists[sublistId];
+        sublistLineLoop:
         for (let i = 0; i < sublistLines.length; i++) {
             /**@type {SublistLine} */
             const sublistLine = sublistLines[i];
+            sublistFieldIdLoop:
             for (const fieldId in sublistLine) {
                 let mappedValue = sublistLine[fieldId];
-                /**@type {number} */
-                let lineIndex = ((isSublistFieldValueUpdate(mappedValue) 
-                    && rec.findSublistLineWithValue(mappedValue) > -1) 
-                    ? rec.findSublistLineWithValue(mappedValue) 
-                    : validateSublistLineIndex(rec, sublistId, i)
-                );
-                /**@type {FieldValue | SetSublistSubrecordOptions} */
-                let upsertValue = ((isSublistFieldValueUpdate(mappedValue) 
-                    && rec.findSublistLineWithValue(mappedValue) > -1)
-                    ? mappedValue.newValue 
-                    : mappedValue
-                )
+                if (isSublistFieldValueUpdate(mappedValue)) {
+                    while (rec.findSublistLineWithValue(mappedValue.lineIdOptions) > -1) {
+                        rec = upsertSublistFieldValue(rec, 
+                            recordType, 
+                            sublistId, 
+                            fieldId,
+                            rec.findSublistLineWithValue(mappedValue.lineIdOptions), 
+                            mappedValue.newValue
+                        )
+                    }
+                    continue sublistFieldIdLoop;
+                } // else is FieldValue | SetSublistSubrecordOptions
                 try {
                     rec = (isSubrecord(mappedValue)
                         ? processSublistSubrecordOptions(rec, 
                             recordType, 
                             sublistId, 
                             fieldId, 
-                            lineIndex, 
-                            upsertValue // as SetSublistSubrecordOptions
-                        ) : upsertSublistFieldValue(
-                            rec, 
+                            validateSublistLineIndex(rec, sublistId, i), 
+                            mappedValue // as SetSublistSubrecordOptions
+                        ) : upsertSublistFieldValue(rec, 
                             recordType, 
                             sublistId, 
                             fieldId, 
-                            lineIndex, 
-                            upsertValue // as FieldValue
+                            validateSublistLineIndex(rec, sublistId, i), 
+                            mappedValue // as FieldValue
                         )
                     );
                 } catch (error) {
@@ -589,8 +590,10 @@ function processSublistSubrecordOptions(
     lineIndex, 
     subrecordOptions
 ) {
-    if (!rec || !parentRecordType || typeof parentSublistId !== 'string' || typeof parentFieldId !== 'string'
-        || typeof lineIndex !== 'number' || !subrecordOptions || isEmptyArray(Object.keys(subrecordOptions))) {
+    if (!rec || !parentRecordType || typeof parentSublistId !== 'string' 
+        || typeof parentFieldId !== 'string'
+        || typeof lineIndex !== 'number' 
+        || !subrecordOptions || isEmptyArray(Object.keys(subrecordOptions))) {
         writeLog(LogTypeEnum.ERROR, 
             `ERROR: processSublistSubrecordOptions() Invalid Parameters:`,
             `rec, parentRecordType, parentSublistId, fieldId, lineIndex, and subrecordOptions are required parameters`,
@@ -718,7 +721,7 @@ function getResponseSublists(rec, responseSublists) {
         );
         return {};
     }
-    /**@type {SublistDictionary | {[sublistId: string]: SublistLine[]}} */
+    /**@type {SublistDictionary} */
     const sublists = {};
     sublistLoop:    
     for (const sublistId in responseSublists) {
@@ -746,7 +749,7 @@ function getResponseSublists(rec, responseSublists) {
         ));
         sublistLineLoop:
         for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
-            /**@type {SublistLine} sublistLine {@link SublistLine}*/
+            /**@type {SublistLine} @see {@link SublistLine}*/
             const sublistLine = {
                 line: lineIndex,
                 id: rec.getSublistValue({

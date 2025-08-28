@@ -1,30 +1,7 @@
 /**
  * @file src/parse_configurations/customer/customerConstants.ts
  */
-import { DATA_DIR, CLOUD_LOG_DIR } from "../../config/env";
 
-/** `${DATA_DIR}/customers` */
-export const CUSTOMER_DIR = `${DATA_DIR}/customers` as string;
-/** `${CLOUD_LOG_DIR}/customers` */
-export const CUSTOMER_LOG_DIR = `${CLOUD_LOG_DIR}/customers` as string;
-/** `${DATA_DIR}/customers/company.tsv` */
-export const SINGLE_COMPANY_FILE = `${CUSTOMER_DIR}/company.tsv` as string;
-/** `${DATA_DIR}/customers/human.tsv` */
-export const SINGLE_HUMAN_FILE = `${CUSTOMER_DIR}/human.tsv` as string;
-/** `${DATA_DIR}/customers/subset.tsv` */
-export const SUBSET_FILE = `${CUSTOMER_DIR}/subset.tsv` as string;
-/**`${DATA_DIR}/customers/small_subset.tsv` */
-export const SMALL_SUBSET_FILE = `${CUSTOMER_DIR}/small_subset.tsv` as string;
-/** `${DATA_DIR}/customers/customer.tsv` */
-export const COMPLETE_FILE = `${CUSTOMER_DIR}/customer.tsv` as string;
-/** `${DATA_DIR}/customers/customer_part1.tsv` */
-export const FIRST_PART_FILE = `${CUSTOMER_DIR}/customer_part1.tsv` as string;
-/** `${DATA_DIR}/customers/customer_part2.tsv` */
-export const SECOND_PART_FILE = `${CUSTOMER_DIR}/customer_part2.tsv` as string;
-/** `${DATA_DIR}/customers/customer_part3.tsv` */
-export const THIRD_PART_FILE = `${CUSTOMER_DIR}/customer_part3.tsv` as string;
-/** `${DATA_DIR}/customers/edge_cases.tsv` */
-export const EDGE_CASES_FILE = `${CUSTOMER_DIR}/edge_cases.tsv` as string;
 /** 
  * maybe this is unnecessary... but I like enums 
  * @enum {string} **`CustomerColumnEnum`**

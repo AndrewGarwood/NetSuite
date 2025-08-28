@@ -3,7 +3,6 @@
  * @file src/utils/io/parsers/GroupedParser.ts
  * @description Hierarchical grouping CSV parsing strategy
  */
-import csv from "csv-parser";
 import * as fs from "node:fs";
 import { BaseParser } from "./BaseParser";
 import { 
@@ -47,7 +46,7 @@ import {
     NEW_LINE as NL,
 } from "../../../config";
 import { clean } from "typeshi:utils/regex";
-import { getDelimiterFromFilePath, isValidCsvSync, NodeLeaves } from "typeshi:utils/io";
+import { getDelimiterFromFilePath, getRows, isValidCsvSync, NodeLeaves } from "typeshi:utils/io";
 import { ParseDictionary, RecordParseOptions } from "src/services/parse/types/ParseOptions";
 
 
@@ -153,25 +152,20 @@ export class GroupedParser extends BaseParser {
         };
         const { keyColumn: primaryColumn, keyOptions: primaryOptions } = groups[0];
         const rootData: NodeStructure = {};
-        return new Promise((resolve, reject) => {
-            let rowIndex = 0;
-            fs.createReadStream(filePath)
-                .pipe(csv({ separator: delimiter }))
-                .on('data', (row: Record<string, any>) => {
-                    const primaryKey = clean(row[primaryColumn], primaryOptions);
-                    context.row = row;
-                    context.rowIndex = rowIndex;
-                    if (!primaryKey) {
-                        mlog.warn(`Row ${rowIndex} has no primary key value for column '${primaryColumn}'. Skipping row.`);
-                        rowIndex++;
-                        return;
-                    }
-                    this.assignGroup(context, 1, rootData, primaryKey);
-                    rowIndex++;
-                })
-                .on('end', () => resolve(rootData))
-                .on('error', reject);
-        });
+        const rows = await getRows(filePath);
+        for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+            let row = rows[rowIndex];
+            const primaryKey = clean(row[primaryColumn], primaryOptions);
+            context.row = row;
+            context.rowIndex = rowIndex;
+            if (!primaryKey) {
+                mlog.warn(`Row ${rowIndex} has no primary key value for column '${primaryColumn}'. Skipping row.`);
+                rowIndex++;
+                continue;
+            }
+            this.assignGroup(context, 1, rootData, primaryKey);
+        }
+        return rootData;
     }
 
     /**

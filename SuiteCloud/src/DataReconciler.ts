@@ -12,10 +12,11 @@ import { isNonEmptyArray, isEmptyArray, hasKeys, isNullLike as isNull,
     isIntegerArray
 } from "typeshi:utils/typeValidation";
 import { 
-    DATA_DIR, mainLogger as mlog, parseLogger as plog, simpleLogger as slog, 
-    INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING, CLOUD_LOG_DIR, 
+    mainLogger as mlog, parseLogger as plog, simpleLogger as slog, 
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING, 
     getSkuDictionary,
-    DELAY
+    DELAY,
+    getProjectFolders
 } from "./config";
 import { getColumnValues, getRows, 
     writeObjectToJsonSync as write, readJsonFileAsObject as read, 
@@ -23,7 +24,8 @@ import { getColumnValues, getRows,
     isValidCsvSync,
     getFileNameTimestamp,
     indentedStringify,
-    isFile
+    isFile,
+    getSourceString
 } from "typeshi:utils/io";
 import * as validate from "typeshi:utils/argumentValidation";
 import path from "node:path";
@@ -43,10 +45,10 @@ import {
     partitionArrayBySize,
     RecordResponseOptions
 } from "./api";
-import { CleanStringOptions, clean, extractLeaf } from "typeshi:utils/regex"
+import { CleanStringOptions, clean, extractFileName, extractLeaf } from "typeshi:utils/regex"
 import { CLEAN_ITEM_ID_OPTIONS } from "src/parse_configurations/evaluators";
 
-const F = path.basename(__filename).replace(/\.[a-z]{1,}$/, '');
+const F = extractFileName(__filename);
 
 /**
  * @param validationDict 
@@ -65,7 +67,7 @@ export async function validateFiles(
     extractor: (columnValue: string, ...args: any[]) => string | Promise<string>,
     extractorArgs: any[] = []
 ): Promise<{ [filePath: string]: string[] }> {
-    const source = `[DataReconciler.validateFiles()]`
+    const source = getSourceString(F, validateFiles.name);
     validate.arrayArgument(source, {csvFiles, isNonEmptyString});
     validate.stringArgument(source, {column});
     validate.functionArgument(source, {extractor});
@@ -122,7 +124,7 @@ export async function extractTargetRows(
     rows: Record<string, any>[];
     remainingValues: string[]
 }> {
-    const source = `[DataReconciler.extractTargetRows()]`
+    const source = getSourceString(F, extractTargetRows.name);
     if(!isNonEmptyString(rowSource) && !isNonEmptyArray(rowSource)) {
         throw new Error([`${source} Invalid param 'rowSource'`,
             `Expected rowSource: string | Record<string, any>[]`,
@@ -204,7 +206,7 @@ const itemIdExtractor = async (
 }
 
 export async function reconcile(): Promise<any> {
-    const source = `[${F}.${reconcile.name}()]`;
+    const source = getSourceString(F, reconcile.name);
 }
 
 
@@ -216,9 +218,11 @@ let endpointFailed: boolean = false;
  * tested on 2500 sales orders, and all passed
  * @TODO parameterize
  */
-export async function validateRelatedRecordEndpoint(): Promise<any> {
-    const source = `[${F}.${validateRelatedRecordEndpoint.name}()]`;
-    const statePath = path.join(CLOUD_LOG_DIR, 'salesorder_reconcile_state.json');
+export async function validateRelatedRecordEndpoint(
+    statePath: string,
+    dictPath: string
+): Promise<any> {
+    const source = getSourceString(F, validateRelatedRecordEndpoint.name);
     if (isFile(statePath)) {
         let previousState = read(statePath);
         if (isStringArray(previousState.processed)) {
@@ -228,7 +232,6 @@ export async function validateRelatedRecordEndpoint(): Promise<any> {
             completedBatches.push(...previousState.completedBatches)
         }
     }
-    const dictPath = path.join(CLOUD_LOG_DIR, 'salesorder_targetItems.json');
     validate.existingFileArgument(source, '.json', {dictPath});
     
     const soTargetItems = read(dictPath) as { [soInternalId: string]: string[] };
@@ -261,7 +264,7 @@ export async function validateRelatedRecordEndpoint(): Promise<any> {
         await DELAY(2000);
     }
     write({errors}, 
-        path.join(CLOUD_LOG_DIR, `${getFileNameTimestamp()}_reconcile_errors.json`)
+        path.join(getProjectFolders().logDir, `${getFileNameTimestamp()}_reconcile_errors.json`)
     );
     write({completedBatches, processed: validatedSalesOrders}, statePath);
     if (endpointFailed) {
@@ -362,9 +365,10 @@ async function validateSalesOrderBatch(
  * @TODO parameterize
  * @returns **`relatedRecordDictionary`** `Promise<{ [id: string]: RecordResult[] }>`
  */
-async function retrieveRelatedRecords(): Promise<{ [itemId: string]: RecordResult[] }> {
+async function retrieveRelatedRecords(
+    filePath: string
+): Promise<{ [itemId: string]: RecordResult[] }> {
     const source = `[${F}.${retrieveRelatedRecords.name}()]`;
-    const filePath = path.join(DATA_DIR, 'items', 'lot_numbered_inventory_item0.tsv');
     const ITEM_ID_COLUMN = 'Item';
     let lnItems = await getColumnValues(filePath, ITEM_ID_COLUMN, itemIdExtractor);
     let itemBatches = partitionArrayBySize(lnItems, 50);

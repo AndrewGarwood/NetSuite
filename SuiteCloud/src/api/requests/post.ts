@@ -4,18 +4,19 @@
 import axios from "axios";
 import { writeObjectToJsonSync as write, getCurrentPacificTime, indentedStringify } from "typeshi:utils/io";
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
-import { RESTLET_URL_STEM, STOP_RUNNING, SCRIPT_ENVIRONMENT as SE, DELAY, OUTPUT_DIR, ERROR_DIR  } from "../../config/env";
+import { RESTLET_URL_STEM, STOP_RUNNING, DELAY, getProjectFolders  } from "../../config/env";
 import { createUrlWithParams } from "../url";
 import { AxiosContentTypeEnum } from "../server";
 import { 
     RecordRequest, RecordResponse, RecordOptions, RecordResponseOptions,
     RecordResult,
 } from "../types";
-import { BATCH_SIZE, partitionArrayBySize, SB_REST_SCRIPTS } from "../configureRequests";
+import { BATCH_SIZE, partitionArrayBySize } from "../configureRequests";
 import path from "node:path";
 
 
 /**
+ * @deprecated
  * @param accessToken `string`
  * @param scriptId `number` - the script ID of the RESTlet to call
  * @param deployId `number` - the deploy ID of the RESTlet to call
@@ -57,7 +58,9 @@ export async function POST(
         return response;
     } catch (error) {
         mlog.error('Error in post.ts POST():');//, error);
-        write({timestamp: getCurrentPacificTime(), caught: error}, path.join(ERROR_DIR, `ERROR_POST.json`));
+        write({timestamp: getCurrentPacificTime(), caught: error}, 
+            path.join(getProjectFolders().logDir, 'errors', `ERROR_POST.json`)
+        );
         throw new Error('Failed to call RESTlet with payload');
     }
 }

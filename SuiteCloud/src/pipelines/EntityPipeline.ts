@@ -11,7 +11,7 @@ import {
 import { 
     STOP_RUNNING,  DELAY, 
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
-    ERROR_DIR
+    getProjectFolders
 } from "../config";
 import { 
     EntityRecordTypeEnum, RecordOptions, SingleRecordRequest, RecordResponse, 
@@ -194,7 +194,7 @@ export async function putEntities(
     } catch (error) {
         mlog.error(`putEntities() Error putting entities.`);
         write({timestamp: getCurrentPacificTime(), caught: error as any}, 
-            path.join(ERROR_DIR, 'ERROR_putEntities.json')
+            path.join(getProjectFolders().logDir, 'errors', 'ERROR_putEntities.json')
         );
     }
     return [];
@@ -220,7 +220,7 @@ export async function putContacts(
     } catch (error) {
         mlog.error(`putContacts() Error putting contacts.`);
         write({timestamp: getCurrentPacificTime(), caught: error as any}, 
-            path.join(ERROR_DIR, 'ERROR_putContacts.json')
+            path.join(getProjectFolders().logDir, 'errors', 'ERROR_putContacts.json')
         );
     }
     return [] as RecordResponse[];

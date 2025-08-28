@@ -1,3 +1,7 @@
+/**
+ * @file src/pipelines/types/Pipeline.ts
+ */
+
 import { RecordOptions } from "../../api/types/RecordEndpoint";
 
 

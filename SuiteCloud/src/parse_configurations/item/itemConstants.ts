@@ -1,15 +1,6 @@
 /**
  * @file src/parse_configurations/item/itemConstants.ts
  */
-import path from "node:path";
-import { DATA_DIR } from "../../config";
-
-/** `${DATA_DIR}/items` */
-export const ITEM_DIR = path.join(DATA_DIR, 'items');
-/** `${DATA_DIR}/items/missingItems.tsv` */
-export const MISSING_ITEMS_FILE = path.join(ITEM_DIR, 'missingItems.tsv');
-/** `${DATA_DIR}/items/service_items_copy.tsv` */
-export const SERVICE_ITEM_FILE = path.join(ITEM_DIR, 'service_items_copy.tsv');
 
 export enum ItemColumnEnum {
     ITEM_ID = 'Item',

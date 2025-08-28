@@ -6,4 +6,4 @@ export * from "./Pipeline";
 export * from "./Item";
 export * from "./Transaction";
 export * from "./Warehouse";
-export * from "./Transaction.typeGuards";
+export * from "./Transaction.TypeGuards";

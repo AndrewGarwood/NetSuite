@@ -24,7 +24,6 @@ export interface SuiteScriptErrorCause {
 
 /**
  * @enum {string} **`AccountEnvironmentEnum`**
- * @description Enum for NetSuite account environments.
  * @property {string} PRODUCTION - Production environment.
  * @property {string} SANDBOX - Sandbox (development) environment.
  */
@@ -35,40 +34,36 @@ export enum AccountEnvironmentEnum {
 
 /**
  * @typedefn **`SuiteScriptEnvironment`**
- * @description NetSuite Account Environment and Script Type mapping.
- * @property {AccountEnvironmentEnum} production - Production environment.
- * @property {AccountEnvironmentEnum} sandbox - Sandbox environment.
- * @property {Record<ScriptTypeEnum, ScriptDictionary>} production.value
- * @property {Record<ScriptTypeEnum, ScriptDictionary>} sandbox.value
  */
 export type SuiteScriptEnvironment = {
-    [K in AccountEnvironmentEnum]?: {
-        [S in ScriptTypeEnum]?: ScriptDictionary
-    }
+    [K in AccountEnvironmentEnum]?: ScriptDictionary
 };
-// export type SuiteScriptEnvironment = Partial<{
-//     [K in AccountEnvironmentEnum]: Partial<{
-//         [S in ScriptTypeEnum]: ScriptDictionary
-//     }>
-// }>;
 
 /**
- * @typedefn **`ScriptDictionary`**
- * @description dictionary mapping a script's label to its details
- * @property {string} key - The name of the script.
- * @property {ScriptDetails} value {@link ScriptDetails}
+ * 
  */
-export type ScriptDictionary = { 
+export type ScriptDictionary = {
+    [S in ScriptTypeEnum]?: { 
+        [key: string]: ScriptDetails 
+    }
+}
+
+/**
+ * @deprecated
+ * @typedefn **`ScriptDictionary`**
+ */
+export type DEP_ScriptDictionary = { 
     [key: string]: ScriptDetails 
 };
 
 /**
  * @typedefn **`ScriptDetails`**
- * @description Script details for NetSuite SuiteScript. assume that the script has been uploaded, a script record made, and a script deployment record made.
+ * @description Script details for NetSuite SuiteScript. 
+ * - assumes that the script has been uploaded, a script record made, and a script deployment record made.
  * @property {number} scriptId - The ID of the script.
- * @property {string} [scriptName] - The script record's name field on NetSuite.
+ * @property {string} scriptName - The script record's name field on NetSuite.
  * @property {number} deployId - The ID of the script deployment.
- * @property {string} [deployName] - The script deployment record's name field on NetSuite.
+ * @property {string} deployName - The script deployment record's name field on NetSuite.
  */
 export type ScriptDetails = {
     scriptId: number;

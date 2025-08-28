@@ -1,0 +1,48 @@
+{
+    "name": "NetSuite Project",
+    "nodeEnv": "sandbox",
+    "srcDir": "src",
+    "makeDirs": false,
+    "dataLoader": {
+        "loadFromCloud": true,
+        "dataSourceConfigFile": "project.data.config.json",
+        "domains": ["accounting", "supply", "relationships"],
+        "ignoreMissingFiles": false
+    },
+    "cloud": {
+        "provider": "Microsoft",
+        "rootName": "OneDrive",
+        "orgSeparator": " - ",
+        "folderName": "NetSuite",
+        "dataDir": "data",
+        "logDir": "logs",
+        "outDir": ".output"
+    },
+    "scripts": {
+        "production": {},
+        "sandbox": {
+            "restlet": {
+                "GET_Record": {
+                    "scriptId": 175,
+                    "deployId": 1
+                },
+                "PUT_Record": {
+                    "scriptId": 176,
+                    "deployId": 1
+                },
+                "GET_RelatedRecord": {
+                    "scriptId": 178,
+                    "deployId": 1
+                },
+                "DELETE_Record": {
+                    "scriptId": 179,
+                    "deployId": 1
+                },
+                "POST_StoreFieldIdsOfRecordType": {
+                    "scriptId": 167,
+                    "deployId": 1
+                }
+            }
+        }
+    }
+}

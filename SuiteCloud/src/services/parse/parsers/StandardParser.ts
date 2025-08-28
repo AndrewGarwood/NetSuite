@@ -3,7 +3,6 @@
  * @description Standard row-by-row CSV parsing strategy
  */
 
-import csv from "csv-parser";
 import * as fs from "node:fs";
 import { BaseParser } from "./BaseParser";
 import { 
@@ -20,6 +19,7 @@ import {
 } from "typeshi:utils/typeValidation";
 import { 
     getDelimiterFromFilePath, 
+    getRows, 
     isValidCsvSync
 } from "typeshi:utils/io";
 import { 
@@ -78,36 +78,24 @@ export class StandardParser extends BaseParser {
             }
         }
         this.rowContext.filePath = filePath;
-        return new Promise((resolve, reject) => {
-            this.rowContext.rowIndex = 0;
-            
-            fs.createReadStream(filePath)
-                .pipe(csv({ separator: delimiter }))
-                .on('data', async (row: Record<string, any>) => {
-                    try {
-                        await this.processRow(row, parseOptions, globalCache, errors);
-                        meta.successfulRows++;
-                    } catch (error) {
-                        this.handleRowError(error as Error, row, errors);
-                    }
-                    this.rowContext.rowIndex++;
-                    meta.totalRows++;
-                })
-                .on('end', () => {
-                    try {
-                        // Convert intermediate results to final format
-                        for (const [recordType, recordMap] of Object.entries(this.intermediate)) {
-                            results[recordType] = Object.values(recordMap);
-                            meta.recordTypeCounts[recordType] = results[recordType].length;
-                        }
-                        mlog.info(`[END StandardParser.parseFile()] Successfully parsed ${meta.totalRows} rows from ${filePath}`);
-                        resolve(results);
-                    } catch (error) {
-                        reject(error);
-                    }
-                })
-                .on('error', reject);
-        });
+        const rows = await getRows(filePath);
+        for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+            let row = rows[rowIndex];
+            this.rowContext.rowIndex = rowIndex;
+            try {
+                await this.processRow(row, parseOptions, globalCache, errors);
+                meta.successfulRows++;
+            } catch (error) {
+                this.handleRowError(error as Error, row, errors);
+            }
+            meta.totalRows++;
+        }
+        for (const [recordType, recordMap] of Object.entries(this.intermediate)) {
+            results[recordType] = Object.values(recordMap);
+            meta.recordTypeCounts[recordType] = results[recordType].length;
+        }
+        mlog.info(`[END StandardParser.parseFile()] Successfully parsed ${meta.totalRows} rows from ${filePath}`);
+        return results;
     }
     
     /**

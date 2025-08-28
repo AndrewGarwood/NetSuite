@@ -4,433 +4,45 @@
  * and ensure proper initialization order
  */
 import path from "node:path";
-import { DATA_DIR, STOP_RUNNING } from "./env";
-import { mainLogger as mlog, simpleLogger as slog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "./setupLog";
+import { 
+    STOP_RUNNING, isEnvironmentInitialized,
+    getDataLoaderConfiguration, 
+    getDataSourceConfigPath,
+    getProjectFolders,
+} from "./env";
+import { 
+    mainLogger as mlog, simpleLogger as slog, INDENT_LOG_LINE as TAB, NEW_LINE as NL 
+} from "./setupLog";
 import { 
     readJsonFileAsObject as read, 
     isValidCsvSync,
     getOneToOneDictionary, getRows, 
-    writeObjectToJsonSync as write 
+    writeObjectToJsonSync as write, 
+    getSourceString,
+    isFile
 } from "typeshi:utils/io";
+import { 
+    DataSourceDictionary, isDataSourceConfiguration, 
+    isDataSourceDictionary, isFileDictionary, 
+    isFolderHierarchy, isLoadFileOptions 
+} from "@config/types";
 import {
     hasKeys, hasNonTrivialKeys, isNonEmptyArray, isNonEmptyString, 
-    isNullLike as isNull, isStringArray 
+    isNullLike as isEmpty, isStringArray, 
+    isObject,
+    isInteger,
+    isEmptyArray
 } from "typeshi:utils/typeValidation";
 import { AccountTypeEnum, AccountDictionary } from "../utils/ns";
 import { WarehouseDictionary, WarehouseRow, WarehouseColumnEnum } from "src/pipelines";
-import { clean, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION } from "typeshi:utils/regex";
+import { clean, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, extractFileName } from "typeshi:utils/regex";
 import * as validate from "typeshi:utils/argumentValidation"
-// Global state to track if data has been loaded
-let dataInitialized = false;
-const F = path.basename(__filename).replace(/\.[a-z]{1,}$/, '');
-/**
- * @enum {string} **`DataDomainEnum`**
- * @property **`REGEX`** = `'REGEX'` **can probably remove this since now handled by typeshi**
- * @property **`ACCOUNTING`** = `'ACCOUNTING'`
- * @property **`SUPPLY`** = `'SUPPLY'`
- * @property **`RELATIONSHIPS`** = `'RELATIONSHIPS'`
- */
-export enum DataDomainEnum {
-    REGEX = 'REGEX',
-    ACCOUNTING = 'ACCOUNTING',
-    SUPPLY = 'SUPPLY',
-    RELATIONSHIPS = 'RELATIONSHIPS'
-}
-/* ----------------------- LOAD ACCOUNTING CONFIG --------------------------- */
-/** `DATA_DIR/items/SKU_TO_INTERNAL_ID_DICT.json` */
-const SKU_DICTIONARY_FILE = path.join(DATA_DIR, 'items', 'SKU_TO_INTERNAL_ID_DICT.json');
-/** `DATA_DIR/uploaded/inventory_item.tsv` */
-const ITEM_FILE = path.join(DATA_DIR, 'items', 'sb_all_item_export.tsv');
-/** `DATA_DIR, 'binnumbers', 'bins.tsv'` */
-const BIN_NUMBERS_FILE = path.join(DATA_DIR, 'binnumbers', 'bins.tsv');
-/** `DATA_DIR, 'binnumbers', 'warehouseData.tsv'` */
-const WAREHOUSE_DATA_FILE = path.join(DATA_DIR, 'binnumbers', 'warehouseData.tsv');
-/** `DATA_DIR, '.constants', 'classes.tsv'` */
-const CLASSES_FILE = path.join(DATA_DIR, '.constants', 'classes.tsv');
-/** `DATA_DIR/accounts/accountDictionary.json` */
-const ACCOUNT_DICTIONARY_FILE = path.join(DATA_DIR, 'accounts', 'accountDictionary.json');
-
-let skuDictionary: Record<string, string> | null = null;
-/** map `account` to `'internalid'` */
-let accountDictionary: Record<string, any> | null = null;
-const ClASS_NAME_COLUMN = 'Name';
-/** map `className` to `'internalid'` */
-let classDictionary: Record<string, string> | null = null;
-
-/* ----------------------- LOAD SUPPLY CONFIG --------------------------- */
-const BIN_NUMBER_COLUMN = 'Bin Number';
-/** map `binnumber` to `internalid` */
-let binDictionary: Record<string, string> | null = null;
-
-/** parent object to hold the dictionary and rows */
-let warehouseData: WarehouseData | null = null;
-/** heirarchical relationship of locations->bins->items->lot_numbers */
-let warehouseDictionary: WarehouseDictionary | null = null;
-/** `{ `{@link WarehouseColumnEnum}`: any }[]` */
-let warehouseRows: WarehouseRow[] | null = null;
-
-export interface WarehouseData {
-    dictionary: WarehouseDictionary;
-    rows: WarehouseRow[]
-}
-/* --------------------- LOAD RELATIONSHIPS CONFIG ------------------------- */
-/** `DATA_DIR, '.constants', 'customer_constants.json'` */
-const CUSTOMER_CONSTANTS_FILE = path.join(DATA_DIR, '.constants', 'customer_constants.json');
-/** `DATA_DIR, '.constants', 'vendor_constants.json'` */
-const VENDOR_CONSTANTS_FILE = path.join(DATA_DIR, '.constants', 'vendor_constants.json');
-/** `DATA_DIR, 'customers', 'entity_value_overrides.json'` */
-const ENTITY_VALUE_OVERRIDE_FILE = path.join(DATA_DIR, 'customers', 'entity_value_overrides.json');
-
-export interface CustomerData {
-    /** map `category` to corresponding netsuite category's `'internalid'` */
-    categoryDictionary: Record<string, number>;
-}
-let customerData: CustomerData | null = null;
-let customerCategoryDictionary: Record<string, number> | null = null;
-let entityValueOverrides: Record<string, string> | null = null;
-
-export interface VendorData {
-    humanVendors: string[]
-}
-let vendorData: VendorData | null = null;
-let humanVendorList: string[] | null = null;
-
-
-/* ------------------------- LOAD REGEX CONFIG ----------------------------- */
-/** `DATA_DIR/.constants/regex_constants.json` */
-const REGEX_FILE = path.join(DATA_DIR, '.constants', `regex_constants.json`);
-let regexConstants: RegexConstants | null = null;
-
-/**
- * @interface **`RegexConstants`**
- * @property **`COMPANY_KEYWORD_LIST`** `string[]` - List of keywords to identify company names
- * @property **`JOB_TITLE_SUFFIX_LIST`** `string[]` - List of common job title suffixes
- */
-export interface RegexConstants {
-    COMPANY_KEYWORD_LIST: string[];
-    JOB_TITLE_SUFFIX_LIST: string[];
-}
-/* ------------------------- MAIN FUNCTION ----------------------------- */
-const DEFAULT_INTERNAL_ID_COLUMN = 'Internal ID';
-const DEFAULT_DOMAINS_TO_LOAD = [
-    // DataDomainEnum.REGEX, 
-    DataDomainEnum.ACCOUNTING,
-    DataDomainEnum.SUPPLY,
-    DataDomainEnum.RELATIONSHIPS
-];
-
-/**
- * @TODO change param of initializeData to be { [DataDomainEnum | string]: args[] } 
- * where args are passed in to the corresponding dataLoading function... or maybe 
- * something like `{ [DataDomainEnum | string]: { loader: function, args: any[] }[] }` 
- * 
- * - Initialize all data required by the application.
- * - This should be called once at the start of the application.
- * - sets {@link dataInitialized} to `true`
- * @param domains `...`{@link DataDomainEnum}`[]` defaults to `[DataDomainEnum.REGEX, DataDomainEnum.INVENTORY]`
- */
-export async function initializeData(...domains: DataDomainEnum[]): Promise<void> {
-    const source = `[dataLoader.initializeData()]`
-    if (dataInitialized) {
-        mlog.info(`${source} Data already initialized, skipping...`);
-        return;
-    }
-    if (!isNonEmptyArray(domains)) {
-        domains = DEFAULT_DOMAINS_TO_LOAD;
-    }
-    mlog.info(`${source} Initializing application data...`);
-    try {
-        for (const d of domains) {
-            switch (d) {
-                case DataDomainEnum.REGEX:
-                    // regexConstants = await loadRegexConstants();
-                    break;
-                case DataDomainEnum.ACCOUNTING:
-                    skuDictionary = await loadSkuDictionary();
-                    accountDictionary = await loadAccountDictionary();
-                    classDictionary = await loadClassDictionary();
-                    break;
-                case DataDomainEnum.SUPPLY:
-                    binDictionary = await loadBinDictionary();
-                    warehouseData = await loadWarehouseData();
-                    warehouseDictionary = warehouseData.dictionary;
-                    warehouseRows = warehouseData.rows;
-                    break;
-                case DataDomainEnum.RELATIONSHIPS:
-                    entityValueOverrides = await loadEntityValueOverrides();
-                    customerData = await loadCustomerData();
-                    customerCategoryDictionary = customerData.categoryDictionary;
-                    vendorData = await loadVendorData();
-                    humanVendorList = vendorData.humanVendors;
-                    break;
-                default:
-                    mlog.warn(
-                        `${source} Unrecognized/unsupported data domain: '${d}'. Skipping...`
-                    );
-                    continue;
-            }
-        }
-        dataInitialized = true;
-        slog.info(`${source} ✓ All data initialized successfully`);
-    } catch (error) {
-        mlog.error(`${source} ✗ Failed to initialize data:`, error);
-        STOP_RUNNING(1, 'Data initialization failed');
-    }
-}
-
-async function loadVendorData(
-    jsonPath: string = VENDOR_CONSTANTS_FILE
-): Promise<VendorData> {
-    const source = `[dataLoader.loadVendorData()]`
-    validate.existingFileArgument(source, '.json', {jsonPath});
-    const data = read(jsonPath);
-    if (!data || typeof data !== 'object' 
-        || !hasKeys(data, 'humanVendors') 
-        || !isStringArray(data.humanVendors)) {
-        let msg = [`${source} Invalid JSON file provided (either not found or missing required columns)`,
-            `json Path received: '${jsonPath}'`,
-            `json keys required: 'humanVendors' (string[])`
-        ].join(TAB);
-        mlog.error(msg)
-        throw new Error(msg);
-    }
-    humanVendorList = data.humanVendors.map(
-        (name: string) => clean(name, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
-    );
-    return data as VendorData;
-}
-
-async function loadCustomerData(
-    jsonPath: string = CUSTOMER_CONSTANTS_FILE
-): Promise<CustomerData> {
-    const source = `[${F}.loadCustomerData()]`
-    validate.existingFileArgument(source, '.json', {jsonPath});
-    const data = read(jsonPath);
-    if (!data || typeof data !== 'object' || !hasKeys(data, 'categoryDictionary')) {
-        let msg = [`${source} Invalid JSON file provided (either not found or missing required columns)`,
-            `json Path received: '${jsonPath}'`,
-            `json keys required: 'categoryDictionary' (Record<string, number>)`
-        ].join(TAB);
-        mlog.error(msg)
-        throw new Error(msg);
-    }
-    return data as CustomerData;
-}
-
-async function loadEntityValueOverrides(
-    jsonPath: string = ENTITY_VALUE_OVERRIDE_FILE
-): Promise<Record<string, string>> {
-    const source = `[${F}.loadEntityOverrides()]`;
-    validate.existingFileArgument(source, '.json', {jsonPath});
-    const data = read(jsonPath) as Record<string, string>;
-    if (!data || typeof data !== 'object') {
-        let msg = [`${source} Invalid JSON file provided (not found)`,
-            `json Path received: '${jsonPath}'`,
-            `   format expected: (Record<string, string>)`
-        ].join(TAB);
-        mlog.error(msg)
-        throw new Error(msg);
-    }
-    slog.debug(`${source} num override keys: ${Object.keys(data).length}`)
-    return data;
-}
-
-async function loadWarehouseData(
-    csvPath: string = WAREHOUSE_DATA_FILE
-): Promise<WarehouseData> {
-    const source = `[dataLoader.loadWarehouseData()]`;
-    if (!isValidCsvSync(csvPath, Object.values(WarehouseColumnEnum))) {
-        let msg = [`${source} Invalid CSV file provided (either not found or missing required columns)`,
-            `csvPath received: '${csvPath}'`,
-            `   keys required: ${Object.values(WarehouseColumnEnum).join(', ')}`
-        ].join(TAB);
-        mlog.error(msg)
-        throw new Error(msg);
-    }
-    const dict: WarehouseDictionary = {};
-    const rows = await getRows(csvPath) as WarehouseRow[];
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const locNumber = Number(row[WarehouseColumnEnum.LOCATION_INTERNAL_ID]);
-        if (!dict[locNumber]) {
-            dict[locNumber] = {};
-        }
-        const binId = String(row[WarehouseColumnEnum.BIN_INTERNAL_ID]);
-        if (!dict[locNumber][binId]) {
-            dict[locNumber][binId] = {};
-        }
-        const itemId = String(row[WarehouseColumnEnum.ITEM_ID]);
-        if (!dict[locNumber][binId][itemId]) {
-            dict[locNumber][binId][itemId] = {
-                description: String(row[WarehouseColumnEnum.ITEM_DESCRIPTION]),
-                lotNumbers: [],
-            };
-        }
-        const lotNumber = String(row[WarehouseColumnEnum.LOT_NUMBER]);
-        if (isNonEmptyString(lotNumber) 
-            && !dict[locNumber][binId][itemId].lotNumbers.includes(lotNumber)) {
-            dict[locNumber][binId][itemId].lotNumbers.push(lotNumber);
-        }
-    }
-    return { dictionary: dict, rows: rows } as WarehouseData
-}
-
-
-/**
- * @consideration could try reading json first and compare if all keys are in 
- * dictionary from return value of `getOneToOneDictionary`
- * @domain {@link DataDomainEnum.ACCOUNTING}
- * @param jsonPath `string` - Path to the JSON file `(default: SKU_DICTIONARY_FILE)`
- * @param csvPath `string` - Path to the CSV file `(default: ITEM_FILE)`
- * @param skuColumn `string` - Column name for SKU `(default: 'Name')`
- * @param internalIdColumn `string` - Column name for Internal ID `(default: DEFAULT_INTERNAL_ID_COLUMN)`
- * @param lazyLoad `boolean` `(default: true)`
- * - set to `true` if just want to load from `jsonPath` (assume file exists)
- * - set to `false` if you want to overwrite file at `jsonPath` (if it exists)
- * @returns **`dictionary`** `Promise<Record<string, string>>`
- */
-async function loadSkuDictionary(
-    jsonPath: string = SKU_DICTIONARY_FILE,
-    csvPath: string = ITEM_FILE, 
-    skuColumn: string = 'Name',
-    internalIdColumn: string = DEFAULT_INTERNAL_ID_COLUMN,
-    lazyLoad: boolean = true
-): Promise<Record<string, string>> {
-    const source = `[dataLoader.loadSkuDictionary()]`
-    validate.multipleStringArguments(source, {jsonPath, csvPath, skuColumn, internalIdColumn})
-    if (lazyLoad) { // Try to load from JSON file first
-        try {
-            const jsonData = read(jsonPath);
-            if (jsonData && hasNonTrivialKeys(jsonData.SKU_TO_INTERNAL_ID_DICT)) {
-                slog.info(`${source} Loaded SKU dictionary from JSON: ${Object.keys(jsonData.SKU_TO_INTERNAL_ID_DICT).length} entries`);
-                return jsonData.SKU_TO_INTERNAL_ID_DICT as Record<string, string>;
-            }
-        } catch (error) {
-            mlog.warn(`${source} Could not read JSON file, will try CSV: ${error}`);
-        } 
-    }
-    
-    // 2. Build dictionary from CSV file
-    if (!isValidCsvSync(csvPath, [skuColumn, internalIdColumn])) {
-        throw new Error(`${source} No JSON data && Invalid CSV file: '${csvPath}'`);
-    }
-    const dictionary = await getOneToOneDictionary(csvPath, skuColumn, internalIdColumn);
-    if (!hasNonTrivialKeys(dictionary)) {
-        throw new Error(`${source} No valid data found in CSV file: '${csvPath}'`);
-    }
-    // Cache the dictionary to JSON for future use
-    try {
-        write({ SKU_TO_INTERNAL_ID_DICT: dictionary }, jsonPath);
-        mlog.debug(`${source} Built and cached SKU dictionary: ${Object.keys(dictionary).length} entries`);
-    } catch (error) {
-        mlog.warn(`${source} Could not write to JSON cache: ${error}`);
-    }
-    return dictionary;
-}
-
-async function loadOneToOneDictionary(
-    csvPath: string,
-    keyColumn: string,
-    valueColumn: string=DEFAULT_INTERNAL_ID_COLUMN,
-): Promise<Record<string, string>> {
-    const source = `[dataLoader.loadSimpleDictionary('${path.basename(csvPath)}')]`;
-    validate.multipleStringArguments(source, {keyColumn, valueColumn});
-    if (!isValidCsvSync(csvPath, [keyColumn, valueColumn])) {
-        let msg = [`${source} Invalid CSV file provided (either not found or missing required columns)`,
-            `  keyColumn: '${keyColumn}'`,
-            `valueColumn: '${valueColumn}'`,
-            `   filePath: '${csvPath}'`
-        ].join(TAB);
-        mlog.error(msg)
-        throw new Error(msg);
-    }
-    let dict = await getOneToOneDictionary(csvPath, keyColumn, valueColumn);
-    if (isNull(dict)) {
-        let msg = [`${source} CSV file did not have data in provided columns`,
-            `  keyColumn: '${keyColumn}'`,
-            `valueColumn: '${valueColumn}'`,
-            `   filePath: '${csvPath}'`
-        ].join(TAB);
-        mlog.error(msg)
-        throw new Error(msg);
-    }
-    return dict;
-}
-
-/**
- * @domain {@link DataDomainEnum.ACCOUNTING}
- * @param jsonPath `string` - Defaults to {@link ACCOUNT_DICTIONARY_FILE}
- * @returns **`dictionary`** `Promise<`{@link AccountDictionary}`>` = `{ [accountType: string]: { [accountName: string]: string } }`
- * - `accountType` -> `accountName` -> `internalid (string)`
- */
-async function loadAccountDictionary(
-    jsonPath: string=ACCOUNT_DICTIONARY_FILE,
-): Promise<AccountDictionary> {
-    validate.existingFileArgument(`dataLoader.loadAccountDictionary`, '.json', {jsonPath});
-    const jsonData = read(jsonPath);
-    if (isNull(jsonData)) {
-        throw new Error([
-            `[dataLoader.loadAccountDictionary()] Invalid jsonData`,
-            `jsonData from jsonPath is null or an empty object`,
-            `json file path received: '${jsonPath}'`
-        ].join(TAB));
-    }
-    for (const accountType of Object.values(AccountTypeEnum)) {
-        if (isNull(jsonData[accountType])) {
-            throw new Error([
-                `[dataLoader.loadAccountDictionary()] Invalid jsonData`,
-                `jsonData is missing data for required key: '${accountType}'`,
-                `filePath: '${jsonPath}'`
-            ].join(TAB));
-        }
-    }
-    return jsonData as AccountDictionary;
-}
-
-async function loadBinDictionary(
-    csvPath: string=BIN_NUMBERS_FILE,
-    binNumberColumn: string = BIN_NUMBER_COLUMN,
-    internalIdColumn: string = DEFAULT_INTERNAL_ID_COLUMN
-): Promise<Record<string, string>> {
-    return await loadOneToOneDictionary(csvPath, binNumberColumn, internalIdColumn);
-}
-
-async function loadClassDictionary(
-    csvPath: string=CLASSES_FILE,
-    classColumn: string = ClASS_NAME_COLUMN,
-    internalIdColumn: string = DEFAULT_INTERNAL_ID_COLUMN
-): Promise<Record<string, string>> {
-    return await loadOneToOneDictionary(csvPath, classColumn, internalIdColumn);
-}
-
-/**
- * Load regex constants
- * @param filePath `string` - Path to the regex constants JSON file (default: `REGEX_FILE`)
- * @returns **`regexConstants`** {@link RegexConstants}
- */
-async function loadRegexConstants(
-    filePath: string=REGEX_FILE
-): Promise<RegexConstants> {
-    const source = `[dataLoader.loadRegexConstants()]`
-    validate.existingPathArgument(source, {filePath});
-    const REGEX_CONSTANTS = read(filePath) as Record<string, any>;
-    if (!REGEX_CONSTANTS || !hasKeys(REGEX_CONSTANTS, ['COMPANY_KEYWORD_LIST', 'JOB_TITLE_SUFFIX_LIST'])) {
-        throw new Error(`${source} Invalid REGEX_CONSTANTS file at '${filePath}'. Expected json object to have 'COMPANY_KEYWORD_LIST' and 'JOB_TITLE_SUFFIX_LIST' keys.`);
-    }
-    const COMPANY_KEYWORD_LIST: string[] = REGEX_CONSTANTS.COMPANY_KEYWORD_LIST || [];
-    if (!isNonEmptyArray(COMPANY_KEYWORD_LIST)) {
-        throw new Error(`${source} Invalid COMPANY_KEYWORD_LIST in REGEX_CONSTANTS file at '${filePath}'`);
-    }
-    const JOB_TITLE_SUFFIX_LIST: string[] = REGEX_CONSTANTS.JOB_TITLE_SUFFIX_LIST || [];
-    if (!isNonEmptyArray(JOB_TITLE_SUFFIX_LIST)) {
-        throw new Error(`${source} Invalid JOB_TITLE_SUFFIX_LIST in REGEX_CONSTANTS file at '${filePath}'`);
-    }
-    slog.info(`${source} Loaded regex constants`,)
-    return {
-        COMPANY_KEYWORD_LIST,
-        JOB_TITLE_SUFFIX_LIST,
-    };
-}
+import { 
+    DataDomainEnum, 
+    DataSourceConfiguration,
+    LoadFileOptions, 
+    FolderHierarchy 
+} from "@config/types/ProjectData";
 
 
 /**
@@ -440,220 +52,617 @@ async function loadRegexConstants(
 export function isDataInitialized(): boolean {
     return dataInitialized;
 }
+/** Global state to track if data has been loaded */
+let dataInitialized = false;
+const F = extractFileName(__filename);
+/* ------------------------------ ACCOUNTING ------------------------------ */
+let skuDictionary: Record<string, string> | null = null;
+let inventoryRows: Record<string, any>[] | null = null;
+let inventoryCache: Record<string, string> | null = null;
+/** map `account` to `'internalid'` */
+let accountDictionary: Record<string, any> | null = null;
+/** map `className` to `'internalid'` */
+let classDictionary: Record<string, string> | null = null;
 
+/* -------------------------------- SUPPLY -------------------------------- */
+/** map `binnumber` to `internalid` */
+let binDictionary: Record<string, string> | null = null;
+/** heirarchical relationship of locations->bins->items->lot_numbers */
+let warehouseDictionary: WarehouseDictionary | null = null;
+/** `{ `{@link WarehouseColumnEnum}`: any }[]` */
+let warehouseRows: WarehouseRow[] | null = null;
+
+/* ---------------------------- RELATIONSHIPS ----------------------------- */
+let customerCategoryDictionary: Record<string, number> | null = null;
+let entityValueOverrides: Record<string, string> | null = null;
+let humanVendorList: string[] | null = null;
+let dataSources: DataSourceDictionary | null = null;
+
+
+/* ------------------------- MAIN FUNCTION ----------------------------- */
+/** `['.tsv', '.csv']` */
+const delimitedFileExtensions = ['.tsv', '.csv'];
 
 /**
- * @deprecated - use typeshi library's dataLoader.getRegexConstants()
- * `sync` Get regex constants
- * @returns **`regexConstants`** {@link RegexConstants}
+ * @note **Requires** `initializeEnviornment()` to be called first
+ * - Initialize all data required by the application.
+ * - This should be called once at the start of the application.
+ * - sets {@link dataInitialized} to `true`
  */
-function getRegexConstants(): RegexConstants {
-    if (!dataInitialized || !regexConstants) {
-        throw new Error('[getRegexConstants()] Regex constants not initialized. Call initializeData() first.');
+export async function initializeData(): Promise<void> {
+    const source = getSourceString(F, initializeData.name);
+    if (!isEnvironmentInitialized()) {
+        throw new Error(`${source} Unable to load data. Please  call initializeEnvironment() first.`)
     }
-    return regexConstants;
+    if (dataInitialized) {
+        mlog.info(`${source} Data already initialized, skipping...`);
+        return;
+    }
+    let dataDir = getProjectFolders().dataDir;
+    let { domains } = getDataLoaderConfiguration();
+
+    /**path to project.data.config.json */
+    let dataSourceConfigPath = getDataSourceConfigPath();
+    validate.existingFileArgument(source, '.json', {dataSourceConfigPath});
+    dataSources = read(dataSourceConfigPath) as DataSourceDictionary;
+    validate.objectArgument(source, {dataSources, isDataSourceDictionary});
+    for (let d of Object.values(DataDomainEnum)) { // @TODO change Object.values(DataDomainEnum) to domains ?
+        validate.existingDirectoryArgument(source, {[`dataDir/${d}`]: path.join(dataDir, d) });
+    }
+    let accountingOptions = getDomainLoadFileOptions(DataDomainEnum.ACCOUNTING)
+    validate.objectArgument(source, {accountingOptions, isLoadFileOptions});
+    mlog.info(`${source} Initializing application data...`);
+    try {
+        for (const d of domains) {
+            switch (d) {
+                case DataDomainEnum.ACCOUNTING:
+                    inventoryRows = await loadInventoryRows();
+                    inventoryCache = await loadInventoryCache();
+                    skuDictionary = (
+                        (!accountingOptions.overwriteCache && accountingOptions.useCache) 
+                        ? inventoryCache 
+                        : await loadOneToOneDictionary(
+                            inventoryRows, 
+                            accountingOptions.itemIdColumn as string, 
+                            accountingOptions.internalIdColumn as string
+                        )
+                    );
+                    classDictionary = await loadClassDictionary();
+                    accountDictionary = await loadAccountDictionary();
+                    if (accountingOptions.overwriteCache) {
+                        // TODO: implement this...
+                    }
+                    break;
+                case DataDomainEnum.SUPPLY:
+                    binDictionary = await loadBinDictionary();
+                    warehouseRows = await loadWarehouseRows()
+                    warehouseDictionary = await loadWarehouseDictionary(warehouseRows);
+                    break;
+                case DataDomainEnum.RELATIONSHIPS:
+                    entityValueOverrides = await loadEntityOverrides();
+                    customerCategoryDictionary = await loadCustomerCategoryDictionary();
+                    humanVendorList = await loadHumanVendorList();
+                    break;
+                default:
+                    mlog.warn(
+                        `${source} Unrecognized/unsupported data domain: '${d}'. Skipping...`
+                    );
+                    continue;
+            }
+            slog.info(` -- Finished loading domain '${d}'`)
+        }
+        dataInitialized = true;
+        slog.info(`${source} ✓ All data initialized successfully`);
+    } catch (error) {
+        mlog.error(`${source} ✗ Failed to initialize data:`, error);
+        STOP_RUNNING(1, 'Data initialization failed');
+    }
+}
+
+
+function getDomainFilePath(
+    domain: DataDomainEnum,
+    fileLabel: string,
+    folderName?: string
+): string {
+    const source = getSourceString(F, getDomainFilePath.name);
+    if (!dataSources) {
+        throw new Error([`${source} Unable to get domain filepath`,
+            `dataSources (DataSourceDictionary) is not defined.`,
+        ].join(TAB));
+    }
+    const dataDir = getProjectFolders().dataDir;
+    let domainConfig = dataSources[domain];
+    let ancestors = [dataDir, domain];
+    let filePath = getDescendant(ancestors, domainConfig, fileLabel, folderName);
+    if (!isNonEmptyString(filePath)) {
+        throw new Error([`${source} Invalid fileLabel (string)`,
+            `  domiain: '${domain}'`,
+            `fileLabel: '${fileLabel}'`,
+            `DataSourceConfiguration for '${domain}' does not have key`
+            +`or descendant with key equal to provided fileLabel`+(isNonEmptyString(folderName) ? `at folderName: '${folderName}'`: ''),
+            `please review data.config file`
+        ].join(TAB));
+    }
+    return filePath;
 }
 
 /**
- * @deprecated - use typeshi library's dataLoader.getRegexConstants()
- * `sync` Get company keyword list
- * @returns **`COMPANY_KEYWORD_LIST`** `string[]`
+ * - get descendant filepath from a FolderHierarchy
+ * @param ancestors 
+ * @param parent 
+ * @param targetKey 
+ * @param targetParent 
+ * @returns 
  */
-function getCompanyKeywordList(): string[] {
-    const constants = getRegexConstants();
-    return constants.COMPANY_KEYWORD_LIST;
+function getDescendant(
+    ancestors: string[],
+    parent: DataSourceConfiguration | FolderHierarchy, 
+    targetKey: string,
+    /** if want child of specific subfolder (useful if have duplicate key names) */
+    targetParent?: string
+): string | undefined {
+    if (targetKey in parent) {
+        let targetValue: string[] | undefined = (isNonEmptyString(parent[targetKey]) 
+            ? [parent[targetKey]] 
+            : isStringArray(parent[targetKey]) 
+            ? parent[targetKey] 
+            : undefined
+        );
+        if (!targetValue) { return '' } // if targetValue reached last case
+        let parts = [...ancestors, ...targetValue];
+        if (isNonEmptyString(targetParent) && parts[parts.length-2] !== targetParent) {
+            // if have found targetKey under a different parent
+            return '';
+        }
+        return path.join(...parts);
+    }
+    let folderKeys = Object.keys(parent).filter(k=>
+        k !== 'options' && isObject(parent[k])
+    );
+    for (let k of folderKeys) {
+        if (isNonEmptyString(targetParent) && k !== targetParent) { continue }
+        let childResult = getDescendant([...ancestors, k], parent[k], targetKey, targetParent)
+        if (childResult) { return childResult }
+    }
+    return;
+}
+
+
+function getDomainLoadFileOptions(
+    domain: DataDomainEnum
+): LoadFileOptions {
+    const source = getSourceString(F, getDomainLoadFileOptions.name);
+    if (!dataSources) {
+        throw new Error([`${source} Unable to get domainOptions, dataSources (DataSourceDictionary) is not defined yet.`].join(TAB));
+    }
+    let domainConfig = dataSources[domain];
+    if (domainConfig && domainConfig.options) {
+        return domainConfig.options;
+    }
+    mlog.warn([`${source} No options (LoadFileOptions) found for domain '${domain}'`,
+        `defined keys in dataSources['${domain}']: ${Object.keys(domainConfig).join(', ')}`
+    ].join(TAB))
+    return {}
+}
+
+async function loadInventoryRows(
+    domain: DataDomainEnum = DataDomainEnum.ACCOUNTING,
+    fileLabel: string = "inventoryExport",
+    folderName: string = 'items',
+): Promise<Record<string, any>[]> {
+    const source = getSourceString(F, loadInventoryRows.name);
+    let filePath = getDomainFilePath(domain, fileLabel, folderName);
+    validate.existingFileArgument(source, delimitedFileExtensions, {filePath});
+    const rows = await getRows(filePath);
+    if (!isNonEmptyArray(rows)) {
+        throw new Error([`${source} No inventory rows read from file`,
+            `filePath: '${filePath}'`
+        ].join(TAB));
+    }
+    return rows;
 }
 
 /**
- * @deprecated - use typeshi library's dataLoader.getRegexConstants()
- * Get job title suffix list
- * @returns **`JOB_TITLE_SUFFIX_LIST`** `string[]`
+ * @param fileLabel `string`
+ * @param folderName `string` `default` = 'binnumbers' (subfolder of `'{dataDir}/supply'`)
+ * @returns **`binDictionary`** `Promise<Record<string, string>>`
  */
-function getJobTitleSuffixList(): string[] {
-    const constants = getRegexConstants();
-    return constants.JOB_TITLE_SUFFIX_LIST;
+async function loadBinDictionary(
+    domain: DataDomainEnum = DataDomainEnum.SUPPLY,
+    fileLabel: string = 'binDictionary',
+    folderName: string = 'binnumbers',
+): Promise<Record<string, string>> {
+    const source = getSourceString(F, loadBinDictionary.name);
+    let filePath = getDomainFilePath(domain, fileLabel, folderName);
+    validate.existingFileArgument(source, delimitedFileExtensions, {filePath});
+    let options = getDomainLoadFileOptions(domain);
+    const dict = await loadOneToOneDictionary(filePath, 
+        options.binNumberColumn as string, 
+        options.internalIdColumn as string
+    );
+    if (isEmpty(dict)) {
+        throw new Error([`${source} No bin entries read from file`,
+            `filePath: '${filePath}'`
+        ].join(TAB));
+    }
+    return dict;
 }
 
 /**
+ * @param fileLabel `string`
+ * @param folderName `string`
+ * @returns **`classDictionary`** `Promise<Record<string, string>>`
+ */
+async function loadClassDictionary(
+    domain: DataDomainEnum = DataDomainEnum.ACCOUNTING,
+    fileLabel: string = "classDictionary",
+    folderName: string = '',
+): Promise<Record<string, string>> {
+    const source = getSourceString(F, loadClassDictionary.name);
+    let filePath = getDomainFilePath(domain, fileLabel, folderName);
+    validate.existingFileArgument(source, delimitedFileExtensions, {filePath});
+    let options = getDomainLoadFileOptions(domain);
+    const dict = await loadOneToOneDictionary(filePath,
+        options.classNameColumn as string, 
+        options.internalIdColumn as string
+    );
+    if (isEmpty(dict)) {
+        throw new Error([`${source} No class entries read from file`,
+            `filePath: '${filePath}'`
+        ].join(TAB));
+    }
+    return dict;
+}
+
+async function loadInventoryCache(
+    domain: DataDomainEnum = DataDomainEnum.ACCOUNTING,
+    fileLabel: string = "inventoryCache",
+    folderName: string = 'items',
+): Promise<Record<string, string>> {
+    const source = getSourceString(F, loadInventoryCache.name);
+    let filePath = getDomainFilePath(domain, fileLabel, folderName);
+    validate.existingFileArgument(source, '.json', {filePath});
+    let jsonData = read(filePath);
+    let keys = Object.keys(jsonData);
+    if (keys.length === 0) {
+        mlog.warn([`${source} No data read into inventoryCache`,
+            `filePath: '${filePath}'`
+        ].join(TAB));
+        return {}
+    }
+    for (let i = 0; i < keys.length; i++) {
+        let itemId = keys[i];
+        let internalId = jsonData[itemId];
+        if (!isNonEmptyString(itemId) || !isNonEmptyString(internalId)) {
+            throw new Error([`${source} Invalid entry in inventoryCache at keyIndex ${i}`,
+                `      itemId (key): '${itemId}'`,
+                `internalId (value): '${internalId}'`,
+                `          filePath: '${filePath}'`
+            ].join(TAB));
+        }
+    }
+    return jsonData as Record<string, string>;
+}
+
+async function loadWarehouseRows(
+    domain: DataDomainEnum = DataDomainEnum.SUPPLY,
+    fileLabel: string = 'warehouseData',
+    folderName: string = 'binnumbers',
+): Promise<WarehouseRow[]> {
+    const source = getSourceString(F, loadWarehouseRows.name);
+    let filePath = getDomainFilePath(domain, fileLabel, folderName);
+    validate.existingFileArgument(source, delimitedFileExtensions, {filePath});
+    const rows = await getRows(filePath) as WarehouseRow[];
+    return rows;
+}
+
+async function loadWarehouseDictionary(
+    rows: Record<string, any>[]
+): Promise<WarehouseDictionary> {
+    const source = getSourceString(F, loadWarehouseDictionary.name);
+    validate.arrayArgument(source, {rows, isObject})
+    const dict: WarehouseDictionary = {};
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        let locNumber = Number(row[WarehouseColumnEnum.LOCATION_INTERNAL_ID]);
+        let binId = String(row[WarehouseColumnEnum.BIN_INTERNAL_ID]);
+        let itemId = String(row[WarehouseColumnEnum.ITEM_ID]);
+        if (!isInteger(locNumber)) {
+            mlog.error(`${source} Invalid LOCATION_INTERNAL_ID at warehouseRows[${i}]`);
+            continue;
+        }
+        if (!isNonEmptyString(binId)) {
+            mlog.error(`${source} Invalid BIN_INTERNAL_ID at warehouseRows[${i}]`);
+            continue;
+        }
+        if (!isNonEmptyString(itemId)) {
+            mlog.error(`${source} Invalid ITEM_ID at warehouseRows[${i}]`);
+            continue;
+        }
+        if (!dict[locNumber]) {
+            dict[locNumber] = {};
+        }
+        if (!dict[locNumber][binId]) {
+            dict[locNumber][binId] = {};
+        }
+        if (!dict[locNumber][binId][itemId]) {
+            dict[locNumber][binId][itemId] = {
+                description: String(row[WarehouseColumnEnum.ITEM_DESCRIPTION]),
+                lotNumbers: [],
+            };
+        }
+        let lotNumber = String(row[WarehouseColumnEnum.LOT_NUMBER]);
+        if (isNonEmptyString(lotNumber) 
+                && !dict[locNumber][binId][itemId].lotNumbers.includes(lotNumber)) {
+            dict[locNumber][binId][itemId].lotNumbers.push(lotNumber);
+        }
+    }
+    return dict;
+}
+
+
+async function loadEntityOverrides(
+    domain: DataDomainEnum = DataDomainEnum.RELATIONSHIPS,
+    fileLabel: string = 'entityOverrides',
+    folderName: string = 'customers',
+): Promise<Record<string, string>> {
+    const source = getSourceString(F, loadEntityOverrides.name);
+    let filePath = getDomainFilePath(domain, fileLabel, folderName);
+    validate.existingFileArgument(source, '.json', {filePath});
+    let jsonData = read(filePath);
+    let keys = Object.keys(jsonData);
+    if (keys.length === 0) {
+        throw new Error([`${source} No data read into entityOverrides`,
+            `filePath: '${filePath}'`
+        ].join(TAB));
+    }
+    for (let i = 0; i < keys.length; i++) {
+        let initialValue = keys[i];
+        let overrideValue = jsonData[initialValue];
+        if (!isNonEmptyString(initialValue) || !isNonEmptyString(overrideValue)) {
+            throw new Error([`${source} Invalid entry in entityOverrides at keyIndex ${i}`,
+                `   initialValue (key): '${initialValue}'`,
+                `overrideValue (value): '${overrideValue}'`,
+                `filePath: '${filePath}'`
+            ].join(TAB));
+        }
+    }
+    return jsonData as Record<string, string>;
+}
+
+async function loadHumanVendorList(
+    domain: DataDomainEnum = DataDomainEnum.RELATIONSHIPS,
+    fileLabel: string = 'humanVendors',
+    folderName: string = 'vendors'
+): Promise<string[]> {
+    const source = getSourceString(F, loadHumanVendorList.name);
+    let filePath = getDomainFilePath(domain, fileLabel, folderName);
+    validate.existingFileArgument(source, '.json', {filePath});
+    const jsonData = read(filePath);
+    if (!jsonData || !isStringArray(jsonData[fileLabel])) {
+        throw new Error([`${source} Invalid json data`,
+            ` Expected: { humanVendors: string[] }`,
+            ` filePath: '${filePath}'`,
+            `fileLabel: '${fileLabel}'`
+        ].join(TAB));
+    }
+    return jsonData[fileLabel].map(
+        (name: string) => clean(name, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION)
+    );
+}
+
+async function loadCustomerCategoryDictionary(
+    domain: DataDomainEnum = DataDomainEnum.RELATIONSHIPS,
+    fileLabel: string='categoryDictionary',
+    folderName: string='customers'
+): Promise<Record<string, number>> {
+    const source = getSourceString(F, loadCustomerCategoryDictionary.name);
+    let filePath = getDomainFilePath(domain, fileLabel, folderName);
+    validate.existingFileArgument(source, '.json', {filePath});
+    const jsonData = read(filePath);
+    if (!isObject(jsonData) || isEmpty(jsonData)) {
+        throw new Error([`${source} no object/data read from file`,
+            `filePath: '${filePath}'`
+        ].join(TAB));
+    }
+    for (let category of Object.keys(jsonData)) {
+        if (!isInteger(jsonData[category])) {
+            throw new Error([`${source} Invalid value for entry in dictionary`,
+                `category: '${category}'`,
+                `Expected data[category]: integer`,
+                `Received data[category]: ${typeof jsonData[category]} = '${jsonData[category]}'`
+            ].join(TAB));
+        }
+    }
+    return jsonData;
+
+
+}
+
+
+
+
+/**
+ * @note for now, only use when loading from (tsv/csv file or row array)
+ * @param rowSource 
+ * @param keyColumn 
+ * @param valueColumn 
+ * @returns 
+ */
+async function loadOneToOneDictionary(
+    rowSource: string | Record<string, any>[],
+    keyColumn: string,
+    valueColumn: string,
+): Promise<Record<string, string>> {
+    const source = getSourceString(F, loadOneToOneDictionary.name);
+    validate.multipleStringArguments(source, {keyColumn, valueColumn});
+    if (isNonEmptyString(rowSource) && !isValidCsvSync(rowSource, [keyColumn, valueColumn])) {
+        let msg = [`${source} Invalid CSV file provided (either not found or missing required columns)`,
+            `  keyColumn: '${keyColumn}'`,
+            `valueColumn: '${valueColumn}'`,
+            `   filePath: '${rowSource}'`
+        ].join(TAB);
+        mlog.error(msg)
+        throw new Error(msg);
+    }
+    let dict = await getOneToOneDictionary(rowSource, keyColumn, valueColumn);
+    if (isEmpty(dict)) {
+        let msg = [`${source} CSV file did not have data in provided columns`,
+            `  keyColumn: '${keyColumn}'`,
+            `valueColumn: '${valueColumn}'`,
+            `   filePath: '${rowSource}'`
+        ].join(TAB);
+        mlog.error(msg)
+        throw new Error(msg);
+    }
+    return dict;
+}
+
+async function loadAccountDictionary(
+    domain: DataDomainEnum = DataDomainEnum.ACCOUNTING,
+    fileLabel: string = 'accountDictionary',
+    folderName: string = 'accounts'
+): Promise<AccountDictionary> {
+    const source = getSourceString(F, loadAccountDictionary.name);
+    let filePath = getDomainFilePath(domain, fileLabel, folderName);
+    validate.existingFileArgument(source, '.json', {filePath});
+    const data = read(filePath);
+    if (isEmpty(data)) {
+        throw new Error([
+            `[dataLoader.loadAccountDictionary()] Invalid jsonData`,
+            `filePath: '${filePath}'`
+        ].join(TAB));
+    }
+    for (const accountType of Object.values(AccountTypeEnum)) {
+        if (isEmpty(data[accountType])) {
+            throw new Error([
+                `[dataLoader.loadAccountDictionary()] Invalid jsonData`,
+                `jsonData is missing data for required key: '${accountType}'`,
+                `filePath: '${filePath}'`
+            ].join(TAB));
+        }
+    }
+    return data as AccountDictionary;
+}
+
+
+
+
+
+
+/**
+ * `sync`
  * `Public API`: Gets the {@link AccountDictionary} = `{ [accountType: string]: Record<string, string> }` 
  * - = `{ [accountType: string]: { [accountName: string]: string } }` 
  * - - `accountName` mapped to `internalid`
- * - Initializes the dictionary if it hasn't been loaded yet from {@link ACCOUNT_DICTIONARY_FILE}.
- * @returns Promise that resolves to the Account dictionary
+ * @returns
  */
-export async function getAccountDictionary(): Promise<AccountDictionary> {
+export function getAccountDictionary(): AccountDictionary {
     if (!accountDictionary) {
-        accountDictionary = await loadAccountDictionary();
+        throw new Error([`${getSourceString(F, getAccountDictionary.name)} accountDictionary undefined`,
+            `call initializeData() first`
+        ].join(TAB));
     }
     return accountDictionary;
 }
 
 
 /**
- * `async`
- * `Public API`: Gets the Class name to Internal ID dictionary from {@link CLASSES_FILE}
- * - Initializes the dictionary if it hasn't been loaded yet.
- * @returns **`classDictionary`** `Promise<Record<string, string>>`
+ * `sync`
+ * @returns **`classDictionary`** `Record<string, string>`
  */
-export async function getClassDictionary(): Promise<Record<string, string>> {
+export function getClassDictionary(): Record<string, string> {
     if (!classDictionary) {
-        classDictionary = await loadClassDictionary();
+        throw new Error([`${getSourceString(F, getSkuDictionary.name)} skuDictionary undefined`,
+            `call initializeData() first`
+        ].join(TAB));
     }
     return classDictionary;
 }
 
 /**
- * `async`
- * `Public API`: Gets the SKU to Internal ID dictionary from {@link SKU_DICTIONARY_FILE} = `DATA_DIR/items/SKU_TO_INTERNAL_ID_DICT.json`
- * - Initializes the dictionary if it hasn't been loaded yet.
- * 
- * @returns Promise that resolves to the SKU dictionary
+ * `sync`
+ * @returns **`skuDictionary`** `Record<string, string>`
  */
-export async function getSkuDictionary(): Promise<Record<string, string>> {
+export function getSkuDictionary(): Record<string, string> {
     if (!skuDictionary) {
-        skuDictionary = await loadSkuDictionary();
+        throw new Error([`${getSourceString(F, getSkuDictionary.name)} skuDictionary undefined`,
+            `call initializeData() first`
+        ].join(TAB));
     }
     return skuDictionary;
 }
 
 /**
- * `async`
- * `Public API`: Gets the Bin Number to Internal ID dictionary from {@link BIN_NUMBERS_FILE}
- * - Initializes the dictionary if it hasn't been loaded yet.
- * @returns **`binDictionary`** `Promise<Record<string, string>>`
+ * `sync`
+ * @returns **`binDictionary`** `Record<string, string>`
  */
-export async function getBinDictionary(): Promise<Record<string, string>> {
+export function getBinDictionary(): Record<string, string> {
     if (!binDictionary) {
-        binDictionary = await loadBinDictionary();
+        throw new Error([`${getSourceString(F, getBinDictionary.name)} binDictionary undefined`,
+            `call initializeData() first`
+        ].join(TAB));
     }
     return binDictionary;
 }
 
 /**
- * `async`
+ * `sync`
  * @returns **`warehouseRows`**
  */
-export async function getWarehouseRows(): Promise<WarehouseRow[]> {
+export function getWarehouseRows(): WarehouseRow[] {
     if (!warehouseRows) {
-        warehouseRows = (await getWarehouseData()).rows;
+        throw new Error([`${getSourceString(F, getWarehouseRows.name)} warehouseRows undefined`,
+            `call initializeData() first`
+        ].join(TAB));
     }
     return warehouseRows;
 }
 
 /**
- * `async`
+ * `sync`
  * @returns **`warehouseDictionary`**
  */
-export async function getWarehouseDictionary(): Promise<WarehouseDictionary> {
+export function getWarehouseDictionary(): WarehouseDictionary {
     if (!warehouseDictionary) {
-        warehouseDictionary = (await getWarehouseData()).dictionary;
+        throw new Error([`${getSourceString(F, getWarehouseDictionary.name)} warehouseDictionary undefined`,
+            `call initializeData() first`
+        ].join(TAB));
     }
     return warehouseDictionary;
 }
 
 /**
- * `async`
- * @returns **`warehouseData`** 
- */
-export async function getWarehouseData(): Promise<WarehouseData> {
-    if (!warehouseData) {
-        warehouseData =  await loadWarehouseData();
-    }
-    return warehouseData;
-}
-
-/**
- * `async`
+ * `sync`
  * @returns **`entityValueOverrides`** `Promise<Record<string, string>>`
  */
-export async function getEntityValueOverrides(): Promise<Record<string, string>> {
+export function getEntityValueOverrides(): Record<string, string> {
     if (!entityValueOverrides) {
-        entityValueOverrides = await loadEntityValueOverrides();
+        throw new Error([
+            `${getSourceString(F, getEntityValueOverrides.name)} entityValueOverrides undefined`,
+            `call initializeData() first`
+        ].join(TAB));
     }
     return entityValueOverrides;
 }
-/**
- * `async`
- * @returns **`customerData`** 
- */
-export async function getCustomerData(): Promise<CustomerData> {
-    if (!customerData) {
-        customerData =  await loadCustomerData();
-    }
-    return customerData;
-}
 
-export async function getCustomerCategoryDictionary(): Promise<{[category: string]: number}> {
+export function getCustomerCategoryDictionary(): { [category: string]: number } {
     if (!customerCategoryDictionary) {
-        customerCategoryDictionary = (await getCustomerData()).categoryDictionary;
+        throw new Error([
+            `${getSourceString(F, getCustomerCategoryDictionary.name)} customerCategoryDictionary undefined`,
+            `call initializeData() first`
+        ].join(TAB));
     }
     return customerCategoryDictionary;
 }
 
-/**
- * `async`
- * @returns **`customerData`** 
- */
-export async function getVendorData(): Promise<VendorData> {
-    if (!vendorData) {
-        vendorData =  await loadVendorData();
-    }
-    return vendorData;
-}
-
-export async function getHumanVendorList(): Promise<string[]> {
+export function getHumanVendorList(): string[] {
     if (!humanVendorList) {
-        humanVendorList = (await getVendorData()).humanVendors;
+        throw new Error([
+            `${getSourceString(F, getHumanVendorList.name)} humanVendorList undefined`,
+            `call initializeData() first`
+        ].join(TAB));
     }
     return humanVendorList;
 }
-
-/**
- * `async`
- * `Public API`: Gets the internal ID for a given SKU.
- * - Initializes the dictionary if it hasn't been loaded yet.
- * 
- * @param sku `string` - The SKU to look up
- * @returns Promise that resolves to the internal ID, or undefined if not found
- */
-export async function getInternalIdForSku(sku: string): Promise<string | undefined> {
-    const dictionary = await getSkuDictionary();
-    return dictionary[sku];
-}
-
-/**
- * `async`
- * `Public API`: Checks if a SKU exists in the dictionary.
- * - Initializes the dictionary if it hasn't been loaded yet.
- * 
- * @param sku `string` - The SKU to check
- * @returns Promise that resolves to true if the SKU exists, false otherwise
- */
-export async function hasSkuInDictionary(sku: string): Promise<boolean> {
-    const dictionary = await getSkuDictionary();
-    return sku in dictionary;
-}
-
-/**
- * `sync`
- * `Public API`: Gets a synchronous version of the SKU dictionary.
- * - Returns null if the dictionary hasn't been loaded yet.
- * - Use this **only** when you're sure the dictionary has already been initialized.
- * 
- * @returns The SKU dictionary or null if not loaded
- */
-export function getSkuDictionarySync(): Record<string, string> | null {
-    return skuDictionary;
-}
-
-/**
- * `sync`
- * `Public API`: Clears the SKU dictionary cache.
- * - Useful for testing or when you need to force a reload of the dictionary.
- * - The next call to any SKU dictionary function will reload the data.
- */
-export function clearSkuDictionaryCache(): void {
-    skuDictionary = null;
-    mlog.debug('[clearSkuDictionaryCache()] SKU dictionary cache cleared');
-}
-
