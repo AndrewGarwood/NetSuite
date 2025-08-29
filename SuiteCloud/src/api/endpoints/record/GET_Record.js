@@ -16,349 +16,374 @@
 
 
 define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
-    /**
-     * @type {LogStatement[]} - `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
-     * @see {@link writeLog}`(type, title, ...details)`
-     * @description return logArray in response so can process in client
-     * */
-    const logArray = [];
-    /**
-     * Get a single record
-     * @param {GetRecordRequest} reqParams {@link GetRecordRequest}
-     * @returns {RecordResponse} **`response`** {@link RecordResponse}
-     */
-    const get = (/**@type {GetRecordRequest}*/reqParams) => {
-        if (!reqParams) {
-            writeLog(LogTypeEnum.ERROR, 
-                'ERROR: GET_Record.get() Invalid request parameters', 
-                `reqParams is empty or undefined`
-            );
-            return {
-                status: 400,
-                message: 'Bad Request',
-                error: 'Invalid request parameters: reqParams is empty or undefined',
-                logs: logArray,
-                results: []
-            }; // as `GetRecordResponse`
-        }
-        let { recordType } = reqParams;
-        /**@type {idSearchOptions[]} */
-        let idOptions = JSON.parse(reqParams.idOptions || '[]');
-        /**@type {RecordResponseOptions} */
-        let responseOptions = JSON.parse(reqParams.responseOptions || '{}');
-        recordType = validateRecordType(recordType);
-        if (!recordType) {
-            writeLog(LogTypeEnum.ERROR,
-                'ERROR: GET_Record.get() Invalid reqParams.recordType',
-                `recordType must be a valid RecordTypeEnum string, received: '${reqParams.recordType}'`
-            );
-            return {
-                status: 400,
-                message: 'Bad Request',
-                error: `Invalid request parameters: reqParams.recordType. recordType must be a valid RecordTypeEnum string, received: '${reqParams.recordType}'`,
-                logs: logArray,
-                results: []
-            }; // as `GetRecordResponse`
-        }
-        if (idOptions && isNonEmptyArray(idOptions)) { 
-            return getById(recordType, idOptions, responseOptions);
-        } else if (!idOptions || isEmptyArray(idOptions)) {
-            return getAll(recordType, responseOptions);
-        } // else 
+/**
+ * @type {LogStatement[]} - `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
+ * @see {@link writeLog}`(type, title, ...details)`
+ * @description return logArray in response so can process in client
+ * */
+const logArray = [];
+const EP = `GET_Record`;
+/**
+ * Get a single record
+ * @param {SingleRecordRequest} reqParams {@link SingleRecordRequest}
+ * @returns {RecordResponse} **`response`** {@link RecordResponse}
+ */
+const get = (/**@type {SingleRecordRequest}*/reqParams) => {
+    if (!reqParams) {
+        writeLog(LogTypeEnum.ERROR, 
+            'ERROR: GET_Record.get() Invalid request parameters', 
+            `reqParams is empty or undefined`
+        );
         return {
             status: 400,
             message: 'Bad Request',
-            error: `Invalid request parameters: reqParams.idOptions; received: '${reqParams.idOptions}'`,
+            error: 'Invalid request parameters: reqParams is empty or undefined',
             logs: logArray,
             results: []
         }; // as `GetRecordResponse`
-    };
-
-    /**
-     * @param {RecordTypeEnum | string} recordType 
-     * @param {idSearchOptions[]} idOptions 
-     * @param {RecordResponseOptions} responseOptions 
-     * @returns {RecordResponse}
-     */
-    function getById(recordType, idOptions, responseOptions) {
-        /**@type {RecordResponse} {@link RecordResponse} */
-        const response = {}
-        /**@type {object | undefined} */
-        let rec = undefined;
-        const recId = searchForRecordById(recordType, idOptions);
-        if (isNaN(recId) || recId === null) {
-            writeLog(LogTypeEnum.AUDIT,
-                'GET_Record.getById() No record found',
-                `No record found for recordType '${recordType}' with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`
-            );
-            response.status = 404;
-            response.error = 'Record Not Found';
-            response.message = `No '${recordType}' record found with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`;
-            response.logs = logArray;
-            response.results = [];
-            response.rejects = [{recordType, idOptions, responseOptions}];
-            return response;
-        }
-        response.status = 200;
-        response.message = `Found '${recordType}' record with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`;
-        response.results = [{
-            internalid: recId, 
-            recordType, 
-            fields: {}, 
-            sublists: {}
-        }];
-        rec = record.load({type: recordType, id: recId, isDynamic: NOT_DYNAMIC });
-        writeLog(LogTypeEnum.DEBUG, 
-            `Loading Existing ${recordType} record with internalid: '${recId}'`, 
-        );
-        if (responseOptions && responseOptions.fields) {
-            response.results[0].fields = getResponseFields(rec, responseOptions.fields);
-        }
-        if (responseOptions && responseOptions.sublists) {
-            response.results[0].sublists = getResponseSublists(rec, responseOptions.sublists);
-        }
-        response.logs = logArray;
-        writeLog(LogTypeEnum.AUDIT, 
-            `GET_Record.getById() Successfully retrieved record`, 
-            `recordType: '${recordType}', internalid: '${recId}'`,
-        );
-        return response;
     }
-
-    /**
-     * @notimplemented
-     * @param {RecordTypeEnum | string} recordType 
-     * @param {RecordResponseOptions} responseOptions 
-     * @returns {RecordResponse}
-     */
-    function getAll(recordType, responseOptions) {
-        const records = [];
-        /**@type {RecordResponse} {@link RecordResponse} */
-        const response = {
-            status: 500,
-            message: 'Internal Server Error',
-            error: `getAll() not yet implemented`,
+    let { recordType } = reqParams;
+    /**@type {idSearchOptions[]} */
+    let idOptions = JSON.parse(reqParams.idOptions || '[]');
+    /**@type {RecordResponseOptions} */
+    let responseOptions = JSON.parse(reqParams.responseOptions || '{}');
+    recordType = validateRecordType(recordType);
+    if (!recordType) {
+        writeLog(LogTypeEnum.ERROR,
+            'ERROR: GET_Record.get() Invalid reqParams.recordType',
+            `recordType must be a valid RecordTypeEnum string, received: '${reqParams.recordType}'`
+        );
+        return {
+            status: 400,
+            message: 'Bad Request',
+            error: `Invalid request parameters: reqParams.recordType. recordType must be a valid RecordTypeEnum string, received: '${reqParams.recordType}'`,
             logs: logArray,
-            results: records
-        }
+            results: []
+        }; // as `GetRecordResponse`
+    }
+    if (idOptions && isNonEmptyArray(idOptions)) { 
+        return getById(recordType, idOptions, responseOptions);
+    } else if (!idOptions || isEmptyArray(idOptions)) {
+        return getAll(recordType, responseOptions);
+    } // else 
+    return {
+        status: 400,
+        message: 'Bad Request',
+        error: `Invalid request parameters: reqParams.idOptions; received: '${reqParams.idOptions}'`,
+        logs: logArray,
+        results: []
+    }; // as `GetRecordResponse`
+};
+
+/**
+ * @param {RecordTypeEnum | string} recordType 
+ * @param {idSearchOptions[]} idOptions 
+ * @param {RecordResponseOptions} responseOptions 
+ * @returns {RecordResponse}
+ */
+function getById(recordType, idOptions, responseOptions) {
+    /**@type {RecordResponse} {@link RecordResponse} */
+    const response = {}
+    /**@type {object | undefined} */
+    let rec = undefined;
+    const recId = searchForRecordById(recordType, idOptions);
+    if (isNaN(recId) || recId === null) {
+        writeLog(LogTypeEnum.AUDIT,
+            'GET_Record.getById() No record found',
+            `No record found for recordType '${recordType}' with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`
+        );
+        response.status = 404;
+        response.error = 'Record Not Found';
+        response.message = `No '${recordType}' record found with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`;
+        response.logs = logArray;
+        response.results = [];
+        response.rejects = [{recordType, idOptions, responseOptions}];
         return response;
     }
-    
-    /**
-     * @param {object} rec 
-     * @param {string | string[]} responseFields = {@link RecordResponseOptions.fields}
-     * @returns {FieldDictionary} **`fields`** = {@link FieldDictionary}
-     */
-    function getResponseFields(rec, responseFields) {
-        if (!rec || !responseFields || (typeof responseFields !== 'string' && !isNonEmptyArray(responseFields))) {
-            writeLog(LogTypeEnum.ERROR, 
-                'getResponseFields() Invalid parameters', 
-                'rec {object} and responseFields {string | string[]} are required'
-            );
-            return {};
-        }
-        /**@type {FieldDictionary} */
-        const fields = {internalid: rec.getValue({ fieldId: idPropertyEnum.INTERNAL_ID })};
-        /**@type {string[]} */
-        responseFields = (typeof responseFields === 'string'
-            ? [responseFields]
-            : responseFields
+    response.status = 200;
+    response.message = `Found '${recordType}' record with idOptions.values() = ${JSON.stringify(Object.values(idOptions))}`;
+    response.results = [{
+        internalid: recId, 
+        recordType, 
+        fields: {}, 
+        sublists: {}
+    }];
+    rec = record.load({type: recordType, id: recId, isDynamic: NOT_DYNAMIC });
+    writeLog(LogTypeEnum.DEBUG, 
+        `Loading Existing ${recordType} record with internalid: '${recId}'`, 
+    );
+    if (responseOptions && responseOptions.fields) {
+        response.results[0].fields = getResponseFields(rec, responseOptions.fields);
+    }
+    if (responseOptions && responseOptions.sublists) {
+        response.results[0].sublists = getResponseSublists(rec, responseOptions.sublists);
+    }
+    response.logs = logArray;
+    writeLog(LogTypeEnum.AUDIT, 
+        `GET_Record.getById() Successfully retrieved record`, 
+        `recordType: '${recordType}', internalid: '${recId}'`,
+    );
+    return response;
+}
+
+/**
+ * @notimplemented
+ * @param {RecordTypeEnum | string} recordType 
+ * @param {RecordResponseOptions} responseOptions 
+ * @returns {RecordResponse}
+ */
+function getAll(recordType, responseOptions) {
+    const records = [];
+    /**@type {RecordResponse} {@link RecordResponse} */
+    const response = {
+        status: 500,
+        message: 'Internal Server Error',
+        error: `getAll() not yet implemented`,
+        logs: logArray,
+        results: records
+    }
+    return response;
+}
+
+/**
+ * @param {object} rec 
+ * @param {string | string[]} responseFields 
+ * @returns {FieldDictionary} **`fields`** = {@link FieldDictionary}
+ */
+function getResponseFields(rec, responseFields) {
+    if (!rec || (!isNonEmptyString(responseFields) && !isNonEmptyArray(responseFields))) {
+        writeLog(LogTypeEnum.ERROR, 
+            'getResponseFields() Invalid parameters', 
+            'rec (object) and responseFields (string | string[]) are required'
         );
-        for (let fieldId of responseFields) {
+        return {};
+    }
+    /**@type {FieldDictionary} */
+    const fields = {internalid: rec.getValue({ fieldId: idPropertyEnum.INTERNAL_ID })};
+    /**@type {string[]} */
+    responseFields = (typeof responseFields === 'string'
+        ? [responseFields]
+        : responseFields
+    );
+    for (let fieldId of responseFields) {
+        try { 
             fieldId = fieldId.toLowerCase();
             /**@type {FieldValue | SubrecordValue} */
             const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSubrecord({fieldId}) 
-                ? rec.getSubrecord({fieldId}) // as Subrecord 
+                ? rec.getSubrecord({ fieldId }) // as Subrecord 
                 : rec.getValue({ fieldId }) // as FieldValue
             );
-            if (value === undefined || value === null) { continue; }
+            if (value === undefined) { continue }
             fields[fieldId] = value;
-        };
-        return fields;
-    }
-    /**
-     * `if` a value of responseSublists is empty or undefined, `return` all fields of the sublist
-     * @param {object} rec 
-     * @param {{[sublistId: string]: string | string[]}} responseSublists = {@link RecordResponseOptions.sublists}
-     * @returns {SublistDictionary | {[sublistId: string]: SublistLine[]}} **`sublists`** = {@link SublistDictionary} = `{[sublistId: string]: `{@link SublistLine}`[]}`
-     */
-    function getResponseSublists(rec, responseSublists) {
-        if (!rec || !responseSublists || isEmptyArray(Object.keys(responseSublists))) {
+        } catch (error) {
             writeLog(LogTypeEnum.ERROR, 
-                'getResponseSublists() Invalid parameters', 
-                'rec and responseSublists are required'
+                `[getResponseFields()] Error getting value for fieldId '${fieldId}'`, 
+                `error: `, error
             );
-            return {};
+            continue
         }
-        /**@type {SublistDictionary | {[sublistId: string]: SublistLine[]}} */
-        const sublists = {};    
-        for (const sublistId in responseSublists) {
-            if (!rec.getSublist({ sublistId })) {
-                writeLog(LogTypeEnum.ERROR, 
-                    `getResponseSublists() Invalid sublistId:`, 
-                    `sublistId '${sublistId}' not found on record`
-                );
-                continue;
-            }
-            sublists[sublistId] = [];
-            const lineCount = rec.getLineCount({ sublistId });
-            if (lineCount === 0) {
-                writeLog(LogTypeEnum.DEBUG, 
-                    `getResponseSublists() No lines found for sublistId '${sublistId}'`, 
-                );
-                continue;
-            }
-            /**@type {string[]} */
-            const responseFields = (typeof responseSublists[sublistId] === 'string'
-                ? [responseSublists[sublistId]]
-                : (!isNonEmptyArray(responseSublists[sublistId])
-                    ? rec.getSublistFields({ sublistId })
-                    : responseSublists[sublistId]
-            )); // as string[]
-            for (let i = 0; i < lineCount; i++) {
-                /**@type {SublistLine} sublistLine {@link SublistLine}*/
-                const sublistLine = {
-                    line: i,
-                    id: rec.getSublistValue({
-                        sublistId, fieldId: 'id', line: i
-                    }),
-                    internalid: rec.getSublistValue({ 
-                        sublistId, fieldId: idPropertyEnum.INTERNAL_ID, line: i 
-                    })
-                };
-                
-                for (const fieldId of responseFields) {
+    };
+    return fields;
+}
+/**
+ * `if` a value of responseSublists is empty or undefined, `return` all fields of the sublist
+ * @param {object} rec 
+ * @param {{[sublistId: string]: string | string[]}} responseSublists
+ * @returns {SublistDictionary | {[sublistId: string]: SublistLine[]}} **`sublists`** = {@link SublistDictionary}
+ */
+function getResponseSublists(rec, responseSublists) {
+    if (!rec || !isObject(responseSublists)) {
+        writeLog(LogTypeEnum.ERROR, 
+            '[getResponseSublists()] Invalid parameters', 
+            'rec and responseSublists are required'
+        );
+        return {};
+    }
+    /**@type {SublistDictionary} */
+    const sublists = {};
+    sublistLoop:    
+    for (const sublistId in responseSublists) {
+        if (!rec.getSublist({ sublistId })) {
+            writeLog(LogTypeEnum.ERROR, 
+                `[getResponseSublists()] Invalid sublistId:`, 
+                `sublistId '${sublistId}' not found on record`
+            );
+            continue;
+        }
+        sublists[sublistId] = [];
+        const lineCount = rec.getLineCount({ sublistId });
+        if (lineCount === 0) {
+            writeLog(LogTypeEnum.DEBUG, 
+                `[getResponseSublists()] No lines found for sublistId '${sublistId}'`, 
+            );
+            continue;
+        }
+        /**@type {string[]} */
+        const responseFields = (typeof responseSublists[sublistId] === 'string'
+            ? [responseSublists[sublistId]]
+            : (!responseSublists[sublistId] || isEmptyArray(responseSublists[sublistId])
+                ? rec.getSublistFields({ sublistId }) // as string[]
+                : responseSublists[sublistId] // as string[]
+        ));
+        sublistLineLoop:
+        for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
+            /**@type {SublistLine} @see {@link SublistLine}*/
+            const sublistLine = {
+                line: lineIndex,
+                id: rec.getSublistValue({
+                    sublistId, fieldId: 'id', line: lineIndex
+                }),
+                internalid: rec.getSublistValue({ 
+                    sublistId, fieldId: idPropertyEnum.INTERNAL_ID, line: lineIndex 
+                })
+            };
+            sublistFieldIdLoop:
+            for (const fieldId of responseFields) {
+                try {
                     /**@type {FieldValue | SubrecordValue} */
                     const value = (Object.values(SubrecordFieldEnum).includes(fieldId) // && rec.hasSublistSubrecord({ sublistId, fieldId, line: i }) 
-                        ? rec.getSublistSubrecord({ sublistId, fieldId, line: i }) // as Subrecord 
-                        : rec.getSublistValue({ sublistId, fieldId, line: i }) // as FieldValue
+                        ? rec.getSublistSubrecord({ sublistId, fieldId, line: lineIndex }) // as Subrecord 
+                        : rec.getSublistValue({ sublistId, fieldId, line: lineIndex }) // as FieldValue
                     ); 
                     if (value === undefined || value === null) { continue; }
                     sublistLine[fieldId] = value;
+                } catch(error) {
+                    writeLog(LogTypeEnum.ERROR, `[getResponseSublists] Error getting sublist field value`,
+                        `sublistId: '${sublistId}'`, 
+                        `fieldId: '${fieldId}'`,
+                        `lineIndex: ${lineIndex}.`,
+                        `error: ${error}`
+                    );
+                    continue sublistFieldIdLoop;
                 }
-                sublists[sublistId].push(sublistLine);
             }
+            sublists[sublistId].push(sublistLine);
         }
-        return sublists;
     }
-        /**
-     * @note does not yet handle searching for multiple records and returning their ids
-     * @param {RecordTypeEnum | string} recordType 
-     * @param {idSearchOptions[]} [idOptions] `Array<`{@link idSearchOptions}`>` = `{ idProp`: {@link idPropertyEnum}, `searchOperator`: {@link RecordOperatorEnum}, `idValue`: string | number` }[]`
-     * @param {FieldDictionary} [fields] - `object` extract idProperty values from `fields` `if` `idOptions` not provided
-     * @returns {number | null} **`recordId`** - the `'internalid'` of the record 
-     * `if` found in the search, or `null` `if` no record was found.
-     */
-    function searchForRecordById(recordType, idOptions, fields) {
-        if (!recordType || typeof recordType !== 'string' || (!idOptions && !fields)) {
-            writeLog(LogTypeEnum.ERROR,
-                `ERROR: searchForRecordById() Invalid Parameters:`,
-                `recordType must be a valid RecordTypeEnum or string, and idOptions or fields (with idProps) must be provided`,
-            );
-            return null;
-        }
-        // if no idOptions provided, extract idProperty values from fields
-        if (fields && (!idOptions || isEmptyArray(idOptions))) {
-            /**@type {idSearchOptions[]} */
-            idOptions = [];
-            for (const idPropFieldId of Object.values(idPropertyEnum)) {
-                if (fields[idPropFieldId]) {
-                    const idValue = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
-                        ? Number(fields[idPropFieldId]) 
-                        : String(fields[idPropFieldId])
-                    );
-                    const searchOperator = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
-                        ? SearchOperatorEnum.RECORD.ANY_OF 
-                        : SearchOperatorEnum.TEXT.IS
-                    );
-                    idOptions.push({
-                        idProp: idPropFieldId,
-                        searchOperator: searchOperator,
-                        idValue: idValue
-                    });
-                }
-            }
-        }
-        /** 
-         * idOptions is invalid and fields does not have any idPropertyEnum values in its keys
-         * -> unable to search for existing record -> return null
-         * */
-        if (!isNonEmptyArray(idOptions)) { 
-            return null;
-        }
-        let recordInternalId = null;
-        for (let i = 0; i < idOptions.length; i++) {
-            const { idProp, searchOperator, idValue } = idOptions[i];
-            if (!idProp || !searchOperator || !idValue) {
-                writeLog(LogTypeEnum.ERROR,
-                    `ERROR: searchForRecordById() Invalid idOptions element.`,
-                    `Invalid idSearchOptions element at idOptions[${i}]`,
-                )
-                continue;
-            }
-            try {
-                const recSearch = search.create({
-                    type: recordType,
-                    filters: [
-                        // [idProp, searchOperator, idValue],
-                        search.createFilter({
-                            name: idProp,
-                            operator: searchOperator,
-                            values: isNonEmptyArray(idValue) ? idValue : [idValue]
-                        }),
-                        // search.createFilter({
-                        //     name: 'mainline',
-                        //     operator: SearchOperatorEnum.TEXT.IS,
-                        //     values: ['T']
-                        // })
-                    ],
+    return sublists;
+}
+/**
+ * @note does not handle searching for multiple records and returning their ids
+ * @param {RecordTypeEnum | string} recordType 
+ * @param {idSearchOptions[]} [idOptions] `Array<`{@link idSearchOptions}`>` = `{ idProp`: {@link idPropertyEnum}, `searchOperator`: {@link RecordOperatorEnum}, `idValue`: string | number` }[]`
+ * @param {FieldDictionary} [fields] - `object` extract idProperty values from `fields` `if` `idOptions` not provided
+ * @returns {number | null} **`recordId`** - the `'internalid'` of the record 
+ * `if` found in the search, or `null` `if` no record was found.
+ */
+function searchForRecordById(recordType, idOptions, fields) {
+    if (!isRecordTypeEnum(recordType) || (!idOptions && !isObject(fields))) {
+        writeLog(LogTypeEnum.ERROR,
+            `[ERROR searchForRecordById()] Invalid Parameters:`,
+            `recordType must be a valid RecordTypeEnum or string, and idOptions or fields (with idProps) must be provided`,
+        );
+        return null;
+    }
+    // if no idOptions provided && fields provided, extract idProperty values from fields
+    if (isObject(fields) && !(isNonEmptyArray(idOptions))) {
+        /**@type {idSearchOptions[]} */
+        idOptions = [];
+        for (const idPropFieldId of Object.values(idPropertyEnum)) {
+            if (fields[idPropFieldId]) {
+                const idValue = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
+                    ? Number(fields[idPropFieldId]) 
+                    : String(fields[idPropFieldId])
+                );
+                const searchOperator = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
+                    ? SearchOperatorEnum.RECORD.ANY_OF 
+                    : SearchOperatorEnum.TEXT.IS
+                );
+                idOptions.push({
+                    idProp: idPropFieldId,
+                    searchOperator: searchOperator,
+                    idValue: idValue
                 });
-                /** @type {ResultSet} */
-                const resultSet = recSearch.run();
-                /** @type {SearchResult[]} */
-                const resultRange = resultSet.getRange({ start: 0, end: 10 });
-                if (resultRange.length === 0) {
-                    writeLog(LogTypeEnum.DEBUG,
-                        `searchForRecordById() 0 records found for idSearchOption ${i+1}/${idOptions.length}`,
-                        `0 '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
-                    );
-                    continue;
-                }
-                const expectSingleResult = Boolean(
-                    typeof idValue === 'string' || 
-                    typeof idValue === 'number' || 
-                    (Array.isArray(idValue) && idValue.length === 1)
-                );
-                /** 
-                 * @consideration if want to be able to return multiple values, 
-                 * store recordIds = resultRange.map(result => result.id) 
-                 */
-                if (resultRange.length > 1 && expectSingleResult) {
-                    writeLog(LogTypeEnum.ERROR,
-                        'WARNING: searchForRecordById() Multiple records found.',
-                        `${resultRange.length} '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
-                        `tentatively storing id of first record found,'${recordInternalId}' then continuing to next idOptions element`
-                    );
-                    recordInternalId = resultRange[0].id;
-                    continue;
-                } else if (resultRange.length === 1) {
-                    writeLog(LogTypeEnum.DEBUG,
-                        'searchForRecordById() Record found!',
-                        `1 '${recordType}' record found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
-                    );
-                    return Number(resultRange[0].id);
-                }
-            } catch (e) {
-                writeLog(LogTypeEnum.ERROR,
-                    `ERROR: searchForRecordById() idOptions for loop`,
-                    `error occurred while searching for '${recordType}' record with ${idProp}='${idValue}' and operator='${searchOperator}'`, 
-                    JSON.stringify(e)
+            }
+        }
+    }
+    /** 
+     * idOptions is invalid and fields does not have any idPropertyEnum values in its keys
+     * -> unable to search for existing record -> return null
+     * */
+    if (!isNonEmptyArray(idOptions)) { 
+        return null;
+    }
+    /**@type {number|null} */
+    let recordId = null;
+    for (let i = 0; i < idOptions.length; i++) {
+        if (!isIdSearchOptions(idOptions[i])) {
+            writeLog(LogTypeEnum.ERROR,
+                `ERROR: searchForRecordById() Invalid idOptions idSearchOptions element.`,
+                `Invalid idSearchOptions element at idOptions[${i}]`,
+            );
+            continue;
+        }
+        const { idProp, searchOperator, idValue } = idOptions[i];
+        try {
+            const recSearch = search.create({
+                type: recordType,
+                filters: [
+                    // [idProp, searchOperator, idValue],
+                    search.createFilter({
+                        name: idProp,
+                        operator: searchOperator,
+                        values: isNonEmptyArray(idValue) ? idValue : [idValue]
+                    }),
+                    // search.createFilter({
+                    //     name: 'mainline',
+                    //     operator: SearchOperatorEnum.TEXT.IS,
+                    //     values: ['T']
+                    // })
+                ],
+            });
+            /** @type {ResultSet} */
+            const resultSet = recSearch.run();
+            /** @type {SearchResult[]} */
+            const resultRange = resultSet.getRange({ start: 0, end: 10 });
+            if (resultRange.length === 0) {
+                writeLog(LogTypeEnum.DEBUG,
+                    `[searchForRecordById()] 0 records found for idSearchOption ${i+1}/${idOptions.length}`,
+                    `0 '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                 );
                 continue;
             }
+            const expectSingleResult = Boolean(
+                typeof idValue === 'string' || 
+                typeof idValue === 'number' || 
+                (Array.isArray(idValue) && idValue.length === 1)
+            );
+            /** 
+             * @consideration if want to be able to return multiple values, 
+             * store recordIds = resultRange.map(result => result.id) 
+             */
+            if (resultRange.length > 1 && expectSingleResult) {
+                recordId = Number(resultRange[0].id);
+                writeLog(LogTypeEnum.DEBUG,
+                    'WARNING: searchForRecordById() Multiple records found.',
+                    `${resultRange.length} '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
+                    `tentatively storing id of first record found,'${recordId}' then continuing to next idOptions element`
+                );
+                continue;
+            } else if (resultRange.length === 1) {
+                writeLog(LogTypeEnum.DEBUG,
+                    'searchForRecordById() Record found!',
+                    `1 '${recordType}' record found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
+                );
+                return Number(resultRange[0].id);
+            }
+        } catch (e) {
+            writeLog(LogTypeEnum.ERROR,
+                `ERROR: searchForRecordById() idOptions for loop`,
+                `error occurred while searching for '${recordType}' record with ${idProp}='${idValue}' and operator='${searchOperator}'`, 
+                JSON.stringify(e)
+            );
+            continue;
         }
-        return recordInternalId ? Number(recordInternalId) : null; // null if no record found
+        if (recordId !== null) {
+            return recordId
+        }
     }
+    return recordId; // null if no record found
+}
 /*---------------------------- [ Helper Functions ] ----------------------------*/
 /**
  * @enum {string} **`LogTypeEnum`**
@@ -475,6 +500,141 @@ function isNonEmptyArray(arr) {return Array.isArray(arr) && arr.length > 0; }
  * - **`false`** `otherwise`.
  */
 function isEmptyArray(val) { return Array.isArray(val) && val.length === 0; }
+/**
+ * @param {any} value 
+ * @returns {value is string[]}
+ */
+function isStringArray(value) { 
+    return isNonEmptyArray(value) 
+    && value.every(el => typeof el === 'string') 
+}
+/**
+ * @param value `any`
+ * @returns {value is string & { length: number }} **`isNonEmptyString`** `boolean`
+ * - `true` `if` `value` is a non-empty string (not just whitespace),
+ * - `false` `otherwise`.
+ */
+function isNonEmptyString(value) {
+    return typeof value === 'string' && value.trim() !== '';
+}
+/**
+ * @param value `any`
+ * @param requireNonNegative `boolean`
+ * - `if` `true` then require that `value` be an integer `>= 0`
+ * - `if` `false` then the sign of the number doesn't matter
+ * @returns **`isInteger`** `boolean`
+ */
+function isInteger(value, requireNonNegative = false) {
+    return (typeof value === 'number'
+        && Number.isInteger(value)
+        && (requireNonNegative ? value >= 0 : true));
+}
+/**
+ * @param value `any`
+ * @param requireNonEmpty `boolean` `default = true`
+ * - `if` `true` then `value` must have at least 1 key
+ * - `if` `false` then `value` is allowed to be an empty object
+ * @param requireNonArray `boolean` `default = true`
+ * - `if` `true` then `value` must not be an array
+ * - `if` `false` then `value` is allowed to be an array
+ * @returns **`isObject`** `boolean` `value is Record<string, any>`
+ */
+function isObject(value, requireNonEmpty = true, requireNonArray = true) {
+    return (value && typeof value === 'object'
+        && (requireNonArray ? !Array.isArray(value) : true)
+        && (requireNonEmpty ? Object.keys(value).length > 0 : true)
+    );
+}
+/**
+ * @note uses `key in obj` for each element of param `keys`
+ * @param obj `T extends Object` the object to check
+ * @param keys `Array<keyof T> | string[] | string` the list of keys that obj must have
+ * @param requireAll `boolean` defaults to `true`
+ * - `if` `true`, all keys must be present in the object;
+ * - `if` `false`, at least one key must be present
+ * @param restrictKeys `boolean` defaults to `false`
+ * - `if` `true`, only the keys provided in the `keys` param are allowed in the object;
+ * - `if` `false`, the object can keys not included in the `keys` param.
+ * @returns **`hasKeys`** `boolean`
+ * - **`true`** `if` `obj` is of type 'object' and has the required key(s),
+ * - **`false`** `otherwise`
+ */
+function hasKeys(obj, keys, requireAll = true, restrictKeys = false) {
+    if (!isObject(obj)) {
+        return false;
+    }
+    if (keys === null || keys === undefined) {
+        throw new Error('[hasKeys()] no keys provided: param `keys` must be defined');
+    }
+    if (!isNonEmptyArray(keys)) {
+        keys = [keys]; // Convert string (assumed to be single key) to array of keys
+    }
+    let numKeysFound = 0;
+    for (const key of keys) {
+        if (key in obj) {
+            numKeysFound++;
+            if (!requireAll && !restrictKeys) {
+                return true;
+            }
+        }
+        else if (requireAll) { // and a key is not found
+            return false;
+        }
+    }
+    if (restrictKeys) {
+        // If restrictKeys is true, check that no other keys are present in the object
+        const objKeys = Object.keys(obj);
+        const extraKeys = objKeys.filter(k => !keys.includes(k));
+        if (extraKeys.length > 0) {
+            return false; // Found keys not in the allowed list
+        }
+    }
+    return requireAll ? numKeysFound === keys.length : numKeysFound > 0;
+}
+
+/**
+ * @param {any} value
+ * @return {value is RecordTypeEnum} 
+ */
+function isRecordTypeEnum(value) {
+    return (isNonEmptyString(value) 
+        && Object.values(RecordTypeEnum).includes(value)
+    );
+}
+/**
+ * `isidSearchOptions`
+ * @param {any} value
+ * @returns {value is idSearchOptions} 
+ */
+function isIdSearchOptions(value) {
+    return Boolean(isObject(value)
+        && hasKeys(value, 
+            ['idProp', 'idValue', 'searchOperator'], 
+            true, true
+        )
+        && isNonEmptyString(value.idProp) // && Object.values(idPropertyEnum).includes(idProp)
+        && isNonEmptyString(value.searchOperator) // validate it's a SearchOperatorEnum
+    )
+}
+/**
+ * @param fileName `string`
+ * @param func `Function | string` - function name or function itself (to get Function.name)
+ * @param funcInfo `any` `(optional)` - context or params of func (converted to string)
+ * @param startLine `number` `(optional)`
+ * @param endLine `number` `(optional)`
+ * @returns **`sourceString`** `string` to use in log statements or argumentValidation calls
+ */
+function getSourceString(fileName, func, funcInfo, startLine, endLine) {
+    let lineNumberText = (isInteger(startLine)
+        ? `:${startLine}`
+        : '');
+    lineNumberText = (isNonEmptyString(lineNumberText)
+        && isInteger(endLine)
+        ? lineNumberText + `-${endLine}`
+        : '');
+    let funcName = typeof func === 'string' ? func : func.name;
+    return `[${fileName}.${funcName}(${funcInfo ?? ''})${lineNumberText}]`;
+}
 /*------------------------ [ Types, Enums, Constants ] ------------------------*/
 /** create/load a record in standard mode by setting `isDynamic` = `false` = `NOT_DYNAMIC`*/
 const NOT_DYNAMIC = false;
@@ -482,12 +642,12 @@ const NOT_DYNAMIC = false;
 /**
  * - {@link RecordTypeEnum}
  * - {@link idSearchOptions}
- * - {@link RecordResponseOptions} = `{ responseFields?: string | string[], responseSublists?: Record<string, string | string[]> }`
+ * - {@link RecordResponseOptions}
  * @typedef {{
  * recordType: string | RecordTypeEnum;
  * idOptions: idSearchOptions[],
  * responseOptions: RecordResponseOptions,
- * }} GetRecordRequest
+ * }} SingleRecordRequest
  */
 
 /**
@@ -505,8 +665,8 @@ const NOT_DYNAMIC = false;
  * @typedef {Object} RecordResult
  * @property {number} internalid
  * @property {string | RecordTypeEnum} recordType
- * @property {FieldDictionary | { [fieldId: string]: FieldValue | SubrecordValue } } fields
- * @property {SublistDictionary | { [sublistId: string]: Array<SublistLine | {[sublistFieldId: string]: FieldValue | SubrecordValue}> } } sublists
+ * @property {FieldDictionary} fields
+ * @property {SublistDictionary} sublists
  */
 /**
  * @typedef {Object} RecordResponseOptions
@@ -535,7 +695,7 @@ const NOT_DYNAMIC = false;
  * sublistIds mapped to an `Array<`{@link SublistLine}`>` = `{ [sublistFieldId: string]: `{@link FieldValue}`; line?: number; internalid?: number; }[]`
  * - {@link SublistLine}'s `sublistFieldId`s specified in the {@link BatchPostRecordRequest.responseSublists} request property.
  * @typedef {{
- * [sublistId: string]: Array<SublistLine | {[sublistFieldId: string]: FieldValue | SubrecordValue}>
+ * [sublistId: string]: Array<SublistLine>
  * }} SublistDictionary
  */
 
@@ -547,30 +707,12 @@ const NOT_DYNAMIC = false;
  * - = `rec.getSublistValue({sublistId: 'addressbook', fieldId: 'id', line: 0})` (type = number)
  * - (returns the `'internalid'` of the addressbook entry.)
  * @typedef {{
- * [sublistFieldId: string]: FieldValue | SubrecordValue
- * line?: number;
- * lineIdProp?: string;
+ * [fieldId: string]: FieldValue | SubrecordValue
  * }} SublistLine
- * @property {number} [line] `number` - the `lineIndex` of the list entry
- * @property {number} [lineIdProp] `string` - the `'sublistFieldId'` of the list entry 
- * with defined value at `SublistLine[sublistFieldId]` that you want to use to search for existing lines
- */
-
-/** Type: **`SubrecordDictionary`** {@link SubrecordDictionary} */
-/**
- * - each key in SubrecordDictionary is the fieldId (`body` or `sublist`) of a field that holds a subrecord object
- * - distinguish between body subrecords and sublist subrecords by checking if the mapped object has property `'sublistId'`
- * - - i.e. `mappedObject = SubrecordDictionary[fieldId]; `
- * - - `if 'sublistId' in mappedObject.keys()`, `then` it's a `sublist` subrecord and vice versa
- * - {@link SetFieldSubrecordOptions} for body subrecords
- * - {@link SetSublistSubrecordOptions} for sublist subrecords
- * @typedef {{
- * [fieldId: string]: SetFieldSubrecordOptions | SetSublistSubrecordOptions
- * }} SubrecordDictionary
  */
 
 /**
- * @typedef {{[subrecordFieldId: string]: FieldValue} | SetFieldSubrecordOptions | SetSublistSubrecordOptions} SubrecordValue 
+ * @typedef { { [fieldId: string]: FieldValue } | SetFieldSubrecordOptions | SetSublistSubrecordOptions} SubrecordValue 
  * */
 
 

@@ -45,7 +45,7 @@ export function isEnvironmentInitialized(): boolean {
  * = the directory where `package.json` and the `node_modules` folder live
  * - `'./SuiteCloud/{home is here}'`
  * */
-export const NODE_HOME_DIR = process.cwd() as string;
+const NODE_HOME_DIR = process.cwd() as string;
 
 /** assume directory this file is located in is always NODE_HOME_DIR */
 const PROJECT_CONFIG_FILE_NAME = `project.config.json`;

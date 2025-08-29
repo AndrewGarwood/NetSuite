@@ -83,7 +83,7 @@ export function isCloudConfiguration(value: any): value is CloudConfiguration {
  * @returns **`isSuiteScriptEnvironment`** `boolean`
  */
 export function isSuiteScriptEnvironment(value: any): value is SuiteScriptEnvironment {
-    return (isObject(value, false)
+    return (isObject(value)
         && Object.keys(value).every(k=> isAccountEnvironmentEnum(k)
             && value[k] === undefined || isScriptDictionary(value[k])
         )
@@ -112,11 +112,11 @@ export function isScriptDetails(value: any): value is ScriptDetails {
  * @returns **`isScriptDictionary`** `boolean`
  */
 export function isScriptDictionary(value: any): value is ScriptDictionary {
-    return (isObject(value)
+    return (isObject(value, false)
         && Object.keys(value).every(
             k=>isNonEmptyString(k) 
                 && Object.values(ScriptTypeEnum).includes(k as ScriptTypeEnum)
-                && isObject(value[k])
+                && isObject(value[k], false)
                 && Object.keys(value[k]).every(
                     subKey=> isNonEmptyString(subKey) 
                         && isScriptDetails(value[k][subKey])

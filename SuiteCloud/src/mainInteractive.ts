@@ -1,4 +1,5 @@
 /**
+ * @deprecated
  * @file src/mainInteractive.ts
  * Interactive CLI version of main.ts with user prompts for pipeline configuration
  */

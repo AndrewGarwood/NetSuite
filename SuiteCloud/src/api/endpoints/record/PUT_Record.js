@@ -43,7 +43,9 @@ const put = (reqBody) => {
         for (let i = 0; i < recordOptions.length; i++) {
             const options = recordOptions[i];
             try {
+                // writeLog(LogTypeEnum.DEBUG, `calling processRecordOptions...`)
                 const result = processRecordOptions(options, responseOptions);
+                // writeLog(LogTypeEnum.DEBUG, `Back in put()...`)
                 if (!result) {
                     writeLog(LogTypeEnum.ERROR,
                         `[put()] Invalid '${options.recordType}' RecordOptions at index ${i}:`,
@@ -55,7 +57,7 @@ const put = (reqBody) => {
             } catch (e) {
                 writeLog(LogTypeEnum.ERROR, 
                     `[put()] Error processing '${options.recordType}' RecordOptions at index ${i}:`, 
-                    String(e), // JSON.stringify(options)
+                    String(e),
                 );
                 rejects.push(options);
                 continue;
@@ -99,9 +101,9 @@ const put = (reqBody) => {
  * @returns {RecordResult | null} **`result`** {@link RecordResult} = `{ internalid: number, recordType: string | RecordTypeEnum, fields?: `{@link FieldDictionary}`, sublists?: `{@link SublistDictionary}` }`
  */
 function processRecordOptions(options, responseOptions) {
-    if (!options || typeof options !== 'object') {
+    if (!isObject(options)) {
         writeLog(LogTypeEnum.ERROR, 
-            `[ERROR processRecordOptions()] Invalid Options:`, 
+            `[ERROR processRecordOptions()] Invalid param 'options':`, 
             `options must be an object of type RecordOptions`,
             `= { recordType: RecordTypeEnum, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
         );
@@ -109,41 +111,31 @@ function processRecordOptions(options, responseOptions) {
     }
     let { recordType, isDynamic, idOptions, fields, sublists } = options;
     recordType = validateRecordType(recordType);
-    if (!recordType) {
+    if (!isRecordTypeEnum(recordType)) {
         writeLog(LogTypeEnum.ERROR,
-            `[ERROR processRecordOptions()] Invalid Options:`,
+            `[ERROR processRecordOptions()] Invalid param 'options':`,
             `options is Missing 'recordType' property`,
             `= { recordType: RecordTypeEnum, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
         );
         return null;
     }
-    const missingFieldsAndSublists = (
-        (!fields || typeof fields !== 'object') 
-        && (!sublists || typeof sublists !== 'object')
-    );
-    if (missingFieldsAndSublists) {
+    if (!isObject(fields) && !isObject(sublists)) {
         writeLog(LogTypeEnum.ERROR, 
-            `[ERROR processRecordOptions()] Invalid Options`,
+            `[ERROR processRecordOptions()] Invalid param 'options'`,
             `options is Missing 'fields' and 'sublists' property (must have at least one)`, 
             `options must be an object of type RecordOptions`,
             `= { recordType: RecordTypeEnum, idOptions?: idSearchOptions[], fields?: FieldDictionary, sublists?: SublistDictionary }`
         );
         return null;
     }
+    // writeLog(LogTypeEnum.DEBUG, `calling searchForRecordById...`)
     const deletions = [];
-    /**@type {object | undefined} */
+    /**@type {any | undefined} */
     let rec = undefined;
     isDynamic = typeof isDynamic === 'boolean' ? isDynamic : NOT_DYNAMIC;
     const recId = searchForRecordById(recordType, idOptions, fields) || null;
     const isExistingRecord = typeof recId === 'number' && recId > 0;
-    if (isExistingRecord && fields && isNonEmptyArray(Object.keys(fields))) { 
-        // remove idPropertyEnum values from keys of fields to avoid DUP_ENTITY error.
-        for (const idPropFieldId of Object.values(idPropertyEnum)) {
-            if (fields[idPropFieldId]) { 
-                deletions.push({idProp: idPropFieldId, value: fields[idPropFieldId]});
-                delete fields[idPropFieldId];
-            }
-        }
+    if (isExistingRecord) { 
         rec = record.load({type: recordType, id: recId, isDynamic });
         writeLog(LogTypeEnum.AUDIT, 
             `Loading Existing ${recordType} record with internalid: '${recId}'`,
@@ -159,8 +151,15 @@ function processRecordOptions(options, responseOptions) {
         rec = record.create({type: recordType, isDynamic });
     }
     
-    if (fields && isNonEmptyArray(Object.keys(fields))) {
+    if (isObject(fields)) {
         try {
+            // remove idPropertyEnum values from keys of fields to avoid DUP_ENTITY error.
+            for (const idPropFieldId of Object.values(idPropertyEnum)) {
+                if (fields[idPropFieldId]) { 
+                    deletions.push({idProp: idPropFieldId, value: fields[idPropFieldId]});
+                    delete fields[idPropFieldId];
+                }
+            } 
             rec = processFieldDictionary(rec, recordType, fields);
             writeLog(LogTypeEnum.AUDIT, `[processRecordOptions()] Completed processFieldDictionary`)
 
@@ -173,7 +172,7 @@ function processRecordOptions(options, responseOptions) {
             return null;
         }
     }
-    if (sublists && isNonEmptyArray(Object.keys(sublists))) {
+    if (isObject(sublists)) {
         try {
             rec = processSublistDictionary(rec, recordType, sublists);
             writeLog(LogTypeEnum.AUDIT, 
@@ -209,7 +208,7 @@ function processRecordOptions(options, responseOptions) {
             `an error occurred when calling the save() function.`,
             `recordType: '${recordType}'`,
             `  recordId: '${recId}' (null/undefined if new record)`,
-            `error: ${JSON.stringify(error)}`,
+            `caught: ${error}`,
         );
         return null;
     }
@@ -226,7 +225,7 @@ function processRecordOptions(options, responseOptions) {
         writeLog(LogTypeEnum.ERROR, `[processRecordOptions()] Error processing ResponseOptions`,
             `recordType: ${recordType}`,
             `  recordId: '${recId}' (null/undefined if new record)`,
-            `error: `, error
+            `caught: ${error}`,
         );
         // return result;
     }
@@ -243,36 +242,33 @@ function processRecordOptions(options, responseOptions) {
  * `if` found in the search, or `null` `if` no record was found.
  */
 function searchForRecordById(recordType, idOptions, fields) {
-    if (!recordType || typeof recordType !== 'string' || (!idOptions && !fields)) {
+    if (!isRecordTypeEnum(recordType) || (!idOptions && !isObject(fields))) {
         writeLog(LogTypeEnum.ERROR,
             `[ERROR searchForRecordById()] Invalid Parameters:`,
             `recordType must be a valid RecordTypeEnum or string, and idOptions or fields (with idProps) must be provided`,
         );
         return null;
     }
-    // if no idOptions provided, extract idProperty values from fields
-    if (fields && (!idOptions || isEmptyArray(idOptions))) {
+    // if no idOptions provided && fields provided, extract idProperty values from fields
+    if (isObject(fields) && !(isNonEmptyArray(idOptions))) {
         /**@type {idSearchOptions[]} */
         idOptions = [];
-    }
-    const remainingIdFields = Object.values(idPropertyEnum).filter(
-        idPropFieldId => !idOptions.some(option => option.idProp === idPropFieldId)
-    );
-    for (const idPropFieldId of remainingIdFields) {
-        if (fields[idPropFieldId]) {
-            const idValue = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
-                ? Number(fields[idPropFieldId]) 
-                : String(fields[idPropFieldId])
-            );
-            const searchOperator = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
-                ? SearchOperatorEnum.RECORD.ANY_OF 
-                : SearchOperatorEnum.TEXT.IS
-            );
-            idOptions.push({
-                idProp: idPropFieldId,
-                searchOperator: searchOperator,
-                idValue: idValue
-            });
+        for (const idPropFieldId of Object.values(idPropertyEnum)) {
+            if (fields[idPropFieldId]) {
+                const idValue = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
+                    ? Number(fields[idPropFieldId]) 
+                    : String(fields[idPropFieldId])
+                );
+                const searchOperator = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
+                    ? SearchOperatorEnum.RECORD.ANY_OF 
+                    : SearchOperatorEnum.TEXT.IS
+                );
+                idOptions.push({
+                    idProp: idPropFieldId,
+                    searchOperator: searchOperator,
+                    idValue: idValue
+                });
+            }
         }
     }
     /** 
@@ -282,16 +278,17 @@ function searchForRecordById(recordType, idOptions, fields) {
     if (!isNonEmptyArray(idOptions)) { 
         return null;
     }
+    /**@type {number|null} */
     let recordId = null;
     for (let i = 0; i < idOptions.length; i++) {
-        const { idProp, searchOperator, idValue } = idOptions[i];
-        if (!idProp || !searchOperator || !idValue) {
+        if (!isIdSearchOptions(idOptions[i])) {
             writeLog(LogTypeEnum.ERROR,
-                `ERROR: searchForRecordById() Invalid idOptions element.`,
+                `ERROR: searchForRecordById() Invalid idOptions idSearchOptions element.`,
                 `Invalid idSearchOptions element at idOptions[${i}]`,
             );
             continue;
         }
+        const { idProp, searchOperator, idValue } = idOptions[i];
         try {
             const recSearch = search.create({
                 type: recordType,
@@ -330,12 +327,12 @@ function searchForRecordById(recordType, idOptions, fields) {
              * store recordIds = resultRange.map(result => result.id) 
              */
             if (resultRange.length > 1 && expectSingleResult) {
+                recordId = Number(resultRange[0].id);
                 writeLog(LogTypeEnum.DEBUG,
                     'WARNING: searchForRecordById() Multiple records found.',
                     `${resultRange.length} '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                     `tentatively storing id of first record found,'${recordId}' then continuing to next idOptions element`
                 );
-                recordId = resultRange[0].id;
                 continue;
             } else if (resultRange.length === 1) {
                 writeLog(LogTypeEnum.DEBUG,
@@ -352,8 +349,11 @@ function searchForRecordById(recordType, idOptions, fields) {
             );
             continue;
         }
+        if (recordId !== null) {
+            return recordId
+        }
     }
-    return recordId ? Number(recordId) : null; // null if no record found
+    return recordId; // null if no record found
 }
 
 /**
@@ -364,7 +364,7 @@ function searchForRecordById(recordType, idOptions, fields) {
  * @returns {object} **`rec`** - the record object with field value set or unchanged if `originalValue === value`. 
  */
 function upsertFieldValue(rec, recordType, fieldId, value) {
-    if (!rec || !recordType || !fieldId || typeof fieldId !== 'string') {
+    if (!rec || !isNonEmptyString(recordType) || !isNonEmptyString(fieldId)) {
         writeLog(LogTypeEnum.ERROR, 
             `ERROR: upsertFieldValue() Invalid Parameters:`,
             `rec, recordType, fieldId, and value are required parameters`,
@@ -430,7 +430,7 @@ function upsertFieldValue(rec, recordType, fieldId, value) {
  * @returns **`rec`** - the record object with sublist field value set or unchanged if `originalValue === value`.
  */
 function upsertSublistFieldValue(rec, recordType, sublistId, fieldId, lineIndex, value) {
-    if (!rec || !recordType || !sublistId || !fieldId ) {
+    if (!rec || [recordType, sublistId, fieldId].some(param=>!isNonEmptyString(param))) {
         writeLog(LogTypeEnum.ERROR, 
             `[ERROR upsertSublistFieldValue()] Invalid Parameters:`,
             `rec, recordType, sublistId, fieldId, and value are required parameters`,
@@ -471,7 +471,7 @@ function upsertSublistFieldValue(rec, recordType, sublistId, fieldId, lineIndex,
  * @returns {object} **`rec`** - the record object with field values set.
  */
 function processFieldDictionary(rec, recordType, fields) {
-    if (!rec || !recordType || !fields || isEmptyArray(Object.keys(fields))) {
+    if (!rec || !isNonEmptyString(recordType) || !isObject(fields)) {
         writeLog(LogTypeEnum.ERROR, 
             `[ERROR processFieldDictionary()] Invalid Parameters:`,
             `rec, recordType, and fields are required parameters`,
@@ -506,67 +506,172 @@ function processFieldDictionary(rec, recordType, fields) {
  * @returns {object} **`rec`**
  */
 function processSublistDictionary(rec, recordType, sublists) {
-    const source = `[${EP}.${processSublistDictionary.name}('${recordType}')]`
-    if (!rec || !recordType || !sublists || isEmptyArray(Object.keys(sublists))) {
+    const source = getSourceString(EP, processSublistDictionary.name, recordType)
+    if (!rec || !isNonEmptyString(recordType) || !sublists || isEmptyArray(Object.keys(sublists))) {
         writeLog(LogTypeEnum.ERROR, 
             `${source} Invalid Parameters:`,
             `rec, recordType, and sublists are required parameters`,
         );
         return rec;
     }
+    sublistIdLoop:
     for (let sublistId in sublists) {
-        if (!sublistId || !rec.getSublist({sublistId})) {
+        try {
+            rec.getSublist({sublistId})
+        } catch (error) {
             writeLog(LogTypeEnum.ERROR, 
                 `${source} Invalid sublistId:`,
-                `sublistId '${sublistId}' not found on record type '${recordType}'`
+                `sublistId '${sublistId}' not found on record type '${recordType}'`,
+                `caught: ${error}`
             );
-            continue;
+            continue sublistIdLoop;
         }
-        const sublistLines = sublists[sublistId];
-        sublistLineLoop:
-        for (let i = 0; i < sublistLines.length; i++) {
-            /**@type {SublistLine} */
-            const sublistLine = sublistLines[i];
-            sublistFieldIdLoop:
-            for (const fieldId in sublistLine) {
-                let mappedValue = sublistLine[fieldId];
-                if (isSublistFieldValueUpdate(mappedValue)) {
-                    while (rec.findSublistLineWithValue(mappedValue.lineIdOptions) > -1) {
-                        rec = upsertSublistFieldValue(rec, 
-                            recordType, 
-                            sublistId, 
-                            fieldId,
-                            rec.findSublistLineWithValue(mappedValue.lineIdOptions), 
-                            mappedValue.newValue
-                        )
-                    }
-                    continue sublistFieldIdLoop;
-                } // else is FieldValue | SetSublistSubrecordOptions
-                try {
-                    rec = (isSubrecord(mappedValue)
-                        ? processSublistSubrecordOptions(rec, 
-                            recordType, 
-                            sublistId, 
-                            fieldId, 
-                            validateSublistLineIndex(rec, sublistId, i), 
-                            mappedValue // as SetSublistSubrecordOptions
-                        ) : upsertSublistFieldValue(rec, 
-                            recordType, 
-                            sublistId, 
-                            fieldId, 
-                            validateSublistLineIndex(rec, sublistId, i), 
-                            mappedValue // as FieldValue
-                        )
-                    );
-                } catch (error) {
-                    writeLog(LogTypeEnum.ERROR, 
-                        `${source} sublist: '${sublistId}' Error processing sublist field: '${fieldId}'`,
-                        `isSublistFieldValueUpdate(mappedValue) ? ${isSublistFieldValueUpdate(mappedValue)}`,
-                        `isSubrecord(mappedValue) ? ${isSubrecord(mappedValue)}`, 
-                        `caughtError: ${error}`,
-                    );
-                    continue;
-                }
+        let dictEntryValue = sublists[sublistId];
+        if (isSublistUpdateDictionary(dictEntryValue)) {
+            try {
+                rec = processSublistUpdateDictionary(rec, recordType, sublistId, dictEntryValue) 
+            } catch (error) {
+                writeLog(LogTypeEnum.ERROR,
+                    `${source} Error when processing SublistUpdateDictionary`,
+                    `sublistId '${sublistId}'`, `recordType '${recordType}'`, 
+                    `caught: ${error}`
+                );
+                continue sublistIdLoop;
+            }
+        } else if (isNonEmptyArray(dictEntryValue) && dictEntryValue.every(v=>isObject(v))) {
+            try {
+                rec = processSublistLines(rec, recordType, sublistId, dictEntryValue) 
+            } catch (error) {
+                writeLog(LogTypeEnum.ERROR,
+                    `${source} Error when processing SublistLine array`,
+                    `sublistId '${sublistId}'`, `recordType '${recordType}'`, 
+                    `caught: ${error}`
+                );
+                continue sublistIdLoop;
+            } 
+        } else {
+            writeLog(LogTypeEnum.ERROR,
+                `${source} Invalid value at sublists['${sublistId}']`,
+                `sublistId '${sublistId}'`, `recordType '${recordType}'`, 
+                `Expected: SublistUpdateDictionary or SublistLine[]`,
+                `Received: ${typeof dictEntryValue} = ${dictEntryValue}`
+            );
+            continue sublistIdLoop;
+        }
+    }
+    return rec;
+}
+
+/**
+ * @note only performs each update entry once (i.e. at most 1 line affected)
+ * @param {Record<string, any>} rec 
+ * @param {RecordTypeEnum} recordType 
+ * @param {string} sublistId 
+ * @param {SublistUpdateDictionary} updateDictionary 
+ * @returns {Record<string, any>} **`rec`**
+ */
+function processSublistUpdateDictionary(
+    rec, 
+    recordType, 
+    sublistId, 
+    updateDictionary
+) {
+    const source = getSourceString(EP, processSublistUpdateDictionary.name, sublistId)
+    if (!isObject(rec) 
+        || [recordType, sublistId].some(param=>!isNonEmptyString(param))
+        || !isSublistUpdateDictionary(updateDictionary)) {
+        writeLog(LogTypeEnum.ERROR, `${source} Invalid parameters`)
+        return rec;
+    }
+    sublistFieldIdLoop:
+    for (let fieldId in updateDictionary) {
+        const { newValue, lineIdOptions } = updateDictionary[fieldId];
+        // let numUpdates = 0;
+        // @consideration change back to while loop
+        if (rec.findSublistLineWithValue(lineIdOptions) > -1) {
+            try {
+                rec = (isSetSublistSubrecordOptions(newValue) 
+                    ? processSublistSubrecordOptions(rec, 
+                        recordType, 
+                        sublistId, 
+                        fieldId, 
+                        rec.findSublistLineWithValue(lineIdOptions), 
+                        newValue
+                    ) : upsertSublistFieldValue(rec, 
+                        recordType, 
+                        sublistId, 
+                        fieldId, 
+                        rec.findSublistLineWithValue(lineIdOptions), 
+                        newValue
+                    )
+                );
+                // numUpdates++;
+            } catch (error) {
+                writeLog(LogTypeEnum.ERROR, 
+                    `${source} Error processing sublistUpdateDictionary['${fieldId}']`,
+                    `recordType: '${recordType}'`,
+                    `sublistId: '${sublistId}'`,
+                    `caught: ${error}`
+                );
+                continue sublistFieldIdLoop;
+            }
+        }
+        // writeLog(LogTypeEnum.DEBUG, `${source} numUpdates for fieldId '${fieldId}' = ${numUpdates}`,
+        //     `i.e. changed ${numUpdates} line(s) in ${recordType} sublist '${sublistId}'`
+        // );
+    }
+    return rec;
+}
+
+/**
+ * @param {Record<string, any>} rec 
+ * @param {RecordTypeEnum} recordType 
+ * @param {string} sublistId 
+ * @param {SublistLine[]} sublistLines 
+ * @returns {Record<string, any>}
+ */
+function processSublistLines(
+    rec,
+    recordType, 
+    sublistId, 
+    sublistLines
+) {
+    const source = getSourceString(EP, processSublistLines.name, sublistId);
+    if (!isObject(rec) 
+        || [recordType, sublistId].some(param=>!isNonEmptyString(param))
+        || !isNonEmptyArray(sublistLines)) {
+        writeLog(LogTypeEnum.ERROR, `${source} Invalid parameters`)
+        return rec;
+    }
+    for (let i = 0; i < sublistLines.length; i++) {
+        const sublistLine = sublistLines[i];
+        sublistFieldIdLoop:
+        for (let fieldId of Object.keys(sublistLine)
+                .filter(k=>k !=='line' && k !== 'id')) {
+            let value = sublistLine[fieldId];
+            try {
+                rec = isSetSublistSubrecordOptions(value) 
+                    ? processSublistSubrecordOptions(rec,
+                        recordType, 
+                        sublistId, 
+                        fieldId, 
+                        sublistLine.line ?? validateSublistLineIndex(rec, sublistId, i), 
+                        value // as SetSublistSubrecordOptions
+                    ) : upsertSublistFieldValue(rec,
+                        recordType,
+                        sublistId,
+                        fieldId,
+                        sublistLine.line ?? validateSublistLineIndex(rec, sublistId, i),
+                        value // as FieldValue
+                    )
+            } catch (error) {
+                writeLog(LogTypeEnum.ERROR, 
+                    `${source} Error processing sublistLine['${fieldId}'] at sublistLines[${i}]`,
+                    `recordType: '${recordType}'`,
+                    `sublistId: '${sublistId}'`,
+                    `caught: ${error}`
+                )
+                continue sublistFieldIdLoop;
             }
         }
     }
@@ -590,10 +695,10 @@ function processSublistSubrecordOptions(
     lineIndex, 
     subrecordOptions
 ) {
-    if (!rec || !parentRecordType || typeof parentSublistId !== 'string' 
-        || typeof parentFieldId !== 'string'
-        || typeof lineIndex !== 'number' 
-        || !subrecordOptions || isEmptyArray(Object.keys(subrecordOptions))) {
+    if (!rec 
+        || [parentRecordType, parentSublistId, parentFieldId].some(param=>!isNonEmptyString(param))
+        || !isInteger(lineIndex, true)
+        || !isObject(subrecordOptions)) {
         writeLog(LogTypeEnum.ERROR, 
             `ERROR: processSublistSubrecordOptions() Invalid Parameters:`,
             `rec, parentRecordType, parentSublistId, fieldId, lineIndex, and subrecordOptions are required parameters`,
@@ -617,10 +722,10 @@ function processSublistSubrecordOptions(
             `fieldId '${parentFieldId}' is not a subrecord field of a '${parentRecordType}' record's '${parentSublistId}' sublist`
         );
     }
-    if (fields && isNonEmptyArray(Object.keys(fields))) {
+    if (isObject(fields)) {
         sublistSubrec = processFieldDictionary(sublistSubrec, subrecordType, fields);
     }
-    if (sublists && isNonEmptyArray(Object.keys(sublists))) {
+    if (isObject(sublists)) {
         sublistSubrec = processSublistDictionary(sublistSubrec, subrecordType, sublists);
     }
     return rec;
@@ -634,7 +739,7 @@ function processSublistSubrecordOptions(
  * @returns {object} **`rec`**
  */
 function processFieldSubrecordOptions(rec, parentRecordType, subrecordOptions) {
-    if (!rec || !parentRecordType || !subrecordOptions || isEmptyArray(Object.keys(subrecordOptions))) {
+    if (!rec || !isRecordTypeEnum(parentRecordType) || !isObject(subrecordOptions)) {
         writeLog(LogTypeEnum.ERROR, 
             `ERROR: processFieldSubrecordOptions() Invalid Parameters:`,
             `rec, parentRecordType, and subrecordOptions are required parameters`,
@@ -642,7 +747,7 @@ function processFieldSubrecordOptions(rec, parentRecordType, subrecordOptions) {
         return rec;
     }
     let { fieldId, fields, sublists, subrecordType } = subrecordOptions;
-    if (!fieldId || typeof fieldId !== 'string') {
+    if (!isNonEmptyString(fieldId)) {
         writeLog(LogTypeEnum.ERROR, 
             `processFieldSubrecordOptions() - Invalid parameter: subrecordOptions`, 
             '(fieldId: string) is required property of subrecordOptions'
@@ -658,10 +763,10 @@ function processFieldSubrecordOptions(rec, parentRecordType, subrecordOptions) {
         );
         return rec;
     }
-    if (fields && isNonEmptyArray(Object.keys(fields))) {
+    if (isObject(fields)) {
         subrec = processFieldDictionary(subrec, subrecordType, fields);
     }
-    if (sublists && isNonEmptyArray(Object.keys(sublists))) {
+    if (isObject(sublists)) {
         subrec = processSublistDictionary(subrec, subrecordType, sublists);
     }
     return rec;
@@ -673,7 +778,7 @@ function processFieldSubrecordOptions(rec, parentRecordType, subrecordOptions) {
  * @returns {FieldDictionary} **`fields`** = {@link FieldDictionary}
  */
 function getResponseFields(rec, responseFields) {
-    if (!rec || !responseFields || (typeof responseFields !== 'string' && !isNonEmptyArray(responseFields))) {
+    if (!rec || (!isNonEmptyString(responseFields) && !isNonEmptyArray(responseFields))) {
         writeLog(LogTypeEnum.ERROR, 
             'getResponseFields() Invalid parameters', 
             'rec (object) and responseFields (string | string[]) are required'
@@ -714,7 +819,7 @@ function getResponseFields(rec, responseFields) {
  * @returns {SublistDictionary | {[sublistId: string]: SublistLine[]}} **`sublists`** = {@link SublistDictionary}
  */
 function getResponseSublists(rec, responseSublists) {
-    if (!rec || !responseSublists || isEmptyArray(Object.keys(responseSublists))) {
+    if (!rec || !isObject(responseSublists)) {
         writeLog(LogTypeEnum.ERROR, 
             '[getResponseSublists()] Invalid parameters', 
             'rec and responseSublists are required'
@@ -885,21 +990,45 @@ function getCurrentPacificTime() {
 function isSubrecord(value) {
     const isNonEmptyObject = Boolean(isObject(value) 
         && !Array.isArray(value)
-        && !isSublistFieldValueUpdate(value) 
-        && isNonEmptyArray(Object.keys(value))
+        && !isSublistFieldValueUpdate(value)
     );
     const isNotDate = Boolean(value 
         && !value.hasOwnProperty('getVarDate') 
         && !value.hasOwnProperty('toLocaleString')
     );
-    const isSetSubrecordOptions = Boolean(value 
-        && (value.hasOwnProperty('fieldId') || value.hasOwnProperty('subrecordType'))
-        && (value.hasOwnProperty('fields') || value.hasOwnProperty('sublists'))
-    );
-    const isSubrecord = Boolean(isNonEmptyObject 
-        && (isSetSubrecordOptions || isNotDate)
+    const isSubrecord = (isNonEmptyObject 
+        && (isSetSublistSubrecordOptions(value)
+            || isSetFieldSubrecordOptions(value)
+            || isNotDate
+        )
     );
     return isSubrecord;
+}
+
+/**
+ * @param {any} value 
+ * @returns {value is SetSublistSubrecordOptions}
+ */
+function isSetSublistSubrecordOptions(value)  {
+    /**@type {SetSublistSubrecordOptions} */
+    const candidate = value;
+    return (isSetFieldSubrecordOptions(value)
+        && isNonEmptyString(candidate.sublistId)
+    );
+}
+
+/**
+ * @param {any} value 
+ * @returns {value is SetFieldSubrecordOptions}
+ */
+function isSetFieldSubrecordOptions(value)  {
+    /**@type {SetFieldSubrecordOptions} */
+    const candidate = value;
+    return (isObject(candidate)
+        && isNonEmptyString(candidate.fieldId)
+        && isNonEmptyString(candidate.subrecordType)
+        && (isObject(candidate.fields) || isObject(candidate.sublists))
+    );
 }
 
 
@@ -908,7 +1037,7 @@ function isSubrecord(value) {
  * @returns {RecordTypeEnum | null} **`recordType`** - the validated record type as a `RecordTypeEnum` value, or `null` if the record type is invalid.
  */
 function validateRecordType(recordType) {
-    if (!recordType || typeof recordType !== 'string') {
+    if (!isNonEmptyString(recordType)) {
         return null;
     }
     const isKey = Object.keys(RecordTypeEnum).includes(recordType.toUpperCase());
@@ -1038,7 +1167,18 @@ function hasNonTrivialKeys(obj) {
     });
 return hasKeyWithNonTrivialValue;
 }
-
+/**
+ * @param value `any`
+ * @param requireNonNegative `boolean`
+ * - `if` `true` then require that `value` be an integer `>= 0`
+ * - `if` `false` then the sign of the number doesn't matter
+ * @returns **`isInteger`** `boolean`
+ */
+function isInteger(value, requireNonNegative = false) {
+    return (typeof value === 'number'
+        && Number.isInteger(value)
+        && (requireNonNegative ? value >= 0 : true));
+}
 
 /**
  * @param value `any`
@@ -1099,18 +1239,18 @@ function hasKeys(obj, keys, requireAll = true, restrictKeys = false) {
 
 /**
  * @param value `any`
- * @param allowEmpty `boolean` `default = true`
- * - `if` `true` then `value` is allowed to be an empty object
- * - `if` `false` then `value` must have at least 1 key
- * @param allowArray `boolean` `default = false`
- * - `if` `true` then `value` is allowed to be an array
- * - `if` `false` then `value` must not be an array
- * @returns {value is Record<string, any>} **`isObject`** `boolean` `value is Record<string, any>`
+ * @param requireNonEmpty `boolean` `default = true`
+ * - `if` `true` then `value` must have at least 1 key
+ * - `if` `false` then `value` is allowed to be an empty object
+ * @param requireNonArray `boolean` `default = true`
+ * - `if` `true` then `value` must not be an array
+ * - `if` `false` then `value` is allowed to be an array
+ * @returns **`isObject`** `boolean` `value is Record<string, any>`
  */
-function isObject(value, allowEmpty = true, allowArray = false) {
-    return Boolean(value && typeof value === 'object'
-        && (allowArray || !Array.isArray(value))
-        && (allowEmpty || Object.keys(value).length > 0)
+function isObject(value, requireNonEmpty = true, requireNonArray = true) {
+    return (value && typeof value === 'object'
+        && (requireNonArray ? !Array.isArray(value) : true)
+        && (requireNonEmpty ? Object.keys(value).length > 0 : true)
     );
 }
 
@@ -1166,12 +1306,28 @@ function isRecordResponseOptions(value) {
  * @param {any} value 
  * @returns {value is FindSublistLineWithValueOptions} **`isFindSublistLineWithValueOptions`** `boolean`
  */
-function isFindSublistLineWithValueOptions(value){
+function isFindSublistLineWithValueOptions(value) {
     return (isObject(value)
         && hasKeys(value, ['sublistId', 'fieldId', 'value'], true, true)
         && isNonEmptyString(value.sublistId)
         && isNonEmptyString(value.fieldId)
     )
+}
+
+/**
+ * @param {any} value 
+ * @returns {value is SublistUpdateDictionary}
+ */
+function isSublistUpdateDictionary(value) {
+    /**@type {SublistUpdateDictionary} */
+    const candidate = value;
+    return (isObject(candidate)
+        && Object.keys(candidate).every(k=>isNonEmptyString(k)
+            && isObject(candidate[k])
+            && candidate[k].newValue !== undefined
+            && isFindSublistLineWithValueOptions(candidate[k].lineIdOptions)
+        )
+    );
 }
 
 /**
@@ -1184,7 +1340,25 @@ function isSublistFieldValueUpdate(value) {
         && isFindSublistLineWithValueOptions(value.lineIdOptions)
     );
 }
-
+/**
+ * @param fileName `string`
+ * @param func `Function | string` - function name or function itself (to get Function.name)
+ * @param funcInfo `any` `(optional)` - context or params of func (converted to string)
+ * @param startLine `number` `(optional)`
+ * @param endLine `number` `(optional)`
+ * @returns **`sourceString`** `string` to use in log statements or argumentValidation calls
+ */
+function getSourceString(fileName, func, funcInfo, startLine, endLine) {
+    let lineNumberText = (isInteger(startLine)
+        ? `:${startLine}`
+        : '');
+    lineNumberText = (isNonEmptyString(lineNumberText)
+        && isInteger(endLine)
+        ? lineNumberText + `-${endLine}`
+        : '');
+    let funcName = typeof func === 'string' ? func : func.name;
+    return `[${fileName}.${funcName}(${funcInfo ?? ''})${lineNumberText}]`;
+}
 
 /*------------------------ [ Types, Enums, Constants ] ------------------------*/
 /** create/load a record in standard mode by setting `isDynamic` = `false` = `NOT_DYNAMIC`*/
@@ -1210,7 +1384,7 @@ INVENTORY_DETAIL: 'inventorydetail'
  * @typedef {Object} RecordRequest
  * @property {RecordOptions | Array<RecordOptions>} recordOptions = {@link RecordOptions} | `Array<`{@link RecordOptions}`>`
  * - {@link RecordOptions} = `{ recordType: `{@link RecordTypeEnum}`, isDynamic?: boolean, idOptions?: `{@link idSearchOptions}`[], fields?: `{@link FieldDictionary}`, sublists?: `{@link SublistDictionary}` }`
- * @property {RecordResponseOptions} [responseOptions] = {@link RecordResponseOptions} = `{ responseFields: string | string[], responseSublists: Record<string, string | string[]> }`
+ * @property {RecordResponseOptions} [responseOptions] = {@link RecordResponseOptions}
  */
 
 /**Type: RecordResponse {@link RecordResponse} */
@@ -1248,7 +1422,7 @@ INVENTORY_DETAIL: 'inventorydetail'
  * @property {number} internalid
  * @property {string | RecordTypeEnum} recordType
  * @property {FieldDictionary} fields
- * @property {SublistDictionary} sublists
+ * @property {{[fieldId: string]: FieldValue | SubrecordValue}} sublists
  */
 
 
@@ -1272,7 +1446,7 @@ INVENTORY_DETAIL: 'inventorydetail'
 /** Type: **`SublistDictionary`** {@link SublistDictionary} */
 /**
  * @typedef {{
- * [sublistId: string]: Array<SublistLine>
+ * [sublistId: string]: Array<SublistLine> | SublistUpdateDictionary
  * }} SublistDictionary
  */
 
@@ -1284,8 +1458,17 @@ INVENTORY_DETAIL: 'inventorydetail'
  * - = `rec.getSublistValue({sublistId: 'addressbook', fieldId: 'id', line: 0})` (type = number)
  * - (returns the `'internalid'` of the addressbook entry.)
  * @typedef {{
- * [fieldId: string]: SublistFieldValueUpdate | FieldValue | SubrecordValue
+ * [fieldId: string]: FieldValue | SubrecordValue
  * }} SublistLine
+ */
+
+/**
+ * @typedef {{
+ * [fieldId: string]: {
+ * newValue: FieldValue | SubrecordValue
+ * lineIdOptions: FindSublistLineWithValueOptions
+ * }
+ * }} SublistUpdateDictionary
  */
 
 /**

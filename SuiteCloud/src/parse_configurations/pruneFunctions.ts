@@ -7,6 +7,7 @@ import {
 } from "../config/setupLog";
 import { 
     FieldDictionary,
+    isSublistUpdateDictionary,
     RecordOptions,
     SetFieldSubrecordOptions,
     SetFieldValueOptions,
@@ -134,7 +135,8 @@ export const pruneAddressBook = (
         return null;
     }
     const linesToKeep: number[] = [];
-    let addressBook = options.sublists.addressbook || [] as SublistLine[];
+    let addressBook = options.sublists.addressbook ?? [];
+    if (isSublistUpdateDictionary(addressBook)) return options
     for (let i = 0; i < addressBook.length; i++) {
         const sublistLine = addressBook[i];
         let addressOptions = sublistLine.addressbookaddress as SetSublistSubrecordOptions;
@@ -227,7 +229,7 @@ export const salesOrder = async (
         );
     }
     const itemSublist = options.sublists.item;
-    if (itemSublist.some(lineItem => 
+    if (isNonEmptyArray(itemSublist) && itemSublist.some(lineItem => 
         lineItem.amount === null || lineItem.amount === undefined 
         || (Number(lineItem.amount) < 0))) {
         mlog.error([`${source}: lineItem.amount is < 0`,

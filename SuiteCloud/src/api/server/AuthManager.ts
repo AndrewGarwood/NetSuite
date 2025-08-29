@@ -21,13 +21,19 @@ import {
 import { 
     readJsonFileAsObject as read
 } from "typeshi/dist/utils/io/reading";
-import { getCurrentPacificTime } from "typeshi/dist/utils/io/dateTime";
+import { getCurrentPacificTime, calculateDifferenceOfDateStrings, TimeUnitEnum } from "typeshi/dist/utils/io/dateTime";
 import { 
     mainLogger as mlog, apiLogger as alog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
     simpleLogger as slog
 } from "../../config/setupLog";
+import * as validate from "@typeshi/argumentValidation";
+import { getSourceString } from "@typeshi/io";
+import { extractFileName } from "@typeshi/regex";
+import { isInteger } from "@typeshi/typeValidation";
 
 export { AuthManager, TokenStatus, AuthState, type AuthOptions, type TokenMetadata };
+
+const F = extractFileName(__filename);
 
 // ============================================================================
 // TYPES
@@ -210,9 +216,9 @@ class AuthManager {
     // ========================================================================
     /**
      * @param tokenResponse {@link TokenResponse} - use tokenResponse to determine value of these variables:
-     * 1. `lastUpdateMs` = `new Date(tokenResponse.lastUpdated).getTime()`
+     * 1. ~~`lastUpdateMs` = `new Date(tokenResponse.lastUpdatedLocaleString).getTime()`~~
      * 2. `expiresInMs` = `tokenResponse.expires_in * 1000`
-     * 3. `expiresAt` = `lastUpdatedMs + expiresInMs`
+     * 3. `expiresAt` = **`tokenResponse.lastUpdated`**` + expiresInMs`
      * 4. `now` = `Date.now()`
      * 5. `isExpired` = `now >= expiresAt - this.options.tokenBufferMs`
      * @returns **`tokenStatus`** — {@link TokenStatus}
@@ -222,23 +228,23 @@ class AuthManager {
      * - {@link TokenStatus.INVALID} `if` `!tokenResponse.expires_in || !tokenResponse.lastUpdated`
      */
     private validateTokenResponse(tokenResponse: TokenResponse): TokenStatus {
+        const source = getSourceString(F, this.validateTokenResponse.name);
         if (!tokenResponse || !tokenResponse.access_token) {
             return TokenStatus.MISSING;
         }
-        if (!tokenResponse.expires_in || !tokenResponse.lastUpdated) {
+        if (!tokenResponse.expires_in || !isInteger(tokenResponse.lastUpdated)) {
             return TokenStatus.INVALID;
         }
         try {
-            const lastUpdatedMs = new Date(tokenResponse.lastUpdated).getTime();
             const expiresInMs = tokenResponse.expires_in * 1000;
-            const expiresAt = lastUpdatedMs + expiresInMs;
+            const expiresAt = tokenResponse.lastUpdated + expiresInMs;
             const now = Date.now();
             if (now >= expiresAt - this.options.tokenBufferMs) {
                 return TokenStatus.EXPIRED;
             }
             return TokenStatus.VALID;
         } catch (error) {
-            mlog.error('[AuthManager.validateTokenResponse()] Error validating token response:', error);
+            mlog.error(`${source} Error validating token response:`, error);
             return TokenStatus.INVALID;
         }
     }
@@ -255,7 +261,7 @@ class AuthManager {
             const token = read(filePath) as TokenResponse;
             return token || null;
         } catch (error) {
-            mlog.warn(`[AuthManager.loadTokenFromFile()] Failed to load token from ${filePath}:`, error);
+            mlog.warn(`${getSourceString(F, this.loadTokenFromFile.name)} Failed to load token from ${filePath}:`, error);
             return null;
         }
     }
@@ -267,13 +273,11 @@ class AuthManager {
      */
     public getCurrentValidToken(): { token: TokenResponse; source: string } | null {
         const step3Token = this.loadTokenFromFile(STEP3_TOKENS_PATH);
-        if (step3Token 
-            && this.validateTokenResponse(step3Token) === TokenStatus.VALID) {
+        if (step3Token && this.validateTokenResponse(step3Token) === TokenStatus.VALID) {
                 return { token: step3Token, source: 'STEP3' };
         }
         const step2Token = this.loadTokenFromFile(STEP2_TOKENS_PATH);
-        if (step2Token 
-            && this.validateTokenResponse(step2Token) === TokenStatus.VALID) {
+        if (step2Token && this.validateTokenResponse(step2Token) === TokenStatus.VALID) {
             return { token: step2Token, source: 'STEP2' };
         }
 
@@ -298,33 +302,33 @@ class AuthManager {
         operationName: string,
         maxRetries: number = this.options.maxRetries
     ): Promise<T> {
+        const source = getSourceString(F, this.retryOperation.name, operationName);
         let lastError: Error | null = null;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                alog.debug(`[AuthManager.retryOperation()] ${operationName} attempt ${attempt}/${maxRetries}`);
+                alog.debug(`${source} attempt ${attempt}/${maxRetries}`);
                 const result = await operation();
                 // Reset error count on success
                 if (this.tokenMetadata) {
                     this.updateTokenMetadata({ errorCount: 0 });
                 }
                 return result;
-            } catch (error) {
+            } catch (error: any) {
                 lastError = error as Error;
                 if (this.tokenMetadata) {
                     this.updateTokenMetadata({ 
                         errorCount: this.tokenMetadata.errorCount + 1 
                     });
                 }
-                mlog.warn(`[AuthManager.retryOperation()] ${operationName} attempt ${attempt} of ${maxRetries} failed:`, error);
-                if (attempt < maxRetries) {
-                    // Exponential backoff
+                mlog.warn(`${source} attempt ${attempt} of ${maxRetries} failed:`, error?.message);
+                if (attempt < maxRetries) { // Exponential backoff
                     const delayMs = this.options.retryDelayMs * Math.pow(2, attempt - 1); 
-                    alog.debug(`[AuthManager.retryOperation()] Retrying ${operationName} in ${delayMs}ms...`);
+                    alog.debug(`${source} Retrying ${operationName} in ${delayMs}ms...`);
                     await this.delay(delayMs);
                 }
             }
         }
-        throw new Error(`[AuthManager.retryOperation()] ${operationName} failed after ${maxRetries} attempts. Last error: ${lastError?.message}`);
+        throw new Error(`${source} ${operationName} failed after ${maxRetries} attempts. Last error: ${lastError?.message}`);
     }
     /**
      * performs the {@link retryOperation} 'authCodeOperation'
@@ -332,6 +336,7 @@ class AuthManager {
      * @returns **`tokenResponse`** — `Promise<`{@link TokenResponse}`>`
      */
     private async exchangeAuthCode(authCode: string): Promise<TokenResponse> {
+        const source = getSourceString(F, this.exchangeAuthCode.name);
         const operation = async () => {
             const params = this.generateGrantParams({code: authCode});
             const response = await axios.post(TOKEN_URL, params.toString(), {
@@ -345,10 +350,11 @@ class AuthManager {
                 timeout: 10000 // 10 second timeout
             });
             if (!response.data || !(response.data as any).access_token) {
-                throw new Error('Invalid token response: missing access_token');
+                throw new Error(`${source} Invalid token response: missing 'access_token'`);
             }
             const tokenResponse = response.data as TokenResponse;
-            tokenResponse.lastUpdated = getCurrentPacificTime();
+            tokenResponse.lastUpdated = Date.now();
+            tokenResponse.lastUpdatedLocaleString = getCurrentPacificTime();
             write(tokenResponse, STEP2_TOKENS_PATH);
             const expiresAt = Date.now() + (tokenResponse.expires_in * 1000);
             this.updateTokenMetadata({
@@ -358,7 +364,7 @@ class AuthManager {
             });
             return tokenResponse;
         };
-        return this.retryOperation(operation, 'exchangeAuthCode');
+        return this.retryOperation(operation, this.exchangeAuthCode.name);
     }
     /**
      * @description 
@@ -394,7 +400,8 @@ class AuthManager {
                 throw new Error('[AuthManager.exchangeRefreshToken()] Invalid refresh token response: missing access_token');
             }
             const tokenResponse = response.data as TokenResponse;
-            tokenResponse.lastUpdated = getCurrentPacificTime();
+            tokenResponse.lastUpdated = Date.now();
+            tokenResponse.lastUpdatedLocaleString = getCurrentPacificTime();
             // Save to STEP3 file
             write(tokenResponse, STEP3_TOKENS_PATH);
             this.updateTokenMetadata({
@@ -404,32 +411,35 @@ class AuthManager {
             });
             return tokenResponse;
         }
-        return this.retryOperation(operation, 'exchangeRefreshToken');
+        return this.retryOperation(operation, this.exchangeRefreshToken.name);
     }
     /**
      * @returns `Promise<string>`
      */
     private async getAuthCode(): Promise<string> {
+        const source = getSourceString(F, this.getAuthCode.name);
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 this.closeServer();
-                reject(new Error('Authorization timeout - no callback received within 5 minutes'));
+                reject(new Error(`${source} Authorization timeout - no callback received within 5 minutes`));
             }, 5 * 60 * 1000); // 5 minute timeout
             this.app.get('/callback', (req: Request, res: Response) => {
                 clearTimeout(timeout);
                 const authCode = req.query.code as string;
                 const error = req.query.error as string;
-                const errorDescription = req.query.error_description as string;
+                const errorDescription = req.query.error_description as string ?? 'Unknown error';
                 if (error) {
-                    res.status(400).send(`Authorization failed: ${error} - ${errorDescription || 'Unknown error'}`);
+                    let msg = `${source} Authorization failed: ${error} - ${errorDescription}`;
+                    res.status(400).send(msg);
                     this.closeServer();
-                    reject(new Error(`OAuth authorization failed: ${error} - ${errorDescription}`));
+                    reject(new Error(msg));
                     return;
                 }
                 if (!authCode) {
-                    res.status(400).send('Authorization failed: No authorization code received');
+                    let msg = `${source} Authorization failed: No authorization code received`;
+                    res.status(400).send(msg);
                     this.closeServer();
-                    reject(new Error('No authorization code received from OAuth callback'));
+                    reject(new Error(msg));
                     return;
                 }
                 /**`<html><body><h2>...</h2><p>...</p><script>{time out for 2 seconds then close window}</script></body></html>` */
@@ -454,19 +464,21 @@ class AuthManager {
                     scope: SCOPE,
                     state: require('crypto').randomBytes(32).toString('hex')
                 }).toString();
-                mlog.info(`[AuthManager.getAuthCode()] Server listening on port ${SERVER_PORT} for OAuth callback`, 
-                    NL+'Opening authorization URL...');
-                open(authLink).catch((err) => {
-                    mlog.error('[AuthManager.getAuthCode()] Failed to open authorization URL:', err);
+                slog.info(`${source} Server listening on port ${SERVER_PORT} for OAuth callback`, 
+                    NL+' -- Opening authorization URL...');
+                open(authLink).catch((err: any) => {
+                    let msg = `${source} Failed to open authorization URL: ${err.message}`
+                    mlog.error(msg);
                     clearTimeout(timeout);
                     this.closeServer();
-                    reject(new Error(`Failed to open authorization URL: ${err.message}`));
+                    reject(new Error(msg));
                 });
             });
             this.server.on('error', (error) => {
+                let msg = `${source} OAuth server error: ${error.message}`
                 clearTimeout(timeout);
-                mlog.error('[AuthManager.getAuthCode()] Server error:', error);
-                reject(new Error(`[AuthManager.getAuthCode()] OAuth server error: ${error.message}`));
+                mlog.error(msg);
+                reject(new Error(msg));
             });
         });
     }
@@ -505,27 +517,43 @@ class AuthManager {
     // ========================================================================
 
     private async performTokenRefresh(): Promise<TokenResponse> {
-        slog.info('[AuthManager.performTokenRefresh()] Attempting token refresh...');
+        const source = getSourceString(F, this.performTokenRefresh.name);
+        slog.info(`${source} Attempting token refresh...`);
         // Try to get existing tokens for refresh
         const step2Token = this.loadTokenFromFile(STEP2_TOKENS_PATH);
         const step3Token = this.loadTokenFromFile(STEP3_TOKENS_PATH);
+        if (!step2Token && !step3Token) {
+            mlog.warn([
+                `${source} No TokenResponse loaded from step2 or step3`,
+                `step 2 token path: '${STEP2_TOKENS_PATH}'`,
+                `step 3 token path: '${STEP3_TOKENS_PATH}'`,
+                ].join(TAB), 
+                NL+`Performing full authorization...`,
+            );
+            return this.performFullAuthorization();
+        }
         // Get the most recent refresh token
         let refreshToken: string | null = null;
-        if (step3Token?.refresh_token) {
+        if (step3Token && step3Token.refresh_token
+            && this.validateTokenResponse(step3Token) === TokenStatus.VALID) {
             refreshToken = step3Token.refresh_token;
-        } else if (step2Token?.refresh_token) {
+        } else if (step2Token && step2Token?.refresh_token
+            && this.validateTokenResponse(step2Token) === TokenStatus.VALID) {
             refreshToken = step2Token.refresh_token;
         }
         if (refreshToken) {
             try {
                 const refreshedTokens = await this.exchangeRefreshToken(refreshToken);
-                slog.info('[AuthManager.performTokenRefresh()] Token refresh successful');
+                slog.info(' -- Token refresh successful');
                 return refreshedTokens;
-            } catch (error) {
-                mlog.warn('[AuthManager.performTokenRefresh()] Token refresh failed, falling back to full authorization:', error);
+            } catch (error: any) {
+                mlog.warn([
+                    `${source} Token refresh failed`+(error && error.message ? error.message : ''),
+                    `Falling back to full authorization`,
+                ].join(NL));
             }
         } else {
-            mlog.warn('[AuthManager.performTokenRefresh()] No refresh token available, performing full authorization');
+            mlog.warn(`${source} No refresh token available, performing full authorization`);
         }
         // Fallback to full authorization flow
         return this.performFullAuthorization();
@@ -534,10 +562,11 @@ class AuthManager {
      * performs step 1 and step 2 of the OAuth authorization flow:
      * - {@link getAuthCode} -> {@link exchangeAuthCode} return {@link TokenResponse} */
     private async performFullAuthorization(): Promise<TokenResponse> {
-        mlog.info('[AuthManager.performFullAuthorization()] Starting full OAuth authorization flow...');
+        const source = getSourceString(F, this.performFullAuthorization.name);
+        slog.info(`${source} Starting full OAuth authorization flow...`);
         const authCode = await this.getAuthCode();
         const tokenResponse = await this.exchangeAuthCode(authCode);
-        slog.info('[AuthManager.performFullAuthorization()] Full authorization flow completed successfully');
+        slog.info(`${source} Full authorization flow completed successfully!`);
         return tokenResponse;
     }
 
@@ -570,8 +599,9 @@ class AuthManager {
     // ========================================================================
 
     public async getAccessToken(): Promise<string> {
+        const source = getSourceString(F, this.getAccessToken.name);
         if (this.state !== AuthState.IDLE && this.options.enableQueueing) {
-            alog.debug('[AuthManager.getAccessToken()] Token acquisition in progress, queueing request...');   
+            mlog.debug(`${source} Token acquisition in progress, queueing request...`);   
             return new Promise<string>((resolve, reject) => {
                 const request: PendingRequest = {
                     resolve,
@@ -582,7 +612,7 @@ class AuthManager {
                 const cutoff = Date.now() - 2 * 60 * 1000;
                 this.pendingRequests = this.pendingRequests.filter(req => {
                     if (req.timestamp < cutoff) {
-                        req.reject(new Error('[AuthManager.getAccessToken()] Request timeout - queued too long'));
+                        req.reject(new Error(`${source} Request timeout - queued too long`));
                         return false;
                     }
                     return true;
@@ -596,31 +626,31 @@ class AuthManager {
         try {
             const current = this.getCurrentValidToken();
             if (current) {
-                alog.debug(`[AuthManager.getAccessToken()] Using valid '${current.source}' token`);
+                slog.debug(`${source} Using valid '${current.source}' token`);
                 this.lastTokenResponse = current.token;
                 this.resolvePendingRequests(current.token.access_token);
                 return current.token.access_token;
             }
             this.state = AuthState.REFRESHING;
-            mlog.info('[AuthManager.getAccessToken()] No valid token found, acquiring new token...');
+            mlog.info(`${source} No valid token found, acquiring new token...`);
             let tokenResponse: TokenResponse;
             try { // try refresh first
                 tokenResponse = await this.performTokenRefresh();
                 this.state = AuthState.IDLE;
             } catch (refreshError) {
-                mlog.warn('[AuthManager.getAccessToken()] Token refresh failed, attempting full authorization:', refreshError);
+                mlog.warn(`${source} Token refresh failed, attempting full authorization:`, refreshError);
                 this.state = AuthState.AUTHORIZING;
                 tokenResponse = await this.performFullAuthorization();
                 this.state = AuthState.IDLE;
             }
             this.lastTokenResponse = tokenResponse;
-            slog.info('[AuthManager.getAccessToken()] Token acquisition successful');
+            slog.info(`${source} Token acquisition successful`);
             this.resolvePendingRequests(tokenResponse.access_token);
             return tokenResponse.access_token;
             
-        } catch (error) {
+        } catch (error: any) {
             this.state = AuthState.ERROR;
-            mlog.error('[AuthManager.getAccessToken()] Token acquisition failed:', error);  
+            mlog.error(`${source} Token acquisition failed:`, error);  
             this.updateTokenMetadata({ status: TokenStatus.INVALID }); 
             const errorMessage = `Failed to acquire access token: ${error instanceof Error ? error.message : 'Unknown error'}`;
             const finalError = new Error(errorMessage);
@@ -649,7 +679,10 @@ class AuthManager {
             pendingRequests: this.pendingRequests.length
         };
     }
-    
+    /**
+     * 
+     * @returns **`isValid`** `Promise<boolean>`
+     */
     public async validateCurrentToken(): Promise<boolean> {
         const current = this.getCurrentValidToken();
         if (!current) {

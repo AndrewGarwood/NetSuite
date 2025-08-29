@@ -9,14 +9,16 @@ import {
 import { isNonEmptyArray, isEmptyArray, hasKeys, isNullLike as isNull,
     isNonEmptyString, 
     isStringArray,
-    isIntegerArray
+    isIntegerArray,
+    isObject,
+    isEmpty
 } from "typeshi:utils/typeValidation";
 import { 
     mainLogger as mlog, parseLogger as plog, simpleLogger as slog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING, 
     getSkuDictionary,
     DELAY,
-    getProjectFolders
+    getProjectFolders, isEnvironmentInitialized, isDataInitialized
 } from "./config";
 import { getColumnValues, getRows, 
     writeObjectToJsonSync as write, readJsonFileAsObject as read, 
@@ -25,7 +27,9 @@ import { getColumnValues, getRows,
     getFileNameTimestamp,
     indentedStringify,
     isFile,
-    getSourceString
+    getSourceString, clearFile, trimFile,
+    getCurrentPacificTime,
+    autoFormatLogsOnExit
 } from "typeshi:utils/io";
 import * as validate from "typeshi:utils/argumentValidation";
 import path from "node:path";
@@ -41,14 +45,411 @@ import {
     isIdOptions,
     isChildOptions,
     isIdSearchOptions,
-    RecordResult,
+    RecordResult, isRecordResult,
     partitionArrayBySize,
-    RecordResponseOptions
+    RecordResponseOptions,
+    instantiateAuthManager,
+    FieldDictionary,
+    isRecordResponseOptions,
+    FieldValue,
+    SubrecordValue,
+    SublistUpdateDictionary,
+    FindSublistLineWithValueOptions,
+    isAuthInitialized,
 } from "./api";
-import { CleanStringOptions, clean, extractFileName, extractLeaf } from "typeshi:utils/regex"
+import { CleanStringOptions, StringReplaceOptions, clean, extractFileName, extractLeaf } from "typeshi:utils/regex"
 import { CLEAN_ITEM_ID_OPTIONS } from "src/parse_configurations/evaluators";
+import { putTransactions } from "src/pipelines";
 
 const F = extractFileName(__filename);
+
+// quantitybilled
+let tranResponseOptions = {
+    fields: ['externalid', 'tranid', 'amount', 'memo', 'total'],
+    sublists: {
+        item: ['id', 'item', 'quantity', 'rate']
+    }
+}
+let placeholders: Required<RecordResult>[] | null = [];
+
+type TransactionUpdateDictionary = {
+    [tranInternalId: string]: TransactionUpdate
+}
+
+type TransactionUpdate = {
+    tranType: RecordTypeEnum;
+    replacements: ReplacementDictionary;
+    fields?: FieldDictionary;
+    originalTotal: number;
+}
+
+type ReplacementDictionary = {
+    [newItemInternalId: string]: {
+        newItemId: string;
+        oldItemInternalId: string;
+        quantity: number;
+        rate: number;
+    }
+}
+
+type ReconcileState = {
+    /** map itemId to list of tranInternalId */
+    firstUpdateCompleted: { 
+        [itemId: string]: string[] 
+    };
+    itemsDeleted: string[];
+    itemsCreated: string[];
+    /** map itemId to list of tranInternalId */
+    secondUpdateCompleted:  { 
+        [itemId: string]: string[] 
+    }
+    
+}
+
+let reconcileState: ReconcileState | null = null;
+export function getReconcileState(): ReconcileState {
+    if (!reconcileState) {
+        throw new Error(`${getSourceString(F, getReconcileState.name)} state has not been loaded yet`);
+    }
+    return reconcileState;
+}
+
+export async function reconcileItems(): Promise<any> {
+    const source = getSourceString(F, reconcileItems.name);
+    if (!isEnvironmentInitialized()) {
+        throw new Error(`${source} environment not initialized`)
+    }
+    if (!isDataInitialized()) {
+        throw new Error(`${source} project data not initialized`)
+    }
+    if (!isAuthInitialized()) {
+        throw new Error(`${source} auth manager not initialized`)
+    }
+    
+    let wDir = path.join(getProjectFolders().dataDir, 'workspace');
+    validate.existingDirectoryArgument(source, {wDir});
+    reconcileState = read(path.join(wDir, 'state.json')) as ReconcileState;
+    validate.objectArgument(source, {reconcileState})
+    let state = getReconcileState();
+    let itemsToDelete: string[] = [];
+    placeholders = (read(path.join(wDir, 'item_placeholders.json')) as { 
+        placeholders: Required<RecordResult>[]
+    }).placeholders;
+    validate.arrayArgument(source, {placeholders, isRecordResult});
+
+    let targetItems = read(path.join(wDir, 'items_to_salesorders.json')) as {
+        [itemId: string]: RecordResult[]
+    };
+    let initialReplacements: { [itemId: string]: TransactionUpdateDictionary } = {}
+    for (let itemId of Object.keys(targetItems).slice(0,1)) {
+        initialReplacements[itemId] = await generateItemTransactionUpdates(
+            itemId, 
+            targetItems[itemId]
+        )
+    }
+    write(initialReplacements, path.join(wDir, 'initial_replacements.json'));
+    itemLoop:
+    for (let [itemId, tranUpdateDict] of Object.entries(initialReplacements)) {
+        if (!state.firstUpdateCompleted[itemId]) {
+            state.firstUpdateCompleted[itemId] = []
+        }
+        let tranKeys = Object.keys(tranUpdateDict);
+        tranLoop:
+        for (let tranInternalId of tranKeys) {
+            const intermediateUpdate = tranUpdateDict[tranInternalId];
+            if (state.firstUpdateCompleted[itemId].includes(tranInternalId)) continue tranLoop;
+            // let success = await performIntermediateReplacement(itemId, tranInternalId, intermediateUpdate);
+            // if (success) {
+            //     slog.info(` -- ${source} successfully performed intermediate replacement for tran ${tranInternalId}`)
+            //     state.firstUpdateCompleted[itemId].push(tranInternalId)
+            // }
+        }
+
+    }
+    write(state, path.join(wDir, 'state.json'));
+    // let lnii_data = read(path.join(wDir, 'lnii_options.json'));
+}
+
+/**
+ * @TODO change return value to something more useful
+ * @param targetItemId 
+ * @param tranInternalId 
+ * @param tranUpdate 
+ * @returns 
+ */
+export async function performIntermediateReplacement(
+    targetItemId: string,
+    tranInternalId: string,
+    tranUpdate: TransactionUpdate
+): Promise<boolean> {
+    const source = getSourceString(F, performIntermediateReplacement.name, 
+        `{ item: '${targetItemId}', tran: '${tranInternalId}' }`
+    );
+    const { tranType, replacements, fields, originalTotal } = tranUpdate;
+    slog.info([`${source} for ${tranType}(${tranInternalId})`,
+        `replacing ${replacements.length} occurrence(s) of item '${targetItemId}'`
+    ].join(TAB));
+    let allReplacementsSuccessful = false;
+    let oldItemInternalIds = Array.from(new Set(
+        Object.values(replacements)
+            .map(v=>v.oldItemInternalId)
+    ));
+    let isFirstPutRequest = true;
+    for (let [newItemInternalId, replacementDetails] of Object.entries(replacements)) {
+        const { quantity, rate, oldItemInternalId } = replacementDetails;
+        const lineWithItemToReplace: FindSublistLineWithValueOptions = {
+            sublistId: 'item',
+            fieldId: 'item',
+            value: oldItemInternalId
+        }
+        const tranRecord: RecordOptions = {
+            recordType: tranType,
+            idOptions: [{
+                idProp: idPropertyEnum.INTERNAL_ID,
+                idValue: Number(tranInternalId),
+                searchOperator: SearchOperatorEnum.RECORD.ANY_OF
+            }],
+            sublists: {
+                item: {
+                    item: {
+                        newValue: Number(newItemInternalId),
+                        lineIdOptions: lineWithItemToReplace
+                    },
+                    rate: {
+                        newValue: rate,
+                        lineIdOptions: lineWithItemToReplace
+                    },
+                    quantity: {
+                        newValue: quantity,
+                        lineIdOptions: lineWithItemToReplace
+                    },
+                    quantitybilled: {
+                        newValue: quantity,
+                        lineIdOptions: lineWithItemToReplace
+                    }
+                } as SublistUpdateDictionary
+            }
+        }
+        if (isFirstPutRequest){
+            tranRecord.fields = fields;
+            isFirstPutRequest = false;
+        }
+        let responseArr = await putTransactions([tranRecord], tranResponseOptions);
+        let putResponse = responseArr[0] as Required<RecordResponse>;
+        let result = putResponse.results[0] as Required<RecordResult>
+        let total = result.fields.total;
+        if (typeof total !== 'number') {
+            mlog.error(`${source} error in result from replacement put request`,
+                `fields.total is not a number`,
+                `received: ${typeof total} = '${total}'`
+            )
+        }
+        if (total !== originalTotal) {
+            mlog.error(`${source} Replacement failed... total not same after update...`,
+                `targetItemId: '${targetItemId}'`,
+                `details: `, JSON.stringify(replacementDetails)
+            );
+            throw new Error(`${source} replacement failed...`)
+        }
+    }
+
+    // validaation after initial replacement....
+    let getReq: SingleRecordRequest = {
+        recordType: tranType,
+        idOptions: [{
+            idProp: idPropertyEnum.INTERNAL_ID,
+            idValue: tranInternalId,
+            searchOperator: SearchOperatorEnum.RECORD.ANY_OF
+        }],
+        responseOptions: tranResponseOptions
+    };
+    let getResponse = await getRecordById(getReq) as Required<RecordResponse>;
+    let getResult = getResponse.results[0] as Required<RecordResult>;
+    let linesWithOldValue = getLinesWithSublistFieldValue(
+        getResult.sublists.item, 
+        'item', 
+        ...oldItemInternalIds
+    );
+    if (linesWithOldValue.length === 0) {
+        allReplacementsSuccessful = true;
+    }
+    return allReplacementsSuccessful;
+}
+
+
+
+/*
+Outline:
+for each itemId in itemBatch
+    // maybe getRecordById(itemId) and make sure has a value for price
+    let relatedSalesOrders = itemDict[itemId];
+    while relatedSalesOrders.length > 0
+        for each 'so' (salesorder RecordResult) in relatedSalesOrders  
+            getRecordById(so.internalid);
+            **need to account for when itemId occurrs in more than 1 line in salesorder**
+            need to store the 'rate' field value; qty is preserved when replacing...
+*/
+    
+async function generateItemTransactionUpdates(
+    itemId: string,
+    transactions: RecordResult[],
+): Promise<TransactionUpdateDictionary> {
+    const source = getSourceString(F, generateItemTransactionUpdates.name, itemId);
+    validate.arrayArgument(source, {transactions, isRecordResult});
+    let skuDict = getSkuDictionary();
+    if (!placeholders && !isNonEmptyArray(placeholders)) {
+        mlog.error(`${source} Cannot handle replacement without instantiation of placeholders`)
+        throw new Error(
+            `${source} Cannot handle replacement without instantiation of placeholders`
+        );
+    }
+    slog.info(`${source} START - num transactions: ${transactions.length}`)
+    let tranUpdates: TransactionUpdateDictionary = {};
+    let itemInternalId = skuDict[itemId];
+    validate.stringArgument(source, {itemInternalId});
+    for (let i = 0; i < transactions.length; i++) {
+        let txn = transactions[i] as Required<RecordResult>;
+        let getReq = SingleRecordRequest(
+            txn.recordType, 
+            String(txn.internalid), 
+            tranResponseOptions
+        );
+        let getRes = await getRecordById(getReq);
+        if (!isNonEmptyArray(getRes.results)) {
+            mlog.error([`${source} Invalid getRecord response`,
+                `tran internalid: ${txn.internalid}`
+            ].join(TAB));
+            throw new Error(`${source} Invalid getRecord response`);
+        }
+        txn = (getRes.results[0]) as Required<RecordResult>;
+        let targetLines = getLinesWithSublistFieldValue(
+            txn.sublists.item, 'item', itemInternalId
+        );
+        if (targetLines.length === 0) {
+            slog.info(` -- no lines found with targetItemId '${itemId}'`,
+                `continuing to next transaction`
+            );
+            continue;
+        }
+        let itemReps: ReplacementDictionary = {};
+        for (let j = 0; j < targetLines.length; j++) {
+            const targetLine = targetLines[j];
+            let placeholderInternalId = String(placeholders[j].internalid);
+            itemReps[placeholderInternalId] = {
+                newItemId: String(placeholders[j].fields.itemid) || '',
+                oldItemInternalId: itemInternalId,
+                quantity: Number(targetLine.quantity),
+                rate: Number(targetLine.rate),
+            }
+        }
+        slog.info([` -- preparing ItemReplacementDictionary for item '${itemId}' with internalId '${itemInternalId}'`,
+            `num corresponding lines in ${txn.recordType}(${txn.internalid}): ${targetLines.length}`,
+            `num replacements: ${Object.keys(itemReps).length}`
+        ].join(TAB));
+        tranUpdates[String(txn.internalid)] = {
+            tranType: txn.recordType as RecordTypeEnum,
+            originalTotal: Number(txn.fields.total),
+            replacements: itemReps,
+            fields: {
+                memo: fixTransactionMemo(txn.fields.memo)
+            }
+        }
+    }
+    return tranUpdates;
+}
+
+const tranTypePattern = new RegExp(/(?<=\()[\sA-Z]+(?=\)<[a-z]+>$)/i);
+function fixTransactionMemo(
+    memo: FieldValue | SubrecordValue,
+    stringReplaceOptions: StringReplaceOptions = [
+        {
+            searchValue: /(?<= )([A-Z]{2,})+ Type '[\sA-Z]+', /i, replaceValue: ''
+        },
+        {
+            searchValue: /QuickBooks Transaction Type.*(?=Expected)/i, replaceValue: ''
+        },
+    ]
+): string {
+    if (isEmpty(memo)) return ''
+    memo = clean(String(memo), { replace: stringReplaceOptions });
+    return memo;
+}
+
+function getLinesWithSublistFieldValue(
+    lines: SublistLine[],
+    fieldId: string,
+    ...targetValues: string[]
+): SublistLine[] {
+    const targetLines: SublistLine[] = [];
+    for (let line of lines) {
+        if (targetValues.includes(String(line[fieldId]))) {
+            targetLines.push(line)
+        }
+    }
+    return targetLines;
+}
+
+const itemIdExtractor = async (
+    value: string, 
+    cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
+): Promise<string> => {
+    return clean(extractLeaf(value), cleanOptions);
+}
+
+
+
+/**
+ * @TODO parameterize
+ * @returns 
+ */
+async function generateRelatedRecordRequest(
+    itemId: string,
+    childOptions: ChildSearchOptions[] = [{
+        childRecordType: RecordTypeEnum.SALES_ORDER,
+        fieldId: 'item',
+        sublistId: 'item',
+    }]
+): Promise<RelatedRecordRequest> {
+    const source = getSourceString(F, generateRelatedRecordRequest.name)
+    validate.stringArgument(source, {itemId});
+    const parentRecordType = RecordTypeEnum.INVENTORY_ITEM;
+    let idOptions: idSearchOptions[];
+    let skuDictionary = getSkuDictionary();
+    if (isNonEmptyString(skuDictionary[itemId])) {
+        idOptions = [{
+            idProp: idPropertyEnum.INTERNAL_ID,
+            idValue: Number(skuDictionary[itemId]),
+            searchOperator: SearchOperatorEnum.RECORD.ANY_OF
+        }]
+    } else {
+        idOptions = [{
+            idProp: idPropertyEnum.ITEM_ID,
+            idValue: itemId,
+            searchOperator: SearchOperatorEnum.TEXT.IS
+        }]
+    }
+    return { parentRecordType, idOptions, childOptions } as RelatedRecordRequest;
+}
+
+
+function SingleRecordRequest(
+    recordType: string | RecordTypeEnum,
+    recordInternalId: string,
+    responseOptions?: RecordResponseOptions
+): SingleRecordRequest {
+    const source = getSourceString(F, 'SingleRecordRequest');
+    validate.enumArgument(source, {recordType, RecordTypeEnum});
+    validate.stringArgument(source, {recordInternalId});
+    validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
+    const idOptions = [{
+        idProp: idPropertyEnum.INTERNAL_ID,
+        idValue: Number(recordInternalId),
+        searchOperator: SearchOperatorEnum.RECORD.ANY_OF
+    }] as idSearchOptions[];
+    const request: SingleRecordRequest = { recordType, idOptions, responseOptions };
+    return request;
+
+}
 
 /**
  * @param validationDict 
@@ -196,289 +597,4 @@ export async function extractTargetRows(
     //     write({remainingValues}, path.join(CLOUD_LOG_DIR, `${getFileNameTimestamp()}_remainingValues.json`))
     // }
     return {rows: targetRows, remainingValues};
-}
-
-const itemIdExtractor = async (
-    value: string, 
-    cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
-): Promise<string> => {
-    return clean(extractLeaf(value), cleanOptions);
-}
-
-export async function reconcile(): Promise<any> {
-    const source = getSourceString(F, reconcile.name);
-}
-
-
-const completedBatches: number[] = [];
-const validatedSalesOrders: any[] = [];
-const errors: any[] = [];
-let endpointFailed: boolean = false;
-/**
- * tested on 2500 sales orders, and all passed
- * @TODO parameterize
- */
-export async function validateRelatedRecordEndpoint(
-    statePath: string,
-    dictPath: string
-): Promise<any> {
-    const source = getSourceString(F, validateRelatedRecordEndpoint.name);
-    if (isFile(statePath)) {
-        let previousState = read(statePath);
-        if (isStringArray(previousState.processed)) {
-            validatedSalesOrders.push(...previousState.processed)
-        }
-        if (isIntegerArray(previousState.completedbatches, true)) {
-            completedBatches.push(...previousState.completedBatches)
-        }
-    }
-    validate.existingFileArgument(source, '.json', {dictPath});
-    
-    const soTargetItems = read(dictPath) as { [soInternalId: string]: string[] };
-    const keys = Object.keys(soTargetItems);
-    const allBatches = partitionArrayBySize(keys, 50) as string[][]; // 839 batches for like 41906 sales order Ids
-    const keyBatches = allBatches.slice(0, 50); // let's just test on first 50
-    mlog.info([`${source} START`,
-        // `num sales orders to process: ${keys.length}`,
-        `num processed: ${validatedSalesOrders.length}`,
-        `  num batches: ${keyBatches.length}`,
-        `completed batches: [${completedBatches.join(', ')}]`
-    ].join(TAB));
-    slog.info(` >   num batches: ${keyBatches.length}`);
-    slog.info(` > num completed: ${completedBatches.length}`);
-    slog.info(` > >   completed: ${completedBatches.join(', ') || 'NONE'}`);
-    await DELAY(2000, `starting batchLoop...`);
-    batchLoop:
-    for (let i = 0; i < keyBatches.length; i++) {
-        if (completedBatches.includes(i)) {
-            slog.info(`${source} > already processed batch ${i} (${i+1}/${keyBatches.length}), continuing`);
-            continue;
-        }
-        await validateSalesOrderBatch(soTargetItems, keyBatches, i);
-        if (endpointFailed) {
-            mlog.error([`${source} Endpoint Failure detected at batch (${i+1}/${keyBatches.length})`])
-            break batchLoop;
-        }
-        slog.info(`${source} Finished batch (${i+1}/${keyBatches.length})`);
-        completedBatches.push(i);
-        await DELAY(2000);
-    }
-    write({errors}, 
-        path.join(getProjectFolders().logDir, `${getFileNameTimestamp()}_reconcile_errors.json`)
-    );
-    write({completedBatches, processed: validatedSalesOrders}, statePath);
-    if (endpointFailed) {
-        slog.debug(`oh no, endpoint failed...`)
-    } else {
-        slog.debug(`endpointFailed still false, so we might be okay`)
-    }
-}
-
-async function validateSalesOrderBatch(
-    /**map salesorder internalid to list of itemIds to verify existence in salesorder's item sublist */
-    dict: { [key: string]: string[] }, 
-    batches: string[][],
-    batchIndex: number
-): Promise<any> {
-    const source = 
-        `[${F}.${validateSalesOrderBatch.name}( ${batchIndex+1}/${batches.length} )]`;
-    const batchKeys = batches[batchIndex];
-    let skuDictionary = await getSkuDictionary();
-    let indexCharLength = String(batchKeys.length).length;
-    salesOrderLoop:
-    for (let i = 0; i < batchKeys.length; i++) {
-        const soInternalId = batchKeys[i];
-        if (validatedSalesOrders.includes(soInternalId)) {
-            slog.info(`${source} > Skipping processed salesorder from batch (${batchIndex+1}/${batches.length})`);
-            continue salesOrderLoop;
-        }
-        const targetItemInternalIds = (dict[soInternalId] ?? []).map(itemId=>skuDictionary[itemId]);
-        const req = generateSingleRecordRequest(RecordTypeEnum.SALES_ORDER, soInternalId);
-        const res = await getRecordById(req) as RecordResponse;
-        await DELAY(1000, null);
-        if (!res || !isNonEmptyArray(res.results)) {
-            mlog.error([`${source} Invalid Response: `,
-                `getRecordById() response was undefined or had undefined results`,
-                `sales order internalid: '${soInternalId}'`
-            ].join(TAB));
-            errors.push({soInternalId, message: 'getRecordById() response was undefined or had undefined results'})
-            continue;
-        }
-        let soResults = res.results as Required<RecordResult>[];
-        if (soResults.length > 1) {
-            mlog.warn(`multiple results returned from get single record request...`);
-            errors.push({soInternalId, message: 'multiple RecordResults returned from getRecordById()'})
-            break;
-        }
-        let so = soResults[0];
-        let itemSublist = so.sublists.item ?? [];
-        let itemsFound: string[] = [];
-        sublistLoop:
-        for (let j = 0; j < itemSublist.length; j++) {
-            let sublistLine = itemSublist[j];
-            if (!hasKeys(sublistLine, 'item' )) {
-                mlog.error([`${source} Invalid SublistLine in RecordResult`,
-                    `salesorder RecordResult.sublists.item[${j}] does not have key 'item'`
-                ].join(TAB));
-                errors.push({
-                    soInternalId, subllistLineIndex: j, 
-                    message: `salesorder RecordResult.sublists.item[${j}] does not have key 'item'`
-                });
-                break salesOrderLoop;
-            }
-            let currentItem = String(sublistLine.item);
-            if (targetItemInternalIds.includes(currentItem) && !itemsFound.includes(currentItem)) {
-                itemsFound.push(currentItem);
-            }
-        }
-        if (itemsFound.length !== targetItemInternalIds.length) {
-            const message = [
-                `${source} endpoint failed. salesorder item sublist is missing ${
-                    targetItemInternalIds.length - itemsFound.length
-                } expected item(s)`,
-                `sales order internalid: '${soInternalId}'`,
-                `missingItems: ${targetItemInternalIds
-                    .filter(id=>!itemsFound.includes(id))
-                    .join(', ')
-                }`,
-                ` itemSublist: ${indentedStringify(itemSublist)}`,
-            ].join(TAB);
-            mlog.error(message);
-            errors.push({
-                soInternalId,
-                message
-            })
-            endpointFailed = true;
-            break salesOrderLoop;
-        }
-        slog.info(`salesorder ${
-            String(i+1).padStart(indexCharLength, ' ')}/${batchKeys.length
-            } has all expected items! salesorder: '${soInternalId}'`
-        );
-        validatedSalesOrders.push(soInternalId);
-    }
-
-
-}
-
-/**
- * @TODO parameterize
- * @returns **`relatedRecordDictionary`** `Promise<{ [id: string]: RecordResult[] }>`
- */
-async function retrieveRelatedRecords(
-    filePath: string
-): Promise<{ [itemId: string]: RecordResult[] }> {
-    const source = `[${F}.${retrieveRelatedRecords.name}()]`;
-    const ITEM_ID_COLUMN = 'Item';
-    let lnItems = await getColumnValues(filePath, ITEM_ID_COLUMN, itemIdExtractor);
-    let itemBatches = partitionArrayBySize(lnItems, 50);
-    let skuDictionary = await getSkuDictionary();
-    /** `relatedRecordDictionary` */
-    let dict: { [itemId: string]: RecordResult[] } = {};
-    for (let i = 0; i < itemBatches.length; i++) {
-        dict = await handleItemBatch(dict, i+1, itemBatches[i], skuDictionary);
-        slog.debug(`${source} END batch ${i+1}/${itemBatches.length} ${'-'.repeat(16)}`);
-    }
-    return dict;
-}
-
-/**
- * @TODO parameterize
- * @returns 
- */
-async function handleItemBatch(
-    relatedRecordDictionary: { [itemId: string]: RecordResult[] },
-    batchIndex: number,
-    lnItems: string[], 
-    skuDictionary: Record<string, string>
-): Promise<{ [itemId: string]: RecordResult[] }> {
-    const source = `[${F}.${handleItemBatch.name}( ${batchIndex} )]`;
-    let numRelatedRecords = 0;
-    let errorItems: string[] = [];
-    itemLoop:
-    for (let i = 0; i < lnItems.length; i++) {
-        let itemId = lnItems[i];
-        slog.debug(`${source} START loop iteration (${i+1}/${lnItems.length}) itemId: '${itemId}'`)
-        if (!(itemId in skuDictionary)) {
-            mlog.warn([`${source} at lnItems[${i}], itemId: '${itemId}'`,
-                `found itemId not in skuDictionary -> need to check that it's in NS`,
-            ].join(TAB));
-            errorItems.push(itemId);
-            continue itemLoop;
-        }
-        const req = await generateRelatedRecordRequest(itemId);
-        relatedRecordDictionary[itemId] = [];
-        const res = await getRelatedRecord(req) as RecordResponse;
-        await DELAY(1000, null);
-        if (!res.results) {
-            mlog.warn([`${source} at lnItems[${i}], itemId: '${itemId}'`,
-                `response.results was undefined, continuing...`
-            ].join(TAB));
-            errorItems.push(itemId);
-            continue itemLoop;
-        }
-        let recordResults = res.results;
-        relatedRecordDictionary[itemId].push(...recordResults);
-        numRelatedRecords += recordResults.length
-        slog.debug([`finished loop iteration (${i+1}/${lnItems.length}) itemId: '${itemId}'`,
-            `related record count: ${recordResults.length}`
-        ].join(TAB));
-    }
-    mlog.debug([`${source} reached end of function....`,
-        `errorItems.length: ${errorItems.length}`,
-    ].join(TAB));
-    slog.debug(`batch's numRelatedRecords: ${numRelatedRecords}`);
-    
-    return relatedRecordDictionary
-}
-
-/**
- * @TODO parameterize
- * @returns 
- */
-async function generateRelatedRecordRequest(
-    itemId: string,
-): Promise<RelatedRecordRequest> {
-    const source = `[${F}.${generateRelatedRecordRequest.name}()]`;
-    validate.stringArgument(source, {itemId});
-    const parentRecordType = RecordTypeEnum.INVENTORY_ITEM;
-    const childOptions: ChildSearchOptions[] = [{
-        childRecordType: RecordTypeEnum.SALES_ORDER,
-        fieldId: 'item',
-        sublistId: 'item',
-    }];
-    let idOptions: idSearchOptions[];
-    let skuDictionary = await getSkuDictionary();
-    if (isNonEmptyString(skuDictionary[itemId])) {
-        idOptions = [{
-            idProp: idPropertyEnum.INTERNAL_ID,
-            idValue: Number(skuDictionary[itemId]),
-            searchOperator: SearchOperatorEnum.RECORD.ANY_OF
-        }]
-    } else {
-        idOptions = [{
-            idProp: idPropertyEnum.ITEM_ID,
-            idValue: itemId,
-            searchOperator: SearchOperatorEnum.TEXT.IS
-        }]
-    }
-    return { parentRecordType, idOptions, childOptions } as RelatedRecordRequest;
-}
-
-
-function generateSingleRecordRequest(
-    recordType: string | RecordTypeEnum,
-    recordInternalId: string,
-    responseOptions: RecordResponseOptions = {
-        fields: ['externalid'],
-        sublists: { item: ['item', 'line'] }
-    }
-): SingleRecordRequest {
-    const idOptions = [{
-        idProp: idPropertyEnum.INTERNAL_ID,
-        idValue: Number(recordInternalId),
-        searchOperator: SearchOperatorEnum.RECORD.ANY_OF
-    }] as idSearchOptions[];
-    return { recordType, idOptions, responseOptions } as SingleRecordRequest;
-
 }

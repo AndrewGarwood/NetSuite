@@ -7,10 +7,6 @@ import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../.
 import { RESTLET_URL_STEM, STOP_RUNNING, DELAY, getProjectFolders  } from "../../config/env";
 import { createUrlWithParams } from "../url";
 import { AxiosContentTypeEnum } from "../server";
-import { 
-    RecordRequest, RecordResponse, RecordOptions, RecordResponseOptions,
-    RecordResult,
-} from "../types";
 import { BATCH_SIZE, partitionArrayBySize } from "../configureRequests";
 import path from "node:path";
 

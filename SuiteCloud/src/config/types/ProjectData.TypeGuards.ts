@@ -78,7 +78,7 @@ export function isFileDictionary(value: any): value is FileDictionary {
  * @returns **`isLoadFileOptions`** `boolean`
  */
 export function isLoadFileOptions(value: any): value is LoadFileOptions {
-    return (isObject(value, false) 
+    return (isObject(value) 
         && Object.keys(value).every(
             k=>isNonEmptyString(k) 
             && (isNonEmptyString(value[k]) 

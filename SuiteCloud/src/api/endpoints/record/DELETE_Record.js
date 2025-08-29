@@ -199,8 +199,9 @@ function handleError(
     }
     return errorResponse;
 }
+
 /**
- * @note does not yet handle searching for multiple records and returning their ids
+ * @note does not handle searching for multiple records and returning their ids
  * @param {RecordTypeEnum | string} recordType 
  * @param {idSearchOptions[]} [idOptions] `Array<`{@link idSearchOptions}`>` = `{ idProp`: {@link idPropertyEnum}, `searchOperator`: {@link RecordOperatorEnum}, `idValue`: string | number` }[]`
  * @param {FieldDictionary} [fields] - `object` extract idProperty values from `fields` `if` `idOptions` not provided
@@ -208,26 +209,25 @@ function handleError(
  * `if` found in the search, or `null` `if` no record was found.
  */
 function searchForRecordById(recordType, idOptions, fields) {
-    const source = `[${EP}.${searchForRecordById.name}()]`;
-    if (isRecordTypeEnum(recordType) || (!idOptions && !fields)) {
+    if (!isRecordTypeEnum(recordType) || (!idOptions && !isObject(fields))) {
         writeLog(LogTypeEnum.ERROR,
-            `${source} Invalid Parameters:`,
+            `[ERROR searchForRecordById()] Invalid Parameters:`,
             `recordType must be a valid RecordTypeEnum or string, and idOptions or fields (with idProps) must be provided`,
         );
         return null;
     }
-    // if no idOptions provided, extract idProperty values from fields
-    if (fields && !isNonEmptyArray(idOptions)) {
+    // if no idOptions provided && fields provided, extract idProperty values from fields
+    if (isObject(fields) && !(isNonEmptyArray(idOptions))) {
         /**@type {idSearchOptions[]} */
         idOptions = [];
         for (const idPropFieldId of Object.values(idPropertyEnum)) {
             if (fields[idPropFieldId]) {
-                const idValue = (idPropFieldId === idPropertyEnum.INTERNAL_ID
-                    ? Number(fields[idPropFieldId])
+                const idValue = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
+                    ? Number(fields[idPropFieldId]) 
                     : String(fields[idPropFieldId])
                 );
-                const searchOperator = (idPropFieldId === idPropertyEnum.INTERNAL_ID
-                    ? SearchOperatorEnum.RECORD.ANY_OF
+                const searchOperator = (idPropFieldId === idPropertyEnum.INTERNAL_ID 
+                    ? SearchOperatorEnum.RECORD.ANY_OF 
                     : SearchOperatorEnum.TEXT.IS
                 );
                 idOptions.push({
@@ -242,19 +242,20 @@ function searchForRecordById(recordType, idOptions, fields) {
      * idOptions is invalid and fields does not have any idPropertyEnum values in its keys
      * -> unable to search for existing record -> return null
      * */
-    if (!isNonEmptyArray(idOptions)) {
+    if (!isNonEmptyArray(idOptions)) { 
         return null;
     }
-    let recordInternalId = null;
+    /**@type {number|null} */
+    let recordId = null;
     for (let i = 0; i < idOptions.length; i++) {
-        const { idProp, searchOperator, idValue } = idOptions[i];
-        if (!idProp || !searchOperator || !idValue) {
+        if (!isIdSearchOptions(idOptions[i])) {
             writeLog(LogTypeEnum.ERROR,
-                `${source} Invalid idOptions element.`,
+                `ERROR: searchForRecordById() Invalid idOptions idSearchOptions element.`,
                 `Invalid idSearchOptions element at idOptions[${i}]`,
-            )
+            );
             continue;
         }
+        const { idProp, searchOperator, idValue } = idOptions[i];
         try {
             const recSearch = search.create({
                 type: recordType,
@@ -278,14 +279,14 @@ function searchForRecordById(recordType, idOptions, fields) {
             const resultRange = resultSet.getRange({ start: 0, end: 10 });
             if (resultRange.length === 0) {
                 writeLog(LogTypeEnum.DEBUG,
-                    `${source} 0 records found for idSearchOption ${i + 1}/${idOptions.length}`,
+                    `[searchForRecordById()] 0 records found for idSearchOption ${i+1}/${idOptions.length}`,
                     `0 '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                 );
                 continue;
             }
             const expectSingleResult = Boolean(
-                typeof idValue === 'string' ||
-                typeof idValue === 'number' ||
+                typeof idValue === 'string' || 
+                typeof idValue === 'number' || 
                 (Array.isArray(idValue) && idValue.length === 1)
             );
             /** 
@@ -293,51 +294,53 @@ function searchForRecordById(recordType, idOptions, fields) {
              * store recordIds = resultRange.map(result => result.id) 
              */
             if (resultRange.length > 1 && expectSingleResult) {
-                writeLog(LogTypeEnum.ERROR,
-                    `WARNING: ${source} Multiple records found.`,
+                recordId = Number(resultRange[0].id);
+                writeLog(LogTypeEnum.DEBUG,
+                    'WARNING: searchForRecordById() Multiple records found.',
                     `${resultRange.length} '${recordType}' records found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
-                    `tentatively storing id of first record found,'${recordInternalId}' then continuing to next idOptions element`
+                    `tentatively storing id of first record found,'${recordId}' then continuing to next idOptions element`
                 );
-                recordInternalId = resultRange[0].id;
                 continue;
             } else if (resultRange.length === 1) {
                 writeLog(LogTypeEnum.DEBUG,
-                    `${source} searchForRecordById() Record found!`,
+                    'searchForRecordById() Record found!',
                     `1 '${recordType}' record found with ${idProp}='${idValue}' and operator='${searchOperator}'`,
                 );
                 return Number(resultRange[0].id);
             }
         } catch (e) {
             writeLog(LogTypeEnum.ERROR,
-                `${source} idOptions for loop`,
-                `error occurred while searching for '${recordType}' record with ${idProp}='${idValue}' and operator='${searchOperator}'`,
+                `ERROR: searchForRecordById() idOptions for loop`,
+                `error occurred while searching for '${recordType}' record with ${idProp}='${idValue}' and operator='${searchOperator}'`, 
                 JSON.stringify(e)
             );
             continue;
         }
+        if (recordId !== null) {
+            return recordId
+        }
     }
-    return recordInternalId ? Number(recordInternalId) : null; // null if no record found
+    return recordId; // null if no record found
 }
+
+
 /**
  * @param {object} rec 
  * @param {string | string[]} responseFields 
  * @returns {FieldDictionary} **`fields`** = {@link FieldDictionary}
  */
 function getResponseFields(rec, responseFields) {
-    if (!rec 
-        || !responseFields 
-        || (!isNonEmptyString(responseFields) 
-        && !isNonEmptyArray(responseFields))) {
+    if (!rec || (!isNonEmptyString(responseFields) && !isNonEmptyArray(responseFields))) {
         writeLog(LogTypeEnum.ERROR, 
             'getResponseFields() Invalid parameters', 
-            'rec {object} and responseFields {string | string[]} are required'
+            'rec (object) and responseFields (string | string[]) are required'
         );
         return {};
     }
     /**@type {FieldDictionary} */
     const fields = {internalid: rec.getValue({ fieldId: idPropertyEnum.INTERNAL_ID })};
     /**@type {string[]} */
-    responseFields = (isNonEmptyString(responseFields)
+    responseFields = (typeof responseFields === 'string'
         ? [responseFields]
         : responseFields
     );
@@ -354,7 +357,7 @@ function getResponseFields(rec, responseFields) {
         } catch (error) {
             writeLog(LogTypeEnum.ERROR, 
                 `[getResponseFields()] Error getting value for fieldId '${fieldId}'`, 
-                `error: ${error}`
+                `error: `, error
             );
             continue
         }
@@ -368,14 +371,14 @@ function getResponseFields(rec, responseFields) {
  * @returns {SublistDictionary | {[sublistId: string]: SublistLine[]}} **`sublists`** = {@link SublistDictionary}
  */
 function getResponseSublists(rec, responseSublists) {
-    if (!rec || !responseSublists || isEmptyArray(Object.keys(responseSublists))) {
+    if (!rec || !isObject(responseSublists)) {
         writeLog(LogTypeEnum.ERROR, 
             '[getResponseSublists()] Invalid parameters', 
             'rec and responseSublists are required'
         );
         return {};
     }
-    /**@type {SublistDictionary | {[sublistId: string]: SublistLine[]}} */
+    /**@type {SublistDictionary} */
     const sublists = {};
     sublistLoop:    
     for (const sublistId in responseSublists) {
@@ -403,7 +406,7 @@ function getResponseSublists(rec, responseSublists) {
         ));
         sublistLineLoop:
         for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
-            /**@type {SublistLine} sublistLine {@link SublistLine}*/
+            /**@type {SublistLine} @see {@link SublistLine}*/
             const sublistLine = {
                 line: lineIndex,
                 id: rec.getSublistValue({
@@ -554,6 +557,18 @@ function isNonEmptyString(value) {
     return typeof value === 'string' && value.trim() !== '';
 }
 /**
+ * @param value `any`
+ * @param requireNonNegative `boolean`
+ * - `if` `true` then require that `value` be an integer `>= 0`
+ * - `if` `false` then the sign of the number doesn't matter
+ * @returns **`isInteger`** `boolean`
+ */
+function isInteger(value, requireNonNegative = false) {
+    return (typeof value === 'number'
+        && Number.isInteger(value)
+        && (requireNonNegative ? value >= 0 : true));
+}
+/**
  * @note uses `key in obj` for each element of param `keys`
  * @param obj `T extends Object` the object to check
  * @param keys `Array<keyof T> | string[] | string` the list of keys that obj must have
@@ -599,22 +614,24 @@ function hasKeys(obj, keys, requireAll = true, restrictKeys = false) {
     }
     return requireAll ? numKeysFound === keys.length : numKeysFound > 0;
 }
+
 /**
  * @param value `any`
- * @param allowEmpty `boolean` `default = true`
- * - `if` `true` then `value` is allowed to be an empty object
- * - `if` `false` then `value` must have at least 1 key
- * @param allowArray `boolean` `default = false`
- * - `if` `true` then `value` is allowed to be an array
- * - `if` `false` then `value` must not be an array
- * @returns {value is Record<string, any>} **`isObject`** `boolean` `value is Record<string, any>`
+ * @param requireNonEmpty `boolean` `default = true`
+ * - `if` `true` then `value` must have at least 1 key
+ * - `if` `false` then `value` is allowed to be an empty object
+ * @param requireNonArray `boolean` `default = true`
+ * - `if` `true` then `value` must not be an array
+ * - `if` `false` then `value` is allowed to be an array
+ * @returns **`isObject`** `boolean` `value is Record<string, any>`
  */
-function isObject(value, allowEmpty = true, allowArray = false) {
-    return Boolean(value && typeof value === 'object'
-        && (allowArray || !Array.isArray(value))
-        && (allowEmpty || Object.keys(value).length > 0)
+function isObject(value, requireNonEmpty = true, requireNonArray = true) {
+    return (value && typeof value === 'object'
+        && (requireNonArray ? !Array.isArray(value) : true)
+        && (requireNonEmpty ? Object.keys(value).length > 0 : true)
     );
 }
+
 /**
  * @param {any} value 
  * @returns {value is RecordResponse}
@@ -679,7 +696,25 @@ function isRecordTypeEnum(value) {
 }
 
 
-
+/**
+ * @param fileName `string`
+ * @param func `Function | string` - function name or function itself (to get Function.name)
+ * @param funcInfo `any` `(optional)` - context or params of func (converted to string)
+ * @param startLine `number` `(optional)`
+ * @param endLine `number` `(optional)`
+ * @returns **`sourceString`** `string` to use in log statements or argumentValidation calls
+ */
+function getSourceString(fileName, func, funcInfo, startLine, endLine) {
+    let lineNumberText = (isInteger(startLine)
+        ? `:${startLine}`
+        : '');
+    lineNumberText = (isNonEmptyString(lineNumberText)
+        && isInteger(endLine)
+        ? lineNumberText + `-${endLine}`
+        : '');
+    let funcName = typeof func === 'string' ? func : func.name;
+    return `[${fileName}.${funcName}(${funcInfo ?? ''})${lineNumberText}]`;
+}
 /*------------------------ [ Types, Enums, Constants ] ------------------------*/
 /** create/load a record in standard mode by setting `isDynamic` = `false` = `NOT_DYNAMIC`*/
 const NOT_DYNAMIC = false;

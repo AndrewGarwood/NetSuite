@@ -1,8 +1,8 @@
 /**
- * @file src/pipelines/types/Transaction.typeGuards.ts
+ * @file src/pipelines/types/Transaction.TypeGuards.ts
  */
 
-import { hasKeys } from "typeshi:utils/typeValidation";
+import { hasKeys, isObject } from "typeshi:utils/typeValidation";
 import { TransactionEntityMatchOptions } from "./Transaction";
 import { MatchSourceEnum } from "./Pipeline";
 
@@ -19,8 +19,7 @@ import { MatchSourceEnum } from "./Pipeline";
 export function isTransactionEntityMatchOptions(
     value: any
 ): value is TransactionEntityMatchOptions {
-    return (value 
-        && typeof value === 'object'
+    return (isObject(value)
         && hasKeys(value, 
             ['entityType', 'entityFieldId', 'matchMethod'], true, false
         )

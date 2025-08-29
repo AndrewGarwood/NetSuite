@@ -4,36 +4,38 @@
 
 import { 
     hasKeys, isPrimitiveValue, isObject, isNonEmptyString, isStringArray, isNonEmptyArray, 
-    isEmptyArray
+    isEmptyArray,
+    isInteger
 } from "typeshi:utils/typeValidation";
 import { SubrecordValue, FieldValue } from "./InternalApi";
 import { isFindSublistLineWithValueOptions } from "./InternalApi.TypeGuards";
 import { RecordResponseOptions, ChildSearchOptions, RelatedRecordRequest, idSearchOptions, 
-    RecordOptions, RecordResponse, SingleRecordRequest, SublistFieldValueUpdate
+    RecordOptions, RecordResponse, SingleRecordRequest, SublistUpdateDictionary,
+    SetFieldSubrecordOptions,
+    SetSublistSubrecordOptions, RecordResult
 } from "./RecordEndpoint";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
 
-/**
- * - {@link SubrecordValue}
- * @param value `any`
- * @returns **`isSubrecordValue`** `boolean`
- * - `true` `if` `value` `isSubrecordParseOptions` or `isSetSubrecordOptions`,
- * - `false` `otherwise`.
- */
-export function isSubrecordValue(value: any): value is SubrecordValue {
-    if (!value || typeof value !== 'object') {
-        return false;
-    }
-    const isSubrecordParseOptions = hasKeys(
-        value, ['fieldOptions', 'sublistOptions'], false
+
+export function isSublistUpdateDictionary(value: any): value is SublistUpdateDictionary {
+    const candidate = value as SublistUpdateDictionary;
+    return (isObject(candidate)
+        && Object.keys(candidate).every(k=>isNonEmptyString(k)
+            && isObject(candidate[k])
+            && candidate[k].newValue !== undefined
+            && isFindSublistLineWithValueOptions(candidate[k].lineIdOptions)
+        )
     );
-    const isSetSubrecordOptions = (hasKeys(value, 'fieldId') 
-        && hasKeys(value, ['fields', 'sublists'], false)
+}
+
+export function isRecordResult(value: any): value is RecordResult {
+    const candidate = value as RecordResult;
+    return (isObject(candidate)
+        && isInteger(candidate.internalid)
+        && isRecordTypeEnum(candidate.recordType)
+        && (!candidate.fields || isObject(candidate.fields))
+        && (!candidate.sublists || isObject(candidate.sublists))
     );
-    return (isObject(value)
-        && 'subrecordType' in value 
-        && (isSubrecordParseOptions || isSetSubrecordOptions)
-    ); 
 }
 
 /**
@@ -88,20 +90,23 @@ export function isRecordOptions(value: any): value is RecordOptions {
  * @returns **`isRecordResponseOptions`** `boolean`
  */
 export function isRecordResponseOptions(value: any): value is RecordResponseOptions {
-    return (isObject(value) 
-    && hasKeys(value, ['fields', 'sublists'], false, true))
-    && (!value.fields 
-        || (isNonEmptyString(value.fields) 
-            || isEmptyArray(value.fields) 
-            || isStringArray(value.fields)
+    const candidate = value as RecordResponseOptions;
+    return (isObject(candidate) 
+        && (!candidate.fields 
+            || (isNonEmptyString(candidate.fields) 
+                || isEmptyArray(candidate.fields) 
+                || isStringArray(candidate.fields)
+            )
         )
-    )
-    && (!value.sublists 
-        || (isObject(value.sublists)
-            && Object.keys(value.sublists).every(k=>
-                isNonEmptyString(value.sublists[k])
-                || isEmptyArray(value.sublists[k]) 
-                || isStringArray(value.sublists[k])
+        && (!candidate.sublists 
+            || (isObject(candidate.sublists)
+                && Object.keys(candidate.sublists).every(k=>
+                    isNonEmptyString(k) && candidate.sublists 
+                    && (isNonEmptyString(candidate.sublists[k])
+                        || isEmptyArray(candidate.sublists[k]) 
+                        || isStringArray(candidate.sublists[k])
+                    )
+                )
             )
         )
     )
@@ -149,11 +154,11 @@ export function isRelatedRecordRequest(value: any): value is RelatedRecordReques
 }
 
 export function isSingleRecordRequest(value: any): value is SingleRecordRequest {
-    return (isObject(value)
-        && hasKeys(value, ['recordType', 'idOptions', 'responseOptions'], false, true)
-        && isRecordTypeEnum(value.recordType)
-        && isIdOptions(value.idOptions)
-        && (!value.responseOptions || isRecordResponseOptions(value.responseOptions))
+    const candidate = value as SingleRecordRequest;
+    return (isObject(candidate)
+        && isRecordTypeEnum(candidate.recordType)
+        && isIdOptions(candidate.idOptions)
+        && (!candidate.responseOptions || isRecordResponseOptions(candidate.responseOptions))
     );
 }
 
@@ -172,9 +177,52 @@ export function isIdOptions(value: any): value is idSearchOptions[] {
     );
 }
 
-export function isSublistFieldValueUpdate(value: any): value is SublistFieldValueUpdate {
-    return (isObject(value)
-        && hasKeys(value, ['newValue', 'lineIdOptions'], true, true)
-        && isFindSublistLineWithValueOptions(value.lineIdOptions)
+// export function isSublistFieldValueUpdate(value: any): value is SublistFieldValueUpdate {
+//     return (isObject(value)
+//         && hasKeys(value, ['newValue', 'lineIdOptions'], true, true)
+//         && isFindSublistLineWithValueOptions(value.lineIdOptions)
+//     );
+// }
+
+
+/**
+ * - {@link SubrecordValue}
+ * @param value `any`
+ * @returns **`isSubrecordValue`** `boolean`
+ * - `true` `if` `value` `isSubrecordParseOptions` or `isSetSubrecordOptions`,
+ * - `false` `otherwise`.
+ */
+export function isSubrecordValue(value: any): value is SubrecordValue {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+    const isSubrecordParseOptions = hasKeys(
+        value, ['fieldOptions', 'sublistOptions'], false
     );
+    const isSetSubrecordOptions = (hasKeys(value, 'fieldId') 
+        && hasKeys(value, ['fields', 'sublists'], false)
+    );
+    return (isObject(value)
+        && 'subrecordType' in value 
+        && (isSubrecordParseOptions || isSetSubrecordOptions)
+    ); 
+}
+
+// @ consideration merge SetSublistSubrecordOptions and SetFieldSubrecordOptions
+
+
+export function isSetSublistSubrecordOptions(value: any): value is SetSublistSubrecordOptions {
+    const candidate = value as SetSublistSubrecordOptions;
+    return (isSetFieldSubrecordOptions(value)
+        && isNonEmptyString(candidate.sublistId)
+    )
+}
+
+export function isSetFieldSubrecordOptions(value: any): value is SetFieldSubrecordOptions {
+    const candidate = value as SetFieldSubrecordOptions;
+    return (isObject(candidate)
+        && isNonEmptyString(candidate.fieldId)
+        && isNonEmptyString(candidate.subrecordType)
+        && (isObject(candidate.fields) || isObject(candidate.sublists))
+    )
 }

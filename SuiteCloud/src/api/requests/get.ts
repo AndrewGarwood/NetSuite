@@ -19,6 +19,7 @@ import {
     RecordResponse,
     RelatedRecordRequest,
     isRelatedRecordRequest,
+    isSingleRecordRequest,
 } from "../types";
 import { getAccessToken } from "../configureAuth";
 import path from "node:path";
@@ -43,7 +44,7 @@ export async function getRecordById(
  * @param recordType {@link RecordTypeEnum} | {@link EntityRecordTypeEnum}
  * @param recordId `string | number`
  * @param idProp {@link idPropertyEnum} - defaults to {@link idPropertyEnum.INTERNAL_ID}
- * @param responseOptions {@link RecordResponseOptions} - defaults to `{}` (empty object)
+ * @param responseOptions {@link RecordResponseOptions} `(optional)`
  * @returns **`response`** - `Promise<`{@link RecordResponse}`>`
  */
 export async function getRecordById(
@@ -54,16 +55,19 @@ export async function getRecordById(
 ): Promise<RecordResponse>
 
 /**
- * - {@link GET_RECORD_SCRIPT_ID} = `175`
- * - {@link GET_RECORD_DEPLOY_ID} = `1`
- *  */
+ * @param arg1 
+ * @param recordId `string | number`
+ * @param idProp {@link idPropertyEnum} - defaults to {@link idPropertyEnum.INTERNAL_ID}
+ * @param responseOptions {@link RecordResponseOptions} `(optional)`
+ * @returns **`response`** - `Promise<`{@link RecordResponse}`>`
+ */
 export async function getRecordById(
     arg1: SingleRecordRequest | RecordTypeEnum | string,
     recordId?: string | number,
     idProp?: idPropertyEnum,
     responseOptions?: RecordResponseOptions
 ): Promise<RecordResponse> {
-    const source = `[get.getRecordById()]`
+    const source = getSourceString(F, getRecordById.name)
     const request = {} as SingleRecordRequest;
     if (typeof arg1 === 'string') {
         validate.enumArgument(source, {recordType: arg1, RecordTypeEnum});
@@ -83,9 +87,10 @@ export async function getRecordById(
             idOptions: [{ idProp, idValue, searchOperator }] as idSearchOptions[],
             responseOptions,
         } as SingleRecordRequest);
-    } else {
+    } else  {
+        validate.objectArgument(source, {request: arg1, isSingleRecordRequest});
         Object.assign(request, arg1);
-    }
+    } 
     try {
         const accessToken = await getAccessToken();
         const response = await GET(
@@ -98,7 +103,7 @@ export async function getRecordById(
     } catch (error: any) {
         mlog.error([`${source} ERROR:`,
             `   name: ${error.name}`,
-            `   code: ${error.code}`,
+            ` status: ${error.status}`,
             `message: ${error.message}`,
             `  stack: ${error.stack}`
         ].join(TAB));
@@ -106,7 +111,7 @@ export async function getRecordById(
             {timestamp: getCurrentPacificTime(), caught: error}, 
             path.join(getProjectFolders().logDir, 'errors', 'ERROR_getRecordById.json')
         );
-        throw new Error('Failed to call GET_Record RESTlet');
+        throw new Error(`${source} Failed`);
     }
 }
 
@@ -127,7 +132,7 @@ export async function getRelatedRecord(
     } catch (error: any) {
         mlog.error([`${source} ERROR:`,
             `   name: ${error.name}`,
-            `   code: ${error.code}`,
+            ` status: ${error.status}`,
             `message: ${error.message}`,
             `  stack: ${error.stack}`
         ].join(TAB));
@@ -153,7 +158,7 @@ export async function GET(
     deployId: number,
     params: Record<string, any>,
 ): Promise<any> {
-    const source = `[get.GET()]`;
+    const source = getSourceString(F, GET.name);
     validate.stringArgument(source, {accessToken});
     validate.numberArgument(source, {scriptId}, true);
     validate.numberArgument(source, {deployId}, true);
@@ -171,13 +176,12 @@ export async function GET(
             },
         });
         return response;
-    } catch (error) {
-        let e = error as any || {}
+    } catch (error: any) {
         mlog.error([`${source} ERROR:`,
-            `   name: ${e.name}`,
-            `   code: ${e.code}`,
-            `message: ${e.message}`,
-            `  stack: ${e.stack}`
+            `   name: ${error.name}`,
+            ` status: ${error.status}`,
+            `message: ${error.message}`,
+            `  stack: ${error.stack}`
         ].join(TAB));
         write(
             {timestamp: getCurrentPacificTime(), caught: error}, 

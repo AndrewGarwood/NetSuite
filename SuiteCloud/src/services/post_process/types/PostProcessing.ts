@@ -5,7 +5,7 @@
 import { 
     FieldDictionary, idSearchOptions, SublistDictionary, SublistLine 
 } from "../../../api";
-import { RecordOptions } from "../../../api/types/RecordEndpoint";
+import { RecordOptions, SublistUpdateDictionary } from "../../../api/types/RecordEndpoint";
 
 /**
  * Defines the order of operations for post-processing
@@ -77,7 +77,12 @@ export type ComposeOptions = {
             composer: (record: RecordOptions, sublists: SublistDictionary) => SublistDictionary | Promise<SublistDictionary>
         } | {
             [sublistId: string]: {
-                composer: (record: RecordOptions, sublistLines: SublistLine[]) => SublistLine[] | Promise<SublistLine[]>
+                composer: (
+                    record: RecordOptions, 
+                    sublistContent: SublistLine[] | SublistUpdateDictionary
+                ) => SublistLine[] 
+                    | SublistUpdateDictionary 
+                    | Promise<SublistLine[] | SublistUpdateDictionary>
             };
         }
     )

@@ -187,7 +187,7 @@ export abstract class BaseParser implements ParseStrategy {
                 sublists[sublistId] = [];
             }
             sublists[sublistId] = await this.processSublistLineParseOptions(
-                row, sublistId, sublists[sublistId], lineOptionsArray
+                row, sublistId, sublists[sublistId] as SublistLine[], lineOptionsArray
             );
         }
         this.debug.push(

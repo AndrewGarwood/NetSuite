@@ -8,6 +8,8 @@ import {
     RecordOptions, idSearchOptions, idPropertyEnum,
     FieldValue,
     FieldDictionary,
+    isSublistUpdateDictionary,
+    SublistUpdateDictionary,
 } from "../../api/types";
 import * as prune from "../pruneFunctions";
 import * as evaluate from "../evaluatorFunctions";
@@ -16,7 +18,7 @@ import * as soEval from "./salesOrderEvaluatorFunctions";
 import { SalesOrderColumnEnum as SO } from "./salesOrderConstants";
 import { CustomerStatusEnum, CustomerTaxItemEnum, RecordTypeEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
 import { getSkuDictionary } from "../../config/dataLoader";
-import { isNonEmptyString } from "typeshi:utils/typeValidation";
+import { isNonEmptyArray, isNonEmptyString } from "typeshi:utils/typeValidation";
 import { SB_TERM_DICTIONARY } from "../../utils/ns";
 import { CleanStringOptions, toTitleCase } from "typeshi:utils/regex";
 import { 
@@ -229,8 +231,9 @@ const assignItemInternalIds = async (
  * */
 const lineItemComposer = async (
     record: RecordOptions, 
-    sublistLines: SublistLine[]
-): Promise<SublistLine[]> => {
+    sublistLines: SublistLine[] | SublistUpdateDictionary
+): Promise<SublistLine[] | SublistUpdateDictionary> => {
+    if (!isNonEmptyArray(sublistLines)) return sublistLines
     sublistLines = await assignItemInternalIds(sublistLines);
     for (let i = 0; i < sublistLines.length; i++) {
         const floatFields = ['rate', 'amount'];
@@ -290,9 +293,11 @@ const appendMemo = (
     }
     /** expected format: `'SO:9999_NUM:0000_PO:1111(TRAN_TYPE)<salesorder>'` */
     let externalId = fields.externalid as string;
-    let tranType = (/(?<=\()[A-Z]+(?=\)<)/.exec(externalId) || [''])[0];
+    const tranTypePattern = new RegExp(/(?<=\().+(?=\)<[a-z]+>$)/i);
+    let tranType = (tranTypePattern.exec(externalId) || [''])[0];
     let expectedTotal: number = 0.00;
     let itemSublist = options.sublists.item;
+    if (isSublistUpdateDictionary(itemSublist)) return fields;
     const ogMemo = fields.memo as string;
     let memo = fields.memo as string || '';
     let notes: string[] = [

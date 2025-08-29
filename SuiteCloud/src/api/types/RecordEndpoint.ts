@@ -106,9 +106,9 @@ export type RecordResponseOptions = {
  */
 export type RecordResult = { 
     internalid: number;
-    recordType: RecordTypeEnum | string; 
+    recordType: RecordTypeEnum; 
     fields?: FieldDictionary;
-    sublists?: SublistDictionary; 
+    sublists?: { [sublistId: string]: SublistLine[] }; 
 };
 
 
@@ -158,8 +158,25 @@ export type FieldDictionary = {
  * @typedefn **`SublistDictionary`**
  */
 export type SublistDictionary = {
-    [sublistId: string]: Array<SublistLine>
+    [sublistId: string]: Array<SublistLine> | SublistUpdateDictionary
 };
+
+export type SublistContent = SublistUpdateDictionary | SublistLine[];
+
+/**
+ * @keys `fieldId` of a sublist field
+ */
+export type SublistUpdateDictionary = {
+    [fieldId: string]: {
+        newValue: FieldValue | SetSublistSubrecordOptions;
+        lineIdOptions: FindSublistLineWithValueOptions
+    }
+}
+
+// export type SublistFieldValueUpdate = {
+//     newValue: FieldValue;
+//     lineIdOptions: FindSublistLineWithValueOptions;
+// }
 
 /**
  * @confirmed `'id'` is a prop of record sublists. e.g. for the `addressbook` sublist, TFAE
@@ -172,7 +189,7 @@ export type SublistDictionary = {
  * @typedefn **`SublistLine`**
  */
 export type SublistLine = {
-    [fieldId: string]: SublistFieldValueUpdate | FieldValue | SubrecordValue;
+    [fieldId: string]: FieldValue | SubrecordValue;
 }
 
 /**
@@ -205,10 +222,4 @@ export type SetSublistSubrecordOptions = {
     fieldId: string;
     fields?: FieldDictionary;
     sublists?: SublistDictionary;
-}
-
-
-export type SublistFieldValueUpdate = {
-    newValue: FieldValue;
-    lineIdOptions: FindSublistLineWithValueOptions;
 }

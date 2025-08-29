@@ -20,11 +20,17 @@ export interface TokenResponse {
     access_token: string;
     refresh_token: string;
     expires_in: number;
+    /** 
+     * `number` time token was last updated in `milliseconds` 
+     * - from `Date.getTime()`
+     */
+    lastUpdated?: number;
     /**
-     * The last updated time of the token (optional). 
-     * manually added by setting TokenResponse.lastUpdated = `getCurrentPacificTime()` at the time of the response. 
+     * `string` `(optional)`
+     * The last updated time of the token . 
+     * manually added by setting `TokenResponse.lastUpdatedLocaleString` = `getCurrentPacificTime()` at the time of the response. 
      * */
-    lastUpdated?: string;
+    lastUpdatedLocaleString?: string;
     token_type?: string;
     scope?: string;
     error?: string;
