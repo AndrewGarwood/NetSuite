@@ -5,11 +5,7 @@ import * as fs from "node:fs";
 import path from "node:path";
 import {
     clearFile, getCurrentPacificTime,
-    formatDebugLogFile, getDirectoryFiles,
-    getRows, RowSourceMetaData, isRowSourceMetaData,
-    getColumnValues, isFile,
-    getIndexedColumnValues, concatenateFiles,
-    indentedStringify,
+    formatDebugLogFile, getDirectoryFiles, isFile,
     trimFile,
     getSourceString
 } from "typeshi:utils/io";
@@ -19,7 +15,7 @@ import {
     getLogFiles,
     initializeEnvironment
 } from "./config";
-import { instantiateAuthManager, RecordOptions, RecordResponse, idSearchOptions } from "./api";
+import { instantiateAuthManager } from "./api";
 import { 
     runMainItemPipeline, 
     ItemPipelineOptions, 
@@ -30,11 +26,10 @@ import {
     NON_INVENTORY_ITEM_PIPELINE_CONFIG,
     SALES_ORDER_PIPELINE_CONFIG
 } from "./pipelines";
-import * as soConstants from "./parse_configurations/salesorder/salesOrderConstants"
-import { hasKeys, isEmptyArray, isNonEmptyArray, isNonEmptyString, isNullLike } from "typeshi:utils/typeValidation";
+import { isEmptyArray, isNonEmptyArray, isNonEmptyString } from "typeshi:utils/typeValidation";
 import * as validate from "typeshi:utils/argumentValidation";
 import { getSkuDictionary, initializeData } from "./config/dataLoader";
-import { EntityRecordTypeEnum, RecordTypeEnum } from "./utils/ns/Enums";
+import { RecordTypeEnum } from "./utils/ns/Enums";
 import { extractFileName } from "@typeshi/regex";
 
 const F = extractFileName(__filename);
@@ -48,7 +43,11 @@ async function main() {
     await initializeData();
     await instantiateAuthManager();
 
-    // stuff
+    // await invokePipeline(RecordTypeEnum.SALES_ORDER, 
+    //     ['filePaths'], 
+    //     runMainTransactionPipeline, 
+    //     SALES_ORDER_PIPELINE_CONFIG
+    // );
 
     mlog.info([`${source} END at ${getCurrentPacificTime()}`,
         `handling logs...`

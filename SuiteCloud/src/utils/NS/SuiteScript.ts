@@ -2,26 +2,6 @@
  * @file src/utils/ns/SuiteScript.ts
  */
 
-export interface SuiteScriptError {
-    type: string;
-    name: string;
-    message: string;
-    id: string;
-    stack: string[];
-    cause?: SuiteScriptErrorCause;
-    notifyOff: boolean;
-    userFacing: boolean;
-}
-
-export interface SuiteScriptErrorCause {
-    type: string;
-    code: string;
-    details: string;
-    userEvent?: any;
-    stackTrace: string[];
-    notifyOff: boolean;
-}
-
 /**
  * @enum {string} **`AccountEnvironmentEnum`**
  * @property {string} PRODUCTION - Production environment.
@@ -44,17 +24,9 @@ export type SuiteScriptEnvironment = {
  */
 export type ScriptDictionary = {
     [S in ScriptTypeEnum]?: { 
-        [key: string]: ScriptDetails 
+        [scriptLabel: string]: ScriptDetails 
     }
 }
-
-/**
- * @deprecated
- * @typedefn **`ScriptDictionary`**
- */
-export type DEP_ScriptDictionary = { 
-    [key: string]: ScriptDetails 
-};
 
 /**
  * @typedefn **`ScriptDetails`**
@@ -100,4 +72,24 @@ export enum ScriptTypeEnum {
     SUITELET = 'suitelet',
     USER_EVENT_SCRIPT = 'usereventscript',
     WORKFLOW_ACTION_SCRIPT = 'workflowactionscript',
+}
+
+export interface SuiteScriptError {
+    type: string;
+    name: string;
+    message: string;
+    id: string;
+    stack: string[];
+    cause?: SuiteScriptErrorCause;
+    notifyOff: boolean;
+    userFacing: boolean;
+}
+
+export interface SuiteScriptErrorCause {
+    type: string;
+    code: string;
+    details: string;
+    userEvent?: any;
+    stackTrace: string[];
+    notifyOff: boolean;
 }

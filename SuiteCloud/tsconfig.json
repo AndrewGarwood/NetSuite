@@ -4,6 +4,7 @@
         "module": "commonjs", // "amd"
         "target": "es2015",
         "moduleResolution": "node",
+        "ignoreDeprecations": "6.0",
         "downlevelIteration": true,
         "sourceMap": false,
         "newLine": "CRLF",
@@ -22,7 +23,7 @@
             "@regex/*": ["./node_modules/typeshi/dist/utils/regex/*"],
             "@io/*": ["./node_modules/typeshi/dist/utils/io/*"],
             "@config/*": ["./src/config/*"],
-            "@ns/*": ["./src/utils/ns/*"],
+            "@ns/*": ["src/utils/ns/*"],
             "N": ["./node_modules/@hitc/netsuite-types/N"],
             "N/*": ["./node_modules/@hitc/netsuite-types/N/*"]
         }
