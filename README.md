@@ -6,8 +6,8 @@
 ### Objective 
 Transfer historical data exported from QuickBooks Desktop into NetSuite account.
 ### Context 
-- I don't have authorization to use the QuickBooks Desktop SDK, so it was necessary to export the historical data as csv files. 
-- I initially used Python and Pandas to transform the data into import-compatible files, but eventually elected to use SuiteScript's [RESTlet][restlet_docs] Script Type because it allows for more control/precision on how records are created/updated (and it would be fun to learn something new).
+- It was necessary to export the historical data as csv files. 
+- I initially used Python and Pandas to transform the data into import-compatible files, but later elected to use SuiteScript's [RESTlet][restlet_docs] Script Type because it allows for more control/precision on how records are created/updated (and it would be fun to learn something new).
 
 ### Some Things to Note
 The formal entry point for this project is [main.ts][main_file]
@@ -44,3 +44,4 @@ The project works by making the following sequence of function calls:
 [project_data_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/config/types/ProjectData.ts
 
 [suite_script_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/utils/ns/SuiteScript.ts
+
