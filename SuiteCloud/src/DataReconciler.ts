@@ -11,7 +11,8 @@ import { isNonEmptyArray, isEmptyArray, hasKeys, isNullLike as isNull,
     isStringArray,
     isIntegerArray,
     isObject,
-    isEmpty
+    isEmpty,
+    isNumeric
 } from "typeshi:utils/typeValidation";
 import { 
     mainLogger as mlog, parseLogger as plog, simpleLogger as slog, 
@@ -55,65 +56,152 @@ import {
     SubrecordValue,
     SublistUpdateDictionary,
     FindSublistLineWithValueOptions,
-    isAuthInitialized,
+    isAuthInitialized, deleteRecord,
+    isRecordOptions,
+    putSingleRecord,
+    isFieldValue,
+    isSublistUpdateDictionary
 } from "./api";
 import { CleanStringOptions, StringReplaceOptions, clean, extractFileName, extractLeaf } from "typeshi:utils/regex"
 import { CLEAN_ITEM_ID_OPTIONS } from "src/parse_configurations/evaluators";
-import { putTransactions } from "src/pipelines";
+import { Factory } from "./api";
 
 const F = extractFileName(__filename);
 
-// quantitybilled
-let tranResponseOptions = {
-    fields: ['externalid', 'tranid', 'amount', 'memo', 'total'],
-    sublists: {
-        item: ['id', 'item', 'quantity', 'rate']
-    }
-}
 let placeholders: Required<RecordResult>[] | null = [];
 
 type TransactionUpdateDictionary = {
-    [tranInternalId: string]: TransactionUpdate
+    [tranInternalId: string]: TransactionLineItemUpdate
 }
 
-type TransactionUpdate = {
+type TransactionLineItemUpdate = {
     tranType: RecordTypeEnum;
-    replacements: ReplacementDictionary;
+    replacements: ReplacementDetails[];
     fields?: FieldDictionary;
     originalTotal: number;
 }
 
-type ReplacementDictionary = {
-    [newItemInternalId: string]: {
-        newItemId: string;
-        oldItemInternalId: string;
-        quantity: number;
-        rate: number;
-    }
+type ReplacementDetails = {
+    newItemInternalId: string;
+    newItemId: string;
+    oldItemInternalId: string;
+    quantity: number;
+    rate: number;
 }
 
-type ReconcileState = {
+type ReconcilerError = {
+    readonly isError: true;
+    source: string;
+    message?: string;
+    error?: any;
+    [key: string]: any;
+}
+
+function ReconcilerError(
+    source: string,
+    message?: string,
+    error?: any,
+    ...details: any[]
+): ReconcilerError {
+    return { isError: true, source, message, error, details } as ReconcilerError;
+}
+function isReconcilerError(value: any): value is ReconcilerError {
+    const candidate = value as ReconcilerError;
+    return (isObject(candidate) 
+        && isNonEmptyString(candidate.source)
+        && (candidate.isError === true)
+    );
+}
+
+type ReconcilerState = {
     /** map itemId to list of tranInternalId */
     firstUpdateCompleted: { 
-        [itemId: string]: string[] 
+        [itemId: string]: {
+            [childRecordType: string]: string[],
+        }
     };
     itemsDeleted: string[];
-    itemsCreated: string[];
+    newItems: Record<string, string>;
     /** map itemId to list of tranInternalId */
     secondUpdateCompleted:  { 
-        [itemId: string]: string[] 
-    }
-    
+        [itemId: string]: {
+            [childRecordType: string]: string[],
+        }
+    };
+    errors: any[];
+    [key: string]: any;
 }
 
-let reconcileState: ReconcileState | null = null;
-export function getReconcileState(): ReconcileState {
-    if (!reconcileState) {
-        throw new Error(`${getSourceString(F, getReconcileState.name)} state has not been loaded yet`);
+let createOptionsDict: { [itemId: string]: Required<RecordOptions> } | null = null;
+export function getCreateOptions(itemId: string): RecordOptions {
+    const source = getSourceString(F, getCreateOptions.name, itemId)
+    if (!createOptionsDict) {
+        throw new Error(`${source} createOptionsDict: { [itemId: string]: RecordOptions } has not been loaded yet`);
     }
-    return reconcileState;
+    if (!hasKeys(createOptionsDict, itemId)) {
+        throw new Error(`${source} itemId '${itemId}' is not a key in createOptionsDict`)
+    }
+    return createOptionsDict[itemId];
 }
 
+let moduleState: ReconcilerState | null = null;
+export function getModuleState(): ReconcilerState {
+    if (!moduleState) {
+        throw new Error(`${getSourceString(F, getModuleState.name)} state has not been loaded yet`);
+    }
+    return moduleState;
+}
+
+function isReconcileState(value: any): value is ReconcilerState {
+    const candidate = value as ReconcilerState;
+    return (isObject(candidate)
+        && isObject(candidate.firstUpdateCompleted, false)
+        && (isEmptyArray(candidate.itemsDeleted) || isStringArray(candidate.itemsDeleted))
+        && isObject(candidate.newItems, false)
+        && isObject(candidate.secondUpdateCompleted, false)
+    );
+}
+type SublistRecordReferenceOptions = { 
+    referenceFieldId: string; 
+    sublistId: string;
+    cacheOptions: CacheOptions;
+    responseOptions: Required<RecordResponseOptions>;
+}
+const revCacheOptions: CacheOptions = {
+    fields: ['name'],
+    sublists: {
+        component: [
+            'quantity', 'bomquantity', 'componentyield', 'description', 
+            //'itemsource', 'itemsourcelist'
+        ] 
+    }
+}
+const revResponseOptions: Required<RecordResponseOptions> = {
+    fields: ['externalid', 'billofmaterial', 'name'],
+    sublists: { 
+        component: [
+            'internalid','item', 'quantity', 'bomquantity', 'unit', 'componentyield',
+            'description', // 'itemsource', 'itemsourcelist'
+        ]
+    }
+
+}
+const soCacheOptions: CacheOptions = {
+    fields: ['total'],
+    sublists: {
+        item: ['quantity', 'quantitybilled', 'rate']
+    }
+}
+const soResponseOptions: Required<RecordResponseOptions> = {
+    fields: ['externalid', 'tranid', 'amount', 'memo', 'total'],
+    sublists: {
+        item: ['id', 'item', 'quantity', 'rate', 'quantitybilled']
+    }
+}
+
+/**
+ * @TODO refactor
+ */
 export async function reconcileItems(): Promise<any> {
     const source = getSourceString(F, reconcileItems.name);
     if (!isEnvironmentInitialized()) {
@@ -125,240 +213,446 @@ export async function reconcileItems(): Promise<any> {
     if (!isAuthInitialized()) {
         throw new Error(`${source} auth manager not initialized`)
     }
-    
     let wDir = path.join(getProjectFolders().dataDir, 'workspace');
     validate.existingDirectoryArgument(source, {wDir});
-    reconcileState = read(path.join(wDir, 'state.json')) as ReconcileState;
-    validate.objectArgument(source, {reconcileState})
-    let state = getReconcileState();
-    let itemsToDelete: string[] = [];
+    const statePath = path.join(wDir, 'reconcile_state.json');
+    validate.existingFileArgument(source, '.json', {statePath});
+
+    moduleState = read(statePath) as ReconcilerState;
+    let state = getModuleState(); // because ReconcileState | null
+    validate.objectArgument(source, {state, isReconcileState});
+
     placeholders = (read(path.join(wDir, 'item_placeholders.json')) as { 
         placeholders: Required<RecordResult>[]
     }).placeholders;
     validate.arrayArgument(source, {placeholders, isRecordResult});
 
-    let targetItems = read(path.join(wDir, 'items_to_salesorders.json')) as {
-        [itemId: string]: RecordResult[]
-    };
-    let initialReplacements: { [itemId: string]: TransactionUpdateDictionary } = {}
-    for (let itemId of Object.keys(targetItems).slice(0,1)) {
-        initialReplacements[itemId] = await generateItemTransactionUpdates(
-            itemId, 
-            targetItems[itemId]
-        )
+    let lnii_data = read(path.join(wDir, 'lnii_options.json')) as { items: Required<RecordOptions>[] };
+    validate.arrayArgument(source, {items: lnii_data.items, isRecordOptions});
+    createOptionsDict = generateRecordDictionary(lnii_data.items);
+    let addedPriceCount = 0;
+    for (let itemId in createOptionsDict) {
+        if (!isNonEmptyArray(createOptionsDict[itemId].sublists.price1)) {
+            createOptionsDict[itemId].sublists.price1 = [{
+                pricelevel: 1, 
+                price: 0.00
+            }]
+            addedPriceCount++;
+        }
     }
-    write(initialReplacements, path.join(wDir, 'initial_replacements.json'));
-    itemLoop:
-    for (let [itemId, tranUpdateDict] of Object.entries(initialReplacements)) {
-        if (!state.firstUpdateCompleted[itemId]) {
-            state.firstUpdateCompleted[itemId] = []
-        }
-        let tranKeys = Object.keys(tranUpdateDict);
-        tranLoop:
-        for (let tranInternalId of tranKeys) {
-            const intermediateUpdate = tranUpdateDict[tranInternalId];
-            if (state.firstUpdateCompleted[itemId].includes(tranInternalId)) continue tranLoop;
-            // let success = await performIntermediateReplacement(itemId, tranInternalId, intermediateUpdate);
-            // if (success) {
-            //     slog.info(` -- ${source} successfully performed intermediate replacement for tran ${tranInternalId}`)
-            //     state.firstUpdateCompleted[itemId].push(tranInternalId)
-            // }
-        }
+    slog.info([` -- createOptionsDict num times had to add price1 sublist: ${addedPriceCount}`,
+        `-- reading in salesorder data and bomrevision data...`
+    ].join(NL));
 
+    let soData = read(
+        path.join(wDir, 'item_to_salesorders.json')
+    ) as {[itemId: string]: RecordResult[]} ?? {};
+    if (isEmpty(soData)) {
+        return ReconcilerError(source, `soData is empty`,
+            `unable to read data from provided json path`
+        );
     }
-    write(state, path.join(wDir, 'state.json'));
-    // let lnii_data = read(path.join(wDir, 'lnii_options.json'));
+    const itemToSalesOrders = (Object.keys(soData)
+        .reduce((acc, itemId) => {
+            acc[itemId] = soData[itemId].map(r=>r.internalid);
+            return acc;
+        }, {} as { [itemId: string]: number[] })
+    );
+    slog.info([` -- read salesorder data into itemToSalesOrders`,
+        `keys.length: ${Object.keys(itemToSalesOrders).length}`,
+        `values.flat.length: ${Object.values(itemToSalesOrders).flat().length}`
+    ].join(TAB));
+    let revisionData = read(
+        path.join(wDir, 'item_to_revisions.json')
+    ) as {[itemId: string]: RecordResult[]} ?? {}
+    if (isEmpty(revisionData)) {
+        return ReconcilerError(source, `revisionData is empty`,
+            `unable to read data from provided json path`
+        );
+    }
+    const itemToRevisions = (Object.keys(revisionData)
+        .reduce((acc, itemId)=> {
+            acc[itemId] = revisionData[itemId].map(r=>r.internalid);
+            return acc;
+        }, {} as { [itemId: string]: number[] })
+    );
+    slog.info([` -- read bomrevision data into itemToRevisions`,
+        `keys.length: ${Object.keys(itemToRevisions).length}`,
+        `values.flat.length: ${Object.values(itemToRevisions).flat().length}`
+    ].join(TAB));
+
+    const itemDependentDict: {
+        [itemId: string]: {
+            [childRecordType: string | RecordTypeEnum]: number[]
+        }
+    } = {};
+    let keys = Array.from(new Set([
+        ...Object.keys(itemToSalesOrders), 
+        ...Object.keys(itemToRevisions)
+    ]));
+    for (let itemId of keys) {
+        if (!(itemId in getSkuDictionary())) {
+            throw new Error(`${source} item '${itemId}' not in skuDictionary...`)
+        }
+    }
+    for (let itemId of keys) {
+        itemDependentDict[itemId] = {};
+        if (itemId in itemToRevisions) {
+            itemDependentDict[itemId][RecordTypeEnum.BOM_REVISION] = itemToRevisions[itemId];
+        }
+        if (itemId in itemToSalesOrders) {
+            itemDependentDict[itemId][RecordTypeEnum.SALES_ORDER] = itemToSalesOrders[itemId];
+        }
+    }
+    write(itemDependentDict, path.join(wDir, 'item_to_dependents.json'));
+    const sublistReferenceDict: {
+        [recordType: string]: SublistRecordReferenceOptions
+    } = {
+        [RecordTypeEnum.BOM_REVISION]: {
+            referenceFieldId: 'item',
+            sublistId: 'component',
+            cacheOptions: revCacheOptions,
+            responseOptions: revResponseOptions
+        },
+        [RecordTypeEnum.SALES_ORDER]: {
+            referenceFieldId: 'item',
+            sublistId: 'item',
+            cacheOptions: soCacheOptions,
+            responseOptions: soResponseOptions
+        }
+    }
+    itemLoop:
+    for (let itemId in itemDependentDict) {
+        childTypeLoop:
+        for (let childRecordType in itemDependentDict[itemId]) {
+            if (!hasKeys(sublistReferenceDict, childRecordType)) {
+                mlog.error(`${source} missing childRecordType '${childRecordType}' from config...`)
+                break itemLoop;
+            }
+            const childUpdateDict = await generateReferenceUpdateDictionary(
+                itemId, 
+                getSkuDictionary()[itemId], 
+                RecordTypeEnum.INVENTORY_ITEM, 
+                childRecordType as RecordTypeEnum,
+                itemDependentDict[itemId][childRecordType],
+                sublistReferenceDict[childRecordType]
+            );
+            childUpdateLoop:
+            for (let childInternalId in childUpdateDict) {
+                let update: ReferenceFieldUpdate = childUpdateDict[childInternalId];
+            }
+        }
+    }
+    
+
+
+
+
+    write(state, statePath);
 }
 
 /**
- * @TODO change return value to something more useful
- * @param targetItemId 
- * @param tranInternalId 
- * @param tranUpdate 
- * @returns 
+ * @consideration change name back to processSublistReferenceUpdate; worry about abstracting to body fields later...  
  */
-export async function performIntermediateReplacement(
-    targetItemId: string,
-    tranInternalId: string,
-    tranUpdate: TransactionUpdate
-): Promise<boolean> {
-    const source = getSourceString(F, performIntermediateReplacement.name, 
-        `{ item: '${targetItemId}', tran: '${tranInternalId}' }`
-    );
-    const { tranType, replacements, fields, originalTotal } = tranUpdate;
-    slog.info([`${source} for ${tranType}(${tranInternalId})`,
-        `replacing ${replacements.length} occurrence(s) of item '${targetItemId}'`
-    ].join(TAB));
-    let allReplacementsSuccessful = false;
-    let oldItemInternalIds = Array.from(new Set(
-        Object.values(replacements)
-            .map(v=>v.oldItemInternalId)
-    ));
-    let isFirstPutRequest = true;
-    for (let [newItemInternalId, replacementDetails] of Object.entries(replacements)) {
-        const { quantity, rate, oldItemInternalId } = replacementDetails;
-        const lineWithItemToReplace: FindSublistLineWithValueOptions = {
-            sublistId: 'item',
-            fieldId: 'item',
-            value: oldItemInternalId
-        }
-        const tranRecord: RecordOptions = {
-            recordType: tranType,
-            idOptions: [{
-                idProp: idPropertyEnum.INTERNAL_ID,
-                idValue: Number(tranInternalId),
-                searchOperator: SearchOperatorEnum.RECORD.ANY_OF
-            }],
-            sublists: {
-                item: {
-                    item: {
-                        newValue: Number(newItemInternalId),
-                        lineIdOptions: lineWithItemToReplace
-                    },
-                    rate: {
-                        newValue: rate,
-                        lineIdOptions: lineWithItemToReplace
-                    },
-                    quantity: {
-                        newValue: quantity,
-                        lineIdOptions: lineWithItemToReplace
-                    },
-                    quantitybilled: {
-                        newValue: quantity,
-                        lineIdOptions: lineWithItemToReplace
-                    }
-                } as SublistUpdateDictionary
+async function processReferenceUpdate(
+    parentItemId: string,
+    childRecordType: RecordTypeEnum,
+    childInternalId: string, 
+    update: ReferenceFieldUpdate,
+    responseOptions?: RecordResponseOptions
+): Promise<any | ReconcilerError> {
+    const source = getSourceString(F, processReferenceUpdate.name, parentItemId);
+    validate.stringArgument(source, {parentItemId});
+    validate.objectArgument(source, {update, isReferenceFieldUpdate});
+    if (responseOptions) validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
+
+    mlog.info(`${source} START`);
+    const { 
+        referenceFieldId, sublistId, oldReference, 
+        validationDictionary, lineCache
+    } = update as ReferenceFieldUpdate;
+    if (childRecordType !== update.recordType) {
+        return ReconcilerError(source, `recordType inconsistency`,
+            `Invalid parameters: childRecordType !== update.recordType`,
+            `childRecordType: '${childRecordType}'`,
+            `update.recordType: '${update.recordType}'`
+        )
+    }
+    const findLineWithOldReference: FindSublistLineWithValueOptions = {
+        sublistId, fieldId: referenceFieldId, value: oldReference
+    }
+    let lastResult: Required<RecordResult> | null = null;
+    let refKeys = Object.keys(lineCache);
+    for (let i = 0; i < refKeys.length; i++) {
+        let newReferenceId = refKeys[i];
+        let cachedLine = lineCache[newReferenceId];
+        const recordOptions = Factory.RecordOptions(
+            childRecordType,
+            Factory.idSearchOptions(idPropertyEnum.INTERNAL_ID, childInternalId)
+        );
+        const sublistUpdateDict: SublistUpdateDictionary = Object.keys(cachedLine).reduce((acc, fieldId)=>{
+            acc[fieldId] = {
+                newValue: cachedLine[fieldId],
+                lineIdOptions: findLineWithOldReference
             }
+            return acc
+        }, {} as SublistUpdateDictionary);
+        recordOptions.sublists[sublistId] = sublistUpdateDict;
+        try {
+            let putResponse = await putSingleRecord(recordOptions, responseOptions);
+            let result = putResponse.results[0];
+            let validationResult = validateUpdateResult(result, validationDictionary);
+            if (isReconcilerError(validationResult)) {
+                return validationResult;
+            }
+            if (result && i === refKeys.length-1) {
+                lastResult = result as Required<RecordResult>;
+            }
+        } catch (error: any) {
+            return ReconcilerError(source, 
+                `encountered error during ${putSingleRecord.name}() or ${validateUpdateResult.name}()`,
+                error
+            );
         }
-        if (isFirstPutRequest){
-            tranRecord.fields = fields;
-            isFirstPutRequest = false;
-        }
-        let responseArr = await putTransactions([tranRecord], tranResponseOptions);
-        let putResponse = responseArr[0] as Required<RecordResponse>;
-        let result = putResponse.results[0] as Required<RecordResult>
-        let total = result.fields.total;
-        if (typeof total !== 'number') {
-            mlog.error(`${source} error in result from replacement put request`,
-                `fields.total is not a number`,
-                `received: ${typeof total} = '${total}'`
+
+    }
+}
+
+/**
+ * @param result 
+ * @param validationDictionary
+ * @returns `error` `if` some `result.fields[fieldId] !== validationDictionary[fieldId]` 
+ */
+function validateUpdateResult(
+    result: RecordResult,
+    validationDictionary: { [fieldId: string]: FieldValue }
+): undefined | ReconcilerError {
+    const source = getSourceString(F, validateUpdateResult.name);
+    validate.objectArgument(source, {result, isRecordResult});
+    result.fields = isObject(result.fields) ? result.fields : {};
+    for (let fieldId in validationDictionary) {
+        if (String(result.fields[fieldId]) !== String(validationDictionary[fieldId])) {
+            return ReconcilerError(source, `encountered invalid update result`,
+                `Invalid Update Result upon comparing cached values`,
+                `String(result.fields[fieldId]) !== String(validationDictionary[fieldId])`,
+                `fieldId: '${fieldId}'`,
+                `       String(result.fields[fieldId]): '${String(result.fields[fieldId])}'`,
+                `String(validationDictionary[fieldId]): '${String(validationDictionary[fieldId])}'`
             )
         }
-        if (total !== originalTotal) {
-            mlog.error(`${source} Replacement failed... total not same after update...`,
-                `targetItemId: '${targetItemId}'`,
-                `details: `, JSON.stringify(replacementDetails)
-            );
-            throw new Error(`${source} replacement failed...`)
-        }
     }
-
-    // validaation after initial replacement....
-    let getReq: SingleRecordRequest = {
-        recordType: tranType,
-        idOptions: [{
-            idProp: idPropertyEnum.INTERNAL_ID,
-            idValue: tranInternalId,
-            searchOperator: SearchOperatorEnum.RECORD.ANY_OF
-        }],
-        responseOptions: tranResponseOptions
-    };
-    let getResponse = await getRecordById(getReq) as Required<RecordResponse>;
-    let getResult = getResponse.results[0] as Required<RecordResult>;
-    let linesWithOldValue = getLinesWithSublistFieldValue(
-        getResult.sublists.item, 
-        'item', 
-        ...oldItemInternalIds
-    );
-    if (linesWithOldValue.length === 0) {
-        allReplacementsSuccessful = true;
-    }
-    return allReplacementsSuccessful;
 }
 
 
 
-/*
-Outline:
-for each itemId in itemBatch
-    // maybe getRecordById(itemId) and make sure has a value for price
-    let relatedSalesOrders = itemDict[itemId];
-    while relatedSalesOrders.length > 0
-        for each 'so' (salesorder RecordResult) in relatedSalesOrders  
-            getRecordById(so.internalid);
-            **need to account for when itemId occurrs in more than 1 line in salesorder**
-            need to store the 'rate' field value; qty is preserved when replacing...
-*/
-    
-async function generateItemTransactionUpdates(
-    itemId: string,
-    transactions: RecordResult[],
-): Promise<TransactionUpdateDictionary> {
-    const source = getSourceString(F, generateItemTransactionUpdates.name, itemId);
-    validate.arrayArgument(source, {transactions, isRecordResult});
-    let skuDict = getSkuDictionary();
+type ReferenceFieldUpdate = {
+    recordType: RecordTypeEnum;
+    sublistId: string;
+    referenceFieldId: string;
+    /** old internalid value*/
+    oldReference: string;
+    validationDictionary: { [fieldId: string]: FieldValue };
+    /**
+     * @keys = new internalid value
+     * */
+    lineCache: {
+        [newReference: string]: { [sublistFieldId: string]: FieldValue }   
+    };
+}
+
+function isReferenceFieldUpdate(value: any): value is ReferenceFieldUpdate {
+    const candidate = value as ReferenceFieldUpdate;
+    return (isObject(candidate) 
+        && isRecordTypeEnum(candidate.recordType)
+        && isNonEmptyString(candidate.sublistId) // need to make optional if abstract to allow body fields...   
+        && isNonEmptyString(candidate.referenceFieldId)
+        && isNumeric(candidate.oldReference)
+        && isObject(candidate.validationDictionary, false)
+        && isObject(candidate.lineCache, false) 
+        && (Object.keys(candidate.lineCache)
+            .every(newReferenceId=>isNumeric(newReferenceId) 
+                && isObject(candidate.lineCache[newReferenceId])
+            )
+        )
+    )
+}
+
+type CacheOptions = Required<RecordResponseOptions>;
+
+/**
+ * @parent is the record such that `childRecord.sublists[sublistId][referenceFieldId] = parentInternalId`
+ * @returns **`dictionary`** `{ [childRecordId: string]: SublistLineRecordReferenceFieldUpdate }`
+ */
+async function generateReferenceUpdateDictionary(
+    parentItemId: string,
+    parentInternalId: string,
+    parentRecordType: RecordTypeEnum,
+    childRecordType: RecordTypeEnum,
+    childInternalIds: number[],
+    referenceOptions: SublistRecordReferenceOptions
+): Promise<{
+    [childRecordId: string]: ReferenceFieldUpdate
+}> {
+    const source = getSourceString(F, generateReferenceUpdateDictionary.name, parentItemId);
+    const { referenceFieldId, sublistId, responseOptions: childResponseOptions, cacheOptions} = referenceOptions;
+    validate.enumArgument(source, {parentRecordType, RecordTypeEnum});
+    validate.enumArgument(source, {childRecordType, RecordTypeEnum});
+    validate.multipleStringArguments(source, {parentItemId, referenceFieldId, sublistId, parentInternalId});
+    validate.objectArgument(source, {childResponseOptions, isRecordResponseOptions})
+    validate.objectArgument(source, {cacheOptions, isRecordResponseOptions});
+    validate.arrayArgument(source, {childRecordIds: childInternalIds, isIntegerArray});
     if (!placeholders && !isNonEmptyArray(placeholders)) {
         mlog.error(`${source} Cannot handle replacement without instantiation of placeholders`)
         throw new Error(
             `${source} Cannot handle replacement without instantiation of placeholders`
         );
     }
-    slog.info(`${source} START - num transactions: ${transactions.length}`)
-    let tranUpdates: TransactionUpdateDictionary = {};
-    let itemInternalId = skuDict[itemId];
-    validate.stringArgument(source, {itemInternalId});
-    for (let i = 0; i < transactions.length; i++) {
-        let txn = transactions[i] as Required<RecordResult>;
-        let getReq = SingleRecordRequest(
-            txn.recordType, 
-            String(txn.internalid), 
-            tranResponseOptions
-        );
-        let getRes = await getRecordById(getReq);
-        if (!isNonEmptyArray(getRes.results)) {
-            mlog.error([`${source} Invalid getRecord response`,
-                `tran internalid: ${txn.internalid}`
+    const dict: {
+        [childRecordId: string]: ReferenceFieldUpdate
+    } = {};
+    for (let i = 0; i < childInternalIds.length; i++) {
+        const childInternalId = String(childInternalIds[i]);
+        let child = (await getRecordById(
+            Factory.SingleRecordRequest(childRecordType, idPropertyEnum.INTERNAL_ID, childInternalId, childResponseOptions)
+        )).results[0] as Required<RecordResult>;
+        if (!child) {
+            mlog.error([`${source} initialChild is undefined`,
+                `at childRecordIds[${i}]`,
             ].join(TAB));
-            throw new Error(`${source} Invalid getRecord response`);
+            break;
         }
-        txn = (getRes.results[0]) as Required<RecordResult>;
-        let targetLines = getLinesWithSublistFieldValue(
-            txn.sublists.item, 'item', itemInternalId
-        );
-        if (targetLines.length === 0) {
-            slog.info(` -- no lines found with targetItemId '${itemId}'`,
-                `continuing to next transaction`
-            );
-            continue;
+        if (!hasKeys(child.sublists, sublistId)) {
+            mlog.error([`${source} child's sublist is undefined`,
+                `at childRecordIds[${i}]`,
+                `from <${childRecordType}>RecordResult.sublists['${sublistId}']`,
+            ].join(TAB));
+            break;
         }
-        let itemReps: ReplacementDictionary = {};
+        const update = {
+            recordType: childRecordType, 
+            referenceFieldId: referenceFieldId, 
+            sublistId,
+            oldReference: parentInternalId, 
+            validationDictionary: {},
+            lineCache: {}
+        } as ReferenceFieldUpdate;
+        cacheOptions.fields = (isStringArray(cacheOptions.fields) 
+            ? cacheOptions.fields
+            : [cacheOptions.fields]
+        )
+        for (let cacheFieldId in cacheOptions.fields) {
+            let cacheValue = child.fields[cacheFieldId];
+            if (isFieldValue(cacheValue)) {
+                update.validationDictionary[cacheFieldId] = cacheValue
+            } else {
+                mlog.error([`${source} Invalid FieldValue in get child.fields`,
+                    `at childRecordIds[${i}]`,
+                    `when setting update.parentValidationDictionary['${cacheFieldId}']`,
+                    `from <${childRecordType}>RecordResult.fields['${cacheFieldId}']`,
+                    `-- <${childRecordType}>RecordResult.fields['${cacheFieldId}'] = ${cacheValue}`
+                ].join(TAB));
+                break;
+            }
+        }
+        let sublistLines = child.sublists[sublistId] ?? [];
+        let targetLines = getLinesWithSublistFieldValue(sublistLines, referenceFieldId, parentInternalId);
+        let sublistCacheFields = (isStringArray(cacheOptions.sublists[sublistId]) 
+            ? cacheOptions.sublists[sublistId]
+            : [cacheOptions.sublists[sublistId]]
+        )
+        validate.arrayArgument(source, {sublistCacheFields, isStringArray});
         for (let j = 0; j < targetLines.length; j++) {
-            const targetLine = targetLines[j];
-            let placeholderInternalId = String(placeholders[j].internalid);
-            itemReps[placeholderInternalId] = {
-                newItemId: String(placeholders[j].fields.itemid) || '',
-                oldItemInternalId: itemInternalId,
-                quantity: Number(targetLine.quantity),
-                rate: Number(targetLine.rate),
-            }
+            const line = targetLines[j];
+            let lineCache = sublistCacheFields.reduce((acc, sublistFieldId)=>{
+                if (isFieldValue(line[sublistFieldId])) {
+                    acc[sublistFieldId] = line[sublistFieldId]
+                }
+                return acc;
+            }, {} as {[fieldId: string]: FieldValue});
+            let newReferenceValue = String(placeholders[j].internalid);
+            update.lineCache[newReferenceValue] = lineCache;
         }
-        slog.info([` -- preparing ItemReplacementDictionary for item '${itemId}' with internalId '${itemInternalId}'`,
-            `num corresponding lines in ${txn.recordType}(${txn.internalid}): ${targetLines.length}`,
-            `num replacements: ${Object.keys(itemReps).length}`
-        ].join(TAB));
-        tranUpdates[String(txn.internalid)] = {
-            tranType: txn.recordType as RecordTypeEnum,
-            originalTotal: Number(txn.fields.total),
-            replacements: itemReps,
-            fields: {
-                memo: fixTransactionMemo(txn.fields.memo)
-            }
-        }
+        dict[childInternalId] = update;
     }
-    return tranUpdates;
+    return dict;
+}
+
+function generateRecordDictionary(
+    records: Required<RecordOptions>[],
+    idField: string | idPropertyEnum = idPropertyEnum.ITEM_ID,
+    recordType: RecordTypeEnum = RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM
+): { [itemId: string]: Required<RecordOptions> } {
+    const source = getSourceString(F, generateRecordDictionary.name);
+    const dict: { [itemId: string]: Required<RecordOptions> } = {};
+    for (let i = 0; i < records.length; i++) {
+        const record = records[i];
+        if (recordType && record.recordType !== recordType) {
+            mlog.error([`${source} Encountered unexpected recordType at records[${i}]`,
+                `expected: '${recordType}'`
+            ].join(TAB));
+            throw new Error(`${source} Invalid record.recordType at records[${i}]`)
+        }
+        let idValue = record.fields[idField] ?? '';
+        if (!isNonEmptyString(idValue)) {
+            mlog.error([`${source} Unable to get idValue from record.fields`,
+                `at records[${i}]`,
+                `idField: '${idField}'`
+            ].join(TAB));
+            throw new Error([`${source} Unable to get idValue from record.fields`
+            ].join(TAB));
+        }
+        dict[idValue] = record;
+    }
+
+    return dict;
+}
+
+async function hasDependentRecords(
+    itemId: string,
+    parentRecordType: RecordTypeEnum,
+    childOptions: ChildSearchOptions[]
+): Promise<boolean | ReconcilerError> {
+    const source = getSourceString(F, hasDependentRecords.name, itemId);
+    let result: RecordResult | null = null;
+    try {
+        let getRes = await getRecordById(
+            Factory.SingleRecordRequest(parentRecordType, idPropertyEnum.ITEM_ID, itemId)
+        );
+        result = getRes.results[0] 
+    } catch (error: any) {
+        return ReconcilerError(source, 
+            `${source} error occurred when calling ${getRecordById.name}`,
+            error
+        );
+    }
+    if (!result) {
+        return ReconcilerError(source, 
+            `get request failed, unable to check for dependents`,
+            `no results from getRecordById(itemId: '${itemId}')`
+        );
+    }
+    const itemInternalId = result.internalid;
+    try {
+        let getRes = await getRelatedRecord(Factory.RelatedRecordRequest(
+            parentRecordType, idPropertyEnum.INTERNAL_ID, itemInternalId, childOptions
+        ));
+        let results = getRes.results ?? [];
+        return results.length > 0;
+    } catch (error: any) {
+        return ReconcilerError(source, 
+            `${source} error occurred when calling ${getRelatedRecord.name}`,
+            error
+        );
+    }
 }
 
 const tranTypePattern = new RegExp(/(?<=\()[\sA-Z]+(?=\)<[a-z]+>$)/i);
+/**
+ * handle this later...
+ * @param memo 
+ * @param stringReplaceOptions 
+ * @returns 
+ */
 function fixTransactionMemo(
     memo: FieldValue | SubrecordValue,
     stringReplaceOptions: StringReplaceOptions = [
@@ -398,58 +692,6 @@ const itemIdExtractor = async (
 
 
 
-/**
- * @TODO parameterize
- * @returns 
- */
-async function generateRelatedRecordRequest(
-    itemId: string,
-    childOptions: ChildSearchOptions[] = [{
-        childRecordType: RecordTypeEnum.SALES_ORDER,
-        fieldId: 'item',
-        sublistId: 'item',
-    }]
-): Promise<RelatedRecordRequest> {
-    const source = getSourceString(F, generateRelatedRecordRequest.name)
-    validate.stringArgument(source, {itemId});
-    const parentRecordType = RecordTypeEnum.INVENTORY_ITEM;
-    let idOptions: idSearchOptions[];
-    let skuDictionary = getSkuDictionary();
-    if (isNonEmptyString(skuDictionary[itemId])) {
-        idOptions = [{
-            idProp: idPropertyEnum.INTERNAL_ID,
-            idValue: Number(skuDictionary[itemId]),
-            searchOperator: SearchOperatorEnum.RECORD.ANY_OF
-        }]
-    } else {
-        idOptions = [{
-            idProp: idPropertyEnum.ITEM_ID,
-            idValue: itemId,
-            searchOperator: SearchOperatorEnum.TEXT.IS
-        }]
-    }
-    return { parentRecordType, idOptions, childOptions } as RelatedRecordRequest;
-}
-
-
-function SingleRecordRequest(
-    recordType: string | RecordTypeEnum,
-    recordInternalId: string,
-    responseOptions?: RecordResponseOptions
-): SingleRecordRequest {
-    const source = getSourceString(F, 'SingleRecordRequest');
-    validate.enumArgument(source, {recordType, RecordTypeEnum});
-    validate.stringArgument(source, {recordInternalId});
-    validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
-    const idOptions = [{
-        idProp: idPropertyEnum.INTERNAL_ID,
-        idValue: Number(recordInternalId),
-        searchOperator: SearchOperatorEnum.RECORD.ANY_OF
-    }] as idSearchOptions[];
-    const request: SingleRecordRequest = { recordType, idOptions, responseOptions };
-    return request;
-
-}
 
 /**
  * @param validationDict 

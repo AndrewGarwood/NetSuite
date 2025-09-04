@@ -626,7 +626,7 @@ class AuthManager {
         try {
             const current = this.getCurrentValidToken();
             if (current) {
-                slog.debug(`${source} Using valid '${current.source}' token`);
+                alog.debug(`${source} Using valid '${current.source}' token`);
                 this.lastTokenResponse = current.token;
                 this.resolvePendingRequests(current.token.access_token);
                 return current.token.access_token;

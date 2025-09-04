@@ -31,10 +31,10 @@ export type SingleRecordRequest = {
  * @typedefn **`RecordResponse`**
  */
 export type RecordResponse = {
-    status: string | number;
+    status: number;
     message: string;
-    results?: RecordResult[];
-    rejects?: any[] | RecordOptions[];
+    results: RecordResult[];
+    rejects: any[] | RecordOptions[];
     error?: string; 
     logs: LogStatement[];
 }
@@ -66,8 +66,14 @@ export type RelatedRecordRequest = {
 }
 
 export type ChildSearchOptions = {
+    /** the `recordType` that is a dependent of `RelatedRecordRequest.parentRecordtype` */
     childRecordType: string | RecordTypeEnum;
+    /** 
+     * The `fieldId` whose value is a `RecordRef` to the `parent` 
+     * - (e.g. its value is an `internalid` of a `parentRecordType record`) 
+     * */
     fieldId: string;
+    /** provide `sublistId` if `fieldId` is a field of a `childRecord.sublist` */
     sublistId?: string;
     responseOptions?: RecordResponseOptions
 }

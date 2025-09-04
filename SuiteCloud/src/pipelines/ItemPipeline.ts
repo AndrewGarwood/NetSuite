@@ -15,7 +15,8 @@ import {
 import { 
     STOP_RUNNING, DELAY, simpleLogger as slog,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
-    getProjectFolders
+    getProjectFolders,
+    getSkuDictionary
 } from "../config";
 import { 
     RecordOptions, RecordResponse, 
@@ -30,7 +31,9 @@ import {
     LogTypeEnum,
     isRecordOptions,
     isRecordResponseOptions,
-    RecordRequest, 
+    RecordRequest,
+    deleteRecord,
+    Factory, 
 } from "../api";
 import { 
     isNonEmptyArray, isNullLike as isNull, isEmptyArray, hasKeys, 
@@ -188,7 +191,7 @@ export async function runMainItemPipeline(
 
 export async function putItems(
     items: RecordOptions[],
-    responseOptions: RecordResponseOptions = DEFAULT_ITEM_RESPONSE_OPTIONS
+    responseOptions?: RecordResponseOptions
 ): Promise<RecordResponse[]> {
     const source = `[ItemPipeline.putItems()]`;
     try {
@@ -271,4 +274,26 @@ export async function generateBinOptions(
         }
     }
     return bins;
+}
+
+
+export async function deleteItem(
+    itemId: string,
+    itemRecordType: RecordTypeEnum = RecordTypeEnum.INVENTORY_ITEM,
+): Promise<RecordResponse | null> {
+    const source = getSourceString(F, deleteItem.name, itemId);
+    try {
+        let itemInternalId = getSkuDictionary()[itemId];
+        validate.stringArgument(source, {itemInternalId});
+        validate.enumArgument(source, {itemRecordType, RecordTypeEnum})
+        const request = Factory.SingleRecordRequest(itemRecordType, idPropertyEnum.INTERNAL_ID, itemInternalId)
+        const response = await deleteRecord(request);
+        return response;
+    } catch (error: any) {
+        mlog.error([`${source} Error occurred when calling deleteRecord()`,
+            `Unable to confirm record was deleted`,
+            ` -> returning null...`
+        ].join(TAB));
+        return null;
+    }
 }

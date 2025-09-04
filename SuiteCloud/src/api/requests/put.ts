@@ -20,12 +20,16 @@ import {
     RecordRequest, RecordResponse, RecordOptions,
     RecordResult,
     isRecordOptions,
+    RecordResponseOptions,
+    isRecordResponseOptions,
+    isRecordResponse,
+    isRecordResult,
 } from "../types";
 import { BATCH_SIZE, partitionArrayBySize } from "../configureRequests";
 import { getAccessToken } from "../configureAuth";
 import path from "node:path";
 import * as validate from "typeshi:utils/argumentValidation";
-import { isEmptyArray } from "typeshi:utils/typeValidation";
+import { isEmptyArray, isNonEmptyArray } from "typeshi:utils/typeValidation";
 import { extractFileName } from "@typeshi/regex";
 
 const F = extractFileName(__filename);
@@ -105,6 +109,66 @@ export async function upsertRecordPayload(
 }
 
 /**
+ * @param record 
+ * @param responseOptions 
+ * @returns  **`response`** `RecordResponse`
+ * @catches `error` 
+ * - `if` `putRes.data` is not a `RecordResponse` 
+ * - `if` `RecordResponse.results[0]` is not a `RecordResult` 
+ */
+export async function putSingleRecord(
+    record: RecordOptions,
+    responseOptions?: RecordResponseOptions
+): Promise<RecordResponse> {
+    const source = getSourceString(F, putSingleRecord.name);
+    let scriptId = getSandboxRestScript("PUT_Record").scriptId;
+    let deployId = getSandboxRestScript("PUT_Record").deployId;
+    let response: RecordResponse;
+    let defaultResponseValues = {
+        results: [], 
+        rejects: [], 
+        logs: []
+    }
+    try {
+        validate.objectArgument(source, {record, isRecordOptions});
+        if (responseOptions) validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
+    } catch (error: any) {
+        mlog.error(`${source} Invalid parameters`, error);
+        response = {
+            status: 400,
+            message: `${source} Invalid parameters, caught: ${error}`,
+            error: `${source} Invalid parameters`,
+            ...defaultResponseValues
+        }
+        return response;
+    }
+    try {
+        const request: RecordRequest = { recordOptions: record, responseOptions };
+        const accessToken = await getAccessToken();
+        let putRes = await PUT(accessToken, scriptId, deployId, request);
+        let resData = (putRes.data ?? {}) as RecordResponse;
+        validate.objectArgument(source, {resData, isRecordResponse})
+        validate.objectArgument(source, {
+            'RecordResponse.results[0]': resData.results[0] ?? {}, isRecordResult
+        });
+        response = resData;
+    } catch (error) {
+        mlog.error(`${source} Error occurred while calling ${PUT.name}():`, error);
+        write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 
+            path.join(getProjectFolders().logDir, `ERROR_${putSingleRecord.name}.json`)
+        );
+        response = {
+            status: 500,
+            message: `${source} Error occurred while calling ${PUT.name}(): ${error}`,
+            error: `${source} Error occurred while calling ${PUT.name}()`,
+            ...defaultResponseValues
+        }
+    }
+    return response;
+
+}
+
+/**
  * @param accessToken `string` - see {@link getAccessToken}
  * @param scriptId `number`
  * @param deployId `number`
@@ -116,7 +180,7 @@ export async function PUT(
     accessToken: string, 
     scriptId: number, 
     deployId: number,
-    payload: Record<string, any> | any,
+    payload: Record<string, any> | RecordRequest,
     contentType: AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN_TEXT = AxiosContentTypeEnum.JSON,
 ): Promise<any> {
     const source = getSourceString(F, PUT.name);

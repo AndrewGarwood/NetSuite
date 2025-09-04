@@ -12,6 +12,7 @@ import {
     getFileNameTimestamp,
     clearFile,
     isRowSourceMetaData,
+    getSourceString,
 } from "typeshi:utils/io";
 import { 
     STOP_RUNNING, DELAY,
@@ -23,7 +24,7 @@ import {
 import { 
     RecordOptions, RecordRequest, RecordResponse, 
     RecordResult, idPropertyEnum,
-    RecordResponseOptions, upsertRecordPayload,
+    RecordResponseOptions, upsertRecordPayload, putSingleRecord,
     SingleRecordRequest, getRecordById,
     FieldDictionary,
     idSearchOptions,
@@ -56,7 +57,8 @@ import {
 } from "src/services/parse/types/index";
 import { PostProcessDictionary } from "src/services/post_process/types/PostProcessing";
 import { DEFAULT_SALES_ORDER_RESPONSE_OPTIONS } from "./TransactionConfig";
-
+import { extractFileName } from "@typeshi/regex";
+const F = extractFileName(__filename);
 
 /**
  * @param options 
@@ -437,7 +439,7 @@ export async function putTransactions(
     slog.info(`${source} START, transactions.length: ${transactions.length}`);
     try {
         validate.arrayArgument(source, {transactions, isRecordOptions});
-        validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
+        if (responseOptions) validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
     } catch (error) {
         mlog.error(`${source} Invalid parameters`, error);
         return [];
@@ -458,8 +460,6 @@ export async function putTransactions(
         return [];
     }
 }
-
-
 
 
 /**

@@ -118,7 +118,7 @@ export async function getRecordById(
 export async function getRelatedRecord(
     request: RelatedRecordRequest
 ): Promise<RecordResponse> {
-    const source = `[${F}.${getRelatedRecord.name}()]`;
+    const source = getSourceString(F, getRelatedRecord.name);
     validate.objectArgument(source, {request, isRelatedRecordRequest});
     try {
         const accessToken = await getAccessToken();

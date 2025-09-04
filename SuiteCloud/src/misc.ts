@@ -37,6 +37,8 @@ import {
 } from "typeshi:utils/io";
 import { 
     FindSublistLineWithValueOptions, getAccessToken, isRecordOptions, 
+    isRecordResponseOptions, 
+    isRecordResult, 
     isRelatedRecordRequest, partitionArrayBySize, SublistDictionary, SublistLine, 
     SublistUpdateDictionary
 } from "./api";
@@ -54,7 +56,7 @@ import {
     LN_INVENTORY_ITEM_POST_PROCESSING_OPTIONS 
 } from "src/parse_configurations/item/itemParseDefinition";
 import { 
-    hasKeys, isEmptyArray, isInteger, isIntegerArray, isNonEmptyArray, 
+    hasKeys, isEmpty, isEmptyArray, isInteger, isIntegerArray, isNonEmptyArray, 
     isNonEmptyString, isNullLike, 
     isObject
 } from "typeshi:utils/typeValidation";
@@ -92,6 +94,7 @@ const itemIdExtractor = async (
     return clean(extractLeaf(value), cleanOptions);
 }
 
+
 async function main(): Promise<void> {
     const source = getSourceString(F, main.name)
     await initializeEnvironment();
@@ -99,10 +102,44 @@ async function main(): Promise<void> {
     await clearFile(...logFiles);
     await initializeData();
     await instantiateAuthManager();
-    mlog.info(`${source} START at ${getCurrentPacificTime()}`);
+    mlog.info(`${source} START at ${getCurrentPacificTime()}`);    
+    let wDir = path.join(getProjectFolders().dataDir, 'workspace');
+    /* ===================================================================== */
+    
+    let soData = read(
+        path.join(wDir, 'item_to_salesorders.json')
+    ) as {[itemId: string]: RecordResult[]} ?? {};
+    if (isEmpty(soData)) {
+        return;
+    }
+    const itemToSalesOrders = (Object.keys(soData)
+        .reduce((acc, itemId) => {
+            acc[itemId] = soData[itemId].map(r=>r.internalid);
+            return acc;
+        }, {} as { [itemId: string]: number[] })
+    );
+    slog.info([` -- read salesorder data into itemToSalesOrders`,
+        `keys.length: ${Object.keys(itemToSalesOrders).length}`,
+        `values.flat.length: ${Object.values(itemToSalesOrders).flat().length}`
+    ].join(TAB));
+    let revisionData = read(
+        path.join(wDir, 'item_to_revisions.json')
+    ) as {[itemId: string]: RecordResult[]} ?? {}
+    if (isEmpty(revisionData)) {
+        return;
+    }
+    const itemToRevisions = (Object.keys(revisionData)
+        .reduce((acc, itemId)=> {
+            acc[itemId] = revisionData[itemId].map(r=>r.internalid);
+            return acc;
+        }, {} as { [itemId: string]: number[] })
+    );
+    slog.info([` -- read bomrevision data into itemToRevisions`,
+        `keys.length: ${Object.keys(itemToRevisions).length}`,
+        `values.flat.length: ${Object.values(itemToRevisions).flat().length}`
+    ].join(TAB));
 
-    await reconcileItems();
-
+    /* ===================================================================== */
     mlog.info([`${source} END at ${getCurrentPacificTime()}`,
         `handling logs...`
     ].join(TAB));
@@ -126,64 +163,6 @@ main().catch(error => {
 
 
 
-
-/**
- * @TODO parameterize
- * @returns 
- */
-async function getRemainingItems(
-    items: RecordOptions[]
-): Promise<string[]> {
-    const source = getSourceString(F, getRemainingItems.name);
-    let itemIds = items
-        .map(record => (record.fields ?? {}).itemid)
-        .filter(idValue=>isNonEmptyString(idValue))
-    let skuDict = await getSkuDictionary();
-    let remainingItems: any[] = [];
-
-    for (let itemId of itemIds) {
-        let internalId = skuDict[itemId];
-        if (!internalId) {
-            mlog.warn([`${source} Invalid itemId`,
-                `No existing internalid found for item with itemid = '${itemId}'`,
-            ].join(TAB));
-            continue;
-        }
-        const idOptions: idSearchOptions[] = [
-            {
-                idProp: idPropertyEnum.INTERNAL_ID,
-                idValue: Number(internalId),
-                searchOperator: SearchOperatorEnum.RECORD.ANY_OF
-            },
-            {
-                idProp: idPropertyEnum.ITEM_ID,
-                idValue: itemId,
-                searchOperator: SearchOperatorEnum.TEXT.IS
-            }
-        ];
-        let getReq: SingleRecordRequest = {
-            recordType: RecordTypeEnum.INVENTORY_ITEM,
-            idOptions: idOptions,
-            responseOptions: DEFAULT_ITEM_RESPONSE_OPTIONS
-        }
-        let getRes = await getRecordById(getReq) as RecordResponse;
-        await DELAY(1000, null);
-        if (!getRes) {
-            mlog.error([`${source} null/undefined response from getRecordById()`,
-                `itemId: '${itemId}'`
-            ].join(TAB));
-            continue;
-        }
-        if (isNonEmptyArray(getRes.results)) {
-            remainingItems.push(...getRes.results)
-        }
-    }
-    mlog.info([`${source} Finished searching for items that still need to be deleted...`,
-        `number of target items: ${itemIds.length}`,
-        ` remainingItems.length: ${remainingItems.length}`
-    ].join(TAB));
-    return remainingItems;
-}
 
 /**
  * @TODO parameterize

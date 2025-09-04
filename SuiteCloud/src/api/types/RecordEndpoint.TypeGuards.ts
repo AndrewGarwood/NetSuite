@@ -17,9 +17,9 @@ import { RecordResponseOptions, ChildSearchOptions, RelatedRecordRequest, idSear
 import { RecordTypeEnum } from "../../utils/ns/Enums";
 
 
-export function isSublistUpdateDictionary(value: any): value is SublistUpdateDictionary {
+export function isSublistUpdateDictionary(value: any, requireNonEmpty: boolean = true): value is SublistUpdateDictionary {
     const candidate = value as SublistUpdateDictionary;
-    return (isObject(candidate)
+    return (isObject(candidate, requireNonEmpty)
         && Object.keys(candidate).every(k=>isNonEmptyString(k)
             && isObject(candidate[k])
             && candidate[k].newValue !== undefined
@@ -93,16 +93,17 @@ export function isRecordResponseOptions(value: any): value is RecordResponseOpti
     const candidate = value as RecordResponseOptions;
     return (isObject(candidate) 
         && (!candidate.fields 
-            || (isNonEmptyString(candidate.fields) 
-                || isEmptyArray(candidate.fields) 
-                || isStringArray(candidate.fields)
-            )
+            || isNonEmptyString(candidate.fields) 
+            || isEmptyArray(candidate.fields) 
+            || isStringArray(candidate.fields)
+            
         )
         && (!candidate.sublists 
-            || (isObject(candidate.sublists)
+            || (isObject(candidate.sublists, false)
                 && Object.keys(candidate.sublists).every(k=>
-                    isNonEmptyString(k) && candidate.sublists 
-                    && (isNonEmptyString(candidate.sublists[k])
+                    isNonEmptyString(k) 
+                    && (!candidate.sublists 
+                        || isNonEmptyString(candidate.sublists[k])
                         || isEmptyArray(candidate.sublists[k]) 
                         || isStringArray(candidate.sublists[k])
                     )
@@ -118,11 +119,13 @@ export function isRecordResponseOptions(value: any): value is RecordResponseOpti
  * @returns **`isRecordResponse`** `boolean`
  */
 export function isRecordResponse(value: any): value is RecordResponse {
-    return (isObject(value)
-        && hasKeys(value, 
-            ['status', 'message', 'results', 'rejects', 'error', 'logs'], 
-            false, true
-        )
+    const candidate = value as RecordResponse;
+    return (isObject(candidate)
+        && isInteger(candidate.status)
+        && Array.isArray(candidate.results)
+        && Array.isArray(candidate.rejects)
+        && Array.isArray(candidate.logs)
+        && (!candidate.error || isNonEmptyString(candidate.error))
     );
 }
 
