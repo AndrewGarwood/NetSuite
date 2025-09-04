@@ -30,7 +30,7 @@ import * as customerConstants from "../parse_configurations/customer/customerCon
 import { parseRecordCsv } from "../services/parse/csvParser";
 import { processParseResults } from "../services/post_process/parseResultsProcessor";
 import { isNonEmptyArray, isNonEmptyString } from "typeshi:utils/typeValidation";
-import { RadioFieldBoolean, RADIO_FIELD_TRUE, } from "../utils/ns/";
+import { RadioFieldBoolean, RADIO_FIELD_TRUE, } from "../utils/ns";
 import { 
     ParseDictionary, ParseResults, ValidatedParseResults 
 } from "../services/parse/types/index";

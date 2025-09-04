@@ -4,7 +4,7 @@
  */
 
 import { CleanStringOptions } from "typeshi/dist/utils/regex";
-import { EntityRecordTypeEnum, RecordTypeEnum } from "src/utils/ns/Enums";
+import { EntityRecordTypeEnum, RecordTypeEnum } from "@utils/ns/Enums";
 import { ParseDictionary, ParseResults } from "src/services/parse/types/ParseOptions";
 
 /**

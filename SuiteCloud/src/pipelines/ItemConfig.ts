@@ -21,7 +21,6 @@ export const DEFAULT_ITEM_RESPONSE_OPTIONS: RecordResponseOptions = {
     }
 }
 
-
 export const BIN_RESPONSE_OPTIONS: RecordResponseOptions = {
     fields: ['binnumber', 'location', 'externalid']
 }
@@ -52,7 +51,6 @@ export const LN_INVENTORY_ITEM_PIPELINE_CONFIG: ItemPipelineOptions = {
 export const NON_INVENTORY_ITEM_PIPELINE_CONFIG: ItemPipelineOptions = {
     parseOptions: { [RecordTypeEnum.NON_INVENTORY_ITEM]: NON_INVENTORY_ITEM_PARSE_OPTIONS },
     postProcessingOptions: { [RecordTypeEnum.NON_INVENTORY_ITEM]: NON_INVENTORY_ITEM_POST_PROCESSING_OPTIONS },
-    // outDir: path.join(CLOUD_LOG_DIR, 'items'),
     responseOptions: DEFAULT_ITEM_RESPONSE_OPTIONS,
     stagesToWrite: [
         // ItemPipelineStageEnum.VALIDATE, 
@@ -65,7 +63,6 @@ export const SERVICE_ITEM_PIPELINE_CONFIG: ItemPipelineOptions = {
     parseOptions: { [RecordTypeEnum.SERVICE_ITEM]: SERVICE_ITEM_PARSE_OPTIONS },
     postProcessingOptions: { [RecordTypeEnum.SERVICE_ITEM]: SERVICE_ITEM_POST_PROCESSING_OPTIONS },
     clearLogFiles: [],
-    // outDir: path.join(CLOUD_LOG_DIR, 'items'),
     stagesToWrite: [
         // ItemPipelineStageEnum.VALIDATE, 
         ItemPipelineStageEnum.PUT_ITEMS
@@ -77,7 +74,6 @@ export const CHARGE_ITEM_PIPELINE_CONFIG: ItemPipelineOptions = {
     parseOptions: { [RecordTypeEnum.OTHER_CHARGE_ITEM]: CHARGE_ITEM_PARSE_OPTIONS },
     postProcessingOptions: { [RecordTypeEnum.OTHER_CHARGE_ITEM]: SERVICE_ITEM_POST_PROCESSING_OPTIONS },
     clearLogFiles: [],
-    // outDir: path.join(CLOUD_LOG_DIR, 'items'),
     stagesToWrite: [
         // ItemPipelineStageEnum.VALIDATE, 
         ItemPipelineStageEnum.PUT_ITEMS
@@ -90,7 +86,6 @@ export const SUBTOTAL_ITEM_PIPELINE_CONFIG: ItemPipelineOptions = {
         [RecordTypeEnum.SUBTOTAL_ITEM]: SUBTOTAL_ITEM_PARSE_OPTIONS 
     },
     clearLogFiles: [],
-    // outDir: path.join(CLOUD_LOG_DIR, 'items'),
     stagesToWrite: [
         // ItemPipelineStageEnum.VALIDATE, 
         ItemPipelineStageEnum.PUT_ITEMS
