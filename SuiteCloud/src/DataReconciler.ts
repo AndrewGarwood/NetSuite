@@ -19,7 +19,8 @@ import {
     INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING, 
     getSkuDictionary,
     DELAY,
-    getProjectFolders, isEnvironmentInitialized, isDataInitialized
+    getProjectFolders, isEnvironmentInitialized, isDataInitialized,
+    setSkuInternalId
 } from "./config";
 import { getColumnValues, getRows, 
     writeObjectToJsonSync as write, readJsonFileAsObject as read, 
@@ -30,7 +31,9 @@ import { getColumnValues, getRows,
     isFile,
     getSourceString, clearFile, trimFile,
     getCurrentPacificTime,
-    autoFormatLogsOnExit
+    autoFormatLogsOnExit,
+    RowSourceMetaData,
+    isRowSourceMetaData
 } from "typeshi:utils/io";
 import * as validate from "typeshi:utils/argumentValidation";
 import path from "node:path";
@@ -63,31 +66,14 @@ import {
     isSublistUpdateDictionary
 } from "./api";
 import { CleanStringOptions, StringReplaceOptions, clean, extractFileName, extractLeaf } from "typeshi:utils/regex"
-import { CLEAN_ITEM_ID_OPTIONS } from "src/parse_configurations/evaluators";
+import { CLEAN_ITEM_ID_OPTIONS, unitType } from "src/parse_configurations/evaluators";
 import { Factory } from "./api";
-
+import { ItemColumnEnum } from "src/parse_configurations/item/itemConstants";
+import { deleteItem } from "src/pipelines";
+/** name of current file */
 const F = extractFileName(__filename);
 
 let placeholders: Required<RecordResult>[] | null = [];
-
-type TransactionUpdateDictionary = {
-    [tranInternalId: string]: TransactionLineItemUpdate
-}
-
-type TransactionLineItemUpdate = {
-    tranType: RecordTypeEnum;
-    replacements: ReplacementDetails[];
-    fields?: FieldDictionary;
-    originalTotal: number;
-}
-
-type ReplacementDetails = {
-    newItemInternalId: string;
-    newItemId: string;
-    oldItemInternalId: string;
-    quantity: number;
-    rate: number;
-}
 
 type ReconcilerError = {
     readonly isError: true;
@@ -98,12 +84,21 @@ type ReconcilerError = {
 }
 
 function ReconcilerError(
-    source: string,
+    source?: string,
     message?: string,
     error?: any,
     ...details: any[]
 ): ReconcilerError {
-    return { isError: true, source, message, error, details } as ReconcilerError;
+    return { 
+        isError: true, 
+        source: (isNonEmptyString(source) 
+            ? source 
+            : getSourceString(F, ReconcilerError.name, 'UNKNOWN_STAGE')
+        ), 
+        message, 
+        error, 
+        details 
+    } as ReconcilerError;
 }
 function isReconcilerError(value: any): value is ReconcilerError {
     const candidate = value as ReconcilerError;
@@ -114,16 +109,17 @@ function isReconcilerError(value: any): value is ReconcilerError {
 }
 
 type ReconcilerState = {
-    /** map itemId to list of tranInternalId */
-    firstUpdateCompleted: { 
+    stage: ItemReconcilerStageEnum;
+    /** map `itemId` to list of `childRecordInternalId` */
+    firstUpdate: { 
         [itemId: string]: {
             [childRecordType: string]: string[],
         }
     };
     itemsDeleted: string[];
     newItems: Record<string, string>;
-    /** map itemId to list of tranInternalId */
-    secondUpdateCompleted:  { 
+    /** map `itemId` to list of `childRecordInternalId` */
+    secondUpdate:  { 
         [itemId: string]: {
             [childRecordType: string]: string[],
         }
@@ -133,7 +129,7 @@ type ReconcilerState = {
 }
 
 let createOptionsDict: { [itemId: string]: Required<RecordOptions> } | null = null;
-export function getCreateOptions(itemId: string): RecordOptions {
+export function getCreateOptions(itemId: string): Required<RecordOptions> {
     const source = getSourceString(F, getCreateOptions.name, itemId)
     if (!createOptionsDict) {
         throw new Error(`${source} createOptionsDict: { [itemId: string]: RecordOptions } has not been loaded yet`);
@@ -152,13 +148,13 @@ export function getModuleState(): ReconcilerState {
     return moduleState;
 }
 
-function isReconcileState(value: any): value is ReconcilerState {
+function isReconcilerState(value: any): value is ReconcilerState {
     const candidate = value as ReconcilerState;
     return (isObject(candidate)
-        && isObject(candidate.firstUpdateCompleted, false)
+        && isObject(candidate.firstUpdate, false)
         && (isEmptyArray(candidate.itemsDeleted) || isStringArray(candidate.itemsDeleted))
         && isObject(candidate.newItems, false)
-        && isObject(candidate.secondUpdateCompleted, false)
+        && isObject(candidate.secondUpdate, false)
     );
 }
 type SublistRecordReferenceOptions = { 
@@ -199,6 +195,33 @@ const soResponseOptions: Required<RecordResponseOptions> = {
     }
 }
 
+const sublistReferenceDict: {
+    [recordType: string]: SublistRecordReferenceOptions
+} = {
+    [RecordTypeEnum.BOM_REVISION]: {
+        referenceFieldId: 'item',
+        sublistId: 'component',
+        cacheOptions: revCacheOptions,
+        responseOptions: revResponseOptions
+    },
+    [RecordTypeEnum.SALES_ORDER]: {
+        referenceFieldId: 'item',
+        sublistId: 'item',
+        cacheOptions: soCacheOptions,
+        responseOptions: soResponseOptions
+    }
+}
+enum ItemReconcilerStageEnum {
+    PRE_PROCESS = 'PRE_PROCESS',
+    GENERATE_PLACEHOLDER_UPDATE = 'GENERATE_PLACEHOLDER_UPDATE',
+    RUN_PLACEHOLDER_UPDATE = 'RUN_PLACEHOLDER_UPDATE',
+    VALIDATE_FIRST_UPDATE = 'VALIDATE_FIRST_UPDATE',
+    DELETE_OLD_ITEM = 'DELETE_OLD_ITEM',
+    CREATE_NEW_ITEM = 'CREATE_NEW_ITEM',
+    GENERATE_NEW_ITEM_UPDATE = 'GENERATE_NEW_ITEM_UPDATE',
+    RUN_NEW_ITEM_UPDATE = 'RUN_NEW_ITEM_UPDATE'
+}
+
 /**
  * @TODO refactor
  */
@@ -219,9 +242,9 @@ export async function reconcileItems(): Promise<any> {
     validate.existingFileArgument(source, '.json', {statePath});
 
     moduleState = read(statePath) as ReconcilerState;
-    let state = getModuleState(); // because ReconcileState | null
-    validate.objectArgument(source, {state, isReconcileState});
-
+    let state = getModuleState(); // because ReconcilerState | null
+    validate.objectArgument(source, {state, isReconcilerState});
+    state.stage = ItemReconcilerStageEnum.PRE_PROCESS;
     placeholders = (read(path.join(wDir, 'item_placeholders.json')) as { 
         placeholders: Required<RecordResult>[]
     }).placeholders;
@@ -229,9 +252,31 @@ export async function reconcileItems(): Promise<any> {
 
     let lnii_data = read(path.join(wDir, 'lnii_options.json')) as { items: Required<RecordOptions>[] };
     validate.arrayArgument(source, {items: lnii_data.items, isRecordOptions});
+    let dataSource = lnii_data.items[0].meta.dataSource ?? {};
+    const [originalFilePath] = Object.keys(dataSource);
+    let fileName = extractFileName(originalFilePath, false);
+    let filePath = path.join(getProjectFolders().dataDir, 'accounting', 'items', fileName);
+    validate.existingFileArgument(source, '.tsv', {filePath});
+    let sourceRows = await getRows(filePath);
+    for (let record of lnii_data.items) {
+        if (!record.fields.unitstype) {
+            let dataSource = record.meta.dataSource as RowSourceMetaData;
+            validate.objectArgument(source, {dataSource, isRowSourceMetaData});
+            let [rowIndex] = dataSource[originalFilePath];
+            validate.numberArgument(source, {rowIndex}, true);
+            const row = sourceRows[rowIndex];
+            record.fields.unitstype = await unitType(row, ItemColumnEnum.UNIT_OF_MEASUREMENT);
+        }
+    }
     createOptionsDict = generateRecordDictionary(lnii_data.items);
     let addedPriceCount = 0;
     for (let itemId in createOptionsDict) {
+        if (createOptionsDict[itemId].fields.unitstype === undefined) {
+            throw new Error([`${source} Invalid RecordOptions in lnii_data`,
+                `itemId: '${itemId}'`,
+                `missing requiredField: 'unitstype'`,
+            ].join(TAB));
+        }
         if (!isNonEmptyArray(createOptionsDict[itemId].sublists.price1)) {
             createOptionsDict[itemId].sublists.price1 = [{
                 pricelevel: 1, 
@@ -286,16 +331,21 @@ export async function reconcileItems(): Promise<any> {
             [childRecordType: string | RecordTypeEnum]: number[]
         }
     } = {};
-    let keys = Array.from(new Set([
-        ...Object.keys(itemToSalesOrders), 
-        ...Object.keys(itemToRevisions)
-    ]));
-    for (let itemId of keys) {
+    let itemKeys = Object.keys(itemToSalesOrders); // itemToSalesOrders, itemToRevisions keys are same
+    // = Array.from(new Set([
+    //     ...Object.keys(itemToSalesOrders), 
+    //     ...Object.keys(itemToRevisions)
+    // ]));
+    // mlog.debug(`itemToSalesOrders, itemToRevisions keys are same ? ${
+    //     Object.keys(itemToSalesOrders).length === Object.keys(itemToRevisions).length
+    //     && Object.keys(itemToSalesOrders).every(k=>Object.keys(itemToRevisions).includes(k))
+    // }`);
+    for (let itemId of itemKeys) {
         if (!(itemId in getSkuDictionary())) {
             throw new Error(`${source} item '${itemId}' not in skuDictionary...`)
         }
     }
-    for (let itemId of keys) {
+    for (let itemId of itemKeys) {
         itemDependentDict[itemId] = {};
         if (itemId in itemToRevisions) {
             itemDependentDict[itemId][RecordTypeEnum.BOM_REVISION] = itemToRevisions[itemId];
@@ -305,51 +355,195 @@ export async function reconcileItems(): Promise<any> {
         }
     }
     write(itemDependentDict, path.join(wDir, 'item_to_dependents.json'));
-    const sublistReferenceDict: {
-        [recordType: string]: SublistRecordReferenceOptions
-    } = {
-        [RecordTypeEnum.BOM_REVISION]: {
-            referenceFieldId: 'item',
-            sublistId: 'component',
-            cacheOptions: revCacheOptions,
-            responseOptions: revResponseOptions
-        },
-        [RecordTypeEnum.SALES_ORDER]: {
-            referenceFieldId: 'item',
-            sublistId: 'item',
-            cacheOptions: soCacheOptions,
-            responseOptions: soResponseOptions
-        }
-    }
     itemLoop:
-    for (let itemId in itemDependentDict) {
-        childTypeLoop:
+    for (let itemId of Object.keys(itemDependentDict).slice(0,2)) {
+        if (!state.firstUpdate[itemId]) {
+            state.firstUpdate[itemId] = {};
+        }
+        const itemInternalId = getSkuDictionary()[itemId];
+        let firstUpdateDict: {
+            [childRecordType: string]: {
+                [childInternalId: string]: ReferenceFieldUpdate;
+            } 
+        } = {};
+        firstUpdateLoop:
         for (let childRecordType in itemDependentDict[itemId]) {
+            if (!state.firstUpdate[itemId][childRecordType]) {
+                state.firstUpdate[itemId][childRecordType] = [];
+            }
             if (!hasKeys(sublistReferenceDict, childRecordType)) {
                 mlog.error(`${source} missing childRecordType '${childRecordType}' from config...`)
                 break itemLoop;
             }
-            const childUpdateDict = await generateReferenceUpdateDictionary(
-                itemId, 
-                getSkuDictionary()[itemId], 
-                RecordTypeEnum.INVENTORY_ITEM, 
-                childRecordType as RecordTypeEnum,
-                itemDependentDict[itemId][childRecordType],
-                sublistReferenceDict[childRecordType]
+            firstUpdateDict[childRecordType] = {};
+            firstChildLoop:
+            for (let childInternalId of itemDependentDict[itemId][childRecordType]) {
+                if (state.firstUpdate[itemId][childRecordType].includes(String(childInternalId))) {
+                    continue firstChildLoop;
+                }
+                state.stage = ItemReconcilerStageEnum.GENERATE_PLACEHOLDER_UPDATE;
+                let update = await generateReferenceUpdate(
+                    itemId, 
+                    itemInternalId, 
+                    RecordTypeEnum.INVENTORY_ITEM,
+                    childRecordType as RecordTypeEnum,
+                    childInternalId, 
+                    sublistReferenceDict[childRecordType],
+                    placeholders.map(p=>p.internalid)
+                );
+                if (isReconcilerError(update)) {
+                    mlog.error([`${source} ${generateReferenceUpdate.name} returned error value`,
+                        `error: `, indentedStringify(update)
+                    ].join(TAB))
+                    state.errors.push({itemId, 
+                        stage: state.stage, 
+                        childRecordType, 
+                        childInternalId, 
+                        error: update
+                    });
+                    break itemLoop;
+                }
+                firstUpdateDict[childRecordType][childInternalId] = update;
+                state.stage = ItemReconcilerStageEnum.RUN_PLACEHOLDER_UPDATE;
+                let updateResult = await processReferenceUpdate(
+                    itemId, 
+                    childRecordType as RecordTypeEnum, 
+                    childInternalId, 
+                    update, 
+                    sublistReferenceDict[childRecordType].responseOptions
+                )
+                if (isReconcilerError(updateResult)) {
+                    mlog.error([`${source} ${processReferenceUpdate.name} returned error value`,
+                        `error: `, indentedStringify(updateResult)
+                    ].join(TAB));
+                    state.errors.push({itemId, 
+                        stage: state.stage, 
+                        childRecordType, 
+                        childInternalId, 
+                        error: updateResult
+                    });
+                    break itemLoop;
+                }
+                state.firstUpdate[itemId][childRecordType].push(String(childInternalId));
+            }
+        }
+        state.stage = ItemReconcilerStageEnum.VALIDATE_FIRST_UPDATE;
+        let stillHasDependents = await hasDependentRecords(
+            itemId, 
+            RecordTypeEnum.INVENTORY_ITEM,
+            Object.keys(itemDependentDict[itemId]).reduce((acc, childRecordType)=> {
+                acc.push(Factory.ChildSearchOptions(
+                    childRecordType as RecordTypeEnum, 
+                    sublistReferenceDict[childRecordType].referenceFieldId, 
+                    sublistReferenceDict[childRecordType].sublistId
+                ));
+                return acc;
+            }, [] as ChildSearchOptions[])
+        );
+        if (isReconcilerError(stillHasDependents)) {
+            mlog.error(`${source} hasDependentRecords returned error`,
+                stillHasDependents
             );
-            childUpdateLoop:
-            for (let childInternalId in childUpdateDict) {
-                let update: ReferenceFieldUpdate = childUpdateDict[childInternalId];
+            state.errors.push({itemId, stage: state.stage, error: stillHasDependents});
+            break itemLoop;
+        }
+        let safeToDelete = (Object.keys(state.firstUpdate[itemId])
+            .every(childRecordType=>{
+                let actualProcessCount = state.firstUpdate[itemId][childRecordType].length;
+                let expectedProcessCount = itemDependentDict[itemId][childRecordType].length;
+                return actualProcessCount === expectedProcessCount;
+            }) && !stillHasDependents
+        );
+        if (!safeToDelete) {
+            slog.info(` -- safeToDelete === false, continuing itemLoop`);
+            state.errors.push({itemId, stage: state.stage, safeToDelete, stillHasDependents});
+            continue itemLoop;
+        }
+        if (!state.itemsDeleted.includes(itemId)) {
+            state.stage = ItemReconcilerStageEnum.DELETE_OLD_ITEM;
+            let deleteRes = await deleteItem(itemId, RecordTypeEnum.INVENTORY_ITEM);
+            if (!deleteRes) {
+                mlog.error([`${source} deleteItem response is null`,
+                    `itemId: '${itemId}'`
+                ].join(TAB));
+                state.errors.push({itemId, stage: state.stage, message: `${source} deleteItem response is null`});
+                break itemLoop;
+            }
+            state.itemsDeleted.push(itemId);
+        }
+        let newItemInternalId: string | null = null;
+        if (!(itemId in state.newItems)) {
+            state.stage = ItemReconcilerStageEnum.CREATE_NEW_ITEM;
+            try {
+                const createOptions = getCreateOptions(itemId);
+                let createRes = await putSingleRecord(createOptions);
+                newItemInternalId = String((createRes.results[0] ?? {internalid: undefined}).internalid);
+                validate.numericStringArgument(source, {newItemInternalId});
+            } catch (error: any) {
+                mlog.error([`${source} error when creating new item`,
+                    `itemId: '${itemId}'`
+                ].join(TAB), error);
+                state.errors.push({itemId, message: `${source} error when creating new item`, stage: state.stage})
+                break itemLoop;
+            }
+            setSkuInternalId(itemId, newItemInternalId);
+            slog.info([` -- Recreated item '${itemId}'`,
+                `newInternalId: '${newItemInternalId}'`,
+                `oldInternalId: '${itemInternalId}'`
+            ].join(TAB));
+            state.newItems[itemId] = newItemInternalId;
+        } else {
+            newItemInternalId = state.newItems[itemId];
+        }
+        
+        if (!state.secondUpdate[itemId]) {
+            state.secondUpdate[itemId] = {};
+        }
+        secondUpdateLoop:
+        for (let childRecordType in firstUpdateDict) {
+            if (!state.secondUpdate[itemId][childRecordType]) {
+                state.secondUpdate[itemId][childRecordType] = [];
+            }
+            secondChildLoop:
+            for (let childInternalId in firstUpdateDict[childRecordType]) {
+                if (state.secondUpdate[itemId][childRecordType].includes(childInternalId)) {
+                    continue secondChildLoop;
+                }
+                const prevUpdate = firstUpdateDict[childRecordType][childInternalId];
+                for (const placeholderId in prevUpdate.lineCache) {
+                    state.stage = ItemReconcilerStageEnum.GENERATE_NEW_ITEM_UPDATE;
+                    const newUpdate = {
+                        recordType: prevUpdate.recordType,
+                        sublistId: sublistReferenceDict[childRecordType].sublistId,
+                        referenceFieldId: sublistReferenceDict[childRecordType].referenceFieldId,
+                        oldReference: placeholderId,
+                        validationDictionary: prevUpdate.validationDictionary,
+                        lineCache: { [newItemInternalId]: prevUpdate.lineCache[placeholderId] }
+                    } as ReferenceFieldUpdate;
+                    state.stage = ItemReconcilerStageEnum.RUN_NEW_ITEM_UPDATE;
+                    let updateResult = await processReferenceUpdate(itemId, 
+                        childRecordType as RecordTypeEnum,
+                        childInternalId, 
+                        newUpdate, 
+                        sublistReferenceDict[childRecordType].responseOptions
+                    )
+                    if (isReconcilerError(updateResult)) {
+                        mlog.error([`${source} secondUpdateLoop -> ${
+                            processReferenceUpdate.name} returned error`,
+                            state.errors.push({itemId, childRecordType, childInternalId, oldReference: placeholderId, stage: state.stage}),
+                            `error: `, 
+                            updateResult
+                        ].join(TAB));
+                        break itemLoop;
+                    }
+                }
+                state.secondUpdate[itemId][childRecordType].push(childInternalId);
             }
         }
     }
-    
-
-
-
-
     write(state, statePath);
 }
+
 
 /**
  * @consideration change name back to processSublistReferenceUpdate; worry about abstracting to body fields later...  
@@ -357,15 +551,18 @@ export async function reconcileItems(): Promise<any> {
 async function processReferenceUpdate(
     parentItemId: string,
     childRecordType: RecordTypeEnum,
-    childInternalId: string, 
+    childInternalId: string | number, 
     update: ReferenceFieldUpdate,
     responseOptions?: RecordResponseOptions
-): Promise<any | ReconcilerError> {
+): Promise<undefined | ReconcilerError> {
     const source = getSourceString(F, processReferenceUpdate.name, parentItemId);
-    validate.stringArgument(source, {parentItemId});
-    validate.objectArgument(source, {update, isReferenceFieldUpdate});
-    if (responseOptions) validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
-
+    try {
+        validate.stringArgument(source, {parentItemId});
+        validate.objectArgument(source, {update, isReferenceFieldUpdate});
+        if (responseOptions) validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
+    } catch (error: any) {
+        return ReconcilerError(source, `Invalid parameters received`, indentedStringify(error));
+    }
     mlog.info(`${source} START`);
     const { 
         referenceFieldId, sublistId, oldReference, 
@@ -378,11 +575,40 @@ async function processReferenceUpdate(
             `update.recordType: '${update.recordType}'`
         )
     }
+    let childRecord: Required<RecordResult>;
+    try {
+        let getRes = await getRecordById(Factory.SingleRecordRequest(
+            childRecordType, 
+            idPropertyEnum.INTERNAL_ID, 
+            childInternalId,
+            responseOptions
+        ));
+        let [result] = getRes.results;
+        validate.objectArgument(source, {result, isRecordResult});
+        validate.objectArgument(source, {childSublistDictionary: result.sublists});
+        childRecord = result as Required<RecordResult>;
+    } catch (error: any) {
+        return ReconcilerError(source, `Failed to get initial record response to store cache values before update`, indentedStringify(error));
+    }
+    let refKeys = Object.keys(lineCache);
+    let targetLines = getLinesWithSublistFieldValue(
+        childRecord.sublists[sublistId], 
+        referenceFieldId, 
+        oldReference
+    ) as { [sublistFieldId: string]: FieldValue }[];
+    mlog.debug([`${source} targetLines.length should be equal to Object.keys(lineCache).length ?`,
+        `targetLines.length: ${targetLines.length}`,
+        `    refKeys.length: ${refKeys.length}`,
+        `refKeys.length === targetLines.length ? ${refKeys.length === targetLines.length}`
+    ].join(TAB));
+    if (refKeys.length !== targetLines.length) {
+        mlog.error(`let's pause and review ....`);
+        STOP_RUNNING(1);
+    }
     const findLineWithOldReference: FindSublistLineWithValueOptions = {
         sublistId, fieldId: referenceFieldId, value: oldReference
     }
     let lastResult: Required<RecordResult> | null = null;
-    let refKeys = Object.keys(lineCache);
     for (let i = 0; i < refKeys.length; i++) {
         let newReferenceId = refKeys[i];
         let cachedLine = lineCache[newReferenceId];
@@ -390,32 +616,55 @@ async function processReferenceUpdate(
             childRecordType,
             Factory.idSearchOptions(idPropertyEnum.INTERNAL_ID, childInternalId)
         );
-        const sublistUpdateDict: SublistUpdateDictionary = Object.keys(cachedLine).reduce((acc, fieldId)=>{
-            acc[fieldId] = {
-                newValue: cachedLine[fieldId],
+        const sublistUpdateDict: SublistUpdateDictionary = Object.keys(cachedLine).reduce((acc, sublistFieldId)=>{
+            acc[sublistFieldId] = {
+                newValue: cachedLine[sublistFieldId],
                 lineIdOptions: findLineWithOldReference
             }
             return acc
         }, {} as SublistUpdateDictionary);
         recordOptions.sublists[sublistId] = sublistUpdateDict;
         try {
+            validate.objectArgument(source, {sublistUpdateDict, isSublistUpdateDictionary});
+            validate.objectArgument(source, {recordOptions, isRecordOptions});
             let putResponse = await putSingleRecord(recordOptions, responseOptions);
             let result = putResponse.results[0];
-            let validationResult = validateUpdateResult(result, validationDictionary);
+            let validationResult = validateResultFields(result, validationDictionary);
             if (isReconcilerError(validationResult)) {
                 return validationResult;
             }
-            if (result && i === refKeys.length-1) {
+            if (result && i === refKeys.length - 1) {
                 lastResult = result as Required<RecordResult>;
             }
         } catch (error: any) {
             return ReconcilerError(source, 
-                `encountered error during ${putSingleRecord.name}() or ${validateUpdateResult.name}()`,
+                `encountered error during ${putSingleRecord.name}() or ${validateResultFields.name}()`,
                 error
             );
         }
+    } // end refKeyLoop
 
+    if (lastResult) { // make sure old reference is gone and all updates went through.
+        let newReferenceIds = Object.keys(update.lineCache);
+        let sublistLines = lastResult.sublists[sublistId] ?? [];
+        let linesWithNewReference = getLinesWithSublistFieldValue(sublistLines, referenceFieldId, ...newReferenceIds);
+        let linesWithOldReference = getLinesWithSublistFieldValue(sublistLines, referenceFieldId, oldReference);
+        if (linesWithOldReference.length > 0
+            || newReferenceIds.length !== linesWithNewReference.length) {
+            return ReconcilerError(source,
+                `Update failed`, 
+                `Invalid lastResult.sublists['${sublistId}']`, 
+                [   
+                    `   oldReference: ${oldReference}`,
+                    `newReferenceIds: ${newReferenceIds.join(', ')}`,
+                    `linesWithOldReference.length > 0 ? ${linesWithOldReference.length > 0}`,
+                    `linesWithNewReference.length: ${linesWithNewReference.length}`,
+                    `      newReferenceIds.length: ${newReferenceIds.length}`   
+                ].join(TAB)
+            );
+        }
     }
+    return;
 }
 
 /**
@@ -423,11 +672,11 @@ async function processReferenceUpdate(
  * @param validationDictionary
  * @returns `error` `if` some `result.fields[fieldId] !== validationDictionary[fieldId]` 
  */
-function validateUpdateResult(
+function validateResultFields(
     result: RecordResult,
     validationDictionary: { [fieldId: string]: FieldValue }
 ): undefined | ReconcilerError {
-    const source = getSourceString(F, validateUpdateResult.name);
+    const source = getSourceString(F, validateResultFields.name);
     validate.objectArgument(source, {result, isRecordResult});
     result.fields = isObject(result.fields) ? result.fields : {};
     for (let fieldId in validationDictionary) {
@@ -453,11 +702,13 @@ type ReferenceFieldUpdate = {
     oldReference: string;
     validationDictionary: { [fieldId: string]: FieldValue };
     /**
-     * @keys = new internalid value
+     * ideally, num keys in lineCache = number of lines where `line[referenceFieldId] = oldReference`
+     * @keys new `internalid` value
      * */
     lineCache: {
         [newReference: string]: { [sublistFieldId: string]: FieldValue }   
     };
+    
 }
 
 function isReferenceFieldUpdate(value: any): value is ReferenceFieldUpdate {
@@ -483,37 +734,183 @@ type CacheOptions = Required<RecordResponseOptions>;
  * @parent is the record such that `childRecord.sublists[sublistId][referenceFieldId] = parentInternalId`
  * @returns **`dictionary`** `{ [childRecordId: string]: SublistLineRecordReferenceFieldUpdate }`
  */
-async function generateReferenceUpdateDictionary(
+async function generateReferenceUpdate(
+    parentItemId: string,
+    oldReferenceId: string,
+    parentRecordType: RecordTypeEnum,
+    childRecordType: RecordTypeEnum,
+    childInternalId: string | number,
+    referenceOptions: SublistRecordReferenceOptions,
+    newReferenceIds: string[] | number[]
+): Promise<ReferenceFieldUpdate | ReconcilerError> {
+    const source = getSourceString(F, generateReferenceUpdate.name, 
+        JSON.stringify({parentItemId, childRecordType, childInternalId})
+    );
+    const { 
+        referenceFieldId, 
+        sublistId, 
+        responseOptions: childResponseOptions, 
+        cacheOptions
+    } = referenceOptions;
+    try {
+        validate.multipleStringArguments(source, {
+            parentItemId, referenceFieldId, sublistId, oldReferenceId}
+        );
+        validate.numericStringArgument(source, {childInternalId}, true, true)
+        validate.enumArgument(source, {parentRecordType, isRecordTypeEnum});
+        validate.enumArgument(source, {childRecordType, isRecordTypeEnum});
+        validate.objectArgument(source, {childResponseOptions, isRecordResponseOptions})
+        validate.objectArgument(source, {cacheOptions, isRecordResponseOptions});
+        validate.arrayArgument(source, {newReferenceIds, isNumeric});
+    } catch (error: any) {
+        return ReconcilerError(source, `Invalid parameters`, indentedStringify(error));
+    }
+
+    childInternalId = String(childInternalId);
+    newReferenceIds = (isIntegerArray(newReferenceIds) 
+        ? newReferenceIds.map(id=>String(id)) 
+        : newReferenceIds
+    ) as string[];
+    let child: Required<RecordResult>;
+    try {
+        child = (await getRecordById(
+            Factory.SingleRecordRequest(
+                childRecordType, 
+                idPropertyEnum.INTERNAL_ID, 
+                childInternalId, 
+                childResponseOptions
+            )
+        )).results[0] as Required<RecordResult>;
+    } catch (error: any) {
+        return ReconcilerError(source,`Error when calling ${getRecordById.name}`,error)
+    }
+    if (!isRecordResult(child) || !isObject(child.sublists) || !hasKeys(child.sublists, sublistId)) {
+        return ReconcilerError(source, `Unable to access child.sublists[sublistId]`,
+            `${source} child's sublist is undefined`,
+            `from <${childRecordType}>RecordResult.sublists['${sublistId}']`,
+            `isRecordResult(child) ? ${isRecordResult(child)}`
+        )
+    }
+    const update = {
+        recordType: childRecordType, 
+        referenceFieldId: referenceFieldId, 
+        sublistId,
+        oldReference: oldReferenceId, 
+        validationDictionary: {},
+        lineCache: {}
+    } as ReferenceFieldUpdate;
+    // ========================================================================
+    // handle update.validationDictionary
+    // ========================================================================
+    cacheOptions.fields = (isStringArray(cacheOptions.fields) 
+        ? cacheOptions.fields
+        : [cacheOptions.fields]
+    )
+    for (let cacheFieldId of cacheOptions.fields) {
+        let cacheValue = child.fields[cacheFieldId];
+        if (!hasKeys(child.fields, [cacheFieldId])) {
+            return ReconcilerError(source,
+                `Error processing cacheOptions.fields`,
+                `hasKeys(child.fields, cacheFieldId) === false`,
+                `cacheFieldId: '${cacheFieldId}'`,
+                `child.fields: ${indentedStringify(child.fields)}`
+            );
+        }
+        if (isFieldValue(cacheValue)) {
+            update.validationDictionary[cacheFieldId] = cacheValue
+        } else {
+            return ReconcilerError(source, 
+                `Invalid FieldValue in get child.fields`,
+                `Unable to store value to validationDictionary`, 
+                [
+                    `${source} Invalid FieldValue in get child.fields`,
+                    `when setting update.parentValidationDictionary['${cacheFieldId}']`,
+                    `from <${childRecordType}>RecordResult.fields['${cacheFieldId}']`,
+                    `-- <${childRecordType}>RecordResult.fields['${cacheFieldId}'] = ${cacheValue}`
+                ].join(TAB)
+            );
+        }
+    }
+    // ========================================================================
+    // handle update.lineCache
+    // ========================================================================
+    let sublistLines = child.sublists[sublistId] ?? [];
+    let targetLines = getLinesWithSublistFieldValue(
+        sublistLines, referenceFieldId, oldReferenceId
+    );
+    newReferenceIds = newReferenceIds.slice(0, targetLines.length)
+    if (targetLines.length > newReferenceIds.length && newReferenceIds.length !== 1) {
+        return ReconcilerError(source,
+            `Unable to associate new reference id's to each occurrence of oldReferenceId`,
+            `targetLines.length > newReferenceIds.length && newReferenceIds.length !== 1`
+        );
+    }
+    let sublistCacheFields = (isStringArray(cacheOptions.sublists[sublistId]) 
+        ? cacheOptions.sublists[sublistId]
+        : [cacheOptions.sublists[sublistId]]
+    );
+    for (let j = 0; j < targetLines.length; j++) {
+        const line = targetLines[j];
+        let lineCache = sublistCacheFields.reduce((acc, sublistFieldId)=>{
+            if (isFieldValue(line[sublistFieldId])) {
+                acc[sublistFieldId] = line[sublistFieldId]
+            }
+            return acc;
+        }, {} as { [sublistFieldId: string]: FieldValue });
+        let newReferenceValue = (newReferenceIds.length === 1 
+            ? newReferenceIds[0] 
+            : newReferenceIds[j]
+        );
+        if (isEmpty(newReferenceValue)) {
+            return ReconcilerError(source, `Invalid newReferenceId value`,
+                `isEmpty(newReferenceValue) === true`,
+                `index out of bounds or something?`
+                
+            )
+        }
+        update.lineCache[newReferenceValue] = lineCache;
+    }
+    return update;
+}
+
+
+/**
+ * @parent is the record such that `childRecord.sublists[sublistId][referenceFieldId] = parentInternalId`
+ * @returns **`dictionary`** `{ [childRecordId: string]: SublistLineRecordReferenceFieldUpdate }`
+ */
+async function PREV_generateReferenceUpdateDictionary(
     parentItemId: string,
     parentInternalId: string,
     parentRecordType: RecordTypeEnum,
     childRecordType: RecordTypeEnum,
-    childInternalIds: number[],
-    referenceOptions: SublistRecordReferenceOptions
+    childInternalIds: string[] | number[],
+    referenceOptions: SublistRecordReferenceOptions,
+    newReferenceIds: string[] | number[]
 ): Promise<{
     [childRecordId: string]: ReferenceFieldUpdate
 }> {
-    const source = getSourceString(F, generateReferenceUpdateDictionary.name, parentItemId);
+    const source = getSourceString(F, PREV_generateReferenceUpdateDictionary.name, parentItemId);
     const { referenceFieldId, sublistId, responseOptions: childResponseOptions, cacheOptions} = referenceOptions;
-    validate.enumArgument(source, {parentRecordType, RecordTypeEnum});
-    validate.enumArgument(source, {childRecordType, RecordTypeEnum});
+    validate.enumArgument(source, {parentRecordType, isRecordTypeEnum});
+    validate.enumArgument(source, {childRecordType, isRecordTypeEnum});
     validate.multipleStringArguments(source, {parentItemId, referenceFieldId, sublistId, parentInternalId});
     validate.objectArgument(source, {childResponseOptions, isRecordResponseOptions})
     validate.objectArgument(source, {cacheOptions, isRecordResponseOptions});
-    validate.arrayArgument(source, {childRecordIds: childInternalIds, isIntegerArray});
-    if (!placeholders && !isNonEmptyArray(placeholders)) {
-        mlog.error(`${source} Cannot handle replacement without instantiation of placeholders`)
-        throw new Error(
-            `${source} Cannot handle replacement without instantiation of placeholders`
-        );
-    }
+    validate.arrayArgument(source, {childInternalIds, isNumeric});
+    validate.arrayArgument(source, {newReferenceIds, isNumeric});
+
     const dict: {
         [childRecordId: string]: ReferenceFieldUpdate
     } = {};
     for (let i = 0; i < childInternalIds.length; i++) {
         const childInternalId = String(childInternalIds[i]);
         let child = (await getRecordById(
-            Factory.SingleRecordRequest(childRecordType, idPropertyEnum.INTERNAL_ID, childInternalId, childResponseOptions)
+            Factory.SingleRecordRequest(
+                childRecordType, 
+                idPropertyEnum.INTERNAL_ID, 
+                childInternalId, 
+                childResponseOptions
+            )
         )).results[0] as Required<RecordResult>;
         if (!child) {
             mlog.error([`${source} initialChild is undefined`,
@@ -555,11 +952,16 @@ async function generateReferenceUpdateDictionary(
             }
         }
         let sublistLines = child.sublists[sublistId] ?? [];
-        let targetLines = getLinesWithSublistFieldValue(sublistLines, referenceFieldId, parentInternalId);
+        let targetLines = getLinesWithSublistFieldValue(
+            sublistLines, referenceFieldId, parentInternalId
+        );
+        if (targetLines.length > newReferenceIds.length) {
+            throw new Error(`${source} targetLines.length > newReferenceIds.length`)
+        }
         let sublistCacheFields = (isStringArray(cacheOptions.sublists[sublistId]) 
             ? cacheOptions.sublists[sublistId]
             : [cacheOptions.sublists[sublistId]]
-        )
+        );
         validate.arrayArgument(source, {sublistCacheFields, isStringArray});
         for (let j = 0; j < targetLines.length; j++) {
             const line = targetLines[j];
@@ -568,9 +970,14 @@ async function generateReferenceUpdateDictionary(
                     acc[sublistFieldId] = line[sublistFieldId]
                 }
                 return acc;
-            }, {} as {[fieldId: string]: FieldValue});
-            let newReferenceValue = String(placeholders[j].internalid);
-            update.lineCache[newReferenceValue] = lineCache;
+            }, {} as {[sublistFieldId: string]: FieldValue});
+            let newReferenceValue = (isNonEmptyString(newReferenceIds[j]) 
+                ? newReferenceIds[j] 
+                : String(newReferenceIds[j])
+            );
+            if (!isEmpty(newReferenceValue)) {
+                update.lineCache[newReferenceValue] = lineCache;
+            }
         }
         dict[childInternalId] = update;
     }
@@ -583,6 +990,16 @@ function generateRecordDictionary(
     recordType: RecordTypeEnum = RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM
 ): { [itemId: string]: Required<RecordOptions> } {
     const source = getSourceString(F, generateRecordDictionary.name);
+    try {
+        validate.arrayArgument(source, {records, isRecordOptions});
+        validate.stringArgument(source, {idField});
+        validate.enumArgument(source, {recordType, isRecordTypeEnum});
+    } catch (error: any) {
+        mlog.error(`${source} Invalid Arguments:`, indentedStringify(error),
+            `${NL} Returning empty object...`
+        );
+        return {};
+    }
     const dict: { [itemId: string]: Required<RecordOptions> } = {};
     for (let i = 0; i < records.length; i++) {
         const record = records[i];

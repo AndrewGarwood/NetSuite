@@ -15,7 +15,8 @@
             "inventoryExport": "fileName.ext",
             "inventoryCache": "fileName.ext"
         },
-        "classDictionary": "fileName.ext"
+        "classDictionary": "fileName.ext",
+        "unitTypeDictionary": "fileName.ext"
     },
     "relationships": {
         "vendors": {

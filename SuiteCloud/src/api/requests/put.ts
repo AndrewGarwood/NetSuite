@@ -24,6 +24,7 @@ import {
     isRecordResponseOptions,
     isRecordResponse,
     isRecordResult,
+    isRecordRequest,
 } from "../types";
 import { BATCH_SIZE, partitionArrayBySize } from "../configureRequests";
 import { getAccessToken } from "../configureAuth";
@@ -146,7 +147,7 @@ export async function putSingleRecord(
         const request: RecordRequest = { recordOptions: record, responseOptions };
         const accessToken = await getAccessToken();
         let putRes = await PUT(accessToken, scriptId, deployId, request);
-        let resData = (putRes.data ?? {}) as RecordResponse;
+        let resData = putRes.data as RecordResponse;
         validate.objectArgument(source, {resData, isRecordResponse})
         validate.objectArgument(source, {
             'RecordResponse.results[0]': resData.results[0] ?? {}, isRecordResult

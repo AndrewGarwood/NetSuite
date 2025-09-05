@@ -26,10 +26,20 @@ const EP = `PUT_Record`;
  * = `{ success: boolean, message: string, results?: `{@link RecordResult}`[], rejects?: `{@link RecordOptions}`[], error?: string, logs: `{@link LogStatement}`[] }`
  */
 const put = (reqBody) => {
-    const { recordOptions, responseOptions } = reqBody;
-    if (!recordOptions || !isNonEmptyArray(recordOptions)) {
-        writeLog(LogTypeEnum.ERROR, '[put()] Invalid Request Parameter', 'non-empty recordOptions is required');
-        return { status: false, message: '[put()] Invalid Request Parameter', error: 'non-empty recordOptions is required', logs: logArray };
+    const source = getSourceString(EP, put.name);
+    let { recordOptions, responseOptions } = reqBody;
+    if (!recordOptions && !isNonEmptyArray(recordOptions)) {
+        writeLog(LogTypeEnum.ERROR, `${source} Invalid Request Body`, 
+            'non-empty recordOptions is required'
+        );
+        return { 
+            status: 400, 
+            message: `${source} Invalid Request Body`, 
+            error: 'Expected: reqBody.recordOptions: RecordOptions | RecordOptions[]',
+            results: [],
+            rejects: [reqBody], 
+            logs: logArray 
+        };
     }
     if (!Array.isArray(recordOptions)) {
         recordOptions = [recordOptions];
@@ -38,7 +48,7 @@ const put = (reqBody) => {
     const results = [];
     /**@type {RecordOptions[]} */
     const rejects = [];
-    writeLog(LogTypeEnum.AUDIT, `[put()] received valid recordOptions of length: ${recordOptions.length}`);
+    writeLog(LogTypeEnum.AUDIT, `${source} received valid recordOptions of length: ${recordOptions.length}`);
     try {
         for (let i = 0; i < recordOptions.length; i++) {
             const options = recordOptions[i];
@@ -48,7 +58,7 @@ const put = (reqBody) => {
                 // writeLog(LogTypeEnum.DEBUG, `Back in put()...`)
                 if (!result) {
                     writeLog(LogTypeEnum.ERROR,
-                        `[put()] Invalid '${options.recordType}' RecordOptions at index ${i}:`,
+                        `${source} Invalid '${options.recordType}' RecordOptions at index ${i}:`,
                     )
                     rejects.push(options);
                     continue;
@@ -56,7 +66,7 @@ const put = (reqBody) => {
                 results.push(result);
             } catch (e) {
                 writeLog(LogTypeEnum.ERROR, 
-                    `[put()] Error processing '${options.recordType}' RecordOptions at index ${i}:`, 
+                    `${source} Error processing '${options.recordType}' RecordOptions at index ${i}:`, 
                     String(e),
                 );
                 rejects.push(options);
@@ -162,7 +172,6 @@ function processRecordOptions(options, responseOptions) {
             } 
             rec = processFieldDictionary(rec, recordType, fields);
             writeLog(LogTypeEnum.AUDIT, `[processRecordOptions()] Completed processFieldDictionary`)
-
         } catch (error) {
             writeLog(LogTypeEnum.ERROR, `[processRecordOptions()] Error processing options.fields`,
                 `recordType: ${recordType}`,
@@ -1392,8 +1401,8 @@ INVENTORY_DETAIL: 'inventorydetail'
  * @typedef {Object} RecordResponse
  * @property {string | number} status - Indicates status of the request.
  * @property {string} message - A message indicating the result of the request.
- * @property {RecordResult[]} [results] - an `Array<`{@link RecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully upserted.
- * @property {RecordOptions[]} [rejects] - an `Array<`{@link RecordOptions}`>` containing the record options that were not successfully upserted.
+ * @property {RecordResult[]} results - an `Array<`{@link RecordResult}`>` containing the record ids and any additional properties specified in the request for all the records successfully upserted.
+ * @property {RecordOptions[] | any[]} rejects - an `Array<`{@link RecordOptions}`>` containing the record options that were not successfully upserted.
  * @property {string} [error] - An error message if the request was not successful.
  * @property {LogStatement[]} logs - an `Array<`{@link LogStatement}`>` generated during the request processing.
  */

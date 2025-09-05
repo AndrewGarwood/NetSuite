@@ -12,7 +12,8 @@ import { isFindSublistLineWithValueOptions } from "./InternalApi.TypeGuards";
 import { RecordResponseOptions, ChildSearchOptions, RelatedRecordRequest, idSearchOptions, 
     RecordOptions, RecordResponse, SingleRecordRequest, SublistUpdateDictionary,
     SetFieldSubrecordOptions,
-    SetSublistSubrecordOptions, RecordResult
+    SetSublistSubrecordOptions, RecordResult,
+    RecordRequest
 } from "./RecordEndpoint";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
 
@@ -66,6 +67,18 @@ export function isRecordTypeEnum(value: any): value is RecordTypeEnum {
     );
 }
 
+export function isRecordRequest(value: any): value is RecordRequest {
+    const candidate = value as RecordRequest;
+    return (isObject(candidate) 
+        && ((isNonEmptyArray(candidate.recordOptions) 
+                && candidate.recordOptions.every(el=>isRecordOptions(el))
+            ) 
+            || isRecordOptions(candidate.recordOptions)
+        )
+        && (!candidate.responseOptions || isRecordResponseOptions(candidate.responseOptions))
+    )
+} 
+
 /**
  * @param value `any`
  * @returns **`isRecordOptions`** `boolean`
@@ -74,8 +87,12 @@ export function isRecordTypeEnum(value: any): value is RecordTypeEnum {
  * - **`false`** `otherwise`.
  */
 export function isRecordOptions(value: any): value is RecordOptions {
-    return (isObject(value)
-        && hasKeys(value, 'recordType') 
+    const candidate = value as RecordOptions;
+    return (isObject(candidate)
+        && isRecordTypeEnum(candidate.recordType)
+        && (!candidate.fields || isObject(candidate.fields, false))
+        && (!candidate.sublists || isObject(candidate.sublists, false))
+        && (!candidate.idOptions || isIdOptions(candidate.idOptions)) 
         && hasKeys(value, 
             ['fields', 'sublists', 'recordType', 'isDynamic', 'idOptions', 'meta'], 
             false, false
@@ -122,10 +139,11 @@ export function isRecordResponse(value: any): value is RecordResponse {
     const candidate = value as RecordResponse;
     return (isObject(candidate)
         && isInteger(candidate.status)
+        && isNonEmptyString(candidate.message)
+        && (!candidate.error || isNonEmptyString(candidate.error))
         && Array.isArray(candidate.results)
         && Array.isArray(candidate.rejects)
         && Array.isArray(candidate.logs)
-        && (!candidate.error || isNonEmptyString(candidate.error))
     );
 }
 

@@ -5,15 +5,17 @@ import path from "node:path";
 import { mainLogger as mlog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL,
     simpleLogger as slog,
-    getProjectFolders
+    getProjectFolders,
+    getUnitTypeDictionary
 } from "../../config";
 import { clean, 
     CleanStringOptions, 
     StringReplaceParams, StringCaseOptions, 
     extractLeaf, REPLACE_EM_HYPHEN,
-    isCleanStringOptions, UNCONDITIONAL_STRIP_DOT_OPTIONS
+    isCleanStringOptions, UNCONDITIONAL_STRIP_DOT_OPTIONS,
+    stringContainsAnyOf
 } from "typeshi:utils/regex";
-import { getIndexedColumnValues, getRows } from "typeshi:utils/io";
+import { getIndexedColumnValues, getRows, getSourceString } from "typeshi:utils/io";
 import * as validate from "typeshi:utils/argumentValidation"
 import { hasKeys, isNonEmptyArray, isNonEmptyString } from "typeshi:utils/typeValidation";
 
@@ -124,4 +126,22 @@ export const description = async (
         result[altDescriptionColumn] = clean(row[altDescriptionColumn]);
     }
     return JSON.stringify(result);
+}
+
+export const unitType = async (
+    row: Record<string, any>,
+    unitTypeColumn: string
+): Promise<number> => {
+    let source = getSourceString(`evaluators.item`, unitType.name);
+    validate.stringArgument(source, {unitTypeColumn});
+    validate.objectArgument(source, {row});
+    let unitTypeValue = String(row[unitTypeColumn]).toLowerCase();
+    let umDict = getUnitTypeDictionary();
+    if (stringContainsAnyOf(unitTypeValue, /gram|pound/i)) {
+        return umDict["Weight"];
+    } else if (stringContainsAnyOf(unitTypeValue, /liter|gal/i)) {
+        return umDict["Volume"]
+    } else {
+        return umDict["Quantity"];
+    }
 }

@@ -63,6 +63,8 @@ let inventoryCache: Record<string, string> | null = null;
 let accountDictionary: Record<string, any> | null = null;
 /** map `className` to `'internalid'` */
 let classDictionary: Record<string, string> | null = null;
+/** units of measure type to `internalid` */
+let unitTypeDictionary: Record<string, number> | null = null;
 
 /* -------------------------------- SUPPLY -------------------------------- */
 /** map `binnumber` to `internalid` */
@@ -127,6 +129,7 @@ export async function initializeData(): Promise<void> {
                             accountingOptions.internalIdColumn as string
                         )
                     );
+                    unitTypeDictionary = await loadUnitTypeDictionary();
                     classDictionary = await loadClassDictionary();
                     accountDictionary = await loadAccountDictionary();
                     if (accountingOptions.overwriteCache) {
@@ -263,6 +266,24 @@ async function loadInventoryRows(
     return rows;
 }
 
+async function loadUnitTypeDictionary(
+    domain: DataDomainEnum = DataDomainEnum.ACCOUNTING,
+    fileLabel = 'unitTypeDictionary',
+    folderName?: string
+): Promise<Record<string, number>> {
+    const source = getSourceString(F, loadUnitTypeDictionary.name);
+    let filePath = getDomainFilePath(domain, fileLabel, folderName);
+    validate.existingFileArgument(source, '.json', {filePath});
+    let data = read(filePath);
+    if (!Object.keys(data).every(k=>isNonEmptyString(k) && isInteger(data[k]))) {
+        throw new Error([`${source} Invalid unitTypeDictionary`,
+            `filePath: '${filePath}'`,
+            `expected json with string keys and integer values`
+        ].join(TAB));
+    }
+    return data as Record<string, number>;
+}
+
 /**
  * @param fileLabel `string`
  * @param folderName `string` `default` = 'binnumbers' (subfolder of `'{dataDir}/supply'`)
@@ -297,7 +318,7 @@ async function loadBinDictionary(
 async function loadClassDictionary(
     domain: DataDomainEnum = DataDomainEnum.ACCOUNTING,
     fileLabel: string = "classDictionary",
-    folderName: string = '',
+    folderName?: string,
 ): Promise<Record<string, string>> {
     const source = getSourceString(F, loadClassDictionary.name);
     let filePath = getDomainFilePath(domain, fileLabel, folderName);
@@ -574,11 +595,24 @@ export function getAccountDictionary(): AccountDictionary {
  */
 export function getClassDictionary(): Record<string, string> {
     if (!classDictionary) {
-        throw new Error([`${getSourceString(F, getSkuDictionary.name)} skuDictionary undefined`,
+        throw new Error([`${getSourceString(F, getClassDictionary.name)} classDictionary undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
     return classDictionary;
+}
+
+/**
+ * `sync`
+ * @returns **`classDictionary`** `Record<string, string>`
+ */
+export function getUnitTypeDictionary(): Record<string, number> {
+    if (!unitTypeDictionary) {
+        throw new Error([`${getSourceString(F, getUnitTypeDictionary.name)} unitTypeDictionary undefined`,
+            `call initializeData() first`
+        ].join(TAB));
+    }
+    return unitTypeDictionary;
 }
 
 /**
@@ -592,6 +626,28 @@ export function getSkuDictionary(): Record<string, string> {
         ].join(TAB));
     }
     return skuDictionary;
+}
+
+export function setSkuInternalId(itemId: string, newInternalId: string | number): string | undefined {
+    const source = getSourceString(F, setSkuInternalId.name);
+    if (!skuDictionary) {
+        throw new Error([`${source} skuDictionary undefined`,
+            `call initializeData() first`
+        ].join(TAB));
+    }
+    let skuDictionaryPath = getDomainFilePath(DataDomainEnum.ACCOUNTING, 'inventoryCache', 'items');
+    try {
+        validate.existingFileArgument(source, '.json', {skuDictionaryPath});
+        validate.multipleStringArguments(source, {itemId, newInternalId});
+    } catch (error: any) {
+        mlog.error(`${source} Invalid Arguments`, error);
+        return;
+    }
+    let oldItemInternalId = skuDictionary[itemId];
+    skuDictionary[itemId] = String(newInternalId);
+    write(skuDictionary, skuDictionaryPath);
+    return oldItemInternalId;
+
 }
 
 /**
