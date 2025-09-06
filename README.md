@@ -22,14 +22,11 @@ The project requires a configuration file ([project.config.json][env_config_file
 The project requires a second configuration file ([project.data.config.json][data_config_file]) to be defined adjacent to the first one.
 - The definition for this configuration is found in [ProjectData.ts][project_data_file]
 - This json file is a DataSourceDictionary object, which organizes data into "domains" that are intended to mirror the category hierarchy under the "Lists" tab in the NetSuite UI.
-- It is expected that each DataDomainEnum value is the name of a subfolder in the 'dataDir' directory defined in initializeEnvironment()
+- It is expected that each DataDomainEnum value is both a key in the DataSourceDictionary and the name of a subfolder in the 'dataDir' directory defined in initializeEnvironment()
 - The value of each DataDomainEnum is a DataSourceConfiguration object. 
 ```ts
 // from ProjectData.ts
-/** 
- * - enum values are keys in DataSourceDictionary 
- * - add more entries to enum and DataSourceDictionary as project progresses
- * */
+/** add more entries to enum and DataSourceDictionary as project progresses */
 enum DataDomainEnum {
     ACCOUNTING = 'accounting',
     SUPPLY = 'supply',
