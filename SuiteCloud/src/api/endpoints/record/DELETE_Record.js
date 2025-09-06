@@ -16,13 +16,12 @@ define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
 const logArray = [];
 /**`'endpoint'` */
 const EP = `DELETE_Record`;
-/** required keys of {@link DeleteRecordRequest} = `['recordType', 'idOptions']` */
+/** required keys of {@link SingleRecordRequest} = `['recordType', 'idOptions']` */
 const REQUEST_KEYS = ['recordType', 'idOptions'];
 
 
 /**
- * - {@link DeleteRecordRequest}
- * @param {{recordType: string; idOptions: string; responseOptions: string;}} reqParams 
+ * @param {{recordType: RecordTypeEnum; idOptions: string; responseOptions: string;}} reqParams 
  * - when applicable, converts json string values to objects in {@link unpackRequestParameters}  
  * @returns {RecordResponse} **`response`** {@link RecordResponse}
  */
@@ -32,7 +31,7 @@ const doDelete = (reqParams) => {
     if (isRecordResponse(unpackResult)) { // if error unpacking
         return unpackResult;
     }
-    writeLog(LogTypeEnum.AUDIT, `${source} Successfully unpacked reqParams to DeleteRecordRequest`);
+    writeLog(LogTypeEnum.AUDIT, `${source} Successfully unpacked reqParams to SingleRecordRequest`);
     const { recordType, idOptions, responseOptions } = unpackResult;
     const recordInternalId = searchForRecordById(recordType, idOptions);
     if (typeof recordInternalId !== 'number') {
@@ -53,7 +52,8 @@ const doDelete = (reqParams) => {
             status: 200,
             message: `${source} END - Successfully deleted '${recordType}' record with internalId '${recordInternalId}'`,
             logs: logArray,
-            results: [recordResult]
+            results: [recordResult],
+            rejects: []
         };
         return response;
     } catch (error) {
@@ -101,7 +101,7 @@ function generateRecordResult(recordType, recordId, responseOptions) {
  * - parses reqParams.idOptions to idSearchOptions[]
  * - (if defined) parses reqParams.responseOptions to RecordResponseOptions
  * @param {{recordType: string; idOptions: string; responseOptions?: string;}} reqParams
- * @returns {DeleteRecordRequest | RecordResponse} **`unpackResult`** `DeleteRecordRequest | RecordResponse`
+ * @returns {SingleRecordRequest | RecordResponse} **`unpackResult`** `DeleteRecordRequest | RecordResponse`
  */
 function unpackRequestParameters(reqParams) {
     const source = `[${EP}.${unpackRequestParameters.name}()]`;
@@ -142,9 +142,9 @@ function unpackRequestParameters(reqParams) {
             `caught: ${error}`
         ]);
     }
-    /**@type {DeleteRecordRequest} */
+    /**@type {SingleRecordRequest} */
     const request = {recordType, idOptions};
-    if (!reqParams.responseOptions) { return request }
+    if (!reqParams.responseOptions || reqParams.responseOptions === 'undefined') { return request }
     /**@type {RecordResponseOptions} */
     let responseOptions = {}
     try {
@@ -368,7 +368,7 @@ function getResponseFields(rec, responseFields) {
  * `if` a value of responseSublists is empty or undefined, `return` all fields of the sublist
  * @param {object} rec 
  * @param {{[sublistId: string]: string | string[]}} responseSublists
- * @returns {SublistDictionary | {[sublistId: string]: SublistLine[]}} **`sublists`** = {@link SublistDictionary}
+ * @returns {{[sublistId: string]: SublistLine[]}} **`sublists`** = {@link SublistDictionary}
  */
 function getResponseSublists(rec, responseSublists) {
     if (!rec || !isObject(responseSublists)) {
@@ -463,7 +463,7 @@ const LogTypeEnum = {
 const NL = '\n > ';
 const TAB = '\n\t• ';
 /**max number of times allowed to call `log[LogTypeEnum](title, details)` per `get()` call */
-const MAX_LOGS_PER_LEVEL = 500;
+const MAX_LOGS_PER_LEVEL = 50;
 /**@type {{[logType: LogTypeEnum]: {count: number, limit: number}}} */
 const logDict = {
     [LogTypeEnum.DEBUG]: { count: 0, limit: MAX_LOGS_PER_LEVEL },
@@ -496,7 +496,7 @@ function writeLog(type, title, ...details) {
             if (logDict[LogTypeEnum.DEBUG].count >= logDict[LogTypeEnum.DEBUG].limit) {
                 break;
             }
-            // log.debug(title, payload);
+            log.debug(title, payload);
             logDict[LogTypeEnum.DEBUG].count++;
             break;
         case LogTypeEnum.ERROR:
@@ -583,7 +583,7 @@ function isInteger(value, requireNonNegative = false) {
  * - **`false`** `otherwise`
  */
 function hasKeys(obj, keys, requireAll = true, restrictKeys = false) {
-    if (!obj || typeof obj !== 'object') {
+    if (!isObject(obj)) {
         return false;
     }
     if (keys === null || keys === undefined) {
@@ -634,7 +634,7 @@ function isObject(value, requireNonEmpty = true, requireNonArray = true) {
 
 /**
  * @param {any} value 
- * @returns {value is RecordResponse}
+ * @returns {value is RecordResponse} **`isRecordResponse`** `boolean`
  */
 function isRecordResponse(value) {
     return (isObject(value)
@@ -723,8 +723,8 @@ const NOT_DYNAMIC = false;
  * @typedef {{
  * recordType: RecordTypeEnum;
  * idOptions: idSearchOptions[];
- * responseOptions: RecordResponseOptions;
- * }} DeleteRecordRequest
+ * responseOptions?: RecordResponseOptions;
+ * }} SingleRecordRequest
  */
 
 /**
@@ -733,16 +733,16 @@ const NOT_DYNAMIC = false;
  * message: string;
  * error?: string;
  * logs: LogStatement[];
- * results?: RecordResult[];
- * rejects?: any[]; 
+ * results: RecordResult[];
+ * rejects: any[]; 
  * }} RecordResponse
  */
 /**
  * @typedef {{
  * internalid: number;
  * recordType: RecordTypeEnum | string;
- * fields: FieldDictionary | { [fieldId: string]: FieldValue | SubrecordValue };
- * sublists: SublistDictionary | { [sublistId: string]: Array<SublistLine> | {[sublistFieldId: string]: FieldValue | SubrecordValue}[] }
+ * fields: FieldDictionary;
+ * sublists: { [sublistId: string]: Array<SublistLine> }
  * }} RecordResult
  */
 /**
@@ -778,7 +778,7 @@ const NOT_DYNAMIC = false;
 /**
  * sublistIds mapped to an `Array<`{@link SublistLine}`>` = `{ [sublistFieldId: string]: `{@link FieldValue}`; line?: number; internalid?: number; }[]`
  * @typedef {{
- * [sublistId: string]: Array<SublistLine | {[sublistFieldId: string]: FieldValue | SubrecordValue}>
+ * [sublistId: string]: Array<SublistLine>
  * }} SublistDictionary
  */
 
@@ -791,12 +791,7 @@ const NOT_DYNAMIC = false;
  * - (returns the `'internalid'` of the addressbook entry.)
  * @typedef {{
  * [sublistFieldId: string]: FieldValue | SubrecordValue
- * line?: number;
- * lineIdProp?: string;
  * }} SublistLine
- * @property {number} [line] `number` - the `lineIndex` of the list entry
- * @property {number} [lineIdProp] `string` - the `'sublistFieldId'` of the list entry 
- * with defined value at `SublistLine[sublistFieldId]` that you want to use to search for existing lines
  */
 
 /** Type: **`LogStatement`** {@link LogStatement} */

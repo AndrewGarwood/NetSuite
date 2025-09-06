@@ -74,6 +74,8 @@ let warehouseDictionary: WarehouseDictionary | null = null;
 /** `{ `{@link WarehouseColumnEnum}`: any }[]` */
 let warehouseRows: WarehouseRow[] | null = null;
 
+let bomRows: Record<string, any>[] | null = null;
+
 /* ---------------------------- RELATIONSHIPS ----------------------------- */
 let customerCategoryDictionary: Record<string, number> | null = null;
 let entityValueOverrides: Record<string, string> | null = null;
@@ -140,6 +142,7 @@ export async function initializeData(): Promise<void> {
                     binDictionary = await loadBinDictionary();
                     warehouseRows = await loadWarehouseRows()
                     warehouseDictionary = await loadWarehouseDictionary(warehouseRows);
+                    bomRows = await loadBomRows();
                     break;
                 case DataDomainEnum.RELATIONSHIPS:
                     entityValueOverrides = await loadEntityOverrides();
@@ -366,6 +369,19 @@ async function loadInventoryCache(
     return jsonData as Record<string, string>;
 }
 
+async function loadBomRows(
+    domain: DataDomainEnum = DataDomainEnum.SUPPLY,
+    fileLabel: string = 'bomExport',
+    folderName: string = 'billofmaterials'
+): Promise<Record<string, any>[]> {
+    const source = getSourceString(F, loadBomRows.name);
+    let filePath = getDomainFilePath(domain, fileLabel, folderName);
+    validate.existingFileArgument(source, delimitedFileExtensions, {filePath});
+    const rows = await getRows(filePath) as Record<string, any>[];
+    validate.arrayArgument(source, {rows, isObject});
+    return rows;
+}
+
 async function loadWarehouseRows(
     domain: DataDomainEnum = DataDomainEnum.SUPPLY,
     fileLabel: string = 'warehouseData',
@@ -503,6 +519,34 @@ async function loadCustomerCategoryDictionary(
 
 
 
+async function loadAccountDictionary(
+    domain: DataDomainEnum = DataDomainEnum.ACCOUNTING,
+    fileLabel: string = 'accountDictionary',
+    folderName: string = 'accounts'
+): Promise<AccountDictionary> {
+    const source = getSourceString(F, loadAccountDictionary.name);
+    let filePath = getDomainFilePath(domain, fileLabel, folderName);
+    validate.existingFileArgument(source, '.json', {filePath});
+    const data = read(filePath);
+    if (isEmpty(data)) {
+        throw new Error([
+            `[dataLoader.loadAccountDictionary()] Invalid jsonData`,
+            `filePath: '${filePath}'`
+        ].join(TAB));
+    }
+    for (const accountType of Object.values(AccountTypeEnum)) {
+        if (isEmpty(data[accountType])) {
+            throw new Error([
+                `[dataLoader.loadAccountDictionary()] Invalid jsonData`,
+                `jsonData is missing data for required key: '${accountType}'`,
+                `filePath: '${filePath}'`
+            ].join(TAB));
+        }
+    }
+    return data as AccountDictionary;
+}
+
+
 
 /**
  * @note for now, only use when loading from (tsv/csv file or row array)
@@ -539,34 +583,6 @@ async function loadOneToOneDictionary(
     }
     return dict;
 }
-
-async function loadAccountDictionary(
-    domain: DataDomainEnum = DataDomainEnum.ACCOUNTING,
-    fileLabel: string = 'accountDictionary',
-    folderName: string = 'accounts'
-): Promise<AccountDictionary> {
-    const source = getSourceString(F, loadAccountDictionary.name);
-    let filePath = getDomainFilePath(domain, fileLabel, folderName);
-    validate.existingFileArgument(source, '.json', {filePath});
-    const data = read(filePath);
-    if (isEmpty(data)) {
-        throw new Error([
-            `[dataLoader.loadAccountDictionary()] Invalid jsonData`,
-            `filePath: '${filePath}'`
-        ].join(TAB));
-    }
-    for (const accountType of Object.values(AccountTypeEnum)) {
-        if (isEmpty(data[accountType])) {
-            throw new Error([
-                `[dataLoader.loadAccountDictionary()] Invalid jsonData`,
-                `jsonData is missing data for required key: '${accountType}'`,
-                `filePath: '${filePath}'`
-            ].join(TAB));
-        }
-    }
-    return data as AccountDictionary;
-}
-
 
 
 
@@ -647,7 +663,18 @@ export function setSkuInternalId(itemId: string, newInternalId: string | number)
     skuDictionary[itemId] = String(newInternalId);
     write(skuDictionary, skuDictionaryPath);
     return oldItemInternalId;
-
+}
+/**
+ * `sync`
+ * @returns **`inventoryRows`** `Record<string, any>[]`
+ */
+export function getInventoryRows(): Record<string, any>[] {
+    if (!inventoryRows) {
+        throw new Error([`${getSourceString(F, getInventoryRows.name)} inventoryRows undefined`,
+            `call initializeData() first`
+        ].join(TAB));
+    }
+    return inventoryRows;
 }
 
 /**
@@ -665,7 +692,7 @@ export function getBinDictionary(): Record<string, string> {
 
 /**
  * `sync`
- * @returns **`warehouseRows`**
+ * @returns **`warehouseRows`** `WarehouseRow[]`
  */
 export function getWarehouseRows(): WarehouseRow[] {
     if (!warehouseRows) {
@@ -674,6 +701,19 @@ export function getWarehouseRows(): WarehouseRow[] {
         ].join(TAB));
     }
     return warehouseRows;
+}
+
+/**
+ * `sync`
+ * @returns **`bomRows`** `Record<string, any>[]`
+ */
+export function getBomRows(): Record<string, any>[] {
+    if (!bomRows) {
+        throw new Error([`${getSourceString(F, getBomRows.name)} bomRows undefined`,
+            `call initializeData() first`
+        ].join(TAB));
+    }
+    return bomRows;
 }
 
 /**

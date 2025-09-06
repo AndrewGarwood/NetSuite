@@ -4,7 +4,6 @@
         "module": "commonjs", // "amd"
         "target": "es2015",
         "moduleResolution": "node",
-        "ignoreDeprecations": "6.0",
         "downlevelIteration": true,
         "sourceMap": false,
         "newLine": "CRLF",

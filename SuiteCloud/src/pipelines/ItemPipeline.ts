@@ -10,7 +10,9 @@ import {
     getCurrentPacificTime, 
     indentedStringify, clearFileSync,
     getFileNameTimestamp, RowSourceMetaData,
-    getSourceString
+    getSourceString,
+    extractTargetRows,
+    getRows
 } from "typeshi:utils/io";
 import { 
     STOP_RUNNING, DELAY, simpleLogger as slog,
@@ -22,11 +24,6 @@ import {
     RecordOptions, RecordResponse, 
     RecordResult, idPropertyEnum,
     RecordResponseOptions, upsertRecordPayload,
-    SingleRecordRequest, getRecordById,
-    FieldDictionary,
-    idSearchOptions,
-    FieldValue,
-    SetFieldSubrecordOptions,
     SourceTypeEnum,
     LogTypeEnum,
     isRecordOptions,
@@ -36,8 +33,7 @@ import {
     Factory, 
 } from "../api";
 import { 
-    isNonEmptyArray, isNullLike as isNull, isEmptyArray, hasKeys, 
-    TypeOfEnum, isNonEmptyString, isIntegerArray,
+    isNonEmptyArray, isNonEmptyString, isIntegerArray,
 } from "typeshi:utils/typeValidation";
 import * as validate from "typeshi:utils/argumentValidation";
 import { RecordTypeEnum, SearchOperatorEnum } from "../utils/ns/Enums";
@@ -53,6 +49,7 @@ import { ParseResults, ValidatedParseResults } from 'src/services/parse/types/in
 import { 
     getCompositeDictionaries, processParseResults 
 } from 'src/services/post_process/parseResultsProcessor';
+import { ItemColumnEnum } from 'src/parse_configurations';
 
 const F = extractFileName(__filename);
 /**
@@ -274,6 +271,47 @@ export async function generateBinOptions(
         }
     }
     return bins;
+}
+
+/**
+ * for each `itemId` in `locationBins`, get its corresponding row in `itemSourceFile`
+ * @param itemSourceFile 
+ * @param locationBins 
+ * @returns **`targetRows`**
+ */
+export async function extractLotNumberedItemRows(
+    itemSourceFile: string,
+    locationBins: WarehouseDictionary
+): Promise<Record<string, any>[]> {
+    const source = getSourceString(F, extractLotNumberedItemRows.name);
+    let itemRows = await getRows(itemSourceFile);
+    let targetItems: string[] = [];
+    for (let [locId, binDict] of Object.entries(locationBins)) {
+        let initialLength = targetItems.length
+        for (let binId in binDict) {
+            let binContent = binDict[binId];
+            targetItems.push(...Object.keys(binContent).filter(
+                itemId => !targetItems.includes(itemId) 
+                && isNonEmptyArray(binContent[itemId].lotNumbers)
+            ));
+        
+        }
+        slog.debug([`${source} handled locId '${locId}'`,
+            `added ${targetItems.length - initialLength} item(s) from ${locId}'s bin(s)`
+        ].join(TAB));
+    }
+    const {rows: targetRows, remainingValues } = await extractTargetRows(
+        itemRows, ItemColumnEnum.ITEM_ID, targetItems, itemIdExtractor
+    );
+    mlog.debug([`${source} finished getting rows from itemSourceFile`,
+    ].join(TAB));
+    return targetRows;
+}
+const itemIdExtractor = async (
+    value: string, 
+    cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
+): Promise<string> => {
+    return clean(extractLeaf(value), cleanOptions);
 }
 
 

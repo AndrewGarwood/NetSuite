@@ -34,10 +34,18 @@ import {
     DEFAULT_ITEM_STAGES_TO_WRITE,
     ALL_ITEM_STAGES
 } from "./pipelines";
-import * as soConstants from "./parse_configurations/salesorder/salesOrderConstants"
 import { getSkuDictionary, initializeData } from "./config/dataLoader";
-import { EntityRecordTypeEnum, RecordTypeEnum } from "./utils/ns/Enums";
+import { RecordTypeEnum } from "./utils/ns/Enums";
 import { invokePipeline } from "./main";
+
+export { 
+    main as mainInteractive, 
+    promptTransactionPipeline, 
+    promptItemPipeline,
+    confirmTransactionConfiguration,
+    confirmItemConfiguration,
+    confirmConfiguration,
+};
 
 // Pipeline selection options
 enum PipelineTypeEnum {
@@ -671,12 +679,3 @@ if (require.main === module) {
         STOP_RUNNING(1);
     });
 }
-
-export { 
-    main as mainInteractive, 
-    promptTransactionPipeline, 
-    promptItemPipeline,
-    confirmTransactionConfiguration,
-    confirmItemConfiguration,
-    confirmConfiguration,
-};

@@ -29,11 +29,11 @@ import {
 
 /** use to set the field `"isinactive"` to false */
 const NOT_INACTIVE = false;
-export const BILLING_PHONE_COLUMNS = [
+const BILLING_PHONE_COLUMNS = [
     C.BILL_TO_FOUR, C.BILL_TO_FIVE, C.PHONE, C.WORK_PHONE, C.MOBILE_PHONE, 
     C.ALT_PHONE, C.ALT_MOBILE, C.HOME_PHONE,
 ];
-export const SHIPPING_PHONE_COLUMNS = [
+const SHIPPING_PHONE_COLUMNS = [
     C.SHIP_TO_FOUR, C.SHIP_TO_FIVE, C.PHONE, C.WORK_PHONE, C.MOBILE_PHONE, 
     C.ALT_PHONE, C.ALT_MOBILE, C.HOME_PHONE,
 ];
@@ -41,7 +41,7 @@ export const SHIPPING_PHONE_COLUMNS = [
  * if `'Columns.FIRST_NAME'` and `Columns.LAST_NAME` not filled, 
  * then look for name to extract from these columns
  * */
-export const NAME_COLUMNS = [
+const NAME_COLUMNS = [
     C.PRIMARY_CONTACT, 
     C.ENTITY_ID, 
     C.STREET_ONE, C.STREET_TWO, 
@@ -51,14 +51,14 @@ export const NAME_COLUMNS = [
     C.SECONDARY_CONTACT,
 ]
 /** Look for {@link evaluate.attention} names in these columns for the billing address */
-export const BILLING_NAME_COLUMNS = [
+const BILLING_NAME_COLUMNS = [
     C.BILL_TO_ONE, C.BILL_TO_TWO, 
     C.STREET_ONE, C.STREET_TWO, 
     C.PRIMARY_CONTACT, C.SECONDARY_CONTACT, C.ENTITY_ID
 ]
 
 /** Look for {@link evaluate.attention} names in these columns for the shipping address */
-export const SHIPPING_NAME_COLUMNS = [
+const SHIPPING_NAME_COLUMNS = [
     C.SHIP_TO_ONE, C.SHIP_TO_TWO, 
     C.SHIP_TO_STREET_ONE, C.SHIP_TO_STREET_TWO,
     C.PRIMARY_CONTACT, C.SECONDARY_CONTACT, C.ENTITY_ID

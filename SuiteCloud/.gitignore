@@ -2,5 +2,5 @@ node_modules
 .env
 .archive
 *notes.txt
-.crf.txt
+*.crf.txt
 *.bak

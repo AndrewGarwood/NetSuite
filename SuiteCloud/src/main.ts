@@ -42,6 +42,7 @@ async function main() {
     await clearFile(...logFiles);
     await initializeData();
     await instantiateAuthManager();
+    /* ===================================================================== */
 
     // await invokePipeline(RecordTypeEnum.SALES_ORDER, 
     //     ['filePaths'], 
@@ -49,6 +50,7 @@ async function main() {
     //     SALES_ORDER_PIPELINE_CONFIG
     // );
 
+    /* ===================================================================== */
     mlog.info([`${source} END at ${getCurrentPacificTime()}`,
         `handling logs...`
     ].join(TAB));

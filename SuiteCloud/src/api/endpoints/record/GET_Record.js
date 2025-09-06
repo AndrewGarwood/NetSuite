@@ -7,61 +7,30 @@
  * @SB_ScriptId 175
  * @SB_DeployId 1
  */
-/**
- * @consideration because NetSuite RESTlet GET request bodies are sourced from request url search parameter and not an actual object payload,
- * maybe I should refactor GetRecordRequest to only have primitives or array of primitives as values.
- * - i.e. `Record<string, string | number | boolean | string[] | number[] | boolean[]>`
- * - or maybe make it a post request but just have functions that call it be named 'get..' on client side?
- */
-
 
 define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
 /**
  * @type {LogStatement[]} - `Array<`{@link LogStatement}`>` = `{ timestamp`: string, `type`: {@link LogTypeEnum}, `title`: string, `details`: any, `message`: string` }[]`
  * @see {@link writeLog}`(type, title, ...details)`
- * @description return logArray in response so can process in client
  * */
 const logArray = [];
 const EP = `GET_Record`;
 /**
- * Get a single record
- * @param {SingleRecordRequest} reqParams {@link SingleRecordRequest}
+ * @param {{ recordType: string; idOptions: string; responseOptions: string; }} reqParams {@link SingleRecordRequest}
+ * - use {@link unpackRequestParameters}`(reqParams)` to get {@link SingleRecordRequest}
  * @returns {RecordResponse} **`response`** {@link RecordResponse}
  */
-const get = (/**@type {SingleRecordRequest}*/reqParams) => {
-    if (!reqParams) {
-        writeLog(LogTypeEnum.ERROR, 
-            'ERROR: GET_Record.get() Invalid request parameters', 
-            `reqParams is empty or undefined`
-        );
-        return {
-            status: 400,
-            message: 'Bad Request',
-            error: 'Invalid request parameters: reqParams is empty or undefined',
-            logs: logArray,
-            results: []
-        }; // as `GetRecordResponse`
+const get = (reqParams) => {
+    const source = getSourceString(EP, get.name);
+    const unpackResult = unpackRequestParameters(reqParams);
+    if (isRecordResponse(unpackResult)) { // if error unpacking
+        return unpackResult;
     }
-    let { recordType } = reqParams;
-    /**@type {idSearchOptions[]} */
-    let idOptions = JSON.parse(reqParams.idOptions || '[]');
-    /**@type {RecordResponseOptions} */
-    let responseOptions = JSON.parse(reqParams.responseOptions || '{}');
-    recordType = validateRecordType(recordType);
-    if (!recordType) {
-        writeLog(LogTypeEnum.ERROR,
-            'ERROR: GET_Record.get() Invalid reqParams.recordType',
-            `recordType must be a valid RecordTypeEnum string, received: '${reqParams.recordType}'`
-        );
-        return {
-            status: 400,
-            message: 'Bad Request',
-            error: `Invalid request parameters: reqParams.recordType. recordType must be a valid RecordTypeEnum string, received: '${reqParams.recordType}'`,
-            logs: logArray,
-            results: []
-        }; // as `GetRecordResponse`
-    }
-    if (idOptions && isNonEmptyArray(idOptions)) { 
+    writeLog(LogTypeEnum.AUDIT, 
+        `${source} Successfully unpacked reqParams to SingleRecordRequest`
+    );
+    const { recordType, idOptions, responseOptions } = unpackResult;
+    if (isNonEmptyArray(idOptions)) { 
         return getById(recordType, idOptions, responseOptions);
     } else if (!idOptions || isEmptyArray(idOptions)) {
         return getAll(recordType, responseOptions);
@@ -71,10 +40,115 @@ const get = (/**@type {SingleRecordRequest}*/reqParams) => {
         message: 'Bad Request',
         error: `Invalid request parameters: reqParams.idOptions; received: '${reqParams.idOptions}'`,
         logs: logArray,
-        results: []
-    }; // as `GetRecordResponse`
+        results: [],
+        rejects: [reqParams]
+    }; // as `RecordResponse`
 };
 
+/**
+ * @param {{ recordType: string; idOptions: string; responseOptions: string; }} reqParams
+ * @returns {SingleRecordRequest | RecordResponse} **`unpackResult`** `DeleteRecordRequest | RecordResponse`
+ */
+function unpackRequestParameters(reqParams) {
+    const source = getSourceString(EP, unpackRequestParameters.name);
+    if (!isObject(reqParams) 
+        || !hasKeys(reqParams, 
+            ['recordType', 'idOptions', 'responseOptions'], 
+            false, true)) {
+        return handleError(reqParams, source, [
+            `Invalid Request Parameters Object: reqParams undefined or is not an object or is missing required keys`,
+            `Expected: object with keys ['recordType', 'idOptions', 'responseOptions'(optional)]`,
+            `Received: ${typeof reqParams} = '${reqParams}'`
+        ]);
+    }
+    let recordType = reqParams.recordType;
+    if (!isRecordTypeEnum(recordType)) {
+        return handleError(reqParams, source, [
+            `Invalid Request Parameter 'recordType'`,
+            `Expected: RecordTypeEnum (string enum value)`,
+            `Received: '${recordType}'`
+        ]);
+    }
+    /**@type {idSearchOptions[]} */
+    let idOptions = [];
+    try {
+        idOptions = JSON.parse(reqParams.idOptions);
+        if (isIdSearchOptions(idOptions)) {
+            idOptions = [idOptions]
+        } else if (!(isNonEmptyArray(idOptions) 
+            && idOptions.every(el=>isIdSearchOptions(el))
+            )) {
+            return handleError(reqParams, source, [
+                `reqParams.idOptions is not a valid Array<idSearchOptions>`,
+                `Expected: { idProp: string, idValue: any, searchOperator: string }[]`,
+                `Received: ${typeof idOptions} = ${JSON.stringify(idOptions)}`
+            ]);
+        }
+    } catch (error) {
+        return handleError(reqParams, source, [
+            `JSON.parse(reqParams.idOptions) failed`,
+            `param 'idOptions' is not valid JSON string`,
+            `caught: ${error}`
+        ]);
+    }
+    /**@type {SingleRecordRequest} */
+    const request = {recordType, idOptions};
+    if (!reqParams.responseOptions 
+        || isEmpty(reqParams.responseOptions) 
+        || reqParams.responseOptions === 'undefined'
+    ) { return request }
+    /**@type {RecordResponseOptions} */
+    let responseOptions = {}
+    try {
+        responseOptions = JSON.parse(reqParams.responseOptions);
+        if (!isRecordResponseOptions(responseOptions)) {
+            return handleError(reqParams, source, [
+                `reqParams.responseOptions is not a valid RecordResponseOptions object`,
+                `Expected: { fields?: string | string[] | undefined; sublists?: Record<string, string | string[]> | undefined; }[]`,
+                `Received: ${typeof idOptions} = ${JSON.stringify(idOptions)}`
+            ]);
+        }
+        request.responseOptions = responseOptions;
+    } catch (error) {
+        return handleError(reqParams, source, [
+            `JSON.parse(reqParams.responseOptions) failed`,
+            `param 'responseOptions' is not valid JSON string`,
+            `caught: ${error}`
+        ]);
+    }
+    return request;
+}
+/**
+ * @param {string} source 
+ * @param {Record<string, any>} requestContent 
+ * @param {any[]} errorDetails
+ * @param {number} status
+ * @param {string} message
+ * @returns {RecordResponse} **`errorResponse`** {@link RecordResponse}
+ */
+function handleError(
+    requestContent,
+    source,
+    errorDetails,
+    status = 400,
+    message = `Bad Request: Invalid Parameter(s)`,
+) {
+    writeLog(LogTypeEnum.ERROR,
+        `${source} -> ${message}`,
+        ...errorDetails, 
+        `requestContent: ${JSON.stringify(requestContent)}`
+    );
+    /**@type {RecordResponse} */
+    let errorResponse = {
+        status,
+        message,
+        error: `${source} ${errorDetails.join(', ')}`,
+        logs: logArray,
+        results: [],
+        rejects: [requestContent]
+    }
+    return errorResponse;
+}
 /**
  * @param {RecordTypeEnum | string} recordType 
  * @param {idSearchOptions[]} idOptions 
@@ -127,7 +201,7 @@ function getById(recordType, idOptions, responseOptions) {
 }
 
 /**
- * @notimplemented
+ * @notimplemented probably have to return paginated results or something.
  * @param {RecordTypeEnum | string} recordType 
  * @param {RecordResponseOptions} responseOptions 
  * @returns {RecordResponse}
@@ -405,7 +479,7 @@ const LogTypeEnum = {
     EMERGENCY: 'emergency',
 };
 /**max number of times allowed to call `log.debug(title, details)` per `get()` call */
-const MAX_LOGS_PER_LEVEL = 500;
+const MAX_LOGS_PER_LEVEL = 10;
 /**@type {{[logType: LogTypeEnum]: {count: number, limit: number}}} */
 const logDict = {
     [LogTypeEnum.DEBUG]: {count: 0, limit: MAX_LOGS_PER_LEVEL},
@@ -486,6 +560,36 @@ function validateRecordType(recordType) {
     if (isValue) { return recordType.toLowerCase(); }
     return null;
 }
+
+
+
+/**
+ * @param value `any` the value to check
+ * @returns **`isEmpty`** `boolean` = `value is '' | (Array<any> & { length: 0 }) | null | undefined | Record<string, never>`
+ * - **`true`** `if` the `value` is null, undefined, empty object (no keys), empty array, or empty string
+ * - **`false`** `otherwise`
+ */
+function isEmpty(value) {
+    if (value === null || value === undefined) {
+        return true;
+    }
+    if (typeof value === 'boolean' || typeof value === 'number') {
+        return false;
+    }
+    // Check for empty object or array
+    if (typeof value === 'object' && isEmptyArray(Object.keys(value))) {
+        return true;
+    }
+    const isNullLikeString = (typeof value === 'string'
+        && (value.trim() === ''
+            || value.toLowerCase() === 'undefined'
+            || value.toLowerCase() === 'null'));
+    if (isNullLikeString) {
+        return true;
+    }
+    return false;
+}
+
 /**
  * @param {any} arr 
  * @returns {arr is Array<any> & { length: number }} `arr is Array<any> & { length: number }`
@@ -602,6 +706,41 @@ function isRecordTypeEnum(value) {
     );
 }
 /**
+ * @param {any} value 
+ * @returns {value is RecordResponse} **`isRecordResponse`** `boolean`
+ */
+function isRecordResponse(value) {
+    return (isObject(value)
+        && hasKeys(value, 
+            ['status', 'message', 'error', 'logs', 'results', 'rejects'],
+            false, true
+        )
+    )
+}
+/**
+ * @param {any} value
+ * @returns {value is RecordResponseOptions} 
+ */
+function isRecordResponseOptions(value) {
+    return Boolean(value && typeof value === 'object'
+        && (!value.fields 
+            || (isNonEmptyString(value.fields)
+                || isEmptyArray(value.fields) 
+                || isStringArray(value.fields)
+            )
+        )
+        && (!value.sublists 
+            || (typeof value.sublists === 'object'
+                && Object.keys(value.sublists).every(k=>
+                    isNonEmptyString(value.sublists[k]) 
+                    || isEmptyArray(value.sublists[k])
+                    || isStringArray(value.sublists[k])
+                )
+            )
+        )
+    )
+}
+/**
  * `isidSearchOptions`
  * @param {any} value
  * @returns {value is idSearchOptions} 
@@ -646,7 +785,7 @@ const NOT_DYNAMIC = false;
  * @typedef {{
  * recordType: string | RecordTypeEnum;
  * idOptions: idSearchOptions[],
- * responseOptions: RecordResponseOptions,
+ * responseOptions?: RecordResponseOptions,
  * }} SingleRecordRequest
  */
 

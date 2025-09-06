@@ -161,15 +161,17 @@ function processRecordOptions(options, responseOptions) {
         rec = record.create({type: recordType, isDynamic });
     }
     
+    if (isExistingRecord) {
+        // remove idPropertyEnum values from keys of fields to avoid DUP_ENTITY error.
+        for (const idPropFieldId of Object.values(idPropertyEnum)) {
+            if (fields[idPropFieldId]) { 
+                deletions.push({idProp: idPropFieldId, value: fields[idPropFieldId]});
+                delete fields[idPropFieldId];
+            }
+        } 
+    }
     if (isObject(fields)) {
         try {
-            // remove idPropertyEnum values from keys of fields to avoid DUP_ENTITY error.
-            for (const idPropFieldId of Object.values(idPropertyEnum)) {
-                if (fields[idPropFieldId]) { 
-                    deletions.push({idProp: idPropFieldId, value: fields[idPropFieldId]});
-                    delete fields[idPropFieldId];
-                }
-            } 
             rec = processFieldDictionary(rec, recordType, fields);
             writeLog(LogTypeEnum.AUDIT, `[processRecordOptions()] Completed processFieldDictionary`)
         } catch (error) {
@@ -595,7 +597,7 @@ function processSublistUpdateDictionary(
     sublistFieldIdLoop:
     for (let fieldId in updateDictionary) {
         const { newValue, lineIdOptions } = updateDictionary[fieldId];
-        // let numUpdates = 0;
+        let numUpdates = 0;
         // @consideration change back to while loop
         if (rec.findSublistLineWithValue(lineIdOptions) > -1) {
             try {
@@ -614,7 +616,7 @@ function processSublistUpdateDictionary(
                         newValue
                     )
                 );
-                // numUpdates++;
+                numUpdates++;
             } catch (error) {
                 writeLog(LogTypeEnum.ERROR, 
                     `${source} Error processing sublistUpdateDictionary['${fieldId}']`,
@@ -1135,7 +1137,32 @@ function validateSublistLineIndex(rec, sublistId, line) {
     }
     return line; // return the original line index because it is valid
 }
-
+/**
+ * @param value `any` the value to check
+ * @returns **`isEmpty`** `boolean` = `value is '' | (Array<any> & { length: 0 }) | null | undefined | Record<string, never>`
+ * - **`true`** `if` the `value` is null, undefined, empty object (no keys), empty array, or empty string
+ * - **`false`** `otherwise`
+ */
+function isEmpty(value) {
+    if (value === null || value === undefined) {
+        return true;
+    }
+    if (typeof value === 'boolean' || typeof value === 'number') {
+        return false;
+    }
+    // Check for empty object or array
+    if (typeof value === 'object' && isEmptyArray(Object.keys(value))) {
+        return true;
+    }
+    const isNullLikeString = (typeof value === 'string'
+        && (value.trim() === ''
+            || value.toLowerCase() === 'undefined'
+            || value.toLowerCase() === 'null'));
+    if (isNullLikeString) {
+        return true;
+    }
+    return false;
+}
 /**
  * @param {any} value 
  * @returns {value is Array<any> & { length: number }} `value is Array<any> & { length: number }`

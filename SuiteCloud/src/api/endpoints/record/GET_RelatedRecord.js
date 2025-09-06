@@ -32,7 +32,7 @@ const EP = `GET_RelatedRecord`;
 /** required keys of {@link RelatedRecordRequest} = `['parentRecordType', 'idOptions', 'childOptions']` */
 const REQUEST_KEYS = ['parentRecordType', 'idOptions', 'childOptions'];
 /**
- * @param {{parentRecordType: string; idOptions: string; childOptions: string}} reqParams
+ * @param {{parentRecordType: RecordTypeEnum; idOptions: string; childOptions: string}} reqParams
  * - when applicable, converts json string values to objects in {@link unpackRequestParameters}  
  * @returns {RecordResponse} **`response`** {@link RecordResponse}
  */
@@ -134,7 +134,7 @@ function generateRecordResult(recordType, recordId, responseOptions) {
  * @param {{parentRecordType: string; idOptions: string; childOptions: string}} reqParams
  * @returns {RelatedRecordRequest | RecordResponse}
  * - {@link RelatedRecordRequest} `if` all params successfully unpacked
- * - {@link RecordResponse} to return in get() with error message if unpacking failed
+ * - {@link RecordResponse} to return in `get()` with error message if unpacking failed
  */
 function unpackRequestParameters(reqParams) {
     const source = `[${EP}.${unpackRequestParameters.name}()]`;
@@ -246,13 +246,11 @@ function getRelatedRecordIds(
     childOptions
 ) {
     const source = `[${EP}.${getRelatedRecordIds.name}()]`;
-    if (!isNonEmptyString(parentRecordType) // redundant checks... 
+    if (!isRecordTypeEnum(parentRecordType) // redundant checks... 
         || typeof parentInternalId !== 'number'
         || !(isNonEmptyArray(childOptions) && childOptions.every(
                 el=>isChildSearchOptions(el)
-                )
-            )
-        ) {
+            ))) {
         writeLog(LogTypeEnum.ERROR, `${source} Invalid Arguments`,
             `${source}`,
             `Expected: parentRecordType (RecordTypeEnum), parentInternalId (number)`,
@@ -347,36 +345,43 @@ function createChildSearch(parentInternalId, searchOptions) {
         );
         return null;
     }
+    /**@type {Filter[] | any[]} */
+    const filters = [];
     /**@type {CreateSearchFilterOptions} */
-    const filterOptions = {
-        name: fieldId,
-        operator: SearchOperatorEnum.RECORD.ANY_OF,
-        values: [parentInternalId]
-    }
-    /**@type {Filter | undefined} */
+    // const filterOptions = {
+    //     name: (isNonEmptyString(sublistId) && sublistId !== fieldId 
+    //         ? `${sublistId}.${fieldId}`
+    //         : fieldId
+    //     ),
+    //     operator: SearchOperatorEnum.RECORD.ANY_OF,
+    //     values: [parentInternalId]
+    // }
+    /**
+     * @type {any | Filter | undefined}
+     * @concern there is something weird/inconsistent about how SuiteScript handles creating a filter
+     * on a sublist field.... but defining as array seems to work across different use cases... i think
+     * */
     let filter = undefined;
-    try { 
-        filter = search.createFilter(filterOptions);
-    } catch (error) {
-        writeLog(LogTypeEnum.ERROR, 
-            `${source} Error creating Filter object: Invalid CreateSearchFilterOptions derived from ChildSearchOptions`,
-            ...[`${source} at childOptions[${i}]`,
-            `An error occurred when calling search.createFilter(CreateSearchFilterOptions)`,
-            `Check validity of fieldId and/or operator and/or sublistId.`,
-            `childSearchOptions: ${JSON.stringify(searchOptions)}`,
-            `derived CreateSearchFilterOptions: ${JSON.stringify(filterOptions)}`,
-            `Caught: ${error}`
-        ]);
-    }
+    // try { 
+    //     filter = search.createFilter(filterOptions);
+    // } catch (error) {
+    //     writeLog(LogTypeEnum.ERROR, 
+    //         `${source} Error creating Filter object: Invalid CreateSearchFilterOptions derived from ChildSearchOptions`,
+    //         ...[`${source} at childOptions[${i}]`,
+    //         `An error occurred when calling search.createFilter(CreateSearchFilterOptions)`,
+    //         `Check validity of fieldId and/or operator and/or sublistId.`,
+    //         `childSearchOptions: ${JSON.stringify(searchOptions)}`,
+    //         `derived CreateSearchFilterOptions: ${JSON.stringify(filterOptions)}`,
+    //         `Caught: ${error}`
+    //     ]);
+    // }
+    filter = [  
+        (isNonEmptyString(sublistId) && sublistId !== fieldId ? `${sublistId}.${fieldId}`: fieldId), 
+        SearchOperatorEnum.RECORD.ANY_OF, 
+        [parentInternalId]
+    ]
     if (!filter) { return null }
-    const filters = [filter];
-    if (isNonEmptyString(sublistId)) {
-        filters.push(search.createFilter({
-            name: 'mainline', 
-            operator: SearchOperatorEnum.TEXT.IS, 
-            values: ['F'] 
-        }));
-    }
+    filters.push(filter);
     /**@type {SearchCreateOptions} */
     const searchCreateOptions = {
         type: childRecordType,
@@ -699,7 +704,7 @@ function writeLog(type, title, ...details) {
             if (logDict[LogTypeEnum.DEBUG].count >= logDict[LogTypeEnum.DEBUG].limit) {
                 break;
             }
-            // log.debug(title, payload);
+            log.debug(title, payload);
             logDict[LogTypeEnum.DEBUG].count++;
             break;
         case LogTypeEnum.ERROR:
@@ -733,20 +738,7 @@ function writeLog(type, title, ...details) {
 function getCurrentPacificTime() {
     return new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
 }
-/**
- * @param {RecordTypeEnum | string} recordType {@link RecordTypeEnum} | `string`
- * @returns {RecordTypeEnum | null} **`recordType`** - the validated record type as a `RecordTypeEnum` value, or `null` if the record type is invalid.
- */
-function validateRecordType(recordType) {
-    if (!isNonEmptyString(recordType)) {
-        return null;
-    }
-    const isKey = Object.keys(RecordTypeEnum).includes(recordType.toUpperCase());
-    const isValue = Object.values(RecordTypeEnum).includes(recordType.toLowerCase());
-    if (isKey) { return RecordTypeEnum[recordType.toUpperCase()]; }
-    if (isValue) { return recordType.toLowerCase(); }
-    return null;
-}
+
 /**
  * @param {any} value 
  * @returns {value is Array<any> & { length: number }} `value is Array<any> & { length: number }`
