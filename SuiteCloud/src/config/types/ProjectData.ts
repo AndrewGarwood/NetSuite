@@ -2,9 +2,6 @@
  * @file src/config/types/ProjectData.ts
  */
 
-import { WarehouseDictionary, WarehouseRow } from "src/pipelines/types/Warehouse";
-
-
 /**
  * @enum {string} **`DataDomainEnum`**
  * @property **`ACCOUNTING`** = `'accounting'`
@@ -26,7 +23,7 @@ export type DataSourceConfiguration = FolderHierarchy & { options?: LoadFileOpti
 
 /**
  * @key is folderName or fileLabel
- * @value is child FolderHierarchy or fileName
+ * @value is child FolderHierarchy or fileName.ext
  */
 export type FolderHierarchy = {
     [folderName: string]: FolderHierarchy
@@ -40,12 +37,11 @@ export type FileDictionary = {
     [fileKey: string]: string | string[]
 };
 
-// export type CompositeFileDictionary = {
-//     [domain: string]: { 
-//         [fileKey:string]: string[] 
-//     }
-// };
 
+
+// ===========================================================================
+// other structures considered
+// ===========================================================================
 /**
  * map file key to `string[]` such that path to file is
  * `path.join(...CompositeFileDictionary[fileKey])`
@@ -54,19 +50,8 @@ export type FileDictionary = {
 //     [fileKey: string]: string[]
 // }
 
-// export type LoadFileOptions = {
-//     name: string,
-//     [key: string]: any
-// }
-
-export interface WarehouseData {
-    dictionary: WarehouseDictionary;
-    rows: WarehouseRow[]
-}
-export interface CustomerData {
-    /** map `category` to corresponding netsuite category's `'internalid'` */
-    categoryDictionary: Record<string, number>;
-}
-export interface VendorData {
-    humanVendors: string[]
-}
+// export type CompositeFileDictionary = {
+//     [domain: string]: { 
+//         [fileKey:string]: string[] 
+//     }
+// };

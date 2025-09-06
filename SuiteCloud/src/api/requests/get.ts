@@ -4,7 +4,8 @@
  */
 import axios from "axios";
 import { 
-    writeObjectToJsonSync as write, getCurrentPacificTime, indentedStringify 
+    writeObjectToJsonSync as write, getCurrentPacificTime, indentedStringify, 
+    getFileNameTimestamp
 } from "typeshi:utils/io";
 import { mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
 import { RESTLET_URL_STEM, STOP_RUNNING, DELAY, getScripts, 
@@ -67,7 +68,7 @@ export async function getRecordById(
     idProp?: idPropertyEnum,
     responseOptions?: RecordResponseOptions
 ): Promise<RecordResponse> {
-    const source = getSourceString(F, getRecordById.name)
+    const source = getSourceString(F, getRecordById.name);
     const request = {} as SingleRecordRequest;
     if (typeof arg1 === 'string') {
         validate.enumArgument(source, {recordType: arg1, RecordTypeEnum});
@@ -109,7 +110,7 @@ export async function getRecordById(
         ].join(TAB));
         write(
             {timestamp: getCurrentPacificTime(), caught: error}, 
-            path.join(getProjectFolders().logDir, 'errors', 'ERROR_getRecordById.json')
+            path.join(getProjectFolders().logDir, 'errors', `${getFileNameTimestamp()}_ERROR_${getRecordById.name}.json`)
         );
         throw new Error(`${source} Failed`);
     }
@@ -138,7 +139,7 @@ export async function getRelatedRecord(
         ].join(TAB));
         write(
             {timestamp: getCurrentPacificTime(), caught: error}, 
-            path.join(getProjectFolders().logDir, 'errors', 'ERROR_getRelatedRecord.json')
+            path.join(getProjectFolders().logDir, 'errors', `${getFileNameTimestamp()}_ERROR_${getRelatedRecord.name}.json`)
         );
         throw new Error(`${source} Failed, unable to return RecordResponse`);
     }
@@ -185,8 +186,8 @@ export async function GET(
         ].join(TAB));
         write(
             {timestamp: getCurrentPacificTime(), caught: error}, 
-            path.join(getProjectFolders().logDir, 'errors', 'ERROR_GET.json')
+            path.join(getProjectFolders().logDir, 'errors', `${getFileNameTimestamp()}_ERROR_${GET.name}.json`)
         );
-        throw new Error('[get.GET()] Failed to call RESTlet with params');
+        throw new Error(`${source} Failed to call RESTlet with params`);
     }
 }

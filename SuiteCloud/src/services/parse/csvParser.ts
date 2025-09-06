@@ -9,14 +9,15 @@ import {
     STOP_RUNNING
 } from "../../config";
 import {
-    isNonEmptyArray, isEmptyArray, isNullLike as isNull,
+    isNonEmptyArray, isEmptyArray, isEmpty,
     areEquivalentObjects,
     isIntegerArray,
     hasKeys
 } from "typeshi:utils/typeValidation";
 import { isRowSourceMetaData, RowSourceMetaData, 
     handleFileArgument, indentedStringify, 
-    isFileData, FileData 
+    isFileData, FileData, 
+    getSourceString
 } from "typeshi:utils/io";
 import * as validate from "typeshi:utils/argumentValidation";
 import { 
@@ -31,7 +32,8 @@ import {
     SublistLineParseOptions,
     isFieldParseOptions,
     isValueMappingEntry,
-    SublistLineIdOptions
+    SublistLineIdOptions,
+    RecordParseOptions
 } from "./types/index";
 import {
     clean, equivalentAlphanumericStrings, DATE_STRING_PATTERN
@@ -44,7 +46,7 @@ import {
 } from "../../api";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
 import { BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES, isBooleanFieldId } from "../../utils/ns/utils";
-/** use to set the field `"isinactive"` to false */
+/** tells endpoint to load record in standard mode */
 const NOT_DYNAMIC = false;
 let rowIndex: number = 0;
 
@@ -61,8 +63,8 @@ export async function parseRecordCsv(
     parseDictionary: ParseDictionary,
     sourceType?: SourceTypeEnum
 ): Promise<ParseResults> {
-    const source = `[csvParser.parseRecordCsv()]`;
-    if (isNull(recordSource)) {
+    const source = getSourceString(__filename, parseRecordCsv.name);
+    if (isEmpty(recordSource)) {
         throw new Error([
             `${source} Invalid Argument: 'recordSource'`,
             `Expected recordSource: string | FileData | Record<string, any>[]`,
@@ -86,7 +88,7 @@ export async function parseRecordCsv(
         for (const recordType of Object.keys(parseDictionary)) {
             const { 
                 keyColumn, fieldOptions, sublistOptions 
-            } = parseDictionary[recordType];
+            } = parseDictionary[recordType] as RecordParseOptions;
             const recordId = clean(row[keyColumn]);
             /** 
              * `if row` pertains to an existing record in `IntermediateParseResults` 
@@ -142,7 +144,7 @@ async function updateRecordMeta(
     recordSource: string | FileData | Record<string, any>[],
     sourceType?: SourceTypeEnum
 ): Promise<void> {
-    const source = `[csvParser.updateRecordMeta()]`;
+    const source = getSourceString(__filename, updateRecordMeta.name);
     if (typeof recordSource === 'string') {
         if (!record.meta || !isRowSourceMetaData(record.meta.dataSource)) {
             record.meta = {
@@ -208,14 +210,14 @@ async function processRow(
     if (!row || !record) {
         return record;
     }
-    if (fieldOptions && !isNull(fieldOptions)) {
+    if (fieldOptions && !isEmpty(fieldOptions)) {
         record.fields = await processFieldDictionaryParseOptions(
-            row, record.fields as FieldDictionary, fieldOptions
+            row, record.fields ?? {}, fieldOptions
         );
     }
-    if (sublistOptions && !isNull(sublistOptions)) {
+    if (sublistOptions && !isEmpty(sublistOptions)) {
         record.sublists = await processSublistDictionaryParseOptions(
-            row, record.sublists as SublistDictionary, sublistOptions
+            row, record.sublists ?? {}, sublistOptions
         );
     }
     return record;
@@ -232,7 +234,7 @@ async function processFieldDictionaryParseOptions(
     fields: FieldDictionary,
     fieldOptions: FieldDictionaryParseOptions,
 ): Promise<FieldDictionary> {
-    if (!row || !fields || isNull(fieldOptions)) {
+    if (!row || !fields || isEmpty(fieldOptions)) {
         return fields;
     }
     for (const fieldId of Object.keys(fieldOptions)) {
@@ -263,7 +265,7 @@ async function processSublistDictionaryParseOptions(
     sublists: SublistDictionary,
     sublistOptions: SublistDictionaryParseOptions,
 ): Promise<SublistDictionary> {
-    if (!row || isNull(sublistOptions)) {
+    if (!row || isEmpty(sublistOptions)) {
         return sublists;
     }
     for (const [sublistId, lineOptionsArray] of Object.entries(sublistOptions)) {
@@ -339,7 +341,7 @@ async function generateSublistSubrecordOptions(
     parentFieldId: string,
     subrecordOptions: SubrecordParseOptions,
 ): Promise<SetSublistSubrecordOptions> {
-    const source = `[csvParser.generateSublistSubrecordOptions()]`
+    const source = getSourceString(__filename, generateSublistSubrecordOptions.name);
     validate.multipleStringArguments(source, { parentSublistId, parentFieldId });
     validate.objectArgument(source, {row});
     validate.objectArgument(source, 

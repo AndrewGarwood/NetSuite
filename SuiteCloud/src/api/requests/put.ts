@@ -105,7 +105,7 @@ export async function upsertRecordPayload(
             continue;
         }
     }
-    slog.info(`${source} END, returning responses`)
+    slog.info(`${source} END, returning responses`);
     return responses;
 }
 

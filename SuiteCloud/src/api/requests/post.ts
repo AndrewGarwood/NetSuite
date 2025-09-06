@@ -1,4 +1,5 @@
 /**
+ * @deprecated for now
  * @file src/api/requests/post.ts
  */
 import axios from "axios";

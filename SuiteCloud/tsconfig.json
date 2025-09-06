@@ -1,9 +1,9 @@
 {    
     "compilerOptions": {
         "strict": true,
-        "module": "commonjs", // "amd"
+        "module": "node16", // "amd"
         "target": "es2015",
-        "moduleResolution": "node",
+        "moduleResolution": "node16",
         "downlevelIteration": true,
         "sourceMap": false,
         "newLine": "CRLF",
