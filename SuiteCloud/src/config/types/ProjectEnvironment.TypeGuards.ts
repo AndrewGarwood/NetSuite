@@ -1,5 +1,5 @@
 /**
- * @file src/types/ProjectEnvironment.TypeGuards.ts
+ * @file src/config/types/ProjectEnvironment.TypeGuards.ts
  */
 
 import { 
@@ -22,11 +22,6 @@ import {
 } from "@typeshi/typeValidation";
 import { DataDomainEnum } from "@config/types/ProjectData";
 
-/** `['dataDir', 'logDir', 'outDir']` 
- * = directory props shared by {@link LocalConfiguration} and {@link CloudConfiguration} 
- * */
-const subdirectoryKeys = ['dataDir', 'logDir', 'outDir'];
-
 export function isProjectConfiguration(value: any): value is ProjectConfiguration {
     return (isObject(value)
         && isNonEmptyString(value.name)
@@ -48,29 +43,35 @@ export function isDataLoaderConfiguration(
     value: any,
     domainEnum: Record<string, string | number> = DataDomainEnum
 ): value is DataLoaderConfiguration {
-    return (isObject(value)
-        && isNonEmptyString(value.dataSourceConfigFile)
-        && typeof value.loadFromCloud === 'boolean'
-        && isNonEmptyArray(value.domains)
-        && value.domains.every(d=>Object.values(domainEnum).includes(d))
+    const candidate = value as DataLoaderConfiguration;
+    return (isObject(candidate)
+        && isNonEmptyString(candidate.dataSourceConfigFile)
+        && isNonEmptyArray(candidate.domains)
+        && candidate.domains.every(d=>Object.values(domainEnum).includes(d))
     );
 }
 
 export function isLocalConfiguration(value: any): value is LocalConfiguration {
-    return (isObject(value)
-        && subdirectoryKeys.every(k=>isNonEmptyString(k))
+    const candidate = value as LocalConfiguration;
+    return (isObject(candidate)
+        && (isNonEmptyString(candidate.dataDir))
+        && (isNonEmptyString(candidate.logDir))
+        && (isNonEmptyString(candidate.tokDir))
     );
 }
 
 export function isCloudConfiguration(value: any): value is CloudConfiguration {
-    return (isObject(value)
-        && subdirectoryKeys.every(k=>isNonEmptyString(k))
+    const candidate = value as CloudConfiguration;
+    return (isObject(candidate)
+        && (isNonEmptyString(candidate.dataDir))
+        && (isNonEmptyString(candidate.logDir))
+        && (isNonEmptyString(candidate.tokDir))
         && (( // specify single absolute path
-                isNonEmptyString(value.absoluteDirPath)
+                isNonEmptyString(candidate.absoluteDirPath)
             ) || ( // e.g. `C:/Users/{USER}/{rootName}{orgSeparator || ''}{ORG || ''}/{folderName}`
-                isNonEmptyString(value.rootName)
-                && (!value.folderName || isNonEmptyString(value.folderName))
-                && (!value.orgSeparator || typeof value.orgSeparator === 'string')
+                isNonEmptyString(candidate.rootName)
+                && (!candidate.folderName || isNonEmptyString(candidate.folderName))
+                && (!candidate.orgSeparator || typeof candidate.orgSeparator === 'string')
             )
         )
     );

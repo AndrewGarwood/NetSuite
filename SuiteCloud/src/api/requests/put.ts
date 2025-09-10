@@ -31,9 +31,6 @@ import { getAccessToken } from "../configureAuth";
 import path from "node:path";
 import * as validate from "typeshi:utils/argumentValidation";
 import { isEmptyArray, isNonEmptyArray } from "typeshi:utils/typeValidation";
-import { extractFileName } from "@typeshi/regex";
-
-const F = extractFileName(__filename);
 
 /**
  * enforces a max number of records per post call (see {@link BATCH_SIZE}) 
@@ -49,7 +46,7 @@ export async function upsertRecordPayload(
     scriptId?: number, 
     deployId?: number,
 ): Promise<RecordResponse[]> {
-    const source = getSourceString(F, upsertRecordPayload.name);
+    const source = getSourceString(__filename, upsertRecordPayload.name);
     scriptId = scriptId ?? getSandboxRestScript("PUT_Record").scriptId;
     deployId = deployId ?? getSandboxRestScript("PUT_Record").deployId;
     validate.objectArgument(source, {payload});
@@ -105,7 +102,7 @@ export async function upsertRecordPayload(
             continue;
         }
     }
-    slog.info(`${source} END, returning responses`);
+    slog.info(`${source} END, returning responses`)
     return responses;
 }
 
@@ -121,7 +118,7 @@ export async function putSingleRecord(
     record: RecordOptions,
     responseOptions?: RecordResponseOptions
 ): Promise<RecordResponse> {
-    const source = getSourceString(F, putSingleRecord.name);
+    const source = getSourceString(__filename, putSingleRecord.name);
     let scriptId = getSandboxRestScript("PUT_Record").scriptId;
     let deployId = getSandboxRestScript("PUT_Record").deployId;
     let response: RecordResponse;
@@ -148,10 +145,10 @@ export async function putSingleRecord(
         const accessToken = await getAccessToken();
         let putRes = await PUT(accessToken, scriptId, deployId, request);
         let resData = putRes.data as RecordResponse;
-        validate.objectArgument(source, {resData, isRecordResponse})
-        validate.objectArgument(source, {
-            'RecordResponse.results[0]': resData.results[0] ?? {}, isRecordResult
-        });
+        // validate.objectArgument(source, {resData, isRecordResponse})
+        // validate.objectArgument(source, {
+        //     'RecordResponse.results[0]': resData.results[0] ?? {}, isRecordResult
+        // });
         response = resData;
     } catch (error) {
         mlog.error(`${source} Error occurred while calling ${PUT.name}():`, error);
@@ -184,7 +181,7 @@ export async function PUT(
     payload: Record<string, any> | RecordRequest,
     contentType: AxiosContentTypeEnum.JSON | AxiosContentTypeEnum.PLAIN_TEXT = AxiosContentTypeEnum.JSON,
 ): Promise<any> {
-    const source = getSourceString(F, PUT.name);
+    const source = getSourceString(__filename, PUT.name);
     validate.multipleStringArguments(source, {accessToken, contentType});
     validate.numberArgument(source, {scriptId}, true);
     validate.numberArgument(source, {deployId}, true);

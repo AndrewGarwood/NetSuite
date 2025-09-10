@@ -9,13 +9,12 @@ import { Factory } from "@api/factory";
 import { getRecordById, getRelatedRecord } from "@api/requests";
 import { ChildSearchOptions, FieldValue, idPropertyEnum, isRecordOptions, RecordOptions, RecordResult, SublistLine, SubrecordValue } from "@api/types";
 import { getSourceString, indentedStringify } from "@typeshi/io";
-import { clean, extractFileName, StringReplaceOptions } from "@typeshi/regex";
+import { clean, StringReplaceOptions } from "@typeshi/regex";
 import { RecordTypeEnum } from "@utils/ns/Enums";
 import { ReconcilerError } from "src/services/maintenance/types/Reconcile";
 import * as validate from "@typeshi/argumentValidation";
 import { hasKeys, isEmpty, isInteger, isNonEmptyString } from "@typeshi/typeValidation";
 
-const F = extractFileName(__filename);
 
 
 export async function hasDependentRecords(
@@ -23,7 +22,7 @@ export async function hasDependentRecords(
     parentRecordType: RecordTypeEnum,
     childOptions: ChildSearchOptions[]
 ): Promise<boolean | ReconcilerError> {
-    const source = getSourceString(F, hasDependentRecords.name, itemId);
+    const source = getSourceString(__filename, hasDependentRecords.name, itemId);
     let result: RecordResult | null = null;
     try {
         let getRes = await getRecordById(
@@ -59,22 +58,22 @@ export async function hasDependentRecords(
 
 /**
  * @param records `Required<`{@link RecordOptions}`>[]`
- * @param idField `string` (a key of RecordOptions.fields)
+ * @param idField `string` (a key of `RecordOptions.fields`)
  * @returns **`dictionary`** `{ [id: string]: Required<RecordOptions> }`
- * - returns empty object if there exists record in records such that record.fields[idField] is undefined/invalid
+ * - returns empty object `if` there exists record in records such that `record.fields[idField]` is undefined/invalid
  */
 export function generateRecordDictionary(
     records: Required<RecordOptions>[],
     idField: string | idPropertyEnum,
 ): { [id: string | number]: Required<RecordOptions> } {
-    const source = getSourceString(F, generateRecordDictionary.name);
+    const source = getSourceString(__filename, generateRecordDictionary.name);
     try {
         validate.arrayArgument(source, {records, isRecordOptions});
         validate.stringArgument(source, {idField});
     } catch (error: any) {
-        mlog.error(`${source} Invalid Arguments:`, indentedStringify(error),
-            `${NL} Returning empty object...`
-        );
+        mlog.error([`${source} Invalid Arguments:`, indentedStringify(error),
+            `Returning empty object...`
+        ].join(NL));
         return {};
     }
     const dict: { [itemId: string]: Required<RecordOptions> } = {};

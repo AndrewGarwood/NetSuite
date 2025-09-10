@@ -4,7 +4,7 @@
 
 export * from "./reconciliation";
 export * from "./types";
-export * from "./reconcileOptions";
+export * from "./reconciliation.options";
 export * from "./errorManagement";
 export * from "./RecordManager";
 export * from "./entitySearch";

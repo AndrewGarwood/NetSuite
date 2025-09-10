@@ -16,7 +16,7 @@
         "folderName": "NetSuite",
         "dataDir": "data",
         "logDir": "logs",
-        "outDir": ".output"
+        "tokDir": "tokens"
     },
     "scripts": {
         "production": {},

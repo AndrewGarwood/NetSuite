@@ -34,7 +34,6 @@ import { formatLogObj, mainLogger, miscLogger, errorLogger } from "@config/setup
 import { ILogObj, ILogObjMeta, Logger } from "tslog";
 dotenv.config();
 
-const F = extractFileName(__filename);
 let environmentInitialized = false;
 
 export function isEnvironmentInitialized(): boolean {
@@ -86,7 +85,7 @@ export async function initializeEnvironment(
     configPath: string = DEFAULT_PROJECT_CONFIG_PATH,
     makeDirs: boolean=false
 ): Promise<void> {
-    const source = getSourceString(F, initializeEnvironment.name);
+    const source = getSourceString(__filename, initializeEnvironment.name);
     mlog.info(`${source} (START)`);
     try {
         validate.booleanArgument(source, {makeDirs});
@@ -135,7 +134,7 @@ async function setLogTransports(
     logDir: string,
     transportDict: { [fileName: string]: Logger<ILogObj> }
 ): Promise<void> {
-    const source = getSourceString(F, setLogTransports.name);
+    const source = getSourceString(__filename, setLogTransports.name);
     validate.existingDirectoryArgument(source, {logDir});
     for (let fileName in transportDict) {
         const logger = transportDict[fileName];
@@ -156,7 +155,7 @@ async function setLogTransports(
 async function loadAccountDetails(
     config: ProjectConfiguration
 ): Promise<AccountDetails> {
-    const source = getSourceString(F, loadAccountDetails.name);
+    const source = getSourceString(__filename, loadAccountDetails.name);
     /**validated previously via isProjectConfiguration in initializeEnvironment() */
     nodeEnv = config.nodeEnv as AccountEnvironmentEnum;
     let details: AccountDetails = nsAccountDictionary.sandbox; 
@@ -187,7 +186,7 @@ async function loadResourceFolderConfiguration(
     config: ProjectConfiguration, 
     makeDirs: boolean = false
 ): Promise<ResourceFolderConfiguration> {
-    const source = getSourceString(F, loadResourceFolderConfiguration.name);
+    const source = getSourceString(__filename, loadResourceFolderConfiguration.name);
     slog.info(`${source} Loading project folders...`);
     let root: string | null = null;
     let folders: ResourceFolderConfiguration | null = null;
@@ -206,14 +205,14 @@ async function loadResourceFolderConfiguration(
     }
     let logDir = isDirectory(folders.logDir) && path.isAbsolute(folders.logDir) 
         ? folders.logDir : path.join(root, folders.logDir);
-    let outDir = isDirectory(folders.outDir) && path.isAbsolute(folders.outDir) 
-        ? folders.outDir : path.join(root, folders.outDir);
+    let tokDir = isDirectory(folders.tokDir) && path.isAbsolute(folders.tokDir) 
+        ? folders.tokDir : path.join(root, folders.tokDir);
     let dataDir = isDirectory(folders.dataDir) && path.isAbsolute(folders.dataDir) 
         ? folders.dataDir : path.join(root, folders.dataDir);
     try {
-        await validateResourceFolders(source, {logDir, outDir, dataDir}, makeDirs);
-        slog.info(`${source} Finished loading [logDir, outDir, dataDir]`)
-        return { logDir, outDir, dataDir } as ResourceFolderConfiguration;
+        await validateResourceFolders(source, {logDir, tokDir, dataDir}, makeDirs);
+        slog.info(`${source} Finished loading [logDir, tokDir, dataDir]`)
+        return { logDir, tokDir, dataDir } as ResourceFolderConfiguration;
     } catch (error: any) {
         throw new Error(`${source} Unable to load resource folders from configuration, ${error}`)
     }
@@ -221,7 +220,7 @@ async function loadResourceFolderConfiguration(
 }
 
 async function getCloudDirectory(cloud: CloudConfiguration): Promise<string> {
-    const source = getSourceString(F, getCloudDirectory.name);
+    const source = getSourceString(__filename, getCloudDirectory.name);
     let configuredCloudDir = '';
     if (isDirectory(cloud.absoluteDirPath) && path.isAbsolute(cloud.absoluteDirPath)) { 
         configuredCloudDir = cloud.absoluteDirPath;
@@ -255,7 +254,7 @@ async function validateResourceFolders(
     dirDictionary: { [dirLabel: string]: string },
     makeDirs: boolean = false
 ): Promise<void> {
-    const vSource = getSourceString(F, validateResourceFolders.name);
+    const vSource = getSourceString(__filename, validateResourceFolders.name);
     for (let [dirLabel, dir] of Object.entries(dirDictionary)) {
         if (isDirectory(dir)) continue;
         if (!makeDirs) {
@@ -274,7 +273,7 @@ async function validateResourceFolders(
  * @returns 
  */
 export function getProjectConfiguration(): ProjectConfiguration {
-    const source = getSourceString(F, getProjectConfiguration.name);
+    const source = getSourceString(__filename, getProjectConfiguration.name);
     if (!projectConfig) {
         throw new Error([`${source} projectConfig is undefined`,
             ` -> call initializeEnvironment() first.`
@@ -288,7 +287,7 @@ export function getProjectConfiguration(): ProjectConfiguration {
  * @returns 
  */
 export function getProjectFolders(): ResourceFolderConfiguration {
-    const source = getSourceString(F, getProjectFolders.name);
+    const source = getSourceString(__filename, getProjectFolders.name);
     if (!resourceFolderConfiguration) {
         throw new Error([`${source} resourceFolderConfiguration is undefined`,
             ` -> call initializeEnvironment() first.`
@@ -301,7 +300,7 @@ export function getProjectFolders(): ResourceFolderConfiguration {
  * @returns 
  */
 export function getDataLoaderConfiguration(): DataLoaderConfiguration {
-    const source = getSourceString(F, getDataLoaderConfiguration.name);
+    const source = getSourceString(__filename, getDataLoaderConfiguration.name);
     if (!dataLoaderConfig) {
         throw new Error([`${source} dataLoaderConfig is undefined`,
             ` -> call initializeEnvironment() first.`
@@ -312,7 +311,7 @@ export function getDataLoaderConfiguration(): DataLoaderConfiguration {
 
 
 export function getDataSourceConfigPath(): string {
-    const source = getSourceString(F, getDataSourceConfigPath.name);
+    const source = getSourceString(__filename, getDataSourceConfigPath.name);
     if (!dataSourceConfigPath) {
         throw new Error([`${source} dataSourceConfigPath is undefined`,
             ` -> call initializeEnvironment() first.`
@@ -323,7 +322,7 @@ export function getDataSourceConfigPath(): string {
 }
 
 export function getAccountDetails(): AccountDetails {
-    const source = getSourceString(F, getAccountDetails.name);
+    const source = getSourceString(__filename, getAccountDetails.name);
     if (!accountDetails) {
         throw new Error([`${source} accountDetails is undefined`,
             ` -> call initializeEnvironment() first.`
@@ -333,7 +332,7 @@ export function getAccountDetails(): AccountDetails {
 }
 
 export function getScriptEnvironment(): SuiteScriptEnvironment {
-    const source = getSourceString(F, getScriptEnvironment.name);
+    const source = getSourceString(__filename, getScriptEnvironment.name);
     if (!scriptEnvrionment) {
         throw new Error([`${source} scriptEnvrionment is undefined`,
             ` -> call initializeEnvironment() first.`
@@ -346,7 +345,7 @@ export function getScripts(
     accountEnv: AccountEnvironmentEnum, 
     scriptType: ScriptTypeEnum
 ): { [scriptLabel: string]: ScriptDetails } {
-    const source = getSourceString(F, getScripts.name);
+    const source = getSourceString(__filename, getScripts.name);
     validate.enumArgument(source, {accountEnv, AccountEnvironmentEnum});
     validate.enumArgument(source, {scriptType, ScriptTypeEnum});
     if (!scriptEnvrionment) {
@@ -368,7 +367,7 @@ export function getScripts(
 }
 
 export function getSandboxRestScript(scriptLabel: string): ScriptDetails {
-    const source = getSourceString(F, getSandboxRestScript.name);
+    const source = getSourceString(__filename, getSandboxRestScript.name);
     if (!scriptEnvrionment) {
         throw new Error([`${source} scriptEnvrionment is undefined`,
             ` -> call initializeEnvironment() first.`

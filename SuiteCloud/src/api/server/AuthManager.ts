@@ -11,14 +11,17 @@ import fs from "node:fs";
 import { 
     SERVER_PORT, REDIRECT_URI, AUTH_URL, TOKEN_URL, 
     REST_CLIENT_ID as CLIENT_ID, REST_CLIENT_SECRET as CLIENT_SECRET,
-    SCOPE, STATE
+    SCOPE, STATE, getProjectFolders,
+    isEnvironmentInitialized
 } from "../../config/env";
 import { createUrlWithParams } from "../url";
-import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum } from "./types";
+import { AxiosContentTypeEnum, TokenResponse, GrantTypeEnum, AuthOptions, AuthState, PendingRequest, TokenMetadata, TokenStatus } from "./types";
 import { 
+    indentedStringify,
     writeObjectToJsonSync as write 
 } from "typeshi/dist/utils/io/writing";
 import { 
+    isFile,
     readJsonFileAsObject as read
 } from "typeshi/dist/utils/io/reading";
 import { getCurrentPacificTime, calculateDifferenceOfDateStrings, TimeUnitEnum } from "typeshi/dist/utils/io/dateTime";
@@ -29,86 +32,13 @@ import {
 import * as validate from "@typeshi/argumentValidation";
 import { getSourceString } from "@typeshi/io";
 import { extractFileName } from "@typeshi/regex";
-import { isInteger } from "@typeshi/typeValidation";
+import { isInteger, isNonEmptyString, isNumeric } from "@typeshi/typeValidation";
+import { isTokenResponse } from "@api/server/types/TokenResponse.TypeGuards";
+import crypto from "crypto";
 
-export { AuthManager, TokenStatus, AuthState, type AuthOptions, type TokenMetadata };
+export { AuthManager };
 
 const F = extractFileName(__filename);
-
-// ============================================================================
-// TYPES
-// ============================================================================
-/**
- * @enum {string} **`TokenStatus`**
- * @property {string} VALID - Token is valid and not expired.
- * @property {string} EXPIRED - Token is expired.
- * @property {string} MISSING - Token is missing or not found.
- * @property {string} INVALID - Token is invalid or malformed.
- */
-enum TokenStatus {
-    VALID = 'VALID',
-    EXPIRED = 'EXPIRED',
-    MISSING = 'MISSING',
-    INVALID = 'INVALID'
-}
-
-/**
- * @enum {string} **`AuthState`**
- * @property {string} IDLE - No token acquisition in progress.
- * @property {string} REFRESHING - Token refresh in progress.
- * @property {string} AUTHORIZING - Full authorization in progress.
- * @property {string} ERROR - Error occurred during token acquisition.
- */
-enum AuthState {
-    IDLE = 'IDLE',
-    REFRESHING = 'REFRESHING',
-    AUTHORIZING = 'AUTHORIZING',
-    ERROR = 'ERROR'
-}
-
-/**
- * @interface **`TokenMetadata`**
- * @property {TokenStatus} status - Current status of the token.
- * @property {number} expiresAt - Expiration time of the token in milliseconds since epoch
- * @property {number} lastValidated - Last validation time of the token in milliseconds since epoch
- * @property {number} refreshCount - Number of times the token has been refreshed.
- * @property {number} errorCount - Number of errors encountered during token acquisition.
- */
-interface TokenMetadata {
-    status: TokenStatus;
-    expiresAt: number; // Unix timestamp in milliseconds
-    lastValidated: number; // Unix timestamp in milliseconds
-    refreshCount: number;
-    errorCount: number;
-}
-
-/**
- * @interface **`AuthOptions`**
- * @property {number} [maxRetries] - Maximum number of retries for token refresh.
- * @property {number} [retryDelayMs] - Delay in milliseconds between retries.
- * @property {number} [tokenBufferMs] - Buffer time in milliseconds before token expiration to refresh.
- * @property {number} [validationIntervalMs] - Interval in milliseconds for token validation checks
- * @property {boolean} [enableQueueing] - Enable queueing of requests when token acquisition is in progress.
- */
-interface AuthOptions {
-    maxRetries?: number;
-    retryDelayMs?: number;
-    tokenBufferMs?: number; // How early to refresh before expiration
-    validationIntervalMs?: number;
-    enableQueueing?: boolean;
-}
-
-/**
- * @interface **`PendingRequest`**
- * @property {function} resolve - Function to resolve the pending request with the token.
- * @property {function} reject - Function to reject the pending request with an error.
- * @property {number} timestamp - Timestamp when the request was created.
- */
-interface PendingRequest {
-    resolve: (token: string) => void;
-    reject: (error: Error) => void;
-    timestamp: number;
-}
 
 // ============================================================================
 // CONSTANTS
@@ -128,13 +58,16 @@ const DEFAULT_AUTH_OPTIONS: Required<AuthOptions> = {
     validationIntervalMs: 30 * 1000, // 30 seconds
     enableQueueing: true
 };
-const TOKEN_DIR = path.join(__dirname, 'tokens');
-/** = `'src/server/tokens/STEP2_tokens.json'`  */
-const STEP2_TOKENS_PATH = path.join(TOKEN_DIR, 'STEP2_tokens.json');
-/** = `'src/server/tokens/STEP3_tokens.json'` */
-const STEP3_TOKENS_PATH = path.join(TOKEN_DIR, 'STEP3_tokens.json');
-/** = `'src/server/tokens/token_metadata.json'` */
-const TOKEN_METADATA_PATH = path.join(TOKEN_DIR, 'token_metadata.json');
+// const TOKEN_DIR = path.join(__dirname, 'tokens');
+// /** = `'__dirname/tokens/STEP2_tokens.json'`  */
+// const STEP2_TOKENS_PATH = path.join(TOKEN_DIR, 'STEP2_tokens.json');
+// /** = `'__dirname/tokens/STEP3_tokens.json'` */
+// const STEP3_TOKENS_PATH = path.join(TOKEN_DIR, 'STEP3_tokens.json');
+// /** = `'__dirname/tokens/token_metadata.json'` */
+// const TOKEN_METADATA_PATH = path.join(TOKEN_DIR, 'token_metadata.json');
+const STEP2_FILENAME = 'STEP2_tokens.json';
+const STEP3_FILENAME = 'STEP3_tokens.json';
+const METADATA_FILENAME = 'token_metadata.json';
 
 // ============================================================================
 // CLASS: AUTH MANAGER
@@ -161,15 +94,26 @@ class AuthManager {
     // ============================================================================
     // TOKEN METADATA MANAGEMENT
     // ============================================================================
-    /** 
-     * - `if` `(fs.existsSync(`{@link TOKEN_METADATA_PATH}`))` 
-     * - `then` try set `this.tokenMetadata = `{@link read}`(TOKEN_METADATA_PATH) as `{@link TokenMetadata}; 
-     * - `else` set `this.tokenMetadata` to a blank {@link TokenMetadata} object
-     * */
+    /**
+     * @returns **`tokDir`** `string`
+     */
+    private getTokenDir(): string {
+        const source = getSourceString(__filename, this.getTokenDir.name);
+        if (!isEnvironmentInitialized()) {
+            throw new Error([`${source} environment not initialized`,
+                ` > unable to get token dir`,
+                ` > call initializeEnvironment() first`
+            ].join(TAB));
+        }
+        return getProjectFolders().tokDir;
+    }
+
     private initializeTokenMetadata(): void {
+        const source = getSourceString(__filename, this.initializeTokenMetadata.name);
+        const metaPath = path.join(this.getTokenDir(), METADATA_FILENAME);
         try {
-            if (fs.existsSync(TOKEN_METADATA_PATH)) {
-                this.tokenMetadata = read(TOKEN_METADATA_PATH) as TokenMetadata;
+            if (isFile(metaPath)) {
+                this.tokenMetadata = read(metaPath) as TokenMetadata;
             } else {
                 this.tokenMetadata = {
                     status: TokenStatus.MISSING,
@@ -181,7 +125,7 @@ class AuthManager {
                 this.saveTokenMetadata();
             }
         } catch (error) {
-            mlog.warn('[AuthManager.initializeTokenMetadata()] Failed to load token metadata, error:', error);
+            mlog.warn(`${source} Failed to load token metadata, error:`, error);
             this.tokenMetadata = {
                 status: TokenStatus.MISSING,
                 expiresAt: 0,
@@ -194,12 +138,14 @@ class AuthManager {
     }
     /** tries to {@link write}`(this.tokenMetadata, `{@link TOKEN_METADATA_PATH}`);`*/
     private saveTokenMetadata(): void {
+        const source = getSourceString(__filename, this.saveTokenMetadata.name);
+        const metaPath = path.join(this.getTokenDir(), METADATA_FILENAME);
         try {
             if (this.tokenMetadata) {
-                write(this.tokenMetadata, TOKEN_METADATA_PATH);
+                write(this.tokenMetadata, metaPath);
             }
         } catch (error) {
-            mlog.error('[AuthManager.saveTokenMetadata()] Failed to save token metadata:', error);
+            mlog.error(`${source} Failed to save token metadata`, error);
         }
     }
     /** assigns new values to {@link tokenMetadata} then calls {@link saveTokenMetadata} */
@@ -215,56 +161,111 @@ class AuthManager {
     // TOKEN VALIDATION AND STATUS
     // ========================================================================
     /**
-     * @param tokenResponse {@link TokenResponse} - use tokenResponse to determine value of these variables:
-     * 1. ~~`lastUpdateMs` = `new Date(tokenResponse.lastUpdatedLocaleString).getTime()`~~
-     * 2. `expiresInMs` = `tokenResponse.expires_in * 1000`
-     * 3. `expiresAt` = **`tokenResponse.lastUpdated`**` + expiresInMs`
-     * 4. `now` = `Date.now()`
-     * 5. `isExpired` = `now >= expiresAt - this.options.tokenBufferMs`
-     * @returns **`tokenStatus`** — {@link TokenStatus}
+     * @param token {@link TokenResponse}
+     * @returns **`tokenStatus`** - {@link TokenStatus}
      * - {@link TokenStatus.VALID} `if` `now >= expiresAt - this.options.tokenBufferMs`
      * - {@link TokenStatus.EXPIRED} `if` `now < expiresAt - this.options.tokenBufferMs`
      * - {@link TokenStatus.MISSING} `if` `!tokenResponse || !tokenResponse.access_token`
      * - {@link TokenStatus.INVALID} `if` `!tokenResponse.expires_in || !tokenResponse.lastUpdated`
      */
-    private validateTokenResponse(tokenResponse: TokenResponse): TokenStatus {
-        const source = getSourceString(F, this.validateTokenResponse.name);
-        if (!tokenResponse || !tokenResponse.access_token) {
-            return TokenStatus.MISSING;
-        }
-        if (!tokenResponse.expires_in || !isInteger(tokenResponse.lastUpdated)) {
+    private validateTokenResponse(token: TokenResponse): TokenStatus {
+        const source = getSourceString(__filename, this.validateTokenResponse.name);
+        // slog.debug(`${source} (START)`)
+        try {
+            validate.objectArgument(source, {token, isTokenResponse});
+            validate.numberArgument(source, { 'token.lastUpdated': token.lastUpdated }, true);
+            validate.numericStringArgument(source, { 'token.expires_in': token.expires_in }, true, true);
+        } catch (error: any) {
+            mlog.error(`${source} token type validation failed`, indentedStringify(error));
             return TokenStatus.INVALID;
         }
+        if (!isTokenResponse(token)) {
+            return TokenStatus.INVALID;
+        }
+        if (!isInteger(token.lastUpdated)) {
+            mlog.error(`${source} lastUpdated is not an integer`,
+                `typeof = ${typeof token.lastUpdated}`,
+                `value  = '${token.lastUpdated}'`
+            );
+            return TokenStatus.INVALID;
+        }
+        // if (!isNumeric(token.expires_in, true, true)) {
+        //     return TokenStatus.INVALID;
+        // }
+        // const expiresIn = (isInteger(token.expires_in) 
+        //     ? token.expires_in 
+        //     : Number(token.expires_in)
+        // );
         try {
-            const expiresInMs = tokenResponse.expires_in * 1000;
-            const expiresAt = tokenResponse.lastUpdated + expiresInMs;
+            // const expiresInMs = expiresIn * 1000;
+            // const expiresAt = token.lastUpdated + expiresInMs;
             const now = Date.now();
-            if (now >= expiresAt - this.options.tokenBufferMs) {
+            if (now >= this.getTokenExpiresAt(token) - this.options.tokenBufferMs) {
+                slog.debug(`${source} returning status = expired`)
                 return TokenStatus.EXPIRED;
             }
+            // slog.debug(` -- returning status = valid`);
             return TokenStatus.VALID;
         } catch (error) {
             mlog.error(`${source} Error validating token response:`, error);
+            slog.debug(`${source} returning status = invalid`);
             return TokenStatus.INVALID;
         }
     }
     /**
+     * @param token {@link TokenResponse}, requires `token.lastUpdated` be defined
+     * @returns **`expiresAt`** `number` 
+     * - `if` valid token, return `Number(token.expires_in)` * 1000 + `token.lastUpdated`
+     * - `else` return `Date.now()` @TODO decide if should throw error instead...
+     */
+    private getTokenExpiresAt(token: TokenResponse): number {
+        const source = getSourceString(__filename, this.getTokenExpiresAt.name);
+        if (!isTokenResponse(token) || !isInteger(token.lastUpdated)) {
+            mlog.error([`${source} Invalid argument: token (TokenResponse)`,
+                `returning expiresAt === now`
+            ].join(TAB));
+            return Date.now();
+        }
+        const expiresIn = (isInteger(token.expires_in) 
+            ? token.expires_in 
+            : Number(token.expires_in)
+        );
+        const expiresInMs = expiresIn * 1000;
+        const expiresAt = token.lastUpdated + expiresInMs;
+        return expiresAt;
+    }
+
+    private withinTokenExpirationBuffer(token: TokenResponse): boolean {
+        // const source = getSourceString(__filename, this.withinTokenExpirationBuffer.name);
+        const expiresAt = this.getTokenExpiresAt(token);
+        const now = Date.now();
+        return (now < expiresAt && now >= expiresAt - this.options.tokenBufferMs);
+    }
+
+    /**
      * - try `return token =` {@link read}`(filePath)` as {@link TokenResponse}
      * @param filePath `string`
-     * @returns **`token`** — {@link TokenResponse} | `null`
+     * @returns **`token`** - {@link TokenResponse}` | null`
      */
     private loadTokenFromFile(filePath: string): TokenResponse | null {
+        const source = getSourceString(__filename, this.loadTokenFromFile.name, filePath);
+        if (!isFile(filePath)) return null;
         try {
-            if (!fs.existsSync(filePath)) {
-                return null;
-            }
             const token = read(filePath) as TokenResponse;
-            return token || null;
+            return token;
         } catch (error) {
-            mlog.warn(`${getSourceString(F, this.loadTokenFromFile.name)} Failed to load token from ${filePath}:`, error);
+            mlog.warn(`${source} Failed to load token from ${filePath}:`, error);
             return null;
         }
     }
+    // @TODO
+    // private getTokenPath(): TokenResponse | null {
+    //     return null;
+    // }
+    // private getMetaPath(): TokenMetadata | null {
+    //     return null;
+    // }
+
     /**
      * tries to get valid token response from either:
      * 1. `STEP3` (the refreshed {@link TokenResponse.access_token}) or 
@@ -272,15 +273,14 @@ class AuthManager {
      * @returns `{ token: `{@link TokenResponse}`; source: string } | null`
      */
     public getCurrentValidToken(): { token: TokenResponse; source: string } | null {
-        const step3Token = this.loadTokenFromFile(STEP3_TOKENS_PATH);
+        const step3Token = this.loadTokenFromFile(path.join(this.getTokenDir(), STEP3_FILENAME));
         if (step3Token && this.validateTokenResponse(step3Token) === TokenStatus.VALID) {
-                return { token: step3Token, source: 'STEP3' };
+            return { token: step3Token, source: 'STEP3' };
         }
-        const step2Token = this.loadTokenFromFile(STEP2_TOKENS_PATH);
+        const step2Token = this.loadTokenFromFile(path.join(this.getTokenDir(), STEP2_FILENAME));
         if (step2Token && this.validateTokenResponse(step2Token) === TokenStatus.VALID) {
             return { token: step2Token, source: 'STEP2' };
         }
-
         return null;
     }
 
@@ -302,7 +302,7 @@ class AuthManager {
         operationName: string,
         maxRetries: number = this.options.maxRetries
     ): Promise<T> {
-        const source = getSourceString(F, this.retryOperation.name, operationName);
+        const source = getSourceString(__filename, this.retryOperation.name, operationName);
         let lastError: Error | null = null;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
@@ -331,13 +331,17 @@ class AuthManager {
         throw new Error(`${source} ${operationName} failed after ${maxRetries} attempts. Last error: ${lastError?.message}`);
     }
     /**
-     * performs the {@link retryOperation} 'authCodeOperation'
+     * calls {@link retryOperation}
      * @param authCode `string`
-     * @returns **`tokenResponse`** — `Promise<`{@link TokenResponse}`>`
+     * @returns **`tokenResponse`** - `Promise<`{@link TokenResponse}`>`
+     * - writes `tokenResponse` to {@link STEP2_TOKENS_PATH}
      */
     private async exchangeAuthCode(authCode: string): Promise<TokenResponse> {
-        const source = getSourceString(F, this.exchangeAuthCode.name);
+        const source = getSourceString(__filename, this.exchangeAuthCode.name);
         const operation = async () => {
+            mlog.debug([`${source} starting operation...`,
+                `isNonEmptyString(authCode) ? ${isNonEmptyString(authCode)}`
+            ].join(', '));
             const params = this.generateGrantParams({code: authCode});
             const response = await axios.post(TOKEN_URL, params.toString(), {
                 headers: { 
@@ -350,13 +354,21 @@ class AuthManager {
                 timeout: 10000 // 10 second timeout
             });
             if (!response.data || !(response.data as any).access_token) {
+                mlog.error(`${source} Invalid token response: missing 'access_token'`)
                 throw new Error(`${source} Invalid token response: missing 'access_token'`);
             }
             const tokenResponse = response.data as TokenResponse;
+            slog.debug(` -- isTokenResponse(response.data) ? ${isTokenResponse(response.data)}`);
+            // Ensure expires_in is a number for calculations
+            if (typeof tokenResponse.expires_in === 'string') {
+                tokenResponse.expires_in = parseInt(tokenResponse.expires_in, 10);
+            }
             tokenResponse.lastUpdated = Date.now();
             tokenResponse.lastUpdatedLocaleString = getCurrentPacificTime();
-            write(tokenResponse, STEP2_TOKENS_PATH);
+            slog.debug(` -- writing TokenResponse to STEP2_TOKENS_PATH...`)
+            write(tokenResponse, path.join(this.getTokenDir(), STEP2_FILENAME));
             const expiresAt = Date.now() + (tokenResponse.expires_in * 1000);
+            slog.debug(` -- calling this.updateTokenMetadata()`)
             this.updateTokenMetadata({
                 status: TokenStatus.VALID,
                 expiresAt,
@@ -375,7 +387,7 @@ class AuthManager {
      * 4. set `tokenResponse` to `response.data` as {@link TokenResponse} and set `tokenResponse.lastUpdated` to {@link getCurrentPacificTime}
      * 5. {@link write} `tokenResponse` to `STEP3_TOKENS_PATH` file, call {@link updateTokenMetadata}, then return `tokenResponse`
      * @param refreshToken `string`
-     * @returns **`tokenResponse`** — `Promise<`{@link TokenResponse}`>`
+     * @returns **`tokenResponse`** - `Promise<`{@link TokenResponse}`>`
      * @throws {Error} `if` `response` from request to {@link TOKEN_URL} is invalid in any of the following ways:
      * 1. is `undefined`
      * 2. does not have `response.data` property, 
@@ -384,7 +396,11 @@ class AuthManager {
     private async exchangeRefreshToken(
         refreshToken: string
     ): Promise<TokenResponse> {
+        const source = getSourceString(__filename, this.exchangeRefreshToken.name);
         const operation = async () => {
+            mlog.debug([`${source} start operation`, 
+                `isNonEmptyString(refreshToken) ? ${isNonEmptyString(refreshToken)}`
+            ].join(', '));
             const params = this.generateGrantParams({refreshToken});
             const response = await axios.post(TOKEN_URL, params.toString(), {
                 headers: { 
@@ -397,13 +413,17 @@ class AuthManager {
                 timeout: 10000 // 10 second timeout
             });
             if (!response || !response.data || !(response.data as any).access_token) {
-                throw new Error('[AuthManager.exchangeRefreshToken()] Invalid refresh token response: missing access_token');
+                throw new Error(`${source} Invalid TokenResponse: empty or missing access_token`);
             }
+            slog.debug(` -- isTokenResponse(response.data) ? ${isTokenResponse(response.data)}`)
             const tokenResponse = response.data as TokenResponse;
+            if (typeof tokenResponse.expires_in === 'string') {
+                tokenResponse.expires_in = parseInt(tokenResponse.expires_in, 10);
+            }
             tokenResponse.lastUpdated = Date.now();
             tokenResponse.lastUpdatedLocaleString = getCurrentPacificTime();
-            // Save to STEP3 file
-            write(tokenResponse, STEP3_TOKENS_PATH);
+            slog.debug(` -- writing token response to step3 path....`)
+            write(tokenResponse, path.join(this.getTokenDir(), STEP3_FILENAME));
             this.updateTokenMetadata({
                 status: TokenStatus.VALID,
                 expiresAt: Date.now() + (tokenResponse.expires_in * 1000),
@@ -414,15 +434,21 @@ class AuthManager {
         return this.retryOperation(operation, this.exchangeRefreshToken.name);
     }
     /**
-     * @returns `Promise<string>`
+     * @param callBackTimeoutMs `number` = `2 * 60 * 1000` (2 minutes) 
+     * @returns **`authCode`** `Promise<string>`
      */
-    private async getAuthCode(): Promise<string> {
+    private async getAuthCode(
+        callBackTimeoutMs: number = 2 * 60 * 1000
+    ): Promise<string> {
         const source = getSourceString(F, this.getAuthCode.name);
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 this.closeServer();
-                reject(new Error(`${source} Authorization timeout - no callback received within 5 minutes`));
-            }, 5 * 60 * 1000); // 5 minute timeout
+                reject(new Error(
+                    `${source} Authorization timeout - no callback received within ${
+                        callBackTimeoutMs / (60 * 1000)} minute(s)`
+                ));
+            }, callBackTimeoutMs);
             this.app.get('/callback', (req: Request, res: Response) => {
                 clearTimeout(timeout);
                 const authCode = req.query.code as string;
@@ -442,13 +468,13 @@ class AuthManager {
                     reject(new Error(msg));
                     return;
                 }
-                /**`<html><body><h2>...</h2><p>...</p><script>{time out for 2 seconds then close window}</script></body></html>` */
+                /**`<html><body><h2>...</h2><p>...</p><script>{time out 5 seconds, close window}</script></body></html>` */
                 const SUCCESSFUL_AUTH_CODE_HTML = (
                     `<html>`
                         +`<body>`
                             + `<h2>Authorization Successful!</h2>`
                             + `<p>You can now close this window.</p>`
-                            + `<script>setTimeout(() => window.close(), 2000);</script>`
+                            + `<script>setTimeout(() => window.close(), 5000);</script>`
                         + `</body>`
                     +`</html>`
                 );
@@ -462,10 +488,11 @@ class AuthManager {
                     redirect_uri: REDIRECT_URI,
                     client_id: CLIENT_ID,
                     scope: SCOPE,
-                    state: require('crypto').randomBytes(32).toString('hex')
+                    state: crypto.randomBytes(32).toString('hex')
                 }).toString();
-                slog.info(`${source} Server listening on port ${SERVER_PORT} for OAuth callback`, 
-                    NL+' -- Opening authorization URL...');
+                slog.info([`${source} Server listening on port ${SERVER_PORT} for OAuth callback`, 
+                    ' -- Opening authorization URL...'
+                ].join(NL));
                 open(authLink).catch((err: any) => {
                     let msg = `${source} Failed to open authorization URL: ${err.message}`
                     mlog.error(msg);
@@ -496,8 +523,9 @@ class AuthManager {
         options: {code?: string; refreshToken?: never} 
         | {code?: never; refreshToken?: string}
     ): URLSearchParams {
+        const source = getSourceString(__filename, this.generateGrantParams.name);
         if (options.code && options.refreshToken) {
-            throw new Error(`[AuthManager.generateGrantParams()] Invalid param 'options'; received both 'code' and 'refreshToken' properties`);
+            throw new Error(`${source} Invalid param 'options'; received both 'code' and 'refreshToken' properties`);
         }
         const params = new URLSearchParams({ redirect_uri: REDIRECT_URI });
         if (options.code) {
@@ -507,7 +535,7 @@ class AuthManager {
             params.append('refresh_token', options.refreshToken);
             params.append('grant_type', GrantTypeEnum.REFRESH_TOKEN);
         } else {
-            throw new Error(`[AuthManager.generateGrantParams()] Invalid param 'options': options must have property 'code' or 'refreshToken'`);
+            throw new Error(`${source} Invalid param 'options': options must have property 'code' or 'refreshToken'`);
         }
         return params;
     }
@@ -518,28 +546,26 @@ class AuthManager {
 
     private async performTokenRefresh(): Promise<TokenResponse> {
         const source = getSourceString(F, this.performTokenRefresh.name);
-        slog.info(`${source} Attempting token refresh...`);
+        mlog.info(`${source} Attempting token refresh...`);
         // Try to get existing tokens for refresh
-        const step2Token = this.loadTokenFromFile(STEP2_TOKENS_PATH);
-        const step3Token = this.loadTokenFromFile(STEP3_TOKENS_PATH);
-        if (!step2Token && !step3Token) {
-            mlog.warn([
-                `${source} No TokenResponse loaded from step2 or step3`,
-                `step 2 token path: '${STEP2_TOKENS_PATH}'`,
-                `step 3 token path: '${STEP3_TOKENS_PATH}'`,
-                ].join(TAB), 
-                NL+`Performing full authorization...`,
-            );
-            return this.performFullAuthorization();
-        }
+        const step2Token = this.loadTokenFromFile(path.join(this.getTokenDir(), STEP2_FILENAME));
+        const step3Token = this.loadTokenFromFile(path.join(this.getTokenDir(), STEP3_FILENAME));
         // Get the most recent refresh token
         let refreshToken: string | null = null;
-        if (step3Token && step3Token.refresh_token
-            && this.validateTokenResponse(step3Token) === TokenStatus.VALID) {
+        if (step3Token 
+            && isNonEmptyString(step3Token.refresh_token)
+            && this.withinTokenExpirationBuffer(step3Token)) { // this.validateTokenResponse(step3Token) === TokenStatus.VALID) {
             refreshToken = step3Token.refresh_token;
-        } else if (step2Token && step2Token?.refresh_token
-            && this.validateTokenResponse(step2Token) === TokenStatus.VALID) {
+            slog.debug(`Using step3Token refresh token --------`);
+        } else if (step2Token 
+            && isNonEmptyString(step2Token.refresh_token)
+            && this.withinTokenExpirationBuffer(step2Token)) { // this.validateTokenResponse(step2Token) === TokenStatus.VALID) {
             refreshToken = step2Token.refresh_token;
+            slog.debug(`Using step2Token refresh token --------`);
+        } else {
+            mlog.warn([
+                `${source} No valid token from step3Token or step2Token`,
+            ].join(TAB));
         }
         if (refreshToken) {
             try {
@@ -555,7 +581,6 @@ class AuthManager {
         } else {
             mlog.warn(`${source} No refresh token available, performing full authorization`);
         }
-        // Fallback to full authorization flow
         return this.performFullAuthorization();
     }
     /** 
@@ -565,6 +590,7 @@ class AuthManager {
         const source = getSourceString(F, this.performFullAuthorization.name);
         slog.info(`${source} Starting full OAuth authorization flow...`);
         const authCode = await this.getAuthCode();
+        if (isNonEmptyString(authCode)) slog.info(` -- obtained authCode, attempting exchange for token...`);
         const tokenResponse = await this.exchangeAuthCode(authCode);
         slog.info(`${source} Full authorization flow completed successfully!`);
         return tokenResponse;
@@ -720,6 +746,7 @@ class AuthManager {
     // ========================================================================
 
     public destroy(): void {
+        const source = getSourceString(__filename, this.destroy.name);
         const authWasActive = (
             this.state !== AuthState.IDLE || this.server !== null
         );
@@ -728,10 +755,10 @@ class AuthManager {
             clearInterval(this.validationTimer);
             this.validationTimer = null;
         }
-        this.rejectPendingRequests(new Error('[AuthManager.destroy()] OAuth manager destroyed'));
+        this.rejectPendingRequests(new Error(`${source} OAuth manager destroyed`));
         
         this.state = AuthState.IDLE;
-        if (authWasActive) mlog.info('[AuthManager.destroy()] OAuth manager destroyed');
+        if (authWasActive) mlog.warn(`${source} OAuth manager destroyed, authWasActive: ${authWasActive}`);
     }
 }
 

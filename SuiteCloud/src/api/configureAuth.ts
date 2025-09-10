@@ -2,8 +2,9 @@
  * @file src/utils/api/configureAuth.ts
  */
 
+import { AuthManager } from "@api/server";
 import { STOP_RUNNING } from "../config/env";
-import { AuthManager, AuthOptions, AuthState } from "./server/AuthManager";
+import { AuthOptions, AuthState } from "./server/types";
 
 let auth: AuthManager | null = null;
 let authInitialized = false;

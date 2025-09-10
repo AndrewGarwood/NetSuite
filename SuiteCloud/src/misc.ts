@@ -32,10 +32,14 @@ import {
     autoFormatLogsOnExit,
     getSourceString,
     RowSourceMetaData,
+    extractTargetRows,
+    indentedStringify,
 } from "typeshi:utils/io";
 import { 
+    Factory,
     isRecordOptions,
-    isRecordResult, 
+    isRecordResult,
+    putSingleRecord, 
 } from "./api";
 import { 
     equivalentAlphanumericStrings, CleanStringOptions, clean, 
@@ -44,28 +48,42 @@ import {
     extractFileName,
     stringStartsWithAnyOf
 } from "typeshi:utils/regex";
+import { SalesOrderColumnEnum } from "./parse_configurations/salesorder/salesOrderConstants";
+import { CustomerColumnEnum } from "./parse_configurations/customer/customerConstants";
 import { ItemColumnEnum } from "./parse_configurations/item/itemConstants";
+import { 
+    LN_INVENTORY_ITEM_PARSE_OPTIONS, 
+    LN_INVENTORY_ITEM_POST_PROCESSING_OPTIONS 
+} from "src/parse_configurations/item/itemParseDefinition";
 import { 
     hasKeys, isEmpty, isEmptyArray, isInteger, isIntegerArray, isNonEmptyArray, 
     isNonEmptyString, 
+    isNumeric, 
     isObject
 } from "typeshi:utils/typeValidation";
 import { idPropertyEnum, RecordOptions, 
     RecordResponse, RecordTypeEnum, RecordResponseOptions, RecordResult,
     SearchOperatorEnum, getRecordById, 
     instantiateAuthManager, idSearchOptions, 
-    SingleRecordRequest, RecordRequest, RelatedRecordRequest, ChildSearchOptions, getRelatedRecord
+    SingleRecordRequest, RecordRequest, 
+    RelatedRecordRequest, ChildSearchOptions, getRelatedRecord
 } from "./api";
-import { CLEAN_ITEM_ID_OPTIONS, unitType } from "src/parse_configurations/evaluators/item";
+import { 
+    CLEAN_ITEM_ID_OPTIONS, itemId, unitType 
+} from "src/parse_configurations/evaluators/item";
 import { 
     reconcileInventoryItems, 
     appendUpdateHistory, isDependentUpdateHistory, 
-    DependentUpdateHistory 
+    DependentUpdateHistory, 
+    sublistReferenceDictionary,
+    ReconcilerState
 } from "src/services/maintenance";
 import * as validate from "typeshi:utils/argumentValidation";
 
-
-
+/**
+ * @TODO test if PUT_Record still works with findSublistLineWithValue() changes...
+ * need to see if it works with string or number for item internalid
+ */
 async function main(): Promise<void> {
     const source = getSourceString(__filename, main.name);
     await initializeEnvironment();
@@ -75,46 +93,63 @@ async function main(): Promise<void> {
     await instantiateAuthManager();
     mlog.info(`${source} START at ${getCurrentPacificTime()}`);    
     let wDir = path.join(getProjectFolders().dataDir, 'workspace');
+    const startTime = Date.now();
     /* ===================================================================== */
 
     try {
         validate.existingDirectoryArgument(source, {wDir});
-        let placeholders = (read(path.join(wDir, 'item_placeholders.json')) as { placeholders: Required<RecordResult>[] }).placeholders;
+        let statePath = path.join(wDir, `${RecordTypeEnum.INVENTORY_ITEM}_reconcile_state.json`);
+        validate.existingFileArgument(source, '.json', {statePath});
+        let state = read(statePath) as ReconcilerState;
+        
+        let soData = read(
+            path.join(wDir, 'item_to_salesorders.json')
+        ) as { [itemId: string]: RecordResult[] } ?? {};
+        let initialItemKeys = Object.keys(soData);
+        
+        const placeholderPath = path.join(wDir, 'item_placeholders.json');
+        let placeholders = (read(placeholderPath) as { placeholders: Required<RecordResult>[] }).placeholders;
         validate.arrayArgument(source, {placeholders, isRecordResult});
         let placeholderIds = placeholders.map(p=>p.internalid);
 
-        const newItemsPath = path.join(wDir, 'lnii_options.json');
+        const newItemsPath = path.join(wDir, `${RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM}_options.json`);
         let newItems = await getItemRecordOptions(newItemsPath);
 
-        const historyPath = path.join(wDir, 'inventory_item_update_history.json')
+        const historyPath = path.join(wDir, `${RecordTypeEnum.INVENTORY_ITEM}_update_history.json`);
+        validate.existingFileArgument(source, '.json', {historyPath});
         let updateHistory = read(historyPath);
         validate.objectArgument(source, {updateHistory, isDependentUpdateHistory});
-        await DELAY(1000, null)
-        let newHistory = await reconcileInventoryItems(placeholderIds, newItems, undefined, updateHistory);
+        await DELAY(1000, `calling ${reconcileInventoryItems.name}()...`);
+        let newHistory = await reconcileInventoryItems(initialItemKeys,
+            placeholderIds, newItems, sublistReferenceDictionary, updateHistory
+        );
         updateHistory = appendUpdateHistory(updateHistory, newHistory);
-        write(updateHistory, historyPath)
+        write(updateHistory, historyPath);
     } catch (error: any) {
-        mlog.error([`${source} reconcileItems failed...`,
-            error
-        ]);
+        mlog.error([`${source} reconciliation failed...`,
+            indentedStringify(error)
+        ].join(NL));
     }
     /* ===================================================================== */
+    let elapsedTimeMinutes = ((Date.now() - startTime) / (1000 * 60)).toFixed(3); 
     mlog.info([`${source} END at ${getCurrentPacificTime()}`,
+        `Elapsed time: ${elapsedTimeMinutes} minutes`, 
         `handling logs...`
     ].join(TAB));
     await trimFile(5, ...logFiles);
-    autoFormatLogsOnExit(logFiles)
+    autoFormatLogsOnExit(logFiles);
     STOP_RUNNING(0);
 }
-main().catch(error => {
-    mlog.error(`${getSourceString(__filename, main.name)}.catch:`, JSON.stringify(error as any));
-    STOP_RUNNING(1);
-});
-
+if (require.main === module) {
+    main().catch(error => {
+        mlog.error(`${getSourceString(__filename, main.name)}.catch:`, JSON.stringify(error as any));
+        STOP_RUNNING(1);
+    });
+}
 /**
  * just wanted to move this code block out of main()
  * @TODO parameterize
- * @param filePath 
+ * @param filePath `string` path to json `{ items: Required<RecordOptions>[] }`
  */
 async function getItemRecordOptions(filePath: string): Promise<Required<RecordOptions>[]> {
     const source = getSourceString(__filename, getItemRecordOptions.name);
@@ -127,29 +162,37 @@ async function getItemRecordOptions(filePath: string): Promise<Required<RecordOp
     );
     let newItems = lnii_data.items;
     let dataSource = newItems[0].meta.dataSource ?? {};
-    let [parseSourcePath] = Object.keys(dataSource);
-    let fileName = extractFileName(parseSourcePath, false);
-    parseSourcePath = path.join(getProjectFolders().dataDir, 'accounting', 'items', fileName);
-    validate.existingFileArgument(source, '.tsv', {filePath});
-    let sourceRows = await getRows(filePath);
+    const [ogParseSourcePath] = Object.keys(dataSource);
+    let fileName = extractFileName(ogParseSourcePath, false);
+    let parseSourcePath = path.join(getProjectFolders().dataDir, 'accounting', 'items', fileName);
+    validate.existingFileArgument(source, '.tsv', {parseSourcePath});
+    let sourceRows = await getRows(parseSourcePath);
     let setClassCount = 0;
+    mlog.debug(`${source} modifying RecordOptions[]...`)
     recordLoop:
-    for (let record of newItems) {
-        if (!record.fields.unitstype) {
+    for (let record of newItems) {            
+        if (isEmpty(record.sublists.price)) {
+            record.sublists.price = [{
+                pricelevel: 1, 
+                price_1_: 0.00
+            }]
+        } 
+        if (isEmpty(record.fields.unitstype)) {
             let dataSource = record.meta.dataSource as RowSourceMetaData;
             validate.objectArgument(source, {dataSource, isRowSourceMetaData});
-            let [sourceIndex] = dataSource[parseSourcePath];
+            let [sourceIndex] = dataSource[ogParseSourcePath];
             validate.numberArgument(source, {rowIndex: sourceIndex}, true);
             let row = sourceRows[sourceIndex];
             record.fields.unitstype = await unitType(row, ItemColumnEnum.UNIT_OF_MEASUREMENT);
         }
         if (isEmpty(record.fields.class) && isNonEmptyString(record.fields.itemid)) {
             if (!hasKeys(indexedInventoryRows, record.fields.itemid)) {
-                slog.warn([`${source} itemid not in inventory export rows...`,
+                slog.warn([` -- item not in inventory export rows`,
                     `itemId: '${record.fields.itemid}'`
-                ].join(TAB));
+                ].join(', '));
                 if (stringStartsWithAnyOf(record.fields.itemid, /MAT|US-LET/)) {
-                    record.fields.class = Number(getClassDictionary()['Marketing Materials'])
+                    record.fields.class = Number(getClassDictionary()['Marketing Materials']);
+                    setClassCount++;
                 }
                 continue recordLoop;
             }
@@ -168,18 +211,26 @@ async function getItemRecordOptions(filePath: string): Promise<Required<RecordOp
                 STOP_RUNNING(1);
             }
         }
-        if (record.sublists.binnumber) {
+        if (isEmpty(record.fields.location) && isNonEmptyString(record.fields.itemid)) {
+            const wRow = getWarehouseRows().find(r=>
+                itemIdExtractor(r["Item ID"]) === record.fields.itemid
+            );
+            if (wRow && isNumeric(wRow["Location Internal ID"], true)) {
+                record.fields.location = Number(wRow["Location Internal ID"]);
+            }
+        }
+        if (record.sublists.binnumber) { 
             delete record.sublists.binnumber;
         }
     }
-    slog.info(` -- setClassCount: ${setClassCount}`);
+    slog.info(` -- setClassCount: ${setClassCount} / ${newItems.length}`);
     return newItems;
 }
 
 
-const itemIdExtractor = async (
+const itemIdExtractor = (
     value: string, 
     cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
-): Promise<string> => {
+): string => {
     return clean(extractLeaf(value), cleanOptions);
 }

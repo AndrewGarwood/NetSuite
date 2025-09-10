@@ -12,11 +12,9 @@ import {
     isIdSearchOptions,
 } from "./types";
 import { getSourceString } from "@typeshi/io";
-import { extractFileName } from "@typeshi/regex";
 import { RecordTypeEnum, SearchOperatorEnum } from "@utils/ns/Enums";
 import * as validate from "@typeshi/argumentValidation";
 import { isNonEmptyString } from "@typeshi/typeValidation";
-const F = extractFileName(__filename);
 
 export const Factory = {
     RelatedRecordRequest,
@@ -32,7 +30,7 @@ function RelatedRecordRequest(
     idValue: string | number,
     childOptions: ChildSearchOptions[]
 ): RelatedRecordRequest {
-    const source = getSourceString(F, RelatedRecordRequest.name);
+    const source = getSourceString(__filename, RelatedRecordRequest.name);
     validate.enumArgument(source, {parentRecordType, RecordTypeEnum});
     validate.enumArgument(source, {idProp, idPropertyEnum});
     let idOptions: idSearchOptions[] = [{
@@ -53,7 +51,7 @@ function SingleRecordRequest(
     idValue: string | number,
     responseOptions?: RecordResponseOptions
 ): SingleRecordRequest {
-    const source = getSourceString(F, SingleRecordRequest.name);
+    const source = getSourceString(__filename, SingleRecordRequest.name);
     validate.enumArgument(source, {recordType, RecordTypeEnum});
     if (responseOptions) validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
     const idOptions = [idSearchOptions(idProp, idValue)]
@@ -69,7 +67,7 @@ function ChildSearchOptions(
     sublistId?: string,
     responseOptions?: RecordResponseOptions
 ): ChildSearchOptions {
-    const source = getSourceString(F, ChildSearchOptions.name);
+    const source = getSourceString(__filename, ChildSearchOptions.name);
     validate.enumArgument(source, {childRecordType, RecordTypeEnum});
     validate.stringArgument(source, {fieldId});
     if (sublistId) validate.stringArgument(source, {sublistId});
@@ -117,7 +115,7 @@ function RecordOptions(
     sublists?: SublistDictionary,
     meta?: Record<string, any>
 ): Required<RecordOptions> {
-    const source = getSourceString(F, RecordOptions.name);
+    const source = getSourceString(__filename, RecordOptions.name);
     validate.enumArgument(source, {recordType, RecordTypeEnum});
     return {
         recordType,

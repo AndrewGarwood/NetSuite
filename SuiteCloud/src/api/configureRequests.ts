@@ -7,10 +7,8 @@ import { mainLogger as mlog,
 } from "../config";
 import * as validate from "typeshi:utils/argumentValidation";
 import path from "node:path";
-import { extractFileName } from "@typeshi/regex";
 import { getSourceString } from "@typeshi/io";
 
-const F = extractFileName(__filename);
 
 export const BATCH_SIZE = 50;
 /** use to set the field `"isinactive"` to false when loading or creating records*/
@@ -25,7 +23,7 @@ export function partitionArrayBySize(
     arr: Array<any>, 
     batchSize: number
 ): Array<Array<any>> {
-    const source = getSourceString(F, partitionArrayBySize.name)
+    const source = getSourceString(__filename, partitionArrayBySize.name)
     try {
         validate.numberArgument(source, {batchSize}, true);
         validate.arrayArgument(source, {arrayToPartition: arr});

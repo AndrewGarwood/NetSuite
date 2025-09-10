@@ -1,9 +1,9 @@
 {    
     "compilerOptions": {
         "strict": true,
-        "module": "node16", // "amd"
-        "target": "es2015",
-        "moduleResolution": "node16",
+        "module": "commonjs",
+        "target": "es2020",
+        "moduleResolution": "node",
         "downlevelIteration": true,
         "sourceMap": false,
         "newLine": "CRLF",
@@ -22,7 +22,7 @@
             "@regex/*": ["./node_modules/typeshi/dist/utils/regex/*"],
             "@io/*": ["./node_modules/typeshi/dist/utils/io/*"],
             "@config/*": ["./src/config/*"],
-            "@ns/*": ["src/utils/ns/*"],
+            "@ns/*": ["./src/utils/ns/*"],
             "N": ["./node_modules/@hitc/netsuite-types/N"],
             "N/*": ["./node_modules/@hitc/netsuite-types/N/*"]
         }
@@ -31,6 +31,7 @@
         "src/*",
         "src/**/*",
         "src/**/**/*",
+        "src/**/**/**/*",
         "__tests__/**/*"
     ],
     "exclude": [

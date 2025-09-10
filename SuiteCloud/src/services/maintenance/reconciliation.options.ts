@@ -27,13 +27,13 @@ export const revResponseOptions: Required<RecordResponseOptions> = {
 
 }
 export const soCacheOptions: CacheOptions = {
-    fields: ['total'],
+    fields: ['total', 'tranid'],
     sublists: {
         item: ['quantity',  'rate'] //'quantitybilled',
     }
 }
 export const soResponseOptions: Required<RecordResponseOptions> = {
-    fields: ['externalid', 'tranid', 'amount', 'memo', 'total'],
+    fields: ['externalid', 'tranid', 'amount', 'memo', 'total', 'tranid'],
     sublists: {
         item: ['id', 'item', 'quantity', 'rate', ]//'quantitybilled']
     }
@@ -43,12 +43,6 @@ export const soResponseOptions: Required<RecordResponseOptions> = {
 export const sublistReferenceDictionary: {
     [recordType: string]: SublistRecordReferenceOptions
 } = {
-    [RecordTypeEnum.BOM_REVISION]: {
-        referenceFieldId: 'item',
-        sublistId: 'component',
-        cacheOptions: revCacheOptions,
-        responseOptions: revResponseOptions
-    },
     [RecordTypeEnum.SALES_ORDER]: {
         referenceFieldId: 'item',
         sublistId: 'item',

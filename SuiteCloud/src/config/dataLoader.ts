@@ -644,6 +644,13 @@ export function getSkuDictionary(): Record<string, string> {
     return skuDictionary;
 }
 
+/**
+ * @param itemId 
+ * @param newInternalId 
+ * @returns **`oldItemInternalId`** `string | undefined`
+ * - returns old internal id of item if itemId in skuDictionary()
+ * - else return undefined
+ */
 export function setSkuInternalId(itemId: string, newInternalId: string | number): string | undefined {
     const source = getSourceString(F, setSkuInternalId.name);
     if (!skuDictionary) {

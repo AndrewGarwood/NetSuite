@@ -1,6 +1,5 @@
 /**
  * @file src/api/requests/get.ts
- * @TODO maybe rewrite the GET endpoint in GET_Record.js to have the request just be idProp, idVal, and recordType
  */
 import axios from "axios";
 import { 
@@ -27,12 +26,10 @@ import path from "node:path";
 import { RecordTypeEnum } from "../../utils/ns/record/Record";
 import { SearchOperatorEnum } from "../../utils/ns/search/Search";
 import * as validate from "typeshi:utils/argumentValidation";
-import { extractFileName } from "@typeshi/regex";
 import { getSourceString } from "typeshi:utils/io";
 import { SingleRecordRequest } from "../types";
 import { AccountEnvironmentEnum, ScriptTypeEnum } from "@utils/ns";
 
-const F = extractFileName(__filename);
 
 /**
  * @param request {@link SingleRecordRequest}
@@ -68,7 +65,7 @@ export async function getRecordById(
     idProp?: idPropertyEnum,
     responseOptions?: RecordResponseOptions
 ): Promise<RecordResponse> {
-    const source = getSourceString(F, getRecordById.name);
+    const source = getSourceString(__filename, getRecordById.name);
     const request = {} as SingleRecordRequest;
     if (typeof arg1 === 'string') {
         validate.enumArgument(source, {recordType: arg1, RecordTypeEnum});
@@ -119,7 +116,7 @@ export async function getRecordById(
 export async function getRelatedRecord(
     request: RelatedRecordRequest
 ): Promise<RecordResponse> {
-    const source = getSourceString(F, getRelatedRecord.name);
+    const source = getSourceString(__filename, getRelatedRecord.name);
     validate.objectArgument(source, {request, isRelatedRecordRequest});
     try {
         const accessToken = await getAccessToken();
@@ -159,7 +156,7 @@ export async function GET(
     deployId: number,
     params: Record<string, any>,
 ): Promise<any> {
-    const source = getSourceString(F, GET.name);
+    const source = getSourceString(__filename, GET.name);
     validate.stringArgument(source, {accessToken});
     validate.numberArgument(source, {scriptId}, true);
     validate.numberArgument(source, {deployId}, true);

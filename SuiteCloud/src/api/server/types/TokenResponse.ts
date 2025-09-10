@@ -4,36 +4,21 @@
  */
 /**
  * @interface **`TokenResponse`**
- * @description Represents the response from the token endpoint.
- * @property {string} access_token - The access token.
- * @property {string} refresh_token - The refresh token.
- * @property {number} expires_in - The expiration time of the access token in seconds.
- * @property {string} [lastUpdated] - The last updated time of the token (optional). manually added by setting TokenResponse.lastUpdated = {@link getCurrentPacificTime}() at the time of the response.
- * - maybe change to just use `Date().getTime()`
- * @property {string} [token_type] - The type of the token (e.g., "Bearer").
- * @property {string} [scope] - The scope of the access token (optional).
- * @property {string} [error] - Error message if the request failed (optional).
- * @property {string} [error_description] - Description of the error (optional).
- * @property {any} [key: string] - Additional properties (optional).
-*/
+ * */
 export interface TokenResponse {
     access_token: string;
-    refresh_token: string;
-    expires_in: number;
+    /** defined if tokenResponse is from exchangeAuthCode() */
+    refresh_token?: string;
+    /** Can come from server as `string` but should be normalized to `number` */
+    expires_in: number | string;
     /** 
      * `number` time token was last updated in `milliseconds` 
-     * - from `Date.getTime()`
+     * - from `Date.now()`
      */
     lastUpdated?: number;
-    /**
-     * `string` `(optional)`
-     * The last updated time of the token . 
-     * manually added by setting `TokenResponse.lastUpdatedLocaleString` = `getCurrentPacificTime()` at the time of the response. 
-     * */
-    lastUpdatedLocaleString?: string;
     token_type?: string;
     scope?: string;
     error?: string;
     error_description?: string;
-    [key: string]: any; // Allow additional properties
+    [key: string]: any;
 }

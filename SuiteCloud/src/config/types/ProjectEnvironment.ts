@@ -1,5 +1,5 @@
 /**
- * @file src/types/ProjectEnvironment.ts
+ * @file src/config/types/ProjectEnvironment.ts
  */
 
 import { DataDomainEnum } from "@config/types/ProjectData";
@@ -30,7 +30,8 @@ export type ProjectConfiguration = {
 export interface ResourceFolderConfiguration {
     dataDir: string;
     logDir: string;
-    outDir: string;
+    /** api auth token directory */
+    tokDir: string;
 }
 
 export type CloudConfiguration = ResourceFolderConfiguration & ({

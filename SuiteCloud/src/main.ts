@@ -5,7 +5,11 @@ import * as fs from "node:fs";
 import path from "node:path";
 import {
     clearFile, getCurrentPacificTime,
-    formatDebugLogFile, getDirectoryFiles, isFile,
+    formatDebugLogFile, getDirectoryFiles,
+    getRows, RowSourceMetaData, isRowSourceMetaData,
+    getColumnValues, isFile,
+    getIndexedColumnValues, concatenateFiles,
+    indentedStringify,
     trimFile,
     getSourceString
 } from "typeshi:utils/io";
@@ -13,7 +17,7 @@ import {
     STOP_RUNNING, DELAY, simpleLogger as slog,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
     getLogFiles,
-    initializeEnvironment
+    initializeEnvironment, initializeData
 } from "./config";
 import { instantiateAuthManager } from "./api";
 import { 
@@ -26,16 +30,12 @@ import {
     NON_INVENTORY_ITEM_PIPELINE_CONFIG,
     SALES_ORDER_PIPELINE_CONFIG
 } from "./pipelines";
-import { isEmptyArray, isNonEmptyArray, isNonEmptyString } from "typeshi:utils/typeValidation";
+import { isNonEmptyArray } from "typeshi:utils/typeValidation";
 import * as validate from "typeshi:utils/argumentValidation";
-import { getSkuDictionary, initializeData } from "./config/dataLoader";
 import { RecordTypeEnum } from "./utils/ns/Enums";
-import { extractFileName } from "@typeshi/regex";
-
-const F = extractFileName(__filename);
 
 async function main() {
-    const source = getSourceString(F, main.name);
+    const source = getSourceString(__filename, main.name);
     mlog.info(`${source} START at ${getCurrentPacificTime()}`);
     await initializeEnvironment();
     let logFiles = getLogFiles();
@@ -71,7 +71,7 @@ export async function invokePipeline(
     pipeline: (recordType: string, filePaths: string[], options: any) => Promise<void>,
     pipelineOptions: TransactionMainPipelineOptions | ItemPipelineOptions | EntityPipelineOptions
 ): Promise<void> {
-    const source = getSourceString(F, invokePipeline.name);
+    const source = getSourceString(__filename, invokePipeline.name);
     filePaths = isNonEmptyArray(filePaths) ? filePaths : [filePaths]
     validate.arrayArgument(source, {filePaths, filePath: isFile});
     recordType = validate.enumArgument(source, {recordType, RecordTypeEnum}) as RecordTypeEnum;
