@@ -31,14 +31,12 @@ import {
 } from "../../config/setupLog";
 import * as validate from "@typeshi/argumentValidation";
 import { getSourceString } from "@typeshi/io";
-import { extractFileName } from "@typeshi/regex";
 import { isInteger, isNonEmptyString, isNumeric } from "@typeshi/typeValidation";
 import { isTokenResponse } from "@api/server/types/TokenResponse.TypeGuards";
 import crypto from "crypto";
 
 export { AuthManager };
 
-const F = extractFileName(__filename);
 
 // ============================================================================
 // CONSTANTS
@@ -58,13 +56,7 @@ const DEFAULT_AUTH_OPTIONS: Required<AuthOptions> = {
     validationIntervalMs: 30 * 1000, // 30 seconds
     enableQueueing: true
 };
-// const TOKEN_DIR = path.join(__dirname, 'tokens');
-// /** = `'__dirname/tokens/STEP2_tokens.json'`  */
-// const STEP2_TOKENS_PATH = path.join(TOKEN_DIR, 'STEP2_tokens.json');
-// /** = `'__dirname/tokens/STEP3_tokens.json'` */
-// const STEP3_TOKENS_PATH = path.join(TOKEN_DIR, 'STEP3_tokens.json');
-// /** = `'__dirname/tokens/token_metadata.json'` */
-// const TOKEN_METADATA_PATH = path.join(TOKEN_DIR, 'token_metadata.json');
+
 const STEP2_FILENAME = 'STEP2_tokens.json';
 const STEP3_FILENAME = 'STEP3_tokens.json';
 const METADATA_FILENAME = 'token_metadata.json';
@@ -163,10 +155,6 @@ class AuthManager {
     /**
      * @param token {@link TokenResponse}
      * @returns **`tokenStatus`** - {@link TokenStatus}
-     * - {@link TokenStatus.VALID} `if` `now >= expiresAt - this.options.tokenBufferMs`
-     * - {@link TokenStatus.EXPIRED} `if` `now < expiresAt - this.options.tokenBufferMs`
-     * - {@link TokenStatus.MISSING} `if` `!tokenResponse || !tokenResponse.access_token`
-     * - {@link TokenStatus.INVALID} `if` `!tokenResponse.expires_in || !tokenResponse.lastUpdated`
      */
     private validateTokenResponse(token: TokenResponse): TokenStatus {
         const source = getSourceString(__filename, this.validateTokenResponse.name);
@@ -189,19 +177,13 @@ class AuthManager {
             );
             return TokenStatus.INVALID;
         }
-        // if (!isNumeric(token.expires_in, true, true)) {
-        //     return TokenStatus.INVALID;
-        // }
-        // const expiresIn = (isInteger(token.expires_in) 
-        //     ? token.expires_in 
-        //     : Number(token.expires_in)
-        // );
+        if (!isNumeric(token.expires_in, true, true)) {
+            return TokenStatus.INVALID;
+        }
         try {
-            // const expiresInMs = expiresIn * 1000;
-            // const expiresAt = token.lastUpdated + expiresInMs;
             const now = Date.now();
             if (now >= this.getTokenExpiresAt(token) - this.options.tokenBufferMs) {
-                slog.debug(`${source} returning status = expired`)
+                // slog.debug(`${source} returning status = expired`)
                 return TokenStatus.EXPIRED;
             }
             // slog.debug(` -- returning status = valid`);
@@ -339,9 +321,9 @@ class AuthManager {
     private async exchangeAuthCode(authCode: string): Promise<TokenResponse> {
         const source = getSourceString(__filename, this.exchangeAuthCode.name);
         const operation = async () => {
-            mlog.debug([`${source} starting operation...`,
-                `isNonEmptyString(authCode) ? ${isNonEmptyString(authCode)}`
-            ].join(', '));
+            // mlog.debug([`${source} starting operation...`,
+            //     `isNonEmptyString(authCode) ? ${isNonEmptyString(authCode)}`
+            // ].join(', '));
             const params = this.generateGrantParams({code: authCode});
             const response = await axios.post(TOKEN_URL, params.toString(), {
                 headers: { 
@@ -367,7 +349,7 @@ class AuthManager {
             tokenResponse.lastUpdatedLocaleString = getCurrentPacificTime();
             slog.debug(` -- writing TokenResponse to STEP2_TOKENS_PATH...`)
             write(tokenResponse, path.join(this.getTokenDir(), STEP2_FILENAME));
-            const expiresAt = Date.now() + (tokenResponse.expires_in * 1000);
+            const expiresAt = this.getTokenExpiresAt(tokenResponse);
             slog.debug(` -- calling this.updateTokenMetadata()`)
             this.updateTokenMetadata({
                 status: TokenStatus.VALID,
@@ -440,7 +422,7 @@ class AuthManager {
     private async getAuthCode(
         callBackTimeoutMs: number = 2 * 60 * 1000
     ): Promise<string> {
-        const source = getSourceString(F, this.getAuthCode.name);
+        const source = getSourceString(__filename, this.getAuthCode.name);
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 this.closeServer();
@@ -545,25 +527,23 @@ class AuthManager {
     // ========================================================================
 
     private async performTokenRefresh(): Promise<TokenResponse> {
-        const source = getSourceString(F, this.performTokenRefresh.name);
-        mlog.info(`${source} Attempting token refresh...`);
-        // Try to get existing tokens for refresh
+        const source = getSourceString(__filename, this.performTokenRefresh.name);
+        slog.info(`${source} Attempting token refresh...`);
         const step2Token = this.loadTokenFromFile(path.join(this.getTokenDir(), STEP2_FILENAME));
         const step3Token = this.loadTokenFromFile(path.join(this.getTokenDir(), STEP3_FILENAME));
-        // Get the most recent refresh token
         let refreshToken: string | null = null;
         if (step3Token 
             && isNonEmptyString(step3Token.refresh_token)
             && this.withinTokenExpirationBuffer(step3Token)) { // this.validateTokenResponse(step3Token) === TokenStatus.VALID) {
             refreshToken = step3Token.refresh_token;
-            slog.debug(`Using step3Token refresh token --------`);
+            slog.debug(`Using step3Token refresh token`);
         } else if (step2Token 
             && isNonEmptyString(step2Token.refresh_token)
             && this.withinTokenExpirationBuffer(step2Token)) { // this.validateTokenResponse(step2Token) === TokenStatus.VALID) {
             refreshToken = step2Token.refresh_token;
-            slog.debug(`Using step2Token refresh token --------`);
+            slog.debug(`Using step2Token refresh token`);
         } else {
-            mlog.warn([
+            slog.warn([
                 `${source} No valid token from step3Token or step2Token`,
             ].join(TAB));
         }
@@ -579,7 +559,7 @@ class AuthManager {
                 ].join(NL));
             }
         } else {
-            mlog.warn(`${source} No refresh token available, performing full authorization`);
+            slog.warn(`${source} No refresh token available, performing full authorization`);
         }
         return this.performFullAuthorization();
     }
@@ -587,7 +567,7 @@ class AuthManager {
      * performs step 1 and step 2 of the OAuth authorization flow:
      * - {@link getAuthCode} -> {@link exchangeAuthCode} return {@link TokenResponse} */
     private async performFullAuthorization(): Promise<TokenResponse> {
-        const source = getSourceString(F, this.performFullAuthorization.name);
+        const source = getSourceString(__filename, this.performFullAuthorization.name);
         slog.info(`${source} Starting full OAuth authorization flow...`);
         const authCode = await this.getAuthCode();
         if (isNonEmptyString(authCode)) slog.info(` -- obtained authCode, attempting exchange for token...`);
@@ -625,7 +605,7 @@ class AuthManager {
     // ========================================================================
 
     public async getAccessToken(): Promise<string> {
-        const source = getSourceString(F, this.getAccessToken.name);
+        const source = getSourceString(__filename, this.getAccessToken.name);
         if (this.state !== AuthState.IDLE && this.options.enableQueueing) {
             mlog.debug(`${source} Token acquisition in progress, queueing request...`);   
             return new Promise<string>((resolve, reject) => {

@@ -125,7 +125,7 @@ export const description = async (
     if (isNonEmptyString(altDescriptionColumn) && hasKeys(row, altDescriptionColumn)) {
         result[altDescriptionColumn] = clean(row[altDescriptionColumn]);
     }
-    return JSON.stringify(result);
+    return result[descriptionColumn];
 }
 
 export const unitType = async (

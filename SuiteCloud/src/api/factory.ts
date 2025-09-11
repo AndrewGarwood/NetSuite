@@ -1,5 +1,5 @@
 /**
- * @file src/api/requestFactory.ts
+ * @file src/api/factory.ts
  * @consideration maybe i should just make classes for the types....
  */
 

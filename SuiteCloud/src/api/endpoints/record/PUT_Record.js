@@ -163,7 +163,8 @@ function processRecordOptions(options, responseOptions) {
     
     if (isExistingRecord) {
         // remove idPropertyEnum values from keys of fields to avoid DUP_ENTITY error.
-        for (const idPropFieldId of Object.values(idPropertyEnum)) {
+        const unmutableIdFields = [idPropertyEnum.INTERNAL_ID, idPropertyEnum.TRANSACTION_ID, idPropertyEnum.ITEM_ID];
+        for (const idPropFieldId of unmutableIdFields) { //Object.values(idPropertyEnum)
             if (fields[idPropFieldId]) { 
                 deletions.push({idProp: idPropFieldId, value: fields[idPropFieldId]});
                 delete fields[idPropFieldId];

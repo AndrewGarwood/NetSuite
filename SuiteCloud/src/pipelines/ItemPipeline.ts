@@ -24,6 +24,11 @@ import {
     RecordOptions, RecordResponse, 
     RecordResult, idPropertyEnum,
     RecordResponseOptions, upsertRecordPayload,
+    SingleRecordRequest, getRecordById,
+    FieldDictionary,
+    idSearchOptions,
+    FieldValue,
+    SetFieldSubrecordOptions,
     SourceTypeEnum,
     LogTypeEnum,
     isRecordOptions,
@@ -33,7 +38,8 @@ import {
     Factory, 
 } from "../api";
 import { 
-    isNonEmptyArray, isNonEmptyString, isIntegerArray,
+    isNonEmptyArray, isNullLike as isNull, isEmptyArray, hasKeys, 
+    TypeOfEnum, isNonEmptyString, isIntegerArray,
 } from "typeshi:utils/typeValidation";
 import * as validate from "typeshi:utils/argumentValidation";
 import { RecordTypeEnum, SearchOperatorEnum } from "../utils/ns/Enums";
@@ -317,21 +323,20 @@ const itemIdExtractor = async (
 
 export async function deleteItem(
     itemId: string,
-    itemRecordType: RecordTypeEnum = RecordTypeEnum.INVENTORY_ITEM,
+    itemRecordType: RecordTypeEnum,
 ): Promise<RecordResponse | null> {
-    const source = getSourceString(F, deleteItem.name, itemId);
+    const source = getSourceString(__filename, deleteItem.name, itemId);
     try {
         let itemInternalId = getSkuDictionary()[itemId];
-        validate.stringArgument(source, {itemInternalId});
-        validate.enumArgument(source, {itemRecordType, RecordTypeEnum})
-        const request = Factory.SingleRecordRequest(itemRecordType, idPropertyEnum.INTERNAL_ID, itemInternalId)
-        const response = await deleteRecord(request);
+        const response = await deleteRecord(Factory.SingleRecordRequest(
+            itemRecordType, idPropertyEnum.INTERNAL_ID, itemInternalId
+        ));
         return response;
     } catch (error: any) {
-        mlog.error([`${source} Error occurred when calling deleteRecord()`,
+        mlog.error([`${source} Error occurred when calling deleteRecord(): ${error}`,
             `Unable to confirm record was deleted`,
             ` -> returning null...`
         ].join(TAB));
-        return null;
+        return null
     }
 }

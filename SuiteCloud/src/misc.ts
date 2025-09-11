@@ -17,7 +17,9 @@ import {
     getUnitTypeDictionary,
     getBomRows,
     getInventoryRows,
-    getClassDictionary
+    getClassDictionary,
+    setSkuInternalId,
+    DataDomainEnum
 } from "./config";
 import {
     readJsonFileAsObject as read,
@@ -34,9 +36,14 @@ import {
     RowSourceMetaData,
     extractTargetRows,
     indentedStringify,
+    getOneToManyDictionary,
+    getOneToOneDictionary,
+    isFile,
 } from "typeshi:utils/io";
 import { 
     Factory,
+    FieldDictionary,
+    FieldValue,
     isRecordOptions,
     isRecordResult,
     putSingleRecord, 
@@ -61,7 +68,8 @@ import {
     isNumeric, 
     isObject
 } from "typeshi:utils/typeValidation";
-import { idPropertyEnum, RecordOptions, 
+import { 
+    idPropertyEnum, RecordOptions, 
     RecordResponse, RecordTypeEnum, RecordResponseOptions, RecordResult,
     SearchOperatorEnum, getRecordById, 
     instantiateAuthManager, idSearchOptions, 
@@ -95,13 +103,8 @@ async function main(): Promise<void> {
     let wDir = path.join(getProjectFolders().dataDir, 'workspace');
     const startTime = Date.now();
     /* ===================================================================== */
-
     try {
         validate.existingDirectoryArgument(source, {wDir});
-        let statePath = path.join(wDir, `${RecordTypeEnum.INVENTORY_ITEM}_reconcile_state.json`);
-        validate.existingFileArgument(source, '.json', {statePath});
-        let state = read(statePath) as ReconcilerState;
-        
         let soData = read(
             path.join(wDir, 'item_to_salesorders.json')
         ) as { [itemId: string]: RecordResult[] } ?? {};
@@ -167,8 +170,12 @@ async function getItemRecordOptions(filePath: string): Promise<Required<RecordOp
     let parseSourcePath = path.join(getProjectFolders().dataDir, 'accounting', 'items', fileName);
     validate.existingFileArgument(source, '.tsv', {parseSourcePath});
     let sourceRows = await getRows(parseSourcePath);
+    let noPreviousCount = 0;
     let setClassCount = 0;
-    mlog.debug(`${source} modifying RecordOptions[]...`)
+    let setLocationCount = 0;
+    let setPriceCount = 0;
+    let fixDescCount = 0;
+    mlog.debug(`${source} modifying RecordOptions[]...`);
     recordLoop:
     for (let record of newItems) {            
         if (isEmpty(record.sublists.price)) {
@@ -176,7 +183,12 @@ async function getItemRecordOptions(filePath: string): Promise<Required<RecordOp
                 pricelevel: 1, 
                 price_1_: 0.00
             }]
-        } 
+            setPriceCount++;
+        } else if (isNonEmptyArray(record.sublists.price) 
+            && !hasKeys(record.sublists.price[0], 'price_1_')) {
+            record.sublists.price[0].price_1_ = 0;
+            setPriceCount++;
+        }
         if (isEmpty(record.fields.unitstype)) {
             let dataSource = record.meta.dataSource as RowSourceMetaData;
             validate.objectArgument(source, {dataSource, isRowSourceMetaData});
@@ -187,9 +199,10 @@ async function getItemRecordOptions(filePath: string): Promise<Required<RecordOp
         }
         if (isEmpty(record.fields.class) && isNonEmptyString(record.fields.itemid)) {
             if (!hasKeys(indexedInventoryRows, record.fields.itemid)) {
-                slog.warn([` -- item not in inventory export rows`,
-                    `itemId: '${record.fields.itemid}'`
-                ].join(', '));
+                // slog.warn([` -- item not in inventory export rows`,
+                //     `itemId: '${record.fields.itemid}'`
+                // ].join(', '));
+                noPreviousCount++;
                 if (stringStartsWithAnyOf(record.fields.itemid, /MAT|US-LET/)) {
                     record.fields.class = Number(getClassDictionary()['Marketing Materials']);
                     setClassCount++;
@@ -211,19 +224,44 @@ async function getItemRecordOptions(filePath: string): Promise<Required<RecordOp
                 STOP_RUNNING(1);
             }
         }
-        if (isEmpty(record.fields.location) && isNonEmptyString(record.fields.itemid)) {
+        if (isNonEmptyString(record.fields.itemid)) {
             const wRow = getWarehouseRows().find(r=>
                 itemIdExtractor(r["Item ID"]) === record.fields.itemid
             );
-            if (wRow && isNumeric(wRow["Location Internal ID"], true)) {
+            if (wRow && isNumeric(wRow["Location Internal ID"], true) 
+                && record.fields.location !==  Number(wRow["Location Internal ID"])) {
                 record.fields.location = Number(wRow["Location Internal ID"]);
+                setLocationCount++;
             }
         }
         if (record.sublists.binnumber) { 
             delete record.sublists.binnumber;
         }
+        if (isNonEmptyString(record.fields.salesdescription)
+            && /^\{.+\}$/.test(record.fields.salesdescription)) {
+            let descObject = JSON.parse(record.fields.salesdescription) ?? {};
+            if ("Description" in descObject 
+                && typeof descObject["Description"] === 'string') {
+                record.fields.salesdescription = descObject["Description"];
+                fixDescCount++;
+            }
+        }
+        if (isNonEmptyString(record.fields.purchasedescription)
+            && /^\{.+\}$/.test(record.fields.purchasedescription)) {
+            let descObject = JSON.parse(record.fields.purchasedescription) ?? {};
+            if ("Purchase Description" in descObject 
+                && typeof descObject["Purchase Description"] === 'string') {
+                record.fields.purchasedescription = descObject["Purchase Description"];
+                fixDescCount++;
+            }
+        }
     }
-    slog.info(` -- setClassCount: ${setClassCount} / ${newItems.length}`);
+    let countCharLength = String(newItems.length).length + 1;
+    slog.info(` --     fixDescCount: ${String(fixDescCount).padEnd(countCharLength)} / ${newItems.length}`);
+    slog.info(` --    setClassCount: ${String(setClassCount).padEnd(countCharLength)} / ${newItems.length}`);
+    slog.info(` --    setPriceCount: ${String(setPriceCount).padEnd(countCharLength)} / ${newItems.length}`);
+    slog.info(` -- setLocationCount: ${String(setLocationCount).padEnd(countCharLength)} / ${newItems.length}`);
+    slog.info(` --  noPreviousCount: ${String(noPreviousCount).padEnd(countCharLength)} / ${newItems.length}`);
     return newItems;
 }
 

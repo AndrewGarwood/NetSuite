@@ -11,8 +11,7 @@ export const revCacheOptions: CacheOptions = {
     fields: ['name'],
     sublists: {
         component: [
-            'quantity', 'bomquantity', 'componentyield', 'description', 
-            //'itemsource', 'itemsourcelist'
+            'quantity', 'bomquantity',
         ] 
     }
 }
@@ -27,26 +26,33 @@ export const revResponseOptions: Required<RecordResponseOptions> = {
 
 }
 export const soCacheOptions: CacheOptions = {
-    fields: ['total', 'tranid'],
+    fields: ['total', 'tranid', 'externalid'],
     sublists: {
-        item: ['quantity',  'rate'] //'quantitybilled',
+        item: ['quantity',  'rate', 'amount'] //'quantitybilled',
     }
 }
 export const soResponseOptions: Required<RecordResponseOptions> = {
-    fields: ['externalid', 'tranid', 'amount', 'memo', 'total', 'tranid'],
+    fields: ['externalid', 'tranid', 'amount', 'total',], //'memo',
     sublists: {
-        item: ['id', 'item', 'quantity', 'rate', ]//'quantitybilled']
+        item: ['id', 'item', 'quantity', 'rate', 'amount' ]//'quantitybilled']
     }
 }
 
 /** for records that have sublist reference dependency on item record */
 export const sublistReferenceDictionary: {
     [recordType: string]: SublistRecordReferenceOptions
-} = {
+} = {    
+    // [RecordTypeEnum.BOM_REVISION]: {
+    //     referenceFieldId: 'item',
+    //     sublistId: 'component',
+    //     cacheOptions: revCacheOptions,
+    //     responseOptions: revResponseOptions
+    // },
     [RecordTypeEnum.SALES_ORDER]: {
         referenceFieldId: 'item',
         sublistId: 'item',
         cacheOptions: soCacheOptions,
         responseOptions: soResponseOptions
-    }
+    },
+    
 }
