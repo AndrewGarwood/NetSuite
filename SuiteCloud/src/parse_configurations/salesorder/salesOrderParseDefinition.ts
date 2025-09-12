@@ -16,9 +16,9 @@ import * as evaluate from "../evaluatorFunctions";
 import * as customerEval from "../customer/customerEvaluatorFunctions";
 import * as soEval from "./salesOrderEvaluatorFunctions";
 import { SalesOrderColumnEnum as SO } from "./salesOrderConstants";
-import { CustomerStatusEnum, CustomerTaxItemEnum, RecordTypeEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
+import { CustomerStatusEnum, CustomerTaxItemEnum, PriceLevelEnum, RecordTypeEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
 import { getSkuDictionary } from "../../config/dataLoader";
-import { isNonEmptyArray, isNonEmptyString } from "typeshi:utils/typeValidation";
+import { isEmpty, isNonEmptyArray, isNonEmptyString, isNumeric } from "typeshi:utils/typeValidation";
 import { SB_TERM_DICTIONARY } from "../../utils/ns";
 import { CleanStringOptions, toTitleCase } from "typeshi:utils/regex";
 import { 
@@ -133,7 +133,8 @@ const LINE_ITEM_SUBLIST_OPTIONS: SublistDictionaryParseOptions = {
     item: [{
         lineIdOptions: {lineIdEvaluator: lineItemIdEvaluator},
         item: { evaluator: evaluate.itemId, args: [SO.ITEM] },
-        quantity: { colName: SO.QUANTITY, defaultValue: 1 },
+        quantity: { colName: SO.QUANTITY, defaultValue: 0 },
+        price: { defaultValue: PriceLevelEnum.CUSTOM },
         rate: { colName: SO.RATE, defaultValue: 0.0 },
         amount: { colName: SO.AMOUNT, defaultValue: 0.0 },
         description: { colName: SO.ITEM_MEMO },
@@ -162,6 +163,7 @@ const MEMO_ARGS: any[] = [
     'QB Summary', SO.TRAN_TYPE, SO.TRAN_NUM,
     SO.SO_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER,
 ]
+
 
 export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: SO.SO_ID,
@@ -198,6 +200,7 @@ export const SALES_ORDER_AMOUNT_VALIDATION_PARSE_OPTIONS: RecordParseOptions = {
     fieldOptions: {
         externalid: { evaluator: soEval.transactionExternalId, args: EXTERNAL_ID_ARGS },
         entity: { evaluator: evaluate.entityId, args: [SO.ENTITY_ID] },
+        memo: { evaluator: soEval.memo, args: MEMO_ARGS },
     },
     sublistOptions: {
         ...LINE_ITEM_SUBLIST_OPTIONS,
@@ -207,15 +210,17 @@ export const SALES_ORDER_AMOUNT_VALIDATION_PARSE_OPTIONS: RecordParseOptions = {
 const assignItemInternalIds = async (
     sublistLines: SublistLine[]
 ): Promise<SublistLine[]> => {
-    const skuDict = await getSkuDictionary();
+    const skuDict = getSkuDictionary();
     for (let i = 0; i < sublistLines.length; i++) {
         let sku = sublistLines[i].item as string;
+        if (isEmpty(sku)) {
+            continue;
+        }
         if (!skuDict[sku]) {
-            mlog.error([`[SalesOrderParseDefinition.lineItemComposer.assignItemInternalids()]`,
+            throw new Error([`[SalesOrderParseDefinition.lineItemComposer.assignItemInternalids()]`,
                 `Error: sku not found in SkuDictionary`,
                 `  sku: '${sku}'`
-            ].join(TAB))
-            continue;
+            ].join(TAB));
         }
         sublistLines[i].item = skuDict[sku];
     }
@@ -242,12 +247,15 @@ const lineItemComposer = async (
                 sublistLines[i][fieldId] = Math.abs(Number(sublistLines[i][fieldId])) ?? 0.0;
             }
         }
-        sublistLines[i].quantity = (
-            isNonEmptyString(sublistLines[i].quantity) 
-                && Number(sublistLines[i].quantity) !== 0
-            ? Math.abs(Number(sublistLines[i].quantity))
-            : 1
-        );
+        // sublistLines[i].quantity = (
+        //     isNonEmptyString(sublistLines[i].quantity) 
+        //         && Number(sublistLines[i].quantity) !== 0
+        //     ? Math.abs(Number(sublistLines[i].quantity))
+        //     : 0
+        // );
+        if (isNumeric(sublistLines[i].quantity) && Number(sublistLines[i].quantity) < 0) {
+            sublistLines[i].quantity = Math.abs(Number(sublistLines[i].quantity))
+        }
         const qty = sublistLines[i].quantity as number;
         const quantityFields = [
             // 'quantityavailable', 'quantitycommitted', 'quantityfulfilled', 
@@ -301,9 +309,7 @@ const appendMemo = (
     const ogMemo = fields.memo as string;
     let memo = fields.memo as string || '';
     let notes: string[] = [
-        `External ID: ${externalId}`, 
-        `QB Type: '${tranType ? toTitleCase(tranType) : 'UNDEFINED'}'`,
-        // `(index, SKU): rate * quantity = amount`
+        `External ID: ${externalId}`,
     ];
     let index = 1;
     for (const lineItem of itemSublist) {

@@ -14,14 +14,13 @@ import { getAccessToken } from "../configureAuth";
 import path from "node:path";
 import * as validate from "typeshi:utils/argumentValidation";
 import { isSingleRecordRequest, RecordResponse, SingleRecordRequest } from "../types";
-import { extractFileName } from "@typeshi/regex";
-
-const F = extractFileName(__filename);
+import { standardizeResponse } from "@api/response";
+import { Factory } from "@api/factory";
 
 export async function deleteRecord(
     request: SingleRecordRequest
 ): Promise<RecordResponse> {
-    const source = getSourceString(F, deleteRecord.name);
+    const source = getSourceString(__filename, deleteRecord.name);
     validate.objectArgument(source, {request, isSingleRecordRequest})
     try {
         const accessToken = await getAccessToken();
@@ -31,7 +30,14 @@ export async function deleteRecord(
             getSandboxRestScript("DELETE_Record").deployId, 
             request
         );
-        return response.data as RecordResponse
+        const recordResponse = response.data ?? Factory.RecordResponse(
+            500,
+            `${deleteRecord.name}() failed`, 
+            `${source} response.data (RecordResponse) is undefined`,
+            undefined, 
+            [request], 
+        );
+        return standardizeResponse(recordResponse);
     } catch (error: any) {
         mlog.error([`${source} ERROR:`,
             `   name: ${error.name}`,
@@ -43,7 +49,7 @@ export async function deleteRecord(
             {timestamp: getCurrentPacificTime(), caught: error}, 
             path.join(getProjectFolders().logDir, 'errors', 'ERROR_deleteRecord.json')
         );
-        throw new Error(`${source} Failed, unable to return RecordResponse`);
+        throw new Error(`${source} Failed, unable to return RecordResponse, ${error}`);
     }
 }
 
@@ -60,7 +66,7 @@ async function DELETE(
     deployId: number,
     params: Record<string, any>,
 ): Promise<any> {
-    const source = `[${F}.DELETE()]`;
+    const source = getSourceString(__filename, DELETE.name);
     validate.stringArgument(source, {accessToken});
     validate.numberArgument(source, {scriptId}, true);
     validate.numberArgument(source, {deployId}, true);
@@ -77,12 +83,12 @@ async function DELETE(
             },
         });
         return response;
-    } catch (error) {
-        mlog.error('Error in delete.DELETE():', error);
+    } catch (error: any) {
+        mlog.error([`${source} failed`, `params: ${indentedStringify(params)}`, `error: ${indentedStringify(error)}`].join(NL));
         write(
-            {timestamp: getCurrentPacificTime(), error: error}, 
+            {timestamp: getCurrentPacificTime(), error}, 
             path.join(getProjectFolders().logDir, 'errors', 'ERROR_DELETE.json')
         );
-        throw new Error('Failed to call RESTlet with params: ' + JSON.stringify(params, null, 4));
+        throw new Error([`${source} failed`, `params: ${indentedStringify(params)}`, `error: ${indentedStringify(error)}`].join(NL));
     }
 }

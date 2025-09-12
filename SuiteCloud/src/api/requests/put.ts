@@ -31,6 +31,8 @@ import { getAccessToken } from "../configureAuth";
 import path from "node:path";
 import * as validate from "typeshi:utils/argumentValidation";
 import { isEmptyArray, isNonEmptyArray } from "typeshi:utils/typeValidation";
+import { standardizeResponse } from "@api/response";
+import { Factory } from "@api/factory";
 
 /**
  * enforces a max number of records per post call (see {@link BATCH_SIZE}) 
@@ -121,48 +123,35 @@ export async function putSingleRecord(
     const source = getSourceString(__filename, putSingleRecord.name);
     let scriptId = getSandboxRestScript("PUT_Record").scriptId;
     let deployId = getSandboxRestScript("PUT_Record").deployId;
-    let response: RecordResponse;
-    let defaultResponseValues = {
-        results: [], 
-        rejects: [], 
-        logs: []
-    }
     try {
         validate.objectArgument(source, {record, isRecordOptions});
         if (responseOptions) validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
     } catch (error: any) {
-        mlog.error(`${source} Invalid parameters`, error);
-        response = {
-            status: 400,
-            message: `${source} Invalid parameters, caught: ${error}`,
-            error: `${source} Invalid parameters`,
-            ...defaultResponseValues
-        }
-        return response;
+        mlog.error(`${source} Invalid parameters ${error}`);
+        return Factory.RecordResponse(400, `${source} Invalid parameters`, error)
     }
     try {
         const request: RecordRequest = { recordOptions: record, responseOptions };
         const accessToken = await getAccessToken();
-        let putRes = await PUT(accessToken, scriptId, deployId, request);
-        let resData = putRes.data as RecordResponse;
-        // validate.objectArgument(source, {resData, isRecordResponse})
-        // validate.objectArgument(source, {
-        //     'RecordResponse.results[0]': resData.results[0] ?? {}, isRecordResult
-        // });
-        response = resData;
+        let response = await PUT(accessToken, scriptId, deployId, request);
+        const recordResponse = response.data ?? Factory.RecordResponse(
+            500,
+            `${putSingleRecord.name}() failed`, 
+            `${source} response.data (RecordResponse) is undefined`,
+            undefined, 
+            [request], 
+        );
+        return standardizeResponse(recordResponse);
     } catch (error) {
         mlog.error(`${source} Error occurred while calling ${PUT.name}():`, error);
         write({timestamp: getCurrentPacificTime(), caught: (error as any)}, 
             path.join(getProjectFolders().logDir, `ERROR_${putSingleRecord.name}.json`)
         );
-        response = {
-            status: 500,
-            message: `${source} Error occurred while calling ${PUT.name}(): ${error}`,
-            error: `${source} Error occurred while calling ${PUT.name}()`,
-            ...defaultResponseValues
-        }
+        return Factory.RecordResponse(500, 
+            `${source} Error occurred while calling ${PUT.name}()`, 
+            error
+        );
     }
-    return response;
 
 }
 

@@ -5,7 +5,8 @@
 import { 
     hasKeys, isPrimitiveValue, isObject, isNonEmptyString, isStringArray, isNonEmptyArray, 
     isEmptyArray,
-    isInteger
+    isInteger,
+    isEmpty
 } from "typeshi:utils/typeValidation";
 import { SubrecordValue, FieldValue } from "./InternalApi";
 import { isFindSublistLineWithValueOptions } from "./InternalApi.TypeGuards";
@@ -34,8 +35,8 @@ export function isRecordResult(value: any): value is RecordResult {
     return (isObject(candidate)
         && isInteger(candidate.internalid)
         && isRecordTypeEnum(candidate.recordType)
-        && (!candidate.fields || isObject(candidate.fields))
-        && (!candidate.sublists || isObject(candidate.sublists))
+        && (!candidate.fields || isObject(candidate.fields, false))
+        && (!candidate.sublists || isObject(candidate.sublists, false))
     );
 }
 
@@ -92,7 +93,7 @@ export function isRecordOptions(value: any): value is RecordOptions {
         && isRecordTypeEnum(candidate.recordType)
         && (!candidate.fields || isObject(candidate.fields, false))
         && (!candidate.sublists || isObject(candidate.sublists, false))
-        && (!candidate.idOptions || isIdOptions(candidate.idOptions)) 
+        && (!candidate.idOptions || isIdOptions(candidate.idOptions, false)) 
         && hasKeys(value, 
             ['fields', 'sublists', 'recordType', 'isDynamic', 'idOptions', 'meta'], 
             false, false
@@ -152,11 +153,12 @@ export function isRecordResponse(value: any): value is RecordResponse {
  * @returns **`isChildSearchOptions`** `boolean`
  */
 export function isChildSearchOptions(value: any): value is ChildSearchOptions {
-    return (isObject(value)
-        && isRecordTypeEnum(value.childRecordType)
-        && isNonEmptyString(value.fieldId)
-        && (!value.sublistId || isNonEmptyString(value.sublistId))
-        && (!value.responseOptions || isRecordResponseOptions(value.responseOptions))
+    const candidate = value as ChildSearchOptions;
+    return (isObject(candidate)
+        && isRecordTypeEnum(candidate.childRecordType)
+        && isNonEmptyString(candidate.fieldId)
+        && (!candidate.sublistId || isNonEmptyString(candidate.sublistId))
+        && (!candidate.responseOptions || isRecordResponseOptions(candidate.responseOptions))
     );
 }
 
@@ -165,12 +167,12 @@ export function isChildOptions(value: any): value is ChildSearchOptions[] {
 }
 
 export function isRelatedRecordRequest(value: any): value is RelatedRecordRequest {
-    return (isObject(value)
-        && hasKeys(value, ['parentRecordType', 'idOptions', 'childOptions'], true, true)
-        && isRecordTypeEnum(value.parentRecordType)
-        && isIdOptions(value.idOptions)
-        && isNonEmptyArray(value.childOptions)
-        && value.childOptions.every((el: any)=>isChildSearchOptions(el))
+    const candidate = value as RelatedRecordRequest;
+    return (isObject(candidate)
+        && isRecordTypeEnum(candidate.parentRecordType)
+        && isIdOptions(candidate.idOptions, true)
+        && isNonEmptyArray(candidate.childOptions)
+        && candidate.childOptions.every((el)=>isChildSearchOptions(el))
     );
 }
 
@@ -178,23 +180,24 @@ export function isSingleRecordRequest(value: any): value is SingleRecordRequest 
     const candidate = value as SingleRecordRequest;
     return (isObject(candidate)
         && isRecordTypeEnum(candidate.recordType)
-        && isIdOptions(candidate.idOptions)
+        && isIdOptions(candidate.idOptions, true)
         && (!candidate.responseOptions || isRecordResponseOptions(candidate.responseOptions))
     );
 }
 
 
 export function isIdSearchOptions(value: any): value is idSearchOptions {
-    return (isObject(value) 
-        && hasKeys(value, ['idProp', 'idValue', 'searchOperator'], true, true) 
-        && isNonEmptyString(value.idProp)
-        && isNonEmptyString(value.searchOperator)
-    )
+    const candidate = value as idSearchOptions;
+    return (isObject(candidate) 
+        && (!isEmpty(candidate.idValue))
+        && isNonEmptyString(candidate.idProp)
+        && isNonEmptyString(candidate.searchOperator)
+    );
 }
 
-export function isIdOptions(value: any): value is idSearchOptions[] {
-    return (isNonEmptyArray(value) 
-        && value.every((el: any)=>isIdSearchOptions(el))
+export function isIdOptions(value: any, requireNonEmpty: boolean = false): value is idSearchOptions[] {
+    return ((!requireNonEmpty && isEmptyArray(value)) 
+        || (isNonEmptyArray(value) && value.every((el: any)=>isIdSearchOptions(el)))
     );
 }
 

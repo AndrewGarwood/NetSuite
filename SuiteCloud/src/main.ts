@@ -44,7 +44,8 @@ async function main() {
     await instantiateAuthManager();
     /* ===================================================================== */
 
-    // await invokePipeline(RecordTypeEnum.SALES_ORDER, 
+    // await invokePipeline(
+    //     RecordTypeEnum.SALES_ORDER, 
     //     ['filePaths'], 
     //     runMainTransactionPipeline, 
     //     SALES_ORDER_PIPELINE_CONFIG

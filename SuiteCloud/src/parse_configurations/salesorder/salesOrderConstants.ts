@@ -1,28 +1,6 @@
 /**
  * @file src/parse_configurations/salesorder/salesOrderConstants.ts
  */
-import {
-    DATA_DIR, CLOUD_LOG_DIR,
-    mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL 
-} from "../../config";
-import path from "node:path";
-
-
-/** `${DATA_DIR}/salesorders` */
-export const SALES_ORDER_DIR = path.join(DATA_DIR, 'salesorders');
-/** `${CLOUD_LOG_DIR}/salesorders` */
-export const SALES_ORDER_LOG_DIR = path.join(CLOUD_LOG_DIR, 'salesorders');
-/** `${DATA_DIR}/salesorders/small_subset.tsv` */
-export const SUBSET_FILE = path.join(SALES_ORDER_DIR, 'subset.tsv');
-/** `${DATA_DIR}/salesorders/small_subset.tsv` */
-export const SMALL_SUBSET_FILE = path.join(SALES_ORDER_DIR, 'small_subset.tsv');
-/** `${DATA_DIR}/salesorders/single_order.tsv` */
-export const SINGLE_ORDER_FILE = path.join(SALES_ORDER_DIR, 'single_order.tsv');
-
-/** `${DATA_DIR}/salesorders/viable` */
-export const VIABLE_SO_DIR = path.join(SALES_ORDER_DIR, 'viable');
-/** `${DATA_DIR}/salesorders/unviable` */
-export const UNVIABLE_SO_DIR = path.join(SALES_ORDER_DIR, 'unviable');
 
 const SALES_ORDER_COLUMNS = [
     'Trans #', 'S. O. #', 'P. O. #', 'Num',

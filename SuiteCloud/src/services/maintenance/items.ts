@@ -23,11 +23,9 @@ import {
     setSkuInternalId,
     getClassDictionary
 } from "../../config";
-import { getColumnValues, getRows, 
+import { 
     writeObjectToJsonSync as write, 
-    readJsonFileAsObject as read, 
-    getIndexedColumnValues, handleFileArgument, 
-    isValidCsvSync,
+    readJsonFileAsObject as read,
     getFileNameTimestamp,
     indentedStringify,
     isFile,
@@ -73,39 +71,20 @@ import {
     isReconcilerError, isReconcilerState, isReferenceFieldUpdate 
 } from "./types/Reconcile.TypeGuards";
 
-
-let wDir: string | null = null;
+/** when defined:
+ * = `path.join(getProjectFolders().dataDir, 'workspace', 
+ * 'reconciler', parentRecordType)` 
+ * */
+let reconcilerDir: string | null = null;
+// let wDir: string | null = null;
 let moduleState: ReconcilerState | null = null;
 let createOptionsDict: { [itemId: string]: Required<RecordOptions> } | null = null;
-
-export function getReconcilerState(): ReconcilerState {
-    const source = getSourceString(__filename, getReconcilerState.name);
-    if (!moduleState) {
-        throw new Error(`${source} state has not been loaded yet`);
-    }
-    try {
-        validate.objectArgument(source, {moduleState, isReconcilerState});
-    } catch(error: any) {
-        throw new Error([`${source} Invalid state`, error].join(NL))
-    }
-    return moduleState;
-}
-
-export function getCreateOptions(itemId: string): Required<RecordOptions> {
-    const source = getSourceString(__filename, getCreateOptions.name, itemId)
-    if (!createOptionsDict) {
-        throw new Error(`${source} createOptionsDict: { [itemId: string]: RecordOptions } has not been loaded yet`);
-    }
-    if (!hasKeys(createOptionsDict, itemId)) {
-        throw new Error(`${source} itemId '${itemId}' is not a key in createOptionsDict`)
-    }
-    return createOptionsDict[itemId];
-}
 
 /**
  * @TODO refactor
  */
-export async function reconcileInventoryItems(
+export async function reconcileItems(
+    oldItemType: RecordTypeEnum,
     targetItemIds: string[],
     placeholderIds: string[] | number[],
     newItems: Required<RecordOptions>[],
@@ -113,61 +92,23 @@ export async function reconcileInventoryItems(
     updateHistory: DependentUpdateHistory,
     stopAfter: ItemReconcilerStageEnum = ItemReconcilerStageEnum.END,
 ): Promise<DependentUpdateHistory> {
-    const source = getSourceString(__filename, reconcileInventoryItems.name);
+    const source = getSourceString(__filename, reconcileItems.name);
     mlog.info(`${source} (START), pre-processing...`);
-    wDir = path.join(getProjectFolders().dataDir, 'workspace');
-    validate.existingDirectoryArgument(source, {wDir});
-    let statePath = path.join(wDir, `${RecordTypeEnum.INVENTORY_ITEM}_reconcile_state.json`);
+    reconcilerDir = path.join(getProjectFolders().dataDir, 'workspace', 'reconciler', oldItemType);
+    validate.existingDirectoryArgument(source, {reconcilerDir});
+    let statePath = path.join(reconcilerDir, `${oldItemType}_state.json`);
     validate.existingFileArgument(source, '.json', {statePath});
 
     moduleState = read(statePath) as ReconcilerState;
     let state = getReconcilerState();
     state = updateState(updateHistory);
-    state.currentStage = ItemReconcilerStageEnum.PRE_PROCESS;
-    slog.debug( ` -- calling ${generateRecordDictionary.name}( Array<RecordOptions>(${newItems.length}) )`)
+    await rectifyState(updateHistory);
+    slog.debug( `${source} -> ${generateRecordDictionary.name}( Array<RecordOptions>(${newItems.length}) )`);
     createOptionsDict = generateRecordDictionary(newItems, idPropertyEnum.ITEM_ID);
-    let missingDeleteCount = 0;
-    let missingCreateCount = 0;
-    let badDeleteStateCount = 0;
-    slog.debug(` -- checking if need to modify itemsDeleted or newItems...`);
-    for (let itemId in updateHistory) {
-        let getRes = await getRecordById(Factory.SingleRecordRequest(
-            RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM, 
-            idPropertyEnum.ITEM_ID,
-            itemId, 
-            { fields: ['externalid', 'itemid'] }
-        ));
-        const [result] = getRes.results;
-        if (!result) { continue }
-        if (result.fields && isNonEmptyString(result.fields.externalid)) {
-            if (result.fields.externalid.includes(RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM)
-                && !(itemId in state.newItems) && isNumeric(getSkuDictionary()[itemId])) {
-                // then has been recreated already, need to make sure state knows that;
-                slog.debug(` -- already recreated item as '${result.fields.externalid}'`)
-                state.newItems[itemId] = getSkuDictionary()[itemId];
-                missingCreateCount++;   
-                if (!state.itemsDeleted.includes(itemId)) {
-                    state.itemsDeleted.push(itemId);
-                    missingDeleteCount++;
-                }
-            } else if (state.itemsDeleted.includes(itemId) 
-                && !result.fields.externalid.includes(RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM)) {
-                state.itemsDeleted = state.itemsDeleted.filter(item=>item !== itemId);
-                badDeleteStateCount++;
-            }
-            
-        } else {
-            throw new Error(`${source} cannot check if already recreated item (no externalid in response), ${indentedStringify(getRes)}`)
-        }
 
-    }
-    slog.debug(` --  missingDeleteCount: ${missingDeleteCount}`);
-    slog.debug(` --  missingCreateCount: ${missingCreateCount}`);
-    slog.debug(` -- badDeleteStateCount: ${badDeleteStateCount}`);
-    saveState(RecordTypeEnum.INVENTORY_ITEM);
-    
+    slog.debug( `${source} -> ${generateDependentDictionary.name}( Array<string>(${targetItemIds.length}),... )`);
     let targetItemDict: DependentDictionary = await generateDependentDictionary(
-        targetItemIds, RecordTypeEnum.INVENTORY_ITEM, refDict
+        targetItemIds, oldItemType, refDict
     );
     slog.debug([`${source} calling ${processDependentDictionary.name}(...)`,
         ` -- param itemIds.length: ${targetItemIds.length}`,
@@ -176,7 +117,7 @@ export async function reconcileInventoryItems(
     let newHistory = await processDependentDictionary(
         targetItemDict,
         placeholderIds,
-        RecordTypeEnum.INVENTORY_ITEM,
+        oldItemType,
         refDict,
         updateHistory,
         stopAfter
@@ -276,7 +217,7 @@ async function processDependentDictionary(
                     childRecordType as RecordTypeEnum, 
                     childInternalId, 
                     update, 
-                    referenceDict[childRecordType].responseOptions
+                    referenceDict[childRecordType],
                 )
                 if (isReconcilerError(updateResult)) {
                     mlog.error([`${source} ${processReferenceUpdate.name} returned error value`,
@@ -297,18 +238,17 @@ async function processDependentDictionary(
                 updateHistory[itemId].first[childRecordType][childInternalId].push(update);
                 if (j > 1 && (j + 1) % saveInterval === 0) {
                     slog.debug([
-                        ` -- [1] saveHistory(${itemId}->${childRecordType}) @ index ( ${j+1} / ${children.length} )`
+                        ` -- [1] saveHistory(${itemId} -> ${childRecordType}) @ index ( ${j+1} / ${children.length} )`
                     ].join(TAB));
                     saveHistory(updateHistory, parentRecordType);
                 }
             }
-            
-            slog.debug([
-                `  end firstChildLoop for item: '${itemId}', childRecordType: ${childRecordType}`,
-                `Elapsed time: ${((Date.now() - itemStartTime)/(60 * 1000)).toFixed(3)} minute(s)`,
-            ].join(', '));
             if (madeChangesForItem) {
-                slog.debug(` -- saving history...`)
+                slog.debug([
+                    `  end firstChildLoop for item: '${itemId}', childRecordType: ${childRecordType}`,
+                    `Elapsed time: ${((Date.now() - itemStartTime)/(60 * 1000)).toFixed(3)} minute(s)`,
+                    ` -- saving history...`
+                ].join(NL))
                 saveHistory(updateHistory, parentRecordType);
             }
         } // end firstUpdateLoop        
@@ -352,8 +292,8 @@ async function processDependentDictionary(
             const children = Object.keys(prevUpdates);
             state.currentStage = ItemReconcilerStageEnum.GENERATE_NEW_ITEM_UPDATE;
             slog.debug([
-            `start secondChildLoop for item: '${itemId}'`,
-            `${childRecordType} count: ${children.length}`
+                `start secondChildLoop for item: '${itemId}'`,
+                `${childRecordType} count: ${children.length}`
             ].join(', '));
             secondChildLoop:
             for (let j = 0; j < children.length; j++) {
@@ -380,7 +320,7 @@ async function processDependentDictionary(
                         childRecordType as RecordTypeEnum,
                         childInternalId, 
                         newUpdate, 
-                        referenceDict[childRecordType].responseOptions,
+                        referenceDict[childRecordType],
                         true
                     )
                     if (isReconcilerError(updateResult)) {
@@ -403,19 +343,21 @@ async function processDependentDictionary(
                 }
                 if (j > 1 && (j + 1) % saveInterval === 0) {
                     slog.debug([
-                        ` -- [2] saveHistory(${itemId}->${childRecordType}) @ index ( ${j+1} / ${children.length} )`
+                        ` -- [2] saveHistory(${itemId} -> ${childRecordType}) @ index ( ${j+1} / ${children.length} )`
                     ].join(TAB));
                     saveHistory(updateHistory, parentRecordType);
                 }
             }
         } // end secondUpdateLoop
         slog.debug([`  end secondUpdateLoop for item '${itemId}'`,
-            `Elapsed time: ${
-                ((Date.now() - itemStartTime)/(60 * 1000)).toFixed(3)
-            } minute(s)`,
-            ].join(', '));
+        ].join(', '));
         if (madeChangesForItem) {
-            slog.debug(` -- saving history...`)
+            slog.debug([
+                `Elapsed time: ${
+                    ((Date.now() - itemStartTime)/(60 * 1000)).toFixed(3)
+                } minute(s)`,
+                ` -- saving history...`
+            ].join(NL));
             saveHistory(updateHistory, parentRecordType);
         }
         slog.debug(`finished '${itemId}' @ keyIndex ( ${i+1} / ${itemKeys.length} )`);
@@ -434,17 +376,11 @@ async function processReferenceUpdate(
     childRecordType: RecordTypeEnum,
     childInternalId: string | number, 
     update: ReferenceFieldUpdate,
-    responseOptions: RecordResponseOptions,
+    childRefDict: SublistRecordReferenceOptions,
     isSecondUpdate: boolean = false,
 ): Promise<undefined | ReconcilerError> {
     const source = getSourceString(__filename, processReferenceUpdate.name, parentItemId);
-    try {
-        validate.stringArgument(source, {parentItemId});
-        validate.objectArgument(source, {update, isReferenceFieldUpdate});
-        if (responseOptions) validate.objectArgument(source, {responseOptions, isRecordResponseOptions});
-    } catch (error: any) {
-        return ReconcilerError(source, `Invalid parameters received`, indentedStringify(error));
-    }
+    const { responseOptions, sublistFields } = childRefDict;
     const { 
         referenceFieldId, sublistId, oldReference, 
         validationDictionary, lineCache
@@ -512,31 +448,33 @@ async function processReferenceUpdate(
             childRecordType,
             Factory.idSearchOptions(idPropertyEnum.INTERNAL_ID, childInternalId)
         );
-        const sublistUpdateDict: SublistUpdateDictionary = Object.keys(cachedLine).reduce((acc, sublistFieldId)=>{
+        const sublistUpdateDict: SublistUpdateDictionary = {};
+        sublistUpdateDict[referenceFieldId] = { // actually overwrite the reference
+            newValue: newReferenceId,
+            lineIdOptions: findLineWithOldReference
+        };
+        for (let sublistFieldId in sublistFields) {
+            sublistUpdateDict[sublistFieldId] = {
+                newValue: sublistFields[sublistFieldId],
+                lineIdOptions: findLineWithOldReference
+            };
+        }
+        Object.assign(sublistUpdateDict, Object.keys(cachedLine).reduce((acc, sublistFieldId)=>{
             acc[sublistFieldId] = {
                 newValue: cachedLine[sublistFieldId],
                 lineIdOptions: findLineWithOldReference
             }
             return acc
-        }, {} as SublistUpdateDictionary);
-        sublistUpdateDict[referenceFieldId] = { // actually overwrite the reference
-            newValue: newReferenceId,
-            lineIdOptions: findLineWithOldReference
-        }
+        }, {} as SublistUpdateDictionary));
         recordOptions.sublists[sublistId] = sublistUpdateDict;
         try {
             let putResponse = await putSingleRecord(recordOptions, responseOptions);
-            let validationResult = validateResultFields(putResponse.results[0], validationDictionary);
-            if (isReconcilerError(validationResult)) {
-                validationResult.isSecondUpdate = isSecondUpdate;
-                return validationResult;
-            }
             if (putResponse.results[0] && i === targetReferences.length - 1) {
                 allUpdatesProcessed = true;
             }
         } catch (error: any) {
             return ReconcilerError(source, 
-                `encountered error during ${putSingleRecord.name}() or ${validateResultFields.name}()`,
+                `encountered error during ${putSingleRecord.name}() or ${compareCacheData.name}()`,
                 error
             );
         }
@@ -548,62 +486,79 @@ async function processReferenceUpdate(
             {allUpdatesProcessed, isSecondUpdate, childRecordType, childInternalId}
         );
     }
-    if (allUpdatesProcessed && isSecondUpdate) { // if can do second validation
-        // slog.debug(`${source} @ second validation for ${childRecordType} '${childInternalId}'`);
-        const getRes = await getRecordById(Factory.SingleRecordRequest(
-            childRecordType, idPropertyEnum.INTERNAL_ID, childInternalId, responseOptions)
-        );
-        const resResult = getRes.results[0] as Required<RecordResult>;
-        if (!isRecordResult(resResult)) {
-            return ReconcilerError(source, `error during second validation`, 
-                `getRecordById().results[0] is invalid`, `response: ${indentedStringify(getRes)}`
-            );
-        }
-        let validationResult = validateResultFields(resResult, validationDictionary);
+    if (allUpdatesProcessed && isSecondUpdate) {
+        let validationResult = await compareCacheData(parentItemId, childRecordType, childInternalId, update, responseOptions);
         if (isReconcilerError(validationResult)) {
             return validationResult;
         }
-        let newReferenceIds = Object.keys(update.lineCache);
-        let sublistLines = resResult.sublists[sublistId] ?? [];
-        let linesWithNewReference = getLinesWithSublistFieldValue(sublistLines, referenceFieldId, ...newReferenceIds);
-        let linesWithOldReference = getLinesWithSublistFieldValue(sublistLines, referenceFieldId, oldReference);
-        if (linesWithOldReference.length > 0) {
-            return ReconcilerError(source,
-                `Update failed (get after updates validation check)`, 
-                `Invalid lastResult.sublists['${sublistId}']`, ...[
-                    `   oldReference: ${oldReference}`,
-                    `newReferenceIds: ${newReferenceIds.join(', ')}`,
-                    `linesWithOldReference.length > 0 ? ${linesWithOldReference.length > 0}`,
-                    `linesWithNewReference.length: ${linesWithNewReference.length}`,
-                    `      newReferenceIds.length: ${newReferenceIds.length}`,
-            ]);
-        }
-        // slog.debug(` -- second validation passed!`);
     }
     return;
 }
 
+
 /**
- * @param result 
- * @param validationDictionary
- * @returns `error` `if` some `result.fields[fieldId] !== validationDictionary[fieldId]` 
+ * @param parentItemId 
+ * @param childRecordType 
+ * @param childInternalId 
+ * @param fieldCache 
+ * @returns `Promise<undefined | ReconcilerError>` 
+ * - ReconcilerError `if` some `result.fields[fieldId] !== fieldCache[fieldId]`
  */
-function validateResultFields(
-    result: RecordResult,
-    validationDictionary: { [fieldId: string]: FieldValue }
-): undefined | ReconcilerError {
-    const source = getSourceString(__filename, validateResultFields.name);
+const compareCacheData = async (
+    parentItemId: string,
+    childRecordType: RecordTypeEnum,
+    childInternalId: string | number,
+    update: ReferenceFieldUpdate,
+    responseOptions: RecordResponseOptions
+): Promise<undefined | ReconcilerError> => {
+    const source = getSourceString(__filename, compareCacheData.name,
+        `${parentItemId} -> ${childInternalId}<${childRecordType}>`
+    );
+    const { 
+        sublistId, referenceFieldId, oldReference,  
+        validationDictionary: fieldCache, lineCache,
+    } = update
+    const response = await getRecordById(Factory.SingleRecordRequest(
+        childRecordType, idPropertyEnum.INTERNAL_ID, childInternalId, responseOptions
+    ))
+    const result = response.results[0] as Required<RecordResult>;
+    if (!result) {
+        return ReconcilerError(source,
+            `getRecordById() failed`,
+            `result (RecordResult) is undefined, unable to compare cache data`,
+            `get response: ${indentedStringify(response)}`
+        )
+    }
     result.fields = isObject(result.fields) ? result.fields : {};
-    for (let fieldId in validationDictionary) {
-        if (String(result.fields[fieldId]) !== String(validationDictionary[fieldId])) {
+    for (let fieldId in fieldCache) {
+        if (String(result.fields[fieldId]) !== String(fieldCache[fieldId])) {
             return ReconcilerError(source, `encountered invalid update result`,
                 `Invalid Update Result upon comparing cached values`,
-                `String(result.fields[fieldId]) !== String(validationDictionary[fieldId])`,
-                `fieldId: '${fieldId}'`,
-                `       String(result.fields[fieldId]): '${String(result.fields[fieldId])}'`,
-                `String(validationDictionary[fieldId]): '${String(validationDictionary[fieldId])}'`
-            )
+                ...[
+                `String(result.fields[fieldId]) !== String(fieldCache[fieldId])`,
+                `result.fields[ '${fieldId}' ]: '${String(result.fields[fieldId])}'`,
+                `   fieldCache[ '${fieldId}' ]: '${String(fieldCache[fieldId])}'`,
+                `   parentItemId: '${parentItemId}'`,
+                `childRecordType: '${childRecordType}'`,
+                `childInternalId: '${childInternalId}'`,
+                `fieldCache: ${Object.entries(fieldCache).join(', ')}`
+            ])
         }
+    }
+    let newReferenceIds = Object.keys(lineCache);
+    let sublistLines = result.sublists[sublistId] ?? [];
+    let linesWithNewReference = getLinesWithSublistFieldValue(sublistLines, referenceFieldId, ...newReferenceIds);
+    let linesWithOldReference = getLinesWithSublistFieldValue(sublistLines, referenceFieldId, oldReference);
+    if (linesWithOldReference.length > 0) {
+        return ReconcilerError(source,
+            `Update failed (get after updates validation check)`, 
+            `Invalid lastResult.sublists['${sublistId}']`, ...[
+                `   oldReference: ${oldReference}`,
+                `newReferenceIds: ${newReferenceIds.join(', ')}`,
+                `linesWithOldReference.length > 0 ? ${linesWithOldReference.length > 0}`,
+                `linesWithNewReference.length: ${linesWithNewReference.length}`,
+                `      newReferenceIds.length: ${newReferenceIds.length}`,
+        ]);
     }
 }
 
@@ -686,7 +641,7 @@ async function handleDelete(
         return ReconcilerError(source, `${source} hasDependentRecords returned error`, stillHasDependents)
     }
     if (stillHasDependents) {
-        return ReconcilerError(source, ` -- safeToDelete === false, aborting itemLoop`, {
+        return ReconcilerError(source, ` -- safeToDelete === false, aborting...`, {
             timestamp: getCurrentPacificTime(), itemId, stage: state.currentStage, stillHasDependents
         })
     }
@@ -720,7 +675,7 @@ async function generatePlaceholderUpdate(
     placeholderIds: string[] | number[]
 ): Promise<ReferenceFieldUpdate | ReconcilerError> {
     const source = getSourceString(__filename, generatePlaceholderUpdate.name, 
-        JSON.stringify({parentItemId, childRecordType, childInternalId})
+        `${parentItemId}<${parentRecordType}> -> ${childInternalId}<${childRecordType}>`
     );
     const { 
         referenceFieldId, 
@@ -823,7 +778,6 @@ async function generatePlaceholderUpdate(
         .filter(p=>!existingReferences.includes(p))
         .slice(0, targetLines.length)
     );
-    // newReferenceIds = newReferenceIds.slice(0, targetLines.length);
     if (targetLines.length > placeholderIds.length && placeholderIds.length !== 1) {
         return ReconcilerError(source,
             `Unable to associate new reference id's to each occurrence of oldReferenceId`,
@@ -864,12 +818,155 @@ async function generatePlaceholderUpdate(
 
 
 
-// const itemIdExtractor = async (
-//     value: string, 
-//     cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
-// ): Promise<string> => {
-//     return clean(extractLeaf(value), cleanOptions);
-// }
+async function rectifyState(
+    updateHistory: DependentUpdateHistory
+): Promise<void> {    
+    const source = getSourceString(__filename, rectifyState.name);
+    const state = getReconcilerState();
+    state.currentStage = ItemReconcilerStageEnum.VALIDATE_INITIAL_STATE;
+    const count = {
+        missingDelete: 0,
+        missingCreate: 0,
+        badDeleteStateCount: 0
+    }
+    slog.debug(`${source} checking if need to modify itemsDeleted or newItems...`);
+    for (let itemId in updateHistory) {
+        let getRes = await getRecordById(Factory.SingleRecordRequest(
+            RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM, 
+            idPropertyEnum.ITEM_ID,
+            itemId, 
+            { fields: ['externalid', 'itemid'] }
+        ));
+        const [result] = getRes.results;
+        if (!result) { continue }
+        if (result.fields && isNonEmptyString(result.fields.externalid)) {
+            if (result.fields.externalid.includes(RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM)
+                && !(itemId in state.newItems) && isNumeric(getSkuDictionary()[itemId])) {
+                // then has been recreated already, need to make sure state knows that;
+                slog.debug(` -- already recreated item as '${result.fields.externalid}'`)
+                state.newItems[itemId] = getSkuDictionary()[itemId];
+                count.missingCreate++;   
+                if (!state.itemsDeleted.includes(itemId)) {
+                    state.itemsDeleted.push(itemId);
+                    count.missingDelete++;
+                }
+            } else if (state.itemsDeleted.includes(itemId) 
+                && !result.fields.externalid.includes(RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM)) {
+                state.itemsDeleted = state.itemsDeleted.filter(item=>item !== itemId);
+                count.missingDelete++;
+            }
+        } else {
+            throw new Error(`${source} cannot check if already recreated item (no externalid in response), ${indentedStringify(getRes)}`)
+        }
+
+    }
+    if (Object.values(count).some(v=> v > 0)) {
+        slog.debug([`${source} state rectified: ${indentedStringify(count)}`,
+            `saving state...`
+        ].join(NL));
+        saveState(RecordTypeEnum.INVENTORY_ITEM);
+    } else {
+        slog.debug( `${source} no corrections necessary`);
+    }
+}
+
+function updateState(
+    updateHistory: DependentUpdateHistory,
+): ReconcilerState {
+    const source = getSourceString(__filename, updateState.name)
+    const state = getReconcilerState();
+    state.currentStage = ItemReconcilerStageEnum.EVALUATE_INITIAL_STATE;
+    let numEdits = 0;
+    for (let itemId in updateHistory) {
+        if (!state.firstUpdate[itemId]) {
+            state.firstUpdate[itemId] = {};
+        }
+        if (!state.secondUpdate[itemId]) {
+            state.secondUpdate[itemId] = {};
+        }
+        for (let childRecordType in updateHistory[itemId].first) {
+            if (!state.firstUpdate[itemId][childRecordType]) {
+                state.firstUpdate[itemId][childRecordType] = [];
+            }
+            for (let childInternalId in updateHistory[itemId].first[childRecordType]) {
+                if (isNonEmptyArray(updateHistory[itemId].first[childRecordType][childInternalId])
+                    && !state.firstUpdate[itemId][childRecordType].includes(childInternalId)) {
+                    state.firstUpdate[itemId][childRecordType].push(childInternalId);
+                    numEdits++;
+                }
+            }
+        }
+        for (let childRecordType in updateHistory[itemId].second) {
+            if (!state.secondUpdate[itemId][childRecordType]) {
+                state.secondUpdate[itemId][childRecordType] = [];
+            }
+            for (let childInternalId in updateHistory[itemId].second[childRecordType]) {
+                if (isNonEmptyArray(updateHistory[itemId].second[childRecordType][childInternalId]) 
+                    && !state.secondUpdate[itemId][childRecordType].includes(childInternalId)) {
+                    state.secondUpdate[itemId][childRecordType].push(childInternalId);
+                    numEdits++;
+                }
+            }
+        }
+    }
+    slog.debug(` -- ${source} numEdits: ${numEdits}`);
+    return state;
+}
+
+function saveState(
+    parentRecordType: RecordTypeEnum,
+    addTimestampPrefix: boolean = false
+): void {
+    const source = getSourceString(__filename, saveState.name);
+    const state = getReconcilerState();
+    if (!isNonEmptyString(reconcilerDir)) {
+        throw new Error(`${source} reconcilerDir (workspace directory) is undefined`);
+    }
+    const statePath = path.join(
+        reconcilerDir, 
+        (addTimestampPrefix ? `${getFileNameTimestamp()}_` : '')
+            +`${parentRecordType}_state.json`
+    );
+    try { 
+        write(state, statePath);
+    } catch (error: any) {
+        throw new Error([`${source} error saving history`,
+            `attempted write @ filePath: '${statePath}'`,
+        ].join(TAB));
+    }
+}
+
+/**
+ * @description writes `currentHistory` to 
+ * - `'wDir/${parentRecordType}_update_history.json'`;
+ * - `'wDir/${getFileNameTimestamp()}_${parentRecordType}_update_history.json'`
+ * @param currentHistory 
+ * @param parentRecordType 
+ * @param addTimestampPrefix 
+ */
+function saveHistory(
+    currentHistory: DependentUpdateHistory,
+    parentRecordType: RecordTypeEnum,
+    addTimestampPrefix: boolean = false
+): void {
+    const source = getSourceString(__filename, saveHistory.name);
+    if (!isNonEmptyString(reconcilerDir)) {
+        throw new Error([`${source} reconcilerDir (workspace directory) is undefined`,
+        ].join(TAB));
+    }
+    let historyPath = path.join(
+        reconcilerDir, 
+        (addTimestampPrefix ? `${getFileNameTimestamp()}_` : '')
+            +`${parentRecordType}_update_history.json`
+    );
+    try { 
+        write(currentHistory, historyPath);
+    } catch (error: any) {
+        throw new Error([`${source} error saving history`,
+            `attempted write @ filePath: '${historyPath}'`,
+        ].join(TAB));
+    }
+}
 
 /**
  * - this function should be redundant if I modify the history object correctly/safely in {@link processDependentDictionary}
@@ -934,103 +1031,6 @@ export function appendUpdateHistory(
     return existingHistory;
 }
 
-function updateState(
-    updateHistory: DependentUpdateHistory,
-): ReconcilerState {
-    const source = getSourceString(__filename, updateState.name)
-    const state = getReconcilerState();
-    let numEdits = 0;
-    for (let itemId in updateHistory) {
-        if (!state.firstUpdate[itemId]) {
-            state.firstUpdate[itemId] = {};
-        }
-        if (!state.secondUpdate[itemId]) {
-            state.secondUpdate[itemId] = {};
-        }
-        for (let childRecordType in updateHistory[itemId].first) {
-            if (!state.firstUpdate[itemId][childRecordType]) {
-                state.firstUpdate[itemId][childRecordType] = [];
-            }
-            for (let childInternalId in updateHistory[itemId].first[childRecordType]) {
-                if (isNonEmptyArray(updateHistory[itemId].first[childRecordType][childInternalId])
-                    && !state.firstUpdate[itemId][childRecordType].includes(childInternalId)) {
-                    state.firstUpdate[itemId][childRecordType].push(childInternalId);
-                    numEdits++;
-                }
-            }
-        }
-        for (let childRecordType in updateHistory[itemId].second) {
-            if (!state.secondUpdate[itemId][childRecordType]) {
-                state.secondUpdate[itemId][childRecordType] = [];
-            }
-            for (let childInternalId in updateHistory[itemId].second[childRecordType]) {
-                if (isNonEmptyArray(updateHistory[itemId].second[childRecordType][childInternalId]) 
-                    && !state.secondUpdate[itemId][childRecordType].includes(childInternalId)) {
-                    state.secondUpdate[itemId][childRecordType].push(childInternalId);
-                    numEdits++;
-                }
-            }
-        }
-    }
-    slog.debug(` -- ${source} numEdits: ${numEdits}`);
-    return state;
-}
-
-function saveState(
-    parentRecordType: RecordTypeEnum,
-    addTimestampPrefix: boolean = false
-): void {
-    const source = getSourceString(__filename, saveState.name);
-    const state = getReconcilerState();
-    if (!wDir) {
-        throw new Error(`${source} wDir is undefined`);
-    }
-    const statePath = path.join(
-        wDir, 
-        (addTimestampPrefix ? `${getFileNameTimestamp()}_` : '')
-            +`${parentRecordType}_reconcile_state.json`
-    );
-    try { 
-        write(state, statePath);
-    } catch (error: any) {
-        throw new Error([`${source} error saving history`,
-            `attempted write @ filePath: '${statePath}'`,
-        ].join(TAB));
-    }
-}
-
-/**
- * @description writes `currentHistory` to 
- * - `'wDir/${parentRecordType}_update_history.json'`;
- * - `'wDir/${getFileNameTimestamp()}_${parentRecordType}_update_history.json'`
- * @param currentHistory 
- * @param parentRecordType 
- * @param addTimestampPrefix 
- */
-function saveHistory(
-    currentHistory: DependentUpdateHistory,
-    parentRecordType: RecordTypeEnum,
-    addTimestampPrefix: boolean = false
-): void {
-    const source = getSourceString(__filename, saveHistory.name);
-    if (!isNonEmptyString(wDir)) {
-        throw new Error([`${source} wDir (workspace directory) is undefined`,
-        ].join(TAB));
-    }
-    let historyPath = path.join(
-        wDir, 
-        (addTimestampPrefix ? `${getFileNameTimestamp()}_` : '')
-            +`${parentRecordType}_update_history.json`
-    );
-    try { 
-        write(currentHistory, historyPath);
-    } catch (error: any) {
-        throw new Error([`${source} error saving history`,
-            `attempted write @ filePath: '${historyPath}'`,
-        ].join(TAB));
-    }
-}
-
 
 /**
  * assumes elements of parentItems are keys in skuDictionary()
@@ -1046,7 +1046,9 @@ async function generateDependentDictionary(
 ): Promise<DependentDictionary> {
     const source = getSourceString(__filename, generateDependentDictionary.name);
     const state = getReconcilerState();
+    state.currentStage = ItemReconcilerStageEnum.GENERATE_DEPENDENT_DICTIONARY;
     const dict: DependentDictionary = {};
+    // let maxItemIdLength = Math.max(...parentItems.map(p=>p.length));
     itemLoop:
     for (let itemId of parentItems) {
         dict[itemId] = {};
@@ -1063,15 +1065,15 @@ async function generateDependentDictionary(
                         refDict[childRecordType].sublistId
                     )]
                 ));
-                await DELAY(700, null);
+                // await DELAY(500, null);
                 if (isNonEmptyArray(getRes.results)) {
                     let children = getRes.results.map(r=>String(r.internalid));
                     dict[itemId][childRecordType] = children;
-                    // slog.debug(
-                    //     ` -- ${parentRecordType} ${itemId.padEnd(maxItemIdLength)}`,
-                    //     `has ${String(children.length).padEnd(5)} ${childRecordType} record(s)`
-                    // );
+                    slog.debug(
+                        ` -- ${itemId}<${parentRecordType}> has ${children.length} ${childRecordType} record(s)`
+                    );
                 } else {
+                    slog.warn(` -- found 0 ${childRecordType} record(s) for ${itemId}<${parentRecordType}>`)
                     continue itemLoop;
                 }
             } catch (error: any) {
@@ -1091,8 +1093,52 @@ async function generateDependentDictionary(
     return dict;
 }
 
+
+
+function getReconcilerState(): ReconcilerState {
+    const source = getSourceString(__filename, getReconcilerState.name);
+    if (!moduleState) {
+        throw new Error(`${source} state has not been loaded yet`);
+    }
+    try {
+        validate.objectArgument(source, {moduleState, isReconcilerState});
+    } catch(error: any) {
+        throw new Error([`${source} Invalid state`, error].join(NL))
+    }
+    return moduleState;
+}
+
+function getCreateOptions(itemId: string): Required<RecordOptions> {
+    const source = getSourceString(__filename, getCreateOptions.name, itemId)
+    if (!createOptionsDict) {
+        throw new Error(`${source} createOptionsDict: { [itemId: string]: RecordOptions } has not been loaded yet`);
+    }
+    if (!hasKeys(createOptionsDict, itemId)) {
+        throw new Error(`${source} itemId '${itemId}' is not a key in createOptionsDict`)
+    }
+    return createOptionsDict[itemId];
+}
+
+
+/**
+ * @notimplemented
+ * @param parentItemId 
+ * @param parentInternalId 
+ * @param parentRecordType 
+ * @param childRecordType 
+ * @param childInternalIds 
+ * @returns 
+ */
 async function performFinalValidation(
-    dependentIdDict: DependentDictionary
+    parentItemId: string,
+    parentInternalId: string | number,
+    parentRecordType: RecordTypeEnum,
+    childRecordType: RecordTypeEnum,
+    childInternalIds: string[],
+    transactions: Required<RecordOptions>[]
 ): Promise<any> {
-    const source = getSourceString(__filename, performFinalValidation.name);
+    const source = getSourceString(__filename, performFinalValidation.name, 
+        `${parentItemId}: <${childRecordType}>(${childInternalIds.length})`
+    );
+    throw new Error(`${source} Not implemented`)
 }

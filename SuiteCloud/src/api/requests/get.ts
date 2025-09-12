@@ -29,7 +29,8 @@ import * as validate from "typeshi:utils/argumentValidation";
 import { getSourceString } from "typeshi:utils/io";
 import { SingleRecordRequest } from "../types";
 import { AccountEnvironmentEnum, ScriptTypeEnum } from "@utils/ns";
-
+import { Factory } from "@api/factory";
+import { standardizeResponse } from "@api/response";
 
 /**
  * @param request {@link SingleRecordRequest}
@@ -97,7 +98,14 @@ export async function getRecordById(
             getSandboxRestScript("GET_Record").deployId,
             request
         );
-        return response.data as RecordResponse;
+        const recordResponse = response.data ?? Factory.RecordResponse(
+            500,
+            `${getRecordById.name}() failed`, 
+            `${source} response.data (RecordResponse) is undefined`,
+            undefined, 
+            [request], 
+        );
+        return standardizeResponse(recordResponse);
     } catch (error: any) {
         mlog.error([`${source} ERROR:`,
             `   name: ${error.name}`,
@@ -109,7 +117,7 @@ export async function getRecordById(
             {timestamp: getCurrentPacificTime(), caught: error}, 
             path.join(getProjectFolders().logDir, 'errors', `${getFileNameTimestamp()}_ERROR_${getRecordById.name}.json`)
         );
-        throw new Error(`${source} Failed`);
+        throw new Error(`${source} Failed, ${error}`);
     }
 }
 

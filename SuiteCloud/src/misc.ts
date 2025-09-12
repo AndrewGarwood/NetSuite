@@ -39,13 +39,17 @@ import {
     getOneToManyDictionary,
     getOneToOneDictionary,
     isFile,
+    getFileNameTimestamp,
 } from "typeshi:utils/io";
 import { 
+    deleteRecord,
     Factory,
     FieldDictionary,
     FieldValue,
+    isIdOptions,
     isRecordOptions,
     isRecordResult,
+    LogTypeEnum,
     putSingleRecord, 
 } from "./api";
 import { 
@@ -58,10 +62,6 @@ import {
 import { SalesOrderColumnEnum } from "./parse_configurations/salesorder/salesOrderConstants";
 import { CustomerColumnEnum } from "./parse_configurations/customer/customerConstants";
 import { ItemColumnEnum } from "./parse_configurations/item/itemConstants";
-import { 
-    LN_INVENTORY_ITEM_PARSE_OPTIONS, 
-    LN_INVENTORY_ITEM_POST_PROCESSING_OPTIONS 
-} from "src/parse_configurations/item/itemParseDefinition";
 import { 
     hasKeys, isEmpty, isEmptyArray, isInteger, isIntegerArray, isNonEmptyArray, 
     isNonEmptyString, 
@@ -80,18 +80,15 @@ import {
     CLEAN_ITEM_ID_OPTIONS, itemId, unitType 
 } from "src/parse_configurations/evaluators/item";
 import { 
-    reconcileInventoryItems, 
+    reconcileItems, 
     appendUpdateHistory, isDependentUpdateHistory, 
     DependentUpdateHistory, 
     sublistReferenceDictionary,
-    ReconcilerState
+    soResponseOptions
 } from "src/services/maintenance";
 import * as validate from "typeshi:utils/argumentValidation";
 
-/**
- * @TODO test if PUT_Record still works with findSublistLineWithValue() changes...
- * need to see if it works with string or number for item internalid
- */
+
 async function main(): Promise<void> {
     const source = getSourceString(__filename, main.name);
     await initializeEnvironment();
@@ -103,36 +100,8 @@ async function main(): Promise<void> {
     let wDir = path.join(getProjectFolders().dataDir, 'workspace');
     const startTime = Date.now();
     /* ===================================================================== */
-    try {
-        validate.existingDirectoryArgument(source, {wDir});
-        let soData = read(
-            path.join(wDir, 'item_to_salesorders.json')
-        ) as { [itemId: string]: RecordResult[] } ?? {};
-        let initialItemKeys = Object.keys(soData);
-        
-        const placeholderPath = path.join(wDir, 'item_placeholders.json');
-        let placeholders = (read(placeholderPath) as { placeholders: Required<RecordResult>[] }).placeholders;
-        validate.arrayArgument(source, {placeholders, isRecordResult});
-        let placeholderIds = placeholders.map(p=>p.internalid);
 
-        const newItemsPath = path.join(wDir, `${RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM}_options.json`);
-        let newItems = await getItemRecordOptions(newItemsPath);
 
-        const historyPath = path.join(wDir, `${RecordTypeEnum.INVENTORY_ITEM}_update_history.json`);
-        validate.existingFileArgument(source, '.json', {historyPath});
-        let updateHistory = read(historyPath);
-        validate.objectArgument(source, {updateHistory, isDependentUpdateHistory});
-        await DELAY(1000, `calling ${reconcileInventoryItems.name}()...`);
-        let newHistory = await reconcileInventoryItems(initialItemKeys,
-            placeholderIds, newItems, sublistReferenceDictionary, updateHistory
-        );
-        updateHistory = appendUpdateHistory(updateHistory, newHistory);
-        write(updateHistory, historyPath);
-    } catch (error: any) {
-        mlog.error([`${source} reconciliation failed...`,
-            indentedStringify(error)
-        ].join(NL));
-    }
     /* ===================================================================== */
     let elapsedTimeMinutes = ((Date.now() - startTime) / (1000 * 60)).toFixed(3); 
     mlog.info([`${source} END at ${getCurrentPacificTime()}`,
@@ -149,6 +118,44 @@ if (require.main === module) {
         STOP_RUNNING(1);
     });
 }
+
+/**
+ * moved stuff from main to here to work on other thing
+ */
+async function runItemReconciler(): Promise<any> {  
+    const source = getSourceString(__filename, runItemReconciler.name);
+    let wDir = path.join(getProjectFolders().dataDir, 'workspace');
+    try {
+        validate.existingDirectoryArgument(source, {wDir});
+        let reconcilerDir = path.join(wDir, 'reconciler', RecordTypeEnum.INVENTORY_ITEM);
+        validate.existingDirectoryArgument(source, {reconcilerDir});
+        const placeholderPath = path.join(wDir, 'reconciler', 'item_placeholders.json');
+        const newItemsPath = path.join(reconcilerDir, `${RecordTypeEnum.LOT_NUMBERED_INVENTORY_ITEM}_options.json`);
+        const historyPath = path.join(reconcilerDir, `${RecordTypeEnum.INVENTORY_ITEM}_update_history.json`);
+        validate.multipleExistingFileArguments(source, '.json', {
+            placeholderPath, newItemsPath, historyPath
+        });
+        let initialItemKeys = Object.keys(read(path.join(wDir, 'item_to_salesorders.json')));
+        
+        let placeholders = (read(placeholderPath) as { placeholders: Required<RecordResult>[] }).placeholders;
+        validate.arrayArgument(source, {placeholders, isRecordResult});
+        let placeholderIds = placeholders.map(p=>p.internalid);
+
+        let newItems = await getItemRecordOptions(newItemsPath);
+        let updateHistory = read(historyPath);
+        validate.objectArgument(source, {updateHistory, isDependentUpdateHistory});
+        await DELAY(1000, `${source} calling ${reconcileItems.name}()...`);
+        let newHistory = await reconcileItems(RecordTypeEnum.INVENTORY_ITEM, initialItemKeys,
+            placeholderIds, newItems, sublistReferenceDictionary, updateHistory
+        );
+        updateHistory = appendUpdateHistory(updateHistory, newHistory);
+        write(updateHistory, historyPath);
+    } catch (error: any) {
+        mlog.error([`${source} reconciliation failed: ${error}`
+        ].join(NL));
+    }
+}
+
 /**
  * just wanted to move this code block out of main()
  * @TODO parameterize

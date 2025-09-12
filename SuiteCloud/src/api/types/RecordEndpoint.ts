@@ -113,8 +113,8 @@ export type RecordResponseOptions = {
 export type RecordResult = { 
     internalid: number;
     recordType: RecordTypeEnum; 
-    fields?: FieldDictionary;
-    sublists?: { [sublistId: string]: SublistLine[] }; 
+    fields: FieldDictionary;
+    sublists: { [sublistId: string]: SublistLine[] }; 
 };
 
 

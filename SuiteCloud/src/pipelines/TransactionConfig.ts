@@ -5,7 +5,7 @@
 import path from "node:path";
 import { EntityRecordTypeEnum, RecordResponseOptions, RecordTypeEnum } from "../api";
 import * as soConstants from "../parse_configurations/salesorder/salesOrderConstants";
-import { SALES_ORDER_POST_PROCESSING_OPTIONS, SALES_ORDER_PARSE_OPTIONS } from "../parse_configurations/salesorder/salesOrderParseDefinition";
+import { SALES_ORDER_POST_PROCESSING_OPTIONS, SALES_ORDER_PARSE_OPTIONS, SALES_ORDER_AMOUNT_VALIDATION_PARSE_OPTIONS } from "../parse_configurations/salesorder/salesOrderParseDefinition";
 import { 
     LocalFileMatchOptions, MatchSourceEnum, 
     TransactionEntityMatchOptions, TransactionMainPipelineOptions, 
@@ -39,7 +39,7 @@ export const ALL_TRANSACTION_STAGES = Object.values(TransactionMainPipelineStage
 //     internalIdColumn: 'Internal ID'
 // } as LocalFileMatchOptions
 
-export const DEFAULT_MATCH_OPTIONS: TransactionEntityMatchOptions = {
+export const DEFAULT_TRANSACTION_MATCH_OPTIONS: TransactionEntityMatchOptions = {
     entityType: EntityRecordTypeEnum.CUSTOMER,
     entityFieldId: 'entity',
     matchMethod: MatchSourceEnum.API,
@@ -53,11 +53,28 @@ export const SALES_ORDER_PIPELINE_CONFIG: TransactionMainPipelineOptions = {
     postProcessingOptions: { 
         [RecordTypeEnum.SALES_ORDER]: SALES_ORDER_POST_PROCESSING_OPTIONS 
     } as PostProcessDictionary,
-    matchOptions: DEFAULT_MATCH_OPTIONS,
+    matchOptions: DEFAULT_TRANSACTION_MATCH_OPTIONS,
     generateMissingEntities: true,
     stagesToWrite: [
-        // TransactionPipelineStageEnum.PARSE,
-        TransactionMainPipelineStageEnum.PUT_SALES_ORDERS
+        // TransactionMainPipelineStageEnum.PARSE,
+        TransactionMainPipelineStageEnum.VALIDATE
     ],
-    stopAfter: TransactionMainPipelineStageEnum.END
+    stopAfter: TransactionMainPipelineStageEnum.VALIDATE
+}
+
+export const VALIDATION_SALES_ORDER_PIPELINE_CONFIG: TransactionMainPipelineOptions = {
+    parseOptions: { 
+        [RecordTypeEnum.SALES_ORDER]: SALES_ORDER_AMOUNT_VALIDATION_PARSE_OPTIONS 
+    } as ParseDictionary,
+    postProcessingOptions: { 
+        [RecordTypeEnum.SALES_ORDER]: SALES_ORDER_POST_PROCESSING_OPTIONS 
+    } as PostProcessDictionary,
+    matchOptions: DEFAULT_TRANSACTION_MATCH_OPTIONS,
+    generateMissingEntities: false,
+    stagesToWrite: [
+        // TransactionMainPipelineStageEnum.PARSE,
+        TransactionMainPipelineStageEnum.VALIDATE
+    ],
+    stopAfter: TransactionMainPipelineStageEnum.VALIDATE
+
 }

@@ -1,5 +1,5 @@
 /**
- * @file src/api/factory.ts
+ * @file src/api/requestFactory.ts
  * @consideration maybe i should just make classes for the types....
  */
 
@@ -9,7 +9,8 @@ import {
     idPropertyEnum, idSearchOptions, ChildSearchOptions, 
     FieldDictionary,
     SublistDictionary, RecordOptions,
-    isIdSearchOptions,
+    isIdSearchOptions, RecordResponse, RecordResult,
+    LogStatement
 } from "./types";
 import { getSourceString } from "@typeshi/io";
 import { RecordTypeEnum, SearchOperatorEnum } from "@utils/ns/Enums";
@@ -21,7 +22,8 @@ export const Factory = {
     SingleRecordRequest,
     ChildSearchOptions,
     idSearchOptions,
-    RecordOptions
+    RecordOptions,
+    RecordResponse
 }
 
 function RelatedRecordRequest(
@@ -125,4 +127,22 @@ function RecordOptions(
         sublists: sublists ?? {},
         meta: meta ?? {}
     } as Required<RecordOptions>
+}
+
+function RecordResponse(
+    status: number = 500,
+    message: string = `An unexpected error occurred -> unable to fulfill request or obtain response`,
+    error: any = `An unexpected error occurred`,
+    results: RecordResult[] = [],
+    rejects: any[] = [],
+    logs: LogStatement[] = []
+): Required<RecordResponse> {
+    return {
+        status: status,
+        message: message,
+        results: results,
+        rejects: rejects,
+        error: error,
+        logs: logs
+    } as Required<RecordResponse>
 }

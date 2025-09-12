@@ -3,7 +3,7 @@
  */
 
 import { 
-    pruneLogger as plog, mainLogger as mlog, INDENT_LOG_LINE as TAB 
+    pruneLogger as plog, mainLogger as mlog, INDENT_LOG_LINE as TAB, simpleLogger as slog 
 } from "../config/setupLog";
 import { 
     FieldDictionary,
@@ -17,7 +17,8 @@ import {
     SubrecordValue,
 } from "../api/types";
 import { 
-    hasKeys, isNullLike as isNull, isNonEmptyArray, isNonEmptyString 
+    hasKeys, isEmpty, isInteger, isNonEmptyArray, isNonEmptyString, 
+    isNumeric
 } from "typeshi:utils/typeValidation";
 import { clean, 
     equivalentAlphanumericStrings, 
@@ -26,13 +27,9 @@ import { clean,
 import { EntityRecordTypeEnum, RecordTypeEnum } from "../utils/ns/Enums";
 import { indentedStringify } from "typeshi:utils/io/writing";
 import { RADIO_FIELD_FALSE, RADIO_FIELD_TRUE } from "../utils/ns";
+import { getSourceString } from "@typeshi/io";
 
-/** `['entity', 'trandate']` */
-const SALES_ORDER_REQUIRED_FIELDS = ['entity', 'trandate'];
-
-const CONTACT_REQUIRED_FIELDS = ['firstname', 'lastname']
-const ADDRESS_REQUIRED_FIELDS = ['addr1']; // , 'country'
-const ENTITY_REQUIRED_FIELDS = ['entityid', 'companyname'] // 'isperson', 
+const requiredNameFields = ['firstname', 'lastname'];
 /** 
  * `ENTITY_REQUIRED_FIELDS = ['entityid', 'companyname']` 
  * - `if` entity isperson, call {@link nameFieldsAreRequired}, 
@@ -41,35 +38,36 @@ const ENTITY_REQUIRED_FIELDS = ['entityid', 'companyname'] // 'isperson',
  * */
 export const entity = (
     options: RecordOptions,
+    requiredFields: string[] = ['entityid', 'companyname'] // 'isperson'
 ): RecordOptions | null => {
-    if (isNull(options) || !options.fields) {
+    if (isEmpty(options) || !options.fields) {
         plog.warn(`pruneEntity(): options or options.fields is null or undefined, returning null`);
         return null;
     }
     if (!Object.values(EntityRecordTypeEnum).includes(options.recordType as EntityRecordTypeEnum)) {
-        mlog.error(`pruneEntity(): options.recordType is not a valid EntityRecordType`,
-            TAB+`expected one of: ${JSON.stringify(Object.values(EntityRecordTypeEnum))}`,
-            TAB+`       received: '${options.recordType}'`
-        );
+        mlog.error([`pruneEntity(): options.recordType is not a valid EntityRecordType`,
+            `expected one of: ${JSON.stringify(Object.values(EntityRecordTypeEnum))}`,
+            `       received: '${options.recordType}'`
+        ].join(TAB));
         return null;
     }
-    if (!hasKeys(options.fields, ENTITY_REQUIRED_FIELDS)) { 
-        plog.warn(`pruneEntity(): options.fields does not have required fields.`,
-            TAB+`required: ${JSON.stringify(ENTITY_REQUIRED_FIELDS)}`,
-            TAB+`received: ${JSON.stringify(options.fields)}`
-        );
+    if (!hasKeys(options.fields, requiredFields)) { 
+        plog.warn([`pruneEntity(): options.fields does not have required fields.`,
+            `required: ${JSON.stringify(requiredFields)}`,
+            `received: ${JSON.stringify(options.fields)}`
+        ].join(TAB));
         return null; 
     }
     if (options.fields.isperson === RADIO_FIELD_TRUE 
-        && !hasKeys(options.fields, CONTACT_REQUIRED_FIELDS)) {
-        plog.warn(`prune.entity(): options.fields does not have required fields.`,
-            TAB+`recordType: ${options.recordType}`,
-            TAB+`required: ${JSON.stringify(CONTACT_REQUIRED_FIELDS)}`,
-            TAB+`received: ${JSON.stringify(Object.keys(options.fields))}`
-        );
+        && !hasKeys(options.fields, requiredNameFields)) {
+        plog.warn([`prune.entity(): options.fields does not have required fields.`,
+            `recordType: ${options.recordType}`,
+            `required: ${JSON.stringify(requiredFields)}`,
+            `received: ${JSON.stringify(Object.keys(options.fields))}`
+        ].join(TAB));
         return null;
     } else if (options.fields.isperson === RADIO_FIELD_FALSE) {
-        const nameFields = [...CONTACT_REQUIRED_FIELDS, 'middlename', 'salutation', 'title'];
+        const nameFields = [...requiredFields, 'middlename', 'salutation', 'title'];
         for (const nameFieldId of nameFields) {
             if (nameFieldId in options.fields) {
                 delete options.fields[nameFieldId];
@@ -81,24 +79,24 @@ export const entity = (
 }
 
 /**
- * - {@link ADDRESS_REQUIRED_FIELDS} = `['addr1']`
  * @param addressOptions {@link SetFieldSubrecordOptions} | {@link SetSublistSubrecordOptions}
  * @returns **`addressOptions`** {@link SetFieldSubrecordOptions} | {@link SetSublistSubrecordOptions} | null
  */
 export const address = (
-    addressOptions: SetFieldSubrecordOptions | SetSublistSubrecordOptions
+    addressOptions: SetFieldSubrecordOptions | SetSublistSubrecordOptions,
+    requiredFields: string[] = ['addr1']
 ): SetFieldSubrecordOptions | SetSublistSubrecordOptions | null => {
     if (!addressOptions || !addressOptions.fields) {
-        mlog.error(`[prune.address()] Invalid 'address' parameter:`, 
-            TAB+`address is undefined or does not have the 'fields' property`
-        );
+        mlog.error([`[prune.address()] Invalid 'address' parameter:`, 
+            `address is undefined or does not have the 'fields' property`
+        ].join(TAB));
         return null;
     }
-    if (!hasKeys(addressOptions.fields, ADDRESS_REQUIRED_FIELDS)) {
-        plog.warn(`[prune.address()]: address not have required fields. returning null.`,
-            TAB+`required: ${JSON.stringify(ADDRESS_REQUIRED_FIELDS)}`,
-            TAB+`received: ${JSON.stringify(Object.keys(addressOptions.fields))}`,
-        );
+    if (!hasKeys(addressOptions.fields, requiredFields)) {
+        plog.warn([`[prune.address()]: address not have required fields. returning null.`,
+            `required: ${JSON.stringify(requiredFields)}`,
+            `received: ${JSON.stringify(Object.keys(addressOptions.fields))}`,
+        ].join(TAB));
         return null;
     }
     const attentionIsRedundant = Boolean(addressOptions.fields 
@@ -113,10 +111,10 @@ export const address = (
         )
     );
     if (attentionIsRedundant) {
-        plog.info(`[prune.address()]: address.attention is redundant with address.addressee , deleting it.`,
-            TAB+`addressee: ${addressOptions.fields.addressee}`,
-            TAB+`attention: ${addressOptions.fields.attention}`
-        );
+        plog.info([`[prune.address()]: address.attention is redundant with address.addressee , deleting it.`,
+            `addressee: ${addressOptions.fields.addressee}`,
+            `attention: ${addressOptions.fields.attention}`
+        ].join(TAB));
         delete addressOptions.fields.attention;
     }
     delete addressOptions.sublists; // delete the empty object created by the parser
@@ -130,8 +128,9 @@ export const address = (
  * */
 export const pruneAddressBook = (
     options: RecordOptions,
+    requiredFields: string[] = ['addr1']
 ): RecordOptions | null => {
-    if (isNull(options) || !options.sublists) {
+    if (isEmpty(options) || !options.sublists) {
         return null;
     }
     const linesToKeep: number[] = [];
@@ -140,7 +139,7 @@ export const pruneAddressBook = (
     for (let i = 0; i < addressBook.length; i++) {
         const sublistLine = addressBook[i];
         let addressOptions = sublistLine.addressbookaddress as SetSublistSubrecordOptions;
-        let validatedAddress = address(addressOptions) as SetSublistSubrecordOptions | null;
+        let validatedAddress = address(addressOptions, requiredFields) as SetSublistSubrecordOptions | null;
         if (!validatedAddress) { continue; }
         addressBook[i].addressbookaddress = validatedAddress;
         linesToKeep.push(i);
@@ -165,44 +164,45 @@ export const pruneAddressBook = (
  */
 export const contact = (
     options: RecordOptions,
+    requiredFields: string[] = requiredNameFields
 ): RecordOptions | null => {
-    if (isNull(options) || !options.fields) {
+    if (isEmpty(options) || !options.fields) {
         mlog.warn(`prune.contact(): options or options.fields is null or undefined, returning null`);
         return null;
     }
     if (options.recordType !== RecordTypeEnum.CONTACT) {
-        mlog.error(`[prune.contact()] Prune Function mismatch: invalid options.recordType`,
-            TAB+`expected: '${RecordTypeEnum.CONTACT}'`,
-            TAB+`received: '${options.recordType}'`
-        );
+        mlog.error([`[prune.contact()] Prune Function mismatch: invalid options.recordType`,
+            `expected: '${RecordTypeEnum.CONTACT}'`,
+            `received: '${options.recordType}'`
+        ].join(TAB));
         return null;
     }
     if (options.fields.isperson === RADIO_FIELD_TRUE) {
         return null;
     }
-    if (!hasKeys(options.fields, CONTACT_REQUIRED_FIELDS)) {
-        mlog.warn(`[prune.contact()]: options.fields does not have required fields`,
-            TAB+`required: ${JSON.stringify(CONTACT_REQUIRED_FIELDS)}`,
-            TAB+`received: ${JSON.stringify(Object.keys(options.fields))}`
-        );
+    if (!hasKeys(options.fields, requiredFields)) {
+        mlog.warn([`[prune.contact()]: options.fields does not have required fields`,
+            `required: ${JSON.stringify(requiredFields)}`,
+            `received: ${JSON.stringify(Object.keys(options.fields))}`
+        ].join(TAB));
         return null;
     }
     return pruneAddressBook(options) as RecordOptions;    
 }
 
 /**
- * *`async`*
- * - {@link SALES_ORDER_REQUIRED_FIELDS} = `['entity', 'trandate']`
+ * `async`
  * - (not requiring addresses right now) validate address in `options.fields.billingaddress` and `options.fields.shippingaddress`
  * - make sure `options.sublists.item.length > 1`
  * @param options {@link RecordOptions}
  * @returns **`options`** or **`null`** `Promise<`{@link RecordOptions}` | null>` 
  */
 export const salesOrder = async (
-    options: RecordOptions
+    options: RecordOptions,
+    requredFields: string[] = ['entity', 'trandate']
 ): Promise<RecordOptions | null> => {
-    const source = `[prune.salesOrder()]`
-    if (isNull(options) || !options.fields || !options.sublists || !options.sublists.item) {
+    const source = getSourceString('prune', salesOrder.name);
+    if (isEmpty(options) || !options.fields || !options.sublists || !options.sublists.item) {
         mlog.warn([`${source}: Invalid 'options' parameter`,
             `options or options.fields or options.sublists is null or undefined.`,
             ` -> returning null`
@@ -216,14 +216,15 @@ export const salesOrder = async (
         ].join(TAB));
         return null;
     }
-    if (!hasKeys(options.fields, SALES_ORDER_REQUIRED_FIELDS)) { 
+    if (!hasKeys(options.fields, requredFields)) { 
         plog.warn([`${source}: options.fields does not have required fields.`,
-            `required: ${JSON.stringify(SALES_ORDER_REQUIRED_FIELDS)}`,
+            `required: ${JSON.stringify(requredFields)}`,
             `received: ${JSON.stringify(options.fields)}`
         ].join(TAB));
         return null; 
     }
-    if (!isNonEmptyString(options.fields.externalid)) { 
+    let externalId = options.fields.externalid;
+    if (!isNonEmptyString(externalId)) { 
         throw new Error(
             `${source} RecordOptions.fields.externalid is null or undefined`
         );
@@ -234,11 +235,31 @@ export const salesOrder = async (
         || (Number(lineItem.amount) < 0))) {
         mlog.error([`${source}: lineItem.amount is < 0`,
             `    item sublist: ${JSON.stringify(options.sublists.item)}`,
-            `order externalid: ${options.fields.externalid}`,
+            `order externalid: ${externalId}`,
             `meta: ${indentedStringify(options.meta || {})}`
         ].join(TAB));
         throw new Error(`bad amount`);
     }
+    let linesToKeep: SublistLine[] = []
+    if (isNonEmptyArray(itemSublist)) {
+        let indicesToKeep = [];
+        for (let i = 0; i < itemSublist.length; i++) {
+            let line = itemSublist[i];
+            if (!isNumeric(line.quantity) || Number(line.quantity) === 0) {
+                continue;
+            }
+            indicesToKeep.push(i);
+        }
+        linesToKeep = indicesToKeep.reduce((acc, lineIndex)=>{
+            acc.push(itemSublist[lineIndex]);
+            return acc;
+        }, [] as SublistLine[]);
+    }
+    if (linesToKeep.length === 0) {
+        mlog.warn(`salesorder has no lineItems with qty > 0`)
+    }
+    options.sublists.item = linesToKeep;
+
 
     if (options.fields.billingaddress) {
         let validatedAddress = address(
@@ -261,9 +282,9 @@ export const salesOrder = async (
         }
     }
     if (!options.fields.billingaddress && !options.fields.shippingaddress) {
-        plog.warn(`${source}: options.fields does not have any address fields.`,
-            TAB+`options.fields.externalid: '${options.fields.externalid}'`,
-        );
+        plog.warn([`${source}: options.fields does not have any address fields.`,
+            `options.fields.externalid: '${options.fields.externalid}'`,
+        ].join(TAB));
         // return null;
     }
     if (!isNonEmptyArray(options.sublists.item)) {

@@ -4,7 +4,7 @@
  */
 
 import { RecordResponseOptions } from "@api/types";
-import { RecordTypeEnum } from "@utils/ns";
+import { PriceLevelEnum, RecordTypeEnum } from "@utils/ns";
 import { CacheOptions, SublistRecordReferenceOptions } from "./types/Reconcile";
 
 export const revCacheOptions: CacheOptions = {
@@ -52,6 +52,7 @@ export const sublistReferenceDictionary: {
         referenceFieldId: 'item',
         sublistId: 'item',
         cacheOptions: soCacheOptions,
+        sublistFields: { price: PriceLevelEnum.CUSTOM, isclosed: true },
         responseOptions: soResponseOptions
     },
     

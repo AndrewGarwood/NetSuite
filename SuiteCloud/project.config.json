@@ -10,8 +10,8 @@
         "ignoreMissingFiles": false
     },
     "cloud": {
-        "provider": "Microsoft",
-        "rootName": "OneDrive",
+        "provider": "provider",
+        "rootName": "rootName",
         "orgSeparator": " - ",
         "folderName": "NetSuite",
         "dataDir": "data",
@@ -19,27 +19,42 @@
         "tokDir": "tokens"
     },
     "scripts": {
-        "production": {},
-        "sandbox": {
+        "production": {
             "restlet": {
                 "GET_Record": {
-                    "scriptId": 175,
+                    "scriptId": 1,
                     "deployId": 1
                 },
                 "PUT_Record": {
-                    "scriptId": 176,
+                    "scriptId": 2,
                     "deployId": 1
                 },
                 "GET_RelatedRecord": {
-                    "scriptId": 178,
+                    "scriptId": 3,
                     "deployId": 1
                 },
                 "DELETE_Record": {
-                    "scriptId": 179,
+                    "scriptId": 4,
+                    "deployId": 1
+                }
+            }
+        },
+        "sandbox": {
+            "restlet": {
+                "GET_Record": {
+                    "scriptId": 1,
                     "deployId": 1
                 },
-                "POST_StoreFieldIdsOfRecordType": {
-                    "scriptId": 167,
+                "PUT_Record": {
+                    "scriptId": 2,
+                    "deployId": 1
+                },
+                "GET_RelatedRecord": {
+                    "scriptId": 3,
+                    "deployId": 1
+                },
+                "DELETE_Record": {
+                    "scriptId": 4,
                     "deployId": 1
                 }
             }

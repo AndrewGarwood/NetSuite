@@ -7,7 +7,23 @@ import { getSourceString } from "@typeshi/io";
 import { isNonEmptyString } from "@typeshi/typeValidation";
 import { RecordTypeEnum } from "@utils/ns";
 
-export type ReconcilerState = {
+
+export {
+    ItemReconcilerStageEnum,
+    ReconcilerState, 
+    TransactionReconcilerState, TransactionReconcilerStageEnum,
+    ReconcilerError, 
+    ReconcilerStatusEnum, 
+    DependentDictionary, 
+    DependentUpdateHistory, 
+    CacheOptions, 
+    SublistRecordReferenceOptions, 
+    ChildRecordUpdateDictionary, 
+    ReferenceFieldUpdate
+}
+
+
+type ReconcilerState = {
     currentStage: ItemReconcilerStageEnum;
     /** map `itemId` to `childRecordType` to `childRecordInternalId[]` */
     firstUpdate: DependentDictionary;
@@ -19,7 +35,18 @@ export type ReconcilerState = {
     [key: string]: any;
 }
 
-export type ReconcilerError = {
+type TransactionReconcilerState = {
+    currentStage: TransactionReconcilerStageEnum;
+    /** array externalid */
+    deleted: string[];
+    /** array externalid */
+    created: string[];
+    /**validated totals */
+    validated: {[txnExternalId: string]: number};
+    errors: any[];
+}
+
+type ReconcilerError = {
     readonly __isError: true;
     source: string;
     message?: string;
@@ -27,8 +54,9 @@ export type ReconcilerError = {
     [key: string]: any;
 }
 
-export enum ItemReconcilerStageEnum {
-    PRE_PROCESS = 'PRE_PROCESS',
+enum ItemReconcilerStageEnum {
+    VALIDATE_INITIAL_STATE = 'VALIDATE_INITIAL_STATE',
+    GENERATE_DEPENDENT_DICTIONARY = 'GENERATE_DEPENDENT_DICTIONARY',
     GENERATE_PLACEHOLDER_UPDATE = 'GENERATE_PLACEHOLDER_UPDATE',
     RUN_PLACEHOLDER_UPDATE = 'RUN_PLACEHOLDER_UPDATE',
     VALIDATE_FIRST_UPDATE = 'VALIDATE_FIRST_UPDATE',
@@ -37,12 +65,26 @@ export enum ItemReconcilerStageEnum {
     GENERATE_NEW_ITEM_UPDATE = 'GENERATE_NEW_ITEM_UPDATE',
     RUN_NEW_ITEM_UPDATE = 'RUN_NEW_ITEM_UPDATE',
     END = 'END',
-    STATE_EVALUATION = 'STATE_EVALUATION'
+    EVALUATE_INITIAL_STATE = 'EVALUATE_INITIAL_STATE'
+}
+
+enum ReconcilerStatusEnum {
+    SAVING_STATE = 'SAVING_STATE',
+    SAVING_HISTORY = 'SAVING_HISTORY',
+    PROCESSING = 'PROCESSING'
+}
+
+enum TransactionReconcilerStageEnum {
+    PRE_PROCESS = 'PRE_PROCESS',
+    CHECK_EXIST = 'CHECK_EXIST',
+    DELETE_TRANSACTION = 'DELETE_TRANSACTION',
+    CREATE_TRANSACTION = 'CREATE_TRANSACTION',
+    VALIDATE_FINAL_STATE = 'VALIDATE_FINAL_STATE',
+    END = 'END'
 }
 
 
-
-export function ReconcilerError(
+function ReconcilerError(
     source?: string,
     message?: string,
     error?: any,
@@ -59,12 +101,13 @@ export function ReconcilerError(
         details 
     } as ReconcilerError;
 }
-export type CacheOptions = Required<RecordResponseOptions>;
+type CacheOptions = Required<RecordResponseOptions>;
 
-export type SublistRecordReferenceOptions = { 
+type SublistRecordReferenceOptions = { 
     referenceFieldId: string; 
     sublistId: string;
     cacheOptions: CacheOptions;
+    sublistFields: {[fieldId: string]: FieldValue};
     responseOptions: Required<RecordResponseOptions>;
 }
 
@@ -73,26 +116,26 @@ export type SublistRecordReferenceOptions = {
  * - `DependentDictionary[itemId][childRecordType].every(` record corresponding to
  * `childInternalId` has a field whose value is a `RecordReference` to `itemId )` is `true`
  * */
-export type DependentDictionary = { 
+type DependentDictionary = { 
     [itemId: string]: {
         /**map childRecordType to internalid array */
         [childRecordType: string]: string[],
     }
 }
 
-export type DependentUpdateHistory = {
+type DependentUpdateHistory = {
     [itemId: string]: {
         [updateLabel: string]: ChildRecordUpdateDictionary,
     }
 }
 
-export type ChildRecordUpdateDictionary = {
+type ChildRecordUpdateDictionary = {
     [childRecordType: string]: {
         [childInternalId: string]: ReferenceFieldUpdate[];
     } 
 }
 
-export type ReferenceFieldUpdate = {
+type ReferenceFieldUpdate = {
     recordType: RecordTypeEnum;
     sublistId: string;
     referenceFieldId: string;

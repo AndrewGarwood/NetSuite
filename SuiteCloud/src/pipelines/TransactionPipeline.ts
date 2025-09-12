@@ -33,7 +33,8 @@ import {
     SourceTypeEnum,
     LogTypeEnum,
     isRecordOptions,
-    isRecordResponseOptions, 
+    isRecordResponseOptions,
+    Factory, 
 } from "../api";
 import { 
     processParseResults, getCompositeDictionaries 
@@ -57,8 +58,6 @@ import {
 } from "src/services/parse/types/index";
 import { PostProcessDictionary } from "src/services/post_process/types/PostProcessing";
 import { DEFAULT_SALES_ORDER_RESPONSE_OPTIONS } from "./TransactionConfig";
-import { extractFileName } from "@typeshi/regex";
-const F = extractFileName(__filename);
 
 /**
  * @param options 
@@ -138,7 +137,9 @@ export async function runMainTransactionPipeline(
         );
         if (await done(options, 
             fileName, TransactionMainPipelineStageEnum.PARSE, parseResults
-        )) break;
+        )) {
+            continue;
+        }
         
         // ====================================================================
         // TransactionMainPipelineStageEnum.VALIDATE
@@ -148,7 +149,9 @@ export async function runMainTransactionPipeline(
         ) as ValidatedParseResults;
         if (await done(options, 
             fileName, TransactionMainPipelineStageEnum.VALIDATE, validatedResults
-        )) break;
+        )) {
+            continue;
+        }
         if (!options.matchOptions) {
             mlog.warn([`${source} Aborting Process.`,
                 `No matchOptions provided && stopAfter stage !== PARSE or VALIDATE`,
@@ -203,7 +206,9 @@ export async function runMainTransactionPipeline(
         }
         if (await done(options, 
             fileName, TransactionMainPipelineStageEnum.MATCH_ENTITY, matchResults
-        )) break;
+        )) {
+            continue;
+        }
         if (isEmptyArray(matchResults.matches)) {
             mlog.warn([`${source} No valid transactions matched to entities.`,
                 `fileName: '${fileName}'`,
@@ -295,7 +300,7 @@ export async function matchTransactionEntity(
     matches: RecordOptions[],
     errors: RecordOptions[]
 }> {
-    const source = `[TransactionPipeline.matchTransactionEntity()]`;
+    const source = getSourceString(__filename, matchTransactionEntity.name, `Array<RecordOptions>(${transactions.length})`)
     try {
         validate.arrayArgument(source, {transactions, isRecordOptions});
         validate.objectArgument(source, {options, isTransactionEntityMatchOptions});
@@ -333,7 +338,7 @@ async function matchUsingApi(
     matches: RecordOptions[],
     errors: RecordOptions[]
 }> {
-    const source = `[TransactionPipeline.matchUsingApi()]`;
+    const source = getSourceString(__filename, matchUsingApi.name);
     try {
         validate.arrayArgument(source, {transactions, isRecordOptions});
         validate.multipleStringArguments(source, {entityType, entityFieldId});
@@ -377,7 +382,7 @@ async function matchUsingApi(
             entityHistory[entityValue] = getRes.results[0].internalid;
             result.matches.push(txn);
         }
-        await DELAY(1200, null);
+        await DELAY(500, null);
         continue;
     }
     return result
@@ -399,8 +404,8 @@ function generateIdOptions(
     }
     const entityValue = transaction.fields[entityFieldId] as string;
     const idOptions: idSearchOptions[] = [
-        idSearchOptions(idPropertyEnum.ENTITY_ID, entityValue),
-        idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
+        Factory.idSearchOptions(idPropertyEnum.ENTITY_ID, entityValue),
+        Factory.idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
             encodeExternalId(`${entityValue}<${entityType}>`)
         ),
     ];
@@ -411,14 +416,14 @@ function generateIdOptions(
         const addressee = addr.fields.addressee as string;
         const attention = addr.fields.attention as string;
         if (addressee) {
-            idOptions.push(idSearchOptions(idPropertyEnum.ENTITY_ID, addressee));
-            idOptions.push(idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
+            idOptions.push(Factory.idSearchOptions(idPropertyEnum.ENTITY_ID, addressee));
+            idOptions.push(Factory.idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
                 encodeExternalId(`${addressee}<${entityType}>`))
             );
         }
         if (attention) {
-            idOptions.push(idSearchOptions(idPropertyEnum.ENTITY_ID, attention));
-            idOptions.push(idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
+            idOptions.push(Factory.idSearchOptions(idPropertyEnum.ENTITY_ID, attention));
+            idOptions.push(Factory.idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
                 encodeExternalId(`${attention}<${entityType}>`))
             );
         }
@@ -461,22 +466,6 @@ export async function putTransactions(
     }
 }
 
-
-/**
- * @factory {@link idSearchOptions}
- * @param idProp 
- * @param idValue 
- * @param searchOperator `string` - `Default` = {@link SearchOperatorEnum.TEXT.IS} = `'is'`
- * @returns **`idSearchOptions`** {@link idSearchOptions}
- */
-function idSearchOptions(
-    idProp: string, 
-    idValue: string | number, 
-    searchOperator: string = SearchOperatorEnum.TEXT.IS
-): idSearchOptions {
-    return { idProp, idValue, searchOperator} as idSearchOptions
-}
-
 /**
  * @TODO have the creation of entities be handled by invoking EntityPipeline instead of doing it here
  * - this is ineffecient and could likely be improved by having better way to retrieve source rows.
@@ -485,7 +474,7 @@ function idSearchOptions(
  * @TODO export customers and can run equivalentAlphanumeric pairwise on entity id from transactions
  * ... slow, but might get the job done...
  */
-export async function resolveUnmatchedTransactions(
+async function resolveUnmatchedTransactions(
     filePath: string,
     transactions: RecordOptions[],
     entityType: EntityRecordTypeEnum = EntityRecordTypeEnum.CUSTOMER

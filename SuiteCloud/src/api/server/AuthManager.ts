@@ -240,13 +240,6 @@ class AuthManager {
             return null;
         }
     }
-    // @TODO
-    // private getTokenPath(): TokenResponse | null {
-    //     return null;
-    // }
-    // private getMetaPath(): TokenMetadata | null {
-    //     return null;
-    // }
 
     /**
      * tries to get valid token response from either:
@@ -341,16 +334,14 @@ class AuthManager {
             }
             const tokenResponse = response.data as TokenResponse;
             slog.debug(` -- isTokenResponse(response.data) ? ${isTokenResponse(response.data)}`);
-            // Ensure expires_in is a number for calculations
-            if (typeof tokenResponse.expires_in === 'string') {
+            if (typeof tokenResponse.expires_in === 'string') { // Ensure expires_in is a number for calculations
                 tokenResponse.expires_in = parseInt(tokenResponse.expires_in, 10);
             }
             tokenResponse.lastUpdated = Date.now();
             tokenResponse.lastUpdatedLocaleString = getCurrentPacificTime();
-            slog.debug(` -- writing TokenResponse to STEP2_TOKENS_PATH...`)
+            slog.debug(` -- writing TokenResponse to STEP2_TOKENS_PATH...`);
             write(tokenResponse, path.join(this.getTokenDir(), STEP2_FILENAME));
             const expiresAt = this.getTokenExpiresAt(tokenResponse);
-            slog.debug(` -- calling this.updateTokenMetadata()`)
             this.updateTokenMetadata({
                 status: TokenStatus.VALID,
                 expiresAt,
@@ -531,20 +522,21 @@ class AuthManager {
         slog.info(`${source} Attempting token refresh...`);
         const step2Token = this.loadTokenFromFile(path.join(this.getTokenDir(), STEP2_FILENAME));
         const step3Token = this.loadTokenFromFile(path.join(this.getTokenDir(), STEP3_FILENAME));
+        /** Get the most recent refresh token */
         let refreshToken: string | null = null;
         if (step3Token 
             && isNonEmptyString(step3Token.refresh_token)
-            && this.withinTokenExpirationBuffer(step3Token)) { // this.validateTokenResponse(step3Token) === TokenStatus.VALID) {
+            && this.withinTokenExpirationBuffer(step3Token)) {
             refreshToken = step3Token.refresh_token;
             slog.debug(`Using step3Token refresh token`);
         } else if (step2Token 
             && isNonEmptyString(step2Token.refresh_token)
-            && this.withinTokenExpirationBuffer(step2Token)) { // this.validateTokenResponse(step2Token) === TokenStatus.VALID) {
+            && this.withinTokenExpirationBuffer(step2Token)) {
             refreshToken = step2Token.refresh_token;
             slog.debug(`Using step2Token refresh token`);
         } else {
             slog.warn([
-                `${source} No valid token from step3Token or step2Token`,
+                ` -- No valid token from step3Token or step2Token`,
             ].join(TAB));
         }
         if (refreshToken) {
@@ -559,7 +551,7 @@ class AuthManager {
                 ].join(NL));
             }
         } else {
-            slog.warn(`${source} No refresh token available, performing full authorization`);
+            slog.warn(` -- No refresh token available, performing full authorization`);
         }
         return this.performFullAuthorization();
     }

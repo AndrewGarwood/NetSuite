@@ -9,7 +9,7 @@ import {
     INDENT_LOG_LINE as TAB, NEW_LINE as NL 
 } from "typeshi/dist/config/setupLog";
 import { 
-    getSourceString, indentedStringify, isDirectory, readJsonFileAsObject as read 
+    getSourceString, indentedStringify, isDirectory, isFile, readJsonFileAsObject as read 
 } from "@typeshi/io";
 import { extractFileName } from "@typeshi/regex";
 import * as validate from "@typeshi/argumentValidation";
@@ -29,8 +29,8 @@ import { NetSuiteAccountDictionary, AccountDetails,
     isAccountEnvironmentEnum,
     isSuiteScriptEnvironment
 } from "@config/types";
-import { isNonEmptyString, isObject } from "@typeshi/typeValidation";
-import { formatLogObj, mainLogger, miscLogger, errorLogger } from "@config/setupLog";
+import { isNonEmptyArray, isNonEmptyString, isObject } from "@typeshi/typeValidation";
+import { formatLogObj, mainLogger, miscLogger, errorLogger, simpleLogger, pruneLogger, parseLogger } from "@config/setupLog";
 import { ILogObj, ILogObjMeta, Logger } from "tslog";
 dotenv.config();
 
@@ -104,11 +104,14 @@ export async function initializeEnvironment(
         resourceFolderConfiguration = await loadResourceFolderConfiguration(config, makeDirs);
         await setLogTransports(resourceFolderConfiguration.logDir, {
             'main.txt': mainLogger,
-            'misc.txt': miscLogger,
-            'error.txt': errorLogger
+            'misc.txt': [miscLogger, simpleLogger],
+            'error.txt': errorLogger,
+            // 'parse.txt': parseLogger,
+            // 'prune.txt': pruneLogger
         });
         dataLoaderConfig = config.dataLoader;
-        dataSourceConfigPath = (path.isAbsolute(dataLoaderConfig.dataSourceConfigFile) 
+        dataSourceConfigPath = (isFile(dataLoaderConfig.dataSourceConfigFile) 
+            && path.isAbsolute(dataLoaderConfig.dataSourceConfigFile) 
             ? dataLoaderConfig.dataSourceConfigFile 
             : path.join(NODE_HOME_DIR, dataLoaderConfig.dataSourceConfigFile)
         );
@@ -128,24 +131,29 @@ export async function initializeEnvironment(
  * - `for` `fileName` in `transportDict.keys`, 
  * `transportDict[fileName].attachTransport(...)` that appends `path.join(logDir, fileName)`
  * @param logDir `string`
- * @param transportDict `{ [fileName: string]: Logger<ILogObj> }`
+ * @param transportDict `{ [fileName: string]: Logger<ILogObj> | Logger<ILogObj>[] }`
  */
 async function setLogTransports(
     logDir: string,
-    transportDict: { [fileName: string]: Logger<ILogObj> }
+    transportDict: { [fileName: string]: Logger<ILogObj> | Logger<ILogObj>[] }
 ): Promise<void> {
     const source = getSourceString(__filename, setLogTransports.name);
     validate.existingDirectoryArgument(source, {logDir});
     for (let fileName in transportDict) {
-        const logger = transportDict[fileName];
-        const logFilePath = path.join(logDir, fileName);
-        LOG_FILES.push(logFilePath);
-        logger.attachTransport((logObj: ILogObj & ILogObjMeta) => {
-            fs.appendFileSync(logFilePath, 
-                JSON.stringify(formatLogObj(logObj)) + "\n", 
-                { encoding: "utf-8" } as fs.WriteFileOptions
-            );
-        });
+        let loggers = (isNonEmptyArray(transportDict[fileName]) 
+            ? transportDict[fileName]
+            : [transportDict[fileName]]
+        );
+        for (const logger of loggers) {
+            const logFilePath = path.join(logDir, fileName);
+            LOG_FILES.push(logFilePath);
+            logger.attachTransport((logObj: ILogObj & ILogObjMeta) => {
+                fs.appendFileSync(logFilePath, 
+                    JSON.stringify(formatLogObj(logObj)) + "\n", 
+                    { encoding: "utf-8" } as fs.WriteFileOptions
+                );
+            });
+        }
     }
     slog.info(`${source} Finished attaching transports: ${Object.keys(transportDict).join(', ')}`)
 }

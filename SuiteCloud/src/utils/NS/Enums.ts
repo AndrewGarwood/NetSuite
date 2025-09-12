@@ -19,30 +19,31 @@ export {
     NetSuiteFileTypeEnum, NetSuiteFileEncodingEnum 
 } from "./File";
 
-export enum LocationEnum {
+
+export {
+    LocationEnum, TaxScheduleEnum, PriceLevelEnum, UnitsTypeEnum, UnitsEnum, 
+    EmailPreferenceEnum, ItemSourceEnum, NetSuiteCountryEnum, 
+    CountryAbbreviationEnum, StateAbbreviationEnum, GlobalSubscriptionStatusEnum,
+}
+
+enum LocationEnum {
     HQ = 1,
     A = 2,
     B = 3,
     C = 4,
 }
-export enum TaxScheduleEnum {
+enum TaxScheduleEnum {
     DEFAULT = 2
 }
-export enum PriceLevelEnum {
+enum PriceLevelEnum {
+    CUSTOM = -1,
     BASE_PRICE = 1
 }
 
-
 /**
  * @enum {string} **`UnitsTypeEnum`**
- * @description Enum for unit types in NetSuite. (defined by account user)
- * @property {string} QUANTITY - Quantity unit type.
- * @property {string} WEIGHT - Weight unit type.
- * @property {string} LENGTH - Length unit type.
- * @property {string} VOLUME - Volume unit type.
- * @property {string} TIME - Time unit type.
  */
-export enum UnitsTypeEnum {
+enum UnitsTypeEnum {
     QUANTITY = "Quantity",
     WEIGHT = "Weight",
     LENGTH = "Length",
@@ -52,21 +53,8 @@ export enum UnitsTypeEnum {
 
 /**
  * @enum {string} **`UnitsEnum`**
- * @description Enum for unit types in NetSuite. (defined by account user)
- * @property {string} EACH - Each unit.
- * @property {string} DOZEN - Dozen unit.
- * @property {string} GRAMS - Grams unit.
- * @property {string} KILOGRAMS - Kilograms unit.
- * @property {string} MILLIGRAMS - Milligrams unit.
- * @property {string} LITERS - Liters unit.
- * @property {string} MILLILITERS - Milliliters unit.
- * @property {string} GALLONS - Gallons unit.
- * @property {string} POUNDS - Pounds unit.
- * @property {string} METERS - Meters unit.
- * @property {string} INCHES - Inches unit.
- * @property {string} FEET - Feet unit.
  */
-export enum UnitsEnum {
+enum UnitsEnum {
     EACH = "each",
     DOZEN = "dozen",
     GRAMS = "grams",
@@ -87,7 +75,7 @@ export enum UnitsEnum {
  * @property {string} HTML - HTML format.
  * @property {string} PDF - PDF format.
  */
-export enum EmailPreferenceEnum {
+enum EmailPreferenceEnum {
     HTML = "_HTML",
     PDF = "_PDF",
 }
@@ -95,12 +83,8 @@ export enum EmailPreferenceEnum {
  * @enum {string} **`GlobalSubscriptionStatusEnum`**
  * @description Enum for global subscription status in NetSuite.
  * @reference https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/schema/enum/globalsubscriptionstatus.html?mode=package
- * @property {string} CONFIRMED_OPT_IN - Confirmed Opt In
- * @property {string} CONFIRMED_OPT_OUT - Confirmed Opt Out
- * @property {string} SOFT_OPT_IN - Soft Opt In
- * @property {string} SOFT_OPT_OUT - Soft Opt Out
  */
-export enum GlobalSubscriptionStatusEnum {
+enum GlobalSubscriptionStatusEnum {
     CONFIRMED_OPT_IN = "_confirmedOptIn",
     CONFIRMED_OPT_OUT = "_confirmedOptOut",
     SOFT_OPT_IN = "_softOptIn",
@@ -118,7 +102,7 @@ export enum GlobalSubscriptionStatusEnum {
  * @property {string} WORK_ORDER - Represents work order items.
  * @property {string} PURCHASE_ORDER - Represents purchase order items.
  */
-export enum ItemSourceEnum {
+enum ItemSourceEnum {
     STOCK = "_stock",
     PHANTOM = "_phantom",
     WORK_ORDER = "_workOrder",
@@ -142,7 +126,7 @@ export enum ItemSourceEnum {
  * @property {string} SOUTH_KOREA - South Korea
  * @more ...
  */
-export enum NetSuiteCountryEnum {
+enum NetSuiteCountryEnum {
     AFGHANISTAN = "_afghanistan",
     ALAND_ISLANDS = "_alandIslands",
     ALBANIA = "_albania",
@@ -412,7 +396,7 @@ export enum NetSuiteCountryEnum {
  * @property {string} JAPAN - JP
  * @property {string} SOUTH_KOREA - KR
  */
-export enum CountryAbbreviationEnum {
+enum CountryAbbreviationEnum {
     AFGHANISTAN = "AF",
     ALAND_ISLANDS = "AX",
     ALBANIA = "AL",
@@ -671,10 +655,10 @@ export enum CountryAbbreviationEnum {
 /**
  * @enum {string} **`StateAbbreviationEnum`**
  * @description Enum for US states and territories two letter abbreviations
- * @property {string} CALIFORNIA - CA
+ * @property {string} WASHINGTON - `'WA'`
  * @more ...
  */
-export enum StateAbbreviationEnum {
+enum StateAbbreviationEnum {
     ALABAMA = "AL",
     ALASKA = "AK",
     AMERICAN_SAMOA = "AS",

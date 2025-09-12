@@ -82,10 +82,10 @@ export const memo = (
     let result = isNonEmptyString(memoPrefix) ? memoPrefix : 'Summary';
     result = result.trim() + ': {'
     const summary: Record<string, any> = {
-        'Type': clean(row[typeColumn]) ?? 'UNDEFINED'
+        'Type': clean(row[typeColumn])
     }
     for (const col of idColumns) {
-        summary[col] = clean(row[col]) ?? 'UNDEFINED';
+        summary[col] = clean(row[col]) ?? '';
     }
     for (const [key, value] of Object.entries(summary)) {
         result += `${key}: ${value}, `;
