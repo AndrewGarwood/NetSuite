@@ -4,12 +4,13 @@
  * @NScriptName PUT_Record
  * @PROD_ScriptId 
  * @PROD_DeployId 
- * @SB_ScriptId 176
+ * @SB_ScriptId 2
  * @SB_DeployId 1
  */
 
 /**
- * @consideration make an enum for sublistIds (of non static sublists) {@link https://stoic.software/articles/types-of-sublists/#:~:text=Lastly%2C%20the-,Static%20List,-sublists%20are%20read} 
+ * @consideration make an enum for sublistIds (of non static sublists) 
+ * {@link https://stoic.software/articles/types-of-sublists/#:~:text=Lastly%2C%20the-,Static%20List,-sublists%20are%20read} 
  */
 define(['N/record', 'N/log', 'N/search'], (record, log, search) => {
 /**
@@ -2160,5 +2161,5 @@ const RecordTypeEnum = {
     WORKPLACE: 'workplace',
     ZONE: 'zone'
 };
-    return { put: put };
+    return { put };
 });

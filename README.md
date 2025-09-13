@@ -1,3 +1,6 @@
+# Note:
+**This repository will no longer receive substantial updates because I was laid off and my position was eliminated as a result of company restructuring.**
+
 # Overview:
 - A collection of scripts using [NetSuite's][netsuite_home] [SuiteScript 2.0][suitescript_docs] to implement NetSuite as company's ERP.
 
@@ -21,12 +24,12 @@ The project requires a configuration file ([project.config.json][env_config_file
 2. **initializeData()** (a function defined in [dataLoader.ts][data_setup_file])
 The project requires a second configuration file ([project.data.config.json][data_config_file]) to be defined adjacent to the first one.
 - The definition for this configuration is found in [ProjectData.ts][project_data_file]
-- This json file is a DataSourceDictionary object, which organizes data into "domains" that are intended to mirror the category hierarchy under the "Lists" tab in the NetSuite UI.
+- This json file is a DataSourceDictionary object, which groups data into "domains" that are intended to mirror the category hierarchy under the "Lists" tab in the NetSuite UI.
 - It is expected that each DataDomainEnum value is both a key in the DataSourceDictionary and the name of a subfolder in the 'dataDir' directory defined in initializeEnvironment()
 - The value of each DataDomainEnum is a DataSourceConfiguration object. 
 ```ts
 // from ProjectData.ts
-/** add more entries to enum and DataSourceDictionary as project progresses */
+/** can add more entries */
 enum DataDomainEnum {
     ACCOUNTING = 'accounting',
     SUPPLY = 'supply',
@@ -45,7 +48,7 @@ type DataSourceConfiguration = FolderHierarchy & { options?: LoadFileOptions }
 - Request bodies for these endpoints are defined in [RecordEndpoint.ts][record_endpoint_types_file]
 
 Okay, now we have to extract the csv content and load it into a request body. This is handled by code in [src/services/parse][parse_folder] (to generate ParseResults) and [src/services/post_process][post_process_folder] (to validate/edit ParseResults)
-- (I'd like to improve the efficiency/robustness of current parsing logic used, but time constraints compel me to postpone this.)
+- I'd like to improve the efficiency of the parsing logic, but time constraints compelled me to postpone this.
 
 // TODO: finish README
 

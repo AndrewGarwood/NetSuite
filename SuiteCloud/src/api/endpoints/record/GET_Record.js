@@ -2,9 +2,9 @@
  * @NApiVersion 2.1
  * @NScriptType Restlet
  * @NScriptName GET_Record
- * @PROD_ScriptId NOT_DEPLOYED
- * @PROD_DeployId NOT_DEPLOYED
- * @SB_ScriptId 175
+ * @PROD_ScriptId 
+ * @PROD_DeployId 
+ * @SB_ScriptId 1
  * @SB_DeployId 1
  */
 

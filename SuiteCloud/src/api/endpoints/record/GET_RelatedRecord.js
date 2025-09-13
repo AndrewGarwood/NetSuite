@@ -4,7 +4,7 @@
  * @NScriptName GET_RelatedRecord
  * @PROD_ScriptId 
  * @PROD_DeployId 
- * @SB_ScriptId 178
+ * @SB_ScriptId 3
  * @SB_DeployId 1
  */
 
@@ -29,15 +29,14 @@ define(['N/record', 'N/search', 'N/log'], (record, search, log) => {
 const logArray = [];
 /**`'endpoint'` */
 const EP = `GET_RelatedRecord`;
-/** required keys of {@link RelatedRecordRequest} = `['parentRecordType', 'idOptions', 'childOptions']` */
-const REQUEST_KEYS = ['parentRecordType', 'idOptions', 'childOptions'];
+
 /**
  * @param {{parentRecordType: RecordTypeEnum; idOptions: string; childOptions: string}} reqParams
  * - when applicable, converts json string values to objects in {@link unpackRequestParameters}  
  * @returns {RecordResponse} **`response`** {@link RecordResponse}
  */
 const get = (reqParams) => {
-    const source = `[${EP}.get()]`;
+    const source = getSourceString(EP, get.name);
     const unpackResult = unpackRequestParameters(reqParams);
     if (isRecordResponse(unpackResult)) { // if error unpacking
         return unpackResult;
@@ -125,7 +124,8 @@ function generateRecordResult(recordType, recordId, responseOptions) {
     }
     return result;
 }
-
+/** required keys of {@link RelatedRecordRequest} = `['parentRecordType', 'idOptions', 'childOptions']` */
+const REQUEST_KEYS = ['parentRecordType', 'idOptions', 'childOptions'];
 /**
  * - validate/convert (when applicable) string values from `reqParams`
  * - validates `parentRecordType` is enum member
@@ -137,7 +137,7 @@ function generateRecordResult(recordType, recordId, responseOptions) {
  * - {@link RecordResponse} to return in `get()` with error message if unpacking failed
  */
 function unpackRequestParameters(reqParams) {
-    const source = `[${EP}.${unpackRequestParameters.name}()]`;
+    const source = getSourceString(EP, unpackRequestParameters.name);
     if (!isObject(reqParams) || !hasKeys(reqParams, REQUEST_KEYS)) {
         return handleError(reqParams, source, [
             `Invalid Request Parameters Object: reqParams undefined or is not an object or is missing required keys`,

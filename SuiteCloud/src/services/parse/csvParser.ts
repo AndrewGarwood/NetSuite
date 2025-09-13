@@ -1,18 +1,18 @@
 /**
- * @file src/csvParser.ts
+ * @file src/services/parse/csvParser.ts
  */
 import { 
     mainLogger as mlog,
     simpleLogger as slog, 
     INDENT_LOG_LINE as TAB, 
     NEW_LINE as NL,
-    STOP_RUNNING
 } from "../../config";
 import {
     isNonEmptyArray, isEmptyArray, isEmpty,
     areEquivalentObjects,
     isIntegerArray,
-    hasKeys
+    hasKeys,
+    isNonEmptyString
 } from "typeshi:utils/typeValidation";
 import { isRowSourceMetaData, RowSourceMetaData, 
     handleFileArgument, indentedStringify, 
@@ -32,8 +32,7 @@ import {
     SublistLineParseOptions,
     isFieldParseOptions,
     isValueMappingEntry,
-    SublistLineIdOptions,
-    RecordParseOptions
+    SublistLineIdOptions
 } from "./types/index";
 import {
     clean, equivalentAlphanumericStrings, DATE_STRING_PATTERN
@@ -74,7 +73,7 @@ export async function parseRecordCsv(
     validate.objectArgument(source, {parseDictionary});
     mlog.info([`${source} START`,
         `recordSource: ${getRecordSourceLabel(recordSource)}`,
-        ` recordTypes: ${JSON.stringify(Object.keys(parseDictionary))}`,
+        ` recordTypes: ${Object.keys(parseDictionary).join(', ')}`,
     ].join(TAB));           
     const rows = await handleFileArgument(recordSource, source);
     const results: ParseResults = {};
@@ -88,8 +87,15 @@ export async function parseRecordCsv(
         for (const recordType of Object.keys(parseDictionary)) {
             const { 
                 keyColumn, fieldOptions, sublistOptions 
-            } = parseDictionary[recordType] as RecordParseOptions;
+            } = parseDictionary[recordType];
             const recordId = clean(row[keyColumn]);
+            if (!recordId) {
+                mlog.warn([`${source} key column value is empty `,
+                    `@ row ${rowIndex} for recordType '${recordType}'`,
+                    `skipping row...`
+                ].join(NL));
+                continue;
+            }
             /** 
              * `if row` pertains to an existing record in `IntermediateParseResults` 
              * (e.g. recordType=salesorder and have already processed one of its rows) 
@@ -238,7 +244,10 @@ async function processFieldDictionaryParseOptions(
         return fields;
     }
     for (const fieldId of Object.keys(fieldOptions)) {
-        if (!fieldId || typeof fieldId !== 'string') { continue; }
+        if (!isNonEmptyString(fieldId)) { continue; }
+        if (fieldId in fields && !isEmpty(fields[fieldId])) {
+            continue;
+        }
         const valueOptions = fieldOptions[fieldId];
         const value = (isFieldParseOptions(valueOptions)
             ? await parseFieldValue(row, 
