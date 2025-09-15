@@ -12,6 +12,8 @@ import * as validate from "typeshi:utils/argumentValidation";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
 import { SB_TERM_DICTIONARY, TermBase } from "../../utils/ns/record/accounting/Term";
 import { ColumnSliceOptions } from "src/services/parse/types/ParseOptions";
+import { FieldDictionary, RecordOptions } from "@api/types";
+import { isNonEmptyString } from "@typeshi/typeValidation";
 
 /**
  * @param row - `Record<string, any>` the `row` of data
@@ -20,6 +22,7 @@ import { ColumnSliceOptions } from "src/services/parse/types/ParseOptions";
  * @returns **`matchResults[minIndex]`** `string` - or an empty string if none is found.
  */
 export const field = (
+    fields: FieldDictionary,
     row: Record<string, any>,
     extractor: (fieldValue: string) => RegExpMatchArray | null | string[],
     ...columnOptions: ColumnSliceOptions[] | string[] | Array<string | ColumnSliceOptions>
@@ -27,33 +30,33 @@ export const field = (
     if (!row || !extractor || !columnOptions || columnOptions.length === 0) {
         return '';
     }
-    plog.debug(NL + `[START evaluate.field()] - extractor: ${extractor.name}()`,
-        TAB+`columnOptions: ${JSON.stringify(columnOptions)}`
-    );
+    plog.debug([`[START evaluate.field()] - extractor: ${extractor.name}()`,
+        `columnOptions: ${JSON.stringify(columnOptions)}`
+    ].join(TAB));
     let result = '';
     for (const colOption of columnOptions) {
         const col = (typeof colOption === 'string' 
             ? colOption : colOption.colName
         );
         let initialVal = clean(row[col]);
-        plog.debug(NL + `colOption: ${JSON.stringify(colOption)}`,
-            TAB+`col: '${col}', initialVal: '${initialVal}'`
-        );
+        plog.debug([`colOption: ${JSON.stringify(colOption)}`,
+            `col: '${col}', initialVal: '${initialVal}'`
+        ].join(TAB));
         if (!initialVal) { continue; }
         const minIndex = (typeof colOption === 'object' && colOption.minIndex 
             ? colOption.minIndex : 0
         );
         const matchResults = extractor(initialVal);
-        plog.debug(NL + `matchResults after ${extractor.name}('${initialVal}'): ${JSON.stringify(matchResults)}`,
-            TAB + `matchResults.length: ${matchResults ? matchResults.length : undefined}`,
-            TAB + `matchResults[minIndex=${minIndex}]: '${matchResults ? matchResults[minIndex] : undefined}'`,        
-        );
+        plog.debug([`matchResults after ${extractor.name}('${initialVal}'): ${JSON.stringify(matchResults)}`,
+            `matchResults.length: ${matchResults ? matchResults.length : undefined}`,
+            `matchResults[minIndex=${minIndex}]: '${matchResults ? matchResults[minIndex] : undefined}'`,        
+        ].join(TAB));
         if (!matchResults || matchResults.length <= minIndex || matchResults[minIndex] === null || matchResults[minIndex] === undefined) {
-            plog.debug(NL + `continue to next column option because at least one of the following is true:`,
-                TAB+`   !matchResults === ${!matchResults}`,
-                TAB+`|| matchResults.length <= minIndex === ${matchResults && matchResults.length <= minIndex}`,
-                TAB+`|| !matchResults[${minIndex}] === ${matchResults && !matchResults[minIndex]}`,
-            );
+            plog.debug([`continue to next column option because at least one of the following is true:`,
+                `   !matchResults === ${!matchResults}`,
+                `|| matchResults.length <= minIndex === ${matchResults && matchResults.length <= minIndex}`,
+                `|| !matchResults[${minIndex}] === ${matchResults && !matchResults[minIndex]}`,
+            ].join(TAB));
             continue;
         }
         result = (matchResults[minIndex] as string);
@@ -64,15 +67,20 @@ export const field = (
 }
 
 export const externalId = async (
+    fields: FieldDictionary,
     row: Record<string, any>, 
     recordType: RecordTypeEnum,
-    idEvaluator: (row: Record<string, any>, ...args: string[]) => string | Promise<string>,
+    idEvaluator: (
+        fields: FieldDictionary,
+        row: Record<string, any>, 
+        ...args: string[]
+    ) => string | Promise<string>,
     ...idEvaluatorArgs: string[]
 ): Promise<string> => {
-    validate.objectArgument(`evaluators.common.externalId`, `row`, row);
-    validate.stringArgument(`evaluators.common.externalId`, `recordType`, recordType);
-    validate.functionArgument(`evaluators.common.externalId`, `idEvaluator`, idEvaluator);
-    let id = await idEvaluator(row, ...idEvaluatorArgs);
+    if (isNonEmptyString(fields.externalid)) {
+        return fields.externalid;
+    }
+    let id = await idEvaluator(fields, row, ...idEvaluatorArgs);
     if (!id) {
         mlog.warn(`[externalId()]: idEvaluator returned falsey value for recordType '${recordType}' with args: ${JSON.stringify(idEvaluatorArgs)}`);
         return '';
@@ -88,9 +96,10 @@ export const externalId = async (
  * @returns `number | null` - the internalid of the terms, or `null` if not found.
  */
 export const terms = (
+    fields: FieldDictionary,
     row: Record<string, any>,
     termsColumn: string,
-    termsDict: Record<string, TermBase>=SB_TERM_DICTIONARY
+    termsDict: Record<string, TermBase>
 ): number | null => {
     if (!row || !termsColumn || !termsDict) {
         mlog.error('[terms()]: Invalid params. Cannot evaluate terms.');

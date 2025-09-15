@@ -2,7 +2,8 @@
  * @file src/parse_configurations/evaluators/item.ts
  */
 import path from "node:path";
-import { mainLogger as mlog, 
+import { 
+    mainLogger as mlog, 
     INDENT_LOG_LINE as TAB, NEW_LINE as NL,
     simpleLogger as slog,
     getProjectFolders,
@@ -18,6 +19,7 @@ import { clean,
 import { getIndexedColumnValues, getRows, getSourceString } from "typeshi:utils/io";
 import * as validate from "typeshi:utils/argumentValidation"
 import { hasKeys, isNonEmptyArray, isNonEmptyString } from "typeshi:utils/typeValidation";
+import { FieldDictionary, RecordOptions } from "@api/types";
 
 /**
  * - convert to upper case
@@ -42,14 +44,12 @@ export const CLEAN_ITEM_ID_OPTIONS = {
 } as CleanStringOptions
 
 export const itemId = async (
+    fields: FieldDictionary, 
     row: Record<string, any>, 
     itemIdColumn: string,
-    cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
+    cleanOptions: CleanStringOptions
 ): Promise<string> => {
     const source = `[evaluators.item.itemId()]`;
-    validate.objectArgument(source, {row});
-    validate.objectArgument(source, {cleanOptions, isCleanStringOptions});
-    validate.stringArgument(source, {itemIdColumn});
     const originalValue = String(row[itemIdColumn]);
     let itemId = clean(extractLeaf(String(row[itemIdColumn])), cleanOptions);
     if (!isNonEmptyString(itemId)) {
@@ -80,22 +80,18 @@ export const itemId = async (
  * @returns 
  */
 export const displayName = async (
+    fields: FieldDictionary, 
     row: Record<string, any>,
     descriptionColumn: string,
     itemIdColumn: string,
-    cleanOptions: CleanStringOptions = CLEAN_ITEM_ID_OPTIONS
+    cleanOptions: CleanStringOptions
 ): Promise<string> => {
-    let source = `[evaluators.item.displayName()]`;
-    validate.multipleStringArguments(source, {descriptionColumn, itemIdColumn});
-    validate.objectArgument(source, {row});
-    validate.objectArgument(source, {cleanOptions, isCleanStringOptions});
-
     const itemIdExtractor = async (value: string,): Promise<string> => {
         return clean(extractLeaf(value), cleanOptions);
     }
     let cacheRows = await getRows(path.join(getProjectFolders().dataDir, 'uploaded', 'inventory_item.tsv'));
     let itemIdCache = await getIndexedColumnValues(cacheRows, 'Name', itemIdExtractor);
-    let itemIdValue = await itemId(row, itemIdColumn, cleanOptions);
+    let itemIdValue = await itemId(fields, row, itemIdColumn, cleanOptions);
     if (hasKeys(itemIdCache, itemIdValue) && isNonEmptyArray(itemIdCache[itemIdValue])) {
         let rowIndex = itemIdCache[itemIdValue][0];
         let cacheDisplayName = cacheRows[rowIndex]['Display Name'] ?? undefined;
@@ -112,13 +108,11 @@ export const displayName = async (
 
 
 export const description = async (
+    fields: FieldDictionary, 
     row: Record<string, any>,
     descriptionColumn: string,
     altDescriptionColumn?: string,
 ): Promise<string> => {
-    let source = `evaluators.item.description`;
-    validate.stringArgument(source, {descriptionColumn});
-    validate.objectArgument(source, {row});
     let result: Record<string, string> = {
         [descriptionColumn]: clean(row[descriptionColumn])
     };
@@ -129,12 +123,10 @@ export const description = async (
 }
 
 export const unitType = async (
+    fields: FieldDictionary, 
     row: Record<string, any>,
     unitTypeColumn: string
 ): Promise<number> => {
-    let source = getSourceString(`evaluators.item`, unitType.name);
-    validate.stringArgument(source, {unitTypeColumn});
-    validate.objectArgument(source, {row});
     let unitTypeValue = String(row[unitTypeColumn]).toLowerCase();
     let umDict = getUnitTypeDictionary();
     if (stringContainsAnyOf(unitTypeValue, /gram|pound/i)) {

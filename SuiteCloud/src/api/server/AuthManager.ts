@@ -9,7 +9,7 @@ import bodyParser from "body-parser";
 import path from "node:path";
 import fs from "node:fs";
 import { 
-    SERVER_PORT, REDIRECT_URI, AUTH_URL, TOKEN_URL, 
+    SERVER_PORT,
     REST_CLIENT_ID as CLIENT_ID, REST_CLIENT_SECRET as CLIENT_SECRET,
     SCOPE, STATE, getProjectFolders,
     isEnvironmentInitialized
@@ -74,8 +74,18 @@ class AuthManager {
     private tokenMetadata: TokenMetadata | null = null;
     private validationTimer: NodeJS.Timeout | null = null;
     private options: Required<AuthOptions>;
+    private redirectUri: string;
+    private tokenUrl: string;
+    private authUrl: string;
+    private port: number;
 
-    constructor(options: AuthOptions = {}) {
+    constructor(
+        options: AuthOptions = {}, 
+        authUrl: string, tokenUrl: string, redirectUri: string, port: number | string) {
+        this.redirectUri = redirectUri;
+        this.tokenUrl = tokenUrl;
+        this.authUrl = authUrl;
+        this.port = isInteger(port) ? port : parseInt(port);
         this.options = { ...DEFAULT_AUTH_OPTIONS, ...options };
         this.app = express();
         this.app.use(bodyParser.urlencoded({ extended: true }));
@@ -318,7 +328,7 @@ class AuthManager {
             //     `isNonEmptyString(authCode) ? ${isNonEmptyString(authCode)}`
             // ].join(', '));
             const params = this.generateGrantParams({code: authCode});
-            const response = await axios.post(TOKEN_URL, params.toString(), {
+            const response = await axios.post(this.tokenUrl, params.toString(), {
                 headers: { 
                     'Content-Type': AxiosContentTypeEnum.FORM_URL_ENCODED 
                 },
@@ -355,13 +365,13 @@ class AuthManager {
      * @description 
      * performs the {@link retryOperation} 'refreshOperation' consisting of the following steps:
      * 1. get `params` = {@link generateGrantParams}`({refreshToken})`
-     * 2. get `response` = `axios.post` to {@link TOKEN_URL} with the generated `params`
+     * 2. get `response` = `axios.post` to TOKEN_URL with the generated `params`
      * 3. check if `response` is valid
      * 4. set `tokenResponse` to `response.data` as {@link TokenResponse} and set `tokenResponse.lastUpdated` to {@link getCurrentPacificTime}
      * 5. {@link write} `tokenResponse` to `STEP3_TOKENS_PATH` file, call {@link updateTokenMetadata}, then return `tokenResponse`
      * @param refreshToken `string`
      * @returns **`tokenResponse`** - `Promise<`{@link TokenResponse}`>`
-     * @throws {Error} `if` `response` from request to {@link TOKEN_URL} is invalid in any of the following ways:
+     * @throws {Error} `if` `response` from request to TOKEN_URL is invalid in any of the following ways:
      * 1. is `undefined`
      * 2. does not have `response.data` property, 
      * 3. `response.data` does not have `access_token` property
@@ -375,7 +385,7 @@ class AuthManager {
                 `isNonEmptyString(refreshToken) ? ${isNonEmptyString(refreshToken)}`
             ].join(', '));
             const params = this.generateGrantParams({refreshToken});
-            const response = await axios.post(TOKEN_URL, params.toString(), {
+            const response = await axios.post(this.tokenUrl, params.toString(), {
                 headers: { 
                     'Content-Type': AxiosContentTypeEnum.FORM_URL_ENCODED 
                 },
@@ -455,15 +465,15 @@ class AuthManager {
                 this.closeServer();
                 resolve(authCode);
             });
-            this.server = this.app.listen(parseInt(SERVER_PORT), () => {
-                const authLink = createUrlWithParams(AUTH_URL, {
+            this.server = this.app.listen(this.port, () => {
+                const authLink = createUrlWithParams(this.authUrl, {
                     response_type: 'code',
-                    redirect_uri: REDIRECT_URI,
+                    redirect_uri: this.redirectUri,
                     client_id: CLIENT_ID,
                     scope: SCOPE,
                     state: crypto.randomBytes(32).toString('hex')
                 }).toString();
-                slog.info([`${source} Server listening on port ${SERVER_PORT} for OAuth callback`, 
+                slog.info([`${source} Server listening on port ${this.port} for OAuth callback`, 
                     ' -- Opening authorization URL...'
                 ].join(NL));
                 open(authLink).catch((err: any) => {
@@ -500,7 +510,7 @@ class AuthManager {
         if (options.code && options.refreshToken) {
             throw new Error(`${source} Invalid param 'options'; received both 'code' and 'refreshToken' properties`);
         }
-        const params = new URLSearchParams({ redirect_uri: REDIRECT_URI });
+        const params = new URLSearchParams({ redirect_uri: this.redirectUri });
         if (options.code) {
             params.append('code', options.code);
             params.append('grant_type', GrantTypeEnum.AUTHORIZATION_CODE);

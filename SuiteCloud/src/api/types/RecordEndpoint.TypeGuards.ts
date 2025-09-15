@@ -94,10 +94,6 @@ export function isRecordOptions(value: any): value is RecordOptions {
         && (!candidate.fields || isObject(candidate.fields, false))
         && (!candidate.sublists || isObject(candidate.sublists, false))
         && (!candidate.idOptions || isIdOptions(candidate.idOptions, false)) 
-        && hasKeys(value, 
-            ['fields', 'sublists', 'recordType', 'isDynamic', 'idOptions', 'meta'], 
-            false, false
-        )
         && isRecordTypeEnum(value.recordType)
     );
 }

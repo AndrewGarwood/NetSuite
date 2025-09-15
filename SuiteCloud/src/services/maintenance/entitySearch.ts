@@ -22,14 +22,12 @@ import {
 } from "typeshi:utils/io";
 import * as validate from "typeshi:utils/argumentValidation";
 import path from "node:path";
-import { clean, equivalentAlphanumericStrings, extractFileName } from "@typeshi/regex";
+import { clean, equivalentAlphanumericStrings, RegExpFlagsEnum } from "@typeshi/regex";
 import { CustomerColumnEnum } from "src/parse_configurations/customer/customerConstants";
 import { MatchData, search as fuzzySearch } from "fast-fuzzy";
 import { SalesOrderColumnEnum } from "src/parse_configurations/salesorder/salesOrderConstants";
 
-const F = extractFileName(__filename);
-
-export { searchInCustomers, searchInSalesOrders, addConcatenatedAddressColumn }
+export { searchInCustomers, searchInSalesOrders }
 
 enum SourceColumnEnum {
     ENTITY = 'Entity',
@@ -41,7 +39,7 @@ async function searchInCustomers(
     customerFile: string,
     outputDir?: string,
 ): Promise<void> {
-    const source = getSourceString(F, searchInCustomers.name);
+    const source = getSourceString(__filename, searchInCustomers.name);
     validate.multipleExistingFileArguments(source, '.tsv', {customerFile, targetEntFile})
     
     const customerRows = await getRows(customerFile);
@@ -86,7 +84,7 @@ async function searchInSalesOrders(
     addrTolerance: number = 0.8,
     outputDir?: string,
 ): Promise<void> {
-    const source = getSourceString(F, searchInSalesOrders.name);
+    const source = getSourceString(__filename, searchInSalesOrders.name);
     validate.existingFileArgument(source, '.tsv', {targetEntFile});
     validate.existingDirectoryArgument(source, {soDirectory});
 
@@ -152,26 +150,15 @@ async function searchInSalesOrders(
     //     `num unique addresses: ${Object.keys(targetAddressDict).length}`
     // ].join(TAB))
     let stats: { [key: string]: any} = {
-        // tolerance: `${indentedStringify({ENT_TOLERANCE, ADDR_TOLERANCE})}`,
-        // entityExactMatchCount: 0,
-        // entityLevenshteinCount: 0,
-        // foundByFuzzySearch: 0,
-        // foundByBilling: 0,
-        // foundByShipping: 0
     }
     for (const targetEnt in targetEntDict) {
         let matchFound = false;
         entityFieldLoop:
         for (const entityField of Object.keys(compositeFieldDict.Entity)) {
             const indexedValues = compositeFieldDict.Entity[entityField];
-            // mlog.debug([`start entityFieldLoop for field '${entityField}'`,
-            //     `entity: '${targetEnt}'`,
-            //     `num '${entityField}' values to compare: ${Object.keys(indexedValues).length}`
-            // ].join(TAB));
             if (isIntegerArray(indexedValues[targetEnt])) { 
                 // exact match with row value at SalesOrderColumnEnum.ENTITY_ID
                 indexedMatches[targetEnt] = indexedValues[targetEnt];
-                // stats.entityExactMatchCount++;
                 stats[entityField] = (stats[entityField] || 0) + 1;
                 matchFound = true;
                 break entityFieldLoop;
@@ -181,7 +168,6 @@ async function searchInSalesOrders(
             });
             if (entMatch) {
                 indexedMatches[targetEnt] = indexedValues[entMatch];
-                // stats.levenshteinCount++
                 stats[entityField] = (stats[entityField] || 0) + 1;
                 matchFound = true;
                 break entityFieldLoop;
@@ -211,10 +197,6 @@ async function searchInSalesOrders(
                 }
             }
         }
-        // mlog.debug([`address search info for entity '${targetEnt}'`,
-        //     `(original) sourceAddresses.length: ${sourceAddresses.length}`,
-        //     `(expanded) targetAddresses.length: ${targetAddresses.length}`
-        // ].join(TAB));
         addressSearchLoop:
         for (const targetAddr of targetAddresses) {
             addressComparisonLoop:
@@ -278,7 +260,7 @@ function addConcatenatedAddressColumn(
     addr: AddressColumns,
     separator: string = ' '
 ): void {
-    let source = `[${F}.addConcatenatedAddressColumn]`;
+    let source = getSourceString(__filename, addConcatenatedAddressColumn.name)
     validate.objectArgument(source, {row});
     validate.stringArgument(source, {outputColumn});
     if (!row || !outputColumn) return;

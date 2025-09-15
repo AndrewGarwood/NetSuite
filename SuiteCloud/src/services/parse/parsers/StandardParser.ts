@@ -117,7 +117,7 @@ export class StandardParser extends BaseParser {
                 const recordId = clean(row[keyColumn]);
                 this.rowContext.recordId = recordId;
                 
-                let record;
+                let record: Required<RecordOptions>;
                 if (this.intermediate[recordType][recordId]) {  
                     record = this.intermediate[recordType][recordId];
                     this.rowContext.cache = {
@@ -127,10 +127,10 @@ export class StandardParser extends BaseParser {
                 } else {
                     record = {
                         recordType: recordType as RecordTypeEnum,
-                        isDynamic: NOT_DYNAMIC,
+                        idOptions: [],
                         fields: {} as FieldDictionary,
                         sublists: {} as SublistDictionary,
-                    } as RecordOptions;
+                    };
                     this.rowContext.cache = globalCache[recordType][recordId] || {};
                 }
                 
@@ -145,10 +145,10 @@ export class StandardParser extends BaseParser {
 
     private async processRecord(
         row: Record<string, any>, 
-        record: RecordOptions, 
+        record: Required<RecordOptions>, 
         fieldOptions: FieldDictionaryParseOptions, 
         sublistOptions: SublistDictionaryParseOptions
-    ): Promise<RecordOptions> {
+    ): Promise<Required<RecordOptions>> {
         if (isNonEmptyArray(Object.keys(fieldOptions))) {
             record.fields = await this.processFields(row, 
                 record.fields as FieldDictionary, 

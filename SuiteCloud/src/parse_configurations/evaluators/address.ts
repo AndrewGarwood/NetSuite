@@ -6,7 +6,9 @@ import { parseLogger as plog, mainLogger as mlog,
     getEntityValueOverrides, 
 } from "../../config";
 import { 
-    FieldValue, 
+    FieldDictionary,
+    FieldValue,
+    RecordOptions, 
 } from "../../api/types";
 import { 
     clean, stringEndsWithAnyOf, 
@@ -20,11 +22,12 @@ import { entityId, firstName, lastName, middleName,
     salutation, jobTitleSuffix 
 } from "./entity";
 import { CountryAbbreviationEnum, StateAbbreviationEnum } from "../../utils/ns/Enums";
+import { isNonEmptyString } from "@typeshi/typeValidation";
 
 
 
 /** 
- * arguments for the {@link attention}`(row, args)` function 
+ * arguments for the {@link attention}`(fields, row, args)` function 
  * to find the name of the person expected to receive the parcel from the `row` data. 
  * */
 export type AttentionArguments = {
@@ -37,36 +40,37 @@ export type AttentionArguments = {
 }
 
 /**
- * `if fullName.includes(`{@link entityId}`(row, args.entityIdColumn))`, 
+ * `if fullName.includes(`{@link entityId}`(fields, row, args.entityIdColumn))`, 
  * - `then` the attention value is redundant because the addressee value is already set to entityId -> return an empty string.
  * @param row `Record<string, any>` - the `row` of data to look for the attention person name in
  * @param args {@link AttentionArguments} - arguments of column names to look for the attention person name in the `row` data.
  * @returns **`result`** `string` - the name of the person expected to receive the parcel from the `row` data.
  */
 export const attention = async (
+    fields: FieldDictionary, 
     row: Record<string, any>,
     args: AttentionArguments
 ): Promise<string> => {
-    if (!row || !args.entityIdColumn) {
-        return '';
+    if (isNonEmptyString(fields.attention)) {
+        return fields.attention;
     }
-    const entity = await entityId(row, args.entityIdColumn);
+    const entity = String(fields.entityid) || entityId(fields, row, args.entityIdColumn);
     const salutationValue = (args.salutationColumn 
-        ? salutation(row, args.salutationColumn, ...(args.nameColumns || []))
+        ? salutation(fields, row, args.salutationColumn, ...(args.nameColumns || []))
         : ''
     );
-    const first = firstName(row, args.firstNameColumn, ...args.nameColumns || []);
-    const middle = middleName(row, args.middleNameColumn, ...args.nameColumns || []);
-    const last = lastName(row, args.lastNameColumn, ...args.nameColumns || []);
-    const title = jobTitleSuffix(row, 'Job Title', ...args.nameColumns || []);
-    plog.debug(NL+`[evaluate.attention()]`,
-        TAB+ `salutationValue: '${salutationValue}'`,
-        TAB+ `entity: '${entity}'`,
-        TAB+ ` first: '${first}'`,
-        TAB+ `middle: '${middle}'`,
-        TAB+ `  last: '${last}'`,
-        TAB+ ` title: '${title}'`,
-    );
+    const first = firstName(fields, row, args.firstNameColumn, ...args.nameColumns || []);
+    const middle = middleName(fields, row, args.middleNameColumn, ...args.nameColumns || []);
+    const last = lastName(fields, row, args.lastNameColumn, ...args.nameColumns || []);
+    const title = jobTitleSuffix(fields, row, 'Job Title', ...args.nameColumns || []);
+    plog.debug([`[evaluate.attention()]`,
+        `salutationValue: '${salutationValue}'`,
+        `entity: '${entity}'`,
+        ` first: '${first}'`,
+        `middle: '${middle}'`,
+        `  last: '${last}'`,
+        ` title: '${title}'`,
+    ].join(TAB));
     let alreadyHasJobTitleSuffix = (
         stringEndsWithAnyOf(last, new RegExp(`,? ?${title}`))
         || stringEndsWithAnyOf(last.replace(/\./, ''), new RegExp(`,? ?${title}`))
@@ -84,14 +88,14 @@ export const attention = async (
     );
     fullName = clean(fullName, {strip: STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION});
     // const result = (fullName.includes(entity)) ? '' : fullName;
-    plog.debug(NL+`[END evaluate.attention]()`,
+    plog.debug([`[END evaluate.attention]()`,
         // NL+`attention(entityIdColumn='${args.entityIdColumn}', salutationColumn='${args.salutationColumn}', nameColumns.length=${args.nameColumns?.length || 0})`,
-        TAB + `    entity: '${entity}'`,
-        TAB + `salutation: '${salutationValue}'`,
-        TAB + `  fullName: '${fullName}'`,
-        TAB + `fullName.includes(entity) ? ${Boolean(entity) && fullName.includes(entity)}`,
-        // TAB + `-> return result: '${result}'`
-    );
+        `    entity: '${entity}'`,
+        `salutation: '${salutationValue}'`,
+        `  fullName: '${fullName}'`,
+        `fullName.includes(entity) ? ${Boolean(entity) && fullName.includes(entity)}`,
+        // `-> return result: '${result}'`
+    ].join(TAB));
     return fullName;
     // return result;
 }
@@ -104,22 +108,26 @@ export const attention = async (
  * - i.e. the entity/company's name
  */
 export const addressee = async (
+    fields: FieldDictionary, 
     row: Record<string, any>,
     entityIdColumn: string,
     companyNameColumn?: string
 ): Promise<string> => {
+    if (isNonEmptyString(fields.addressee)) {
+        return fields.addressee;
+    }
     if (!row || !entityIdColumn) {
         mlog.error(`addressee() called with invalid parameters.`,
-            TAB + `addressee() requires row, entityIdColumn, and companyNameColumn`,
+            `addressee() requires row, entityIdColumn, and companyNameColumn`,
         );
         return '';
     }
-    let entity = entityId(row, entityIdColumn);
+    let entity = entityId(fields, row, entityIdColumn);
     let companyName = (companyNameColumn 
         ? checkForOverride(
             clean(row[companyNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION), 
             companyNameColumn, 
-            await getEntityValueOverrides()
+            getEntityValueOverrides()
         ) as string
         : ''
     );
@@ -130,7 +138,7 @@ export type StreetArguments = {
     streetLineOneColumn: string;
     streetLineTwoColumn: string;
     companyNameColumn?: string;
-    addresseeFunction: (row: Record<string, any>, entityIdColumn: string, companyNameColumn?: string) => string | Promise<string>;
+    addresseeFunction: (fields: FieldDictionary, row: Record<string, any>, entityIdColumn: string, companyNameColumn?: string) => string | Promise<string>;
 } & AttentionArguments;
 
 /**
@@ -146,6 +154,7 @@ export type StreetArguments = {
  * @returns **`streetLineValue`** `string` - the street line value based on the `streetLineNumber` and the content of the `row` object.
  */
 export const street = async (
+    fields: FieldDictionary, 
     row: Record<string, any>,
     streetLineNumber: 1 | 2,
     args: StreetArguments
@@ -158,13 +167,17 @@ export const street = async (
     );
     if (invalidStreetArguments) {
         mlog.error(`street() called with invalid parameters.`,
-            TAB + `street() requries row, streetLineNumber, and`,
-            TAB + `args object with defined args.streetLineOneColumn, args.streetLineTwoColumn, args.entityIdColumn`,
+            `street() requries row, streetLineNumber, and`,
+            `args object with defined args.streetLineOneColumn, args.streetLineTwoColumn, args.entityIdColumn`,
         );
         return '';
-    }        
-    const attentionValue = await attention(row, args);
+    }
+    // if (isNonEmptyString(fields[`addr${streetLineNumber}`])) {
+    //     return fields[`addr${streetLineNumber}`] as string;
+    // }        
+    const attentionValue = await attention(fields, row, args);
     const addresseeValue = await args.addresseeFunction(
+        fields,
         row, args.entityIdColumn, args.companyNameColumn
     );
     const streetLineOneValue = clean(row[args.streetLineOneColumn], {
@@ -239,6 +252,7 @@ export const street = async (
 }
 
 export const state = (
+    fields: FieldDictionary, 
     row: Record<string, any>, 
     stateColumn: string
 ): FieldValue => {
@@ -254,7 +268,7 @@ export const state = (
 }
 
 export const country = (
-    row: Record<string, any>, 
+    fields: FieldDictionary, row: Record<string, any>, 
     countryColumn: string, 
     stateColumn: string
 ): FieldValue => {

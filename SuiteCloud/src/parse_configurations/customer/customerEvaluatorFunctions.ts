@@ -2,7 +2,9 @@
  * @file src/parse_configurations/customer/customerEvaluatorFunctions.ts
  */
 import {
+    FieldDictionary,
     FieldValue,
+    RecordOptions,
 } from "../../api/types";
 import { 
     mainLogger as mlog, 
@@ -18,9 +20,11 @@ import {
 import { isPerson, firstName, middleName, lastName, entityId } from "../evaluatorFunctions";
 import { CustomerColumnEnum as C } from "./customerConstants";
 import { checkForOverride, RADIO_FIELD_FALSE, RADIO_FIELD_TRUE } from "../../utils/ns";
+import { isNonEmptyString } from "@typeshi/typeValidation";
 
 
 export const customerIsPerson = async (
+    fields: FieldDictionary,
     row: Record<string, any>, 
     entityIdColumn: string,
     companyColumn: string=C.COMPANY
@@ -35,7 +39,7 @@ export const customerIsPerson = async (
     if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return RADIO_FIELD_FALSE;
     }
-    return (await isPerson(row, entityIdColumn, companyColumn) 
+    return (isPerson(fields, row, entityIdColumn, companyColumn) 
         ? RADIO_FIELD_TRUE 
         : RADIO_FIELD_FALSE
     );
@@ -46,6 +50,7 @@ export const customerIsPerson = async (
  * from `evaluatorFunctions.ts` if customer is an individual human and not a company 
  * */
 export const firstNameIfCustomerIsPerson = async (
+    fields: FieldDictionary,
     row: Record<string, any>,
     entityIdColumn: string,
     firstNameColumn?: string,
@@ -54,14 +59,15 @@ export const firstNameIfCustomerIsPerson = async (
     if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return '';
     }
-    if (!await isPerson(row, entityIdColumn)) {
+    if (!isPerson(fields, row, entityIdColumn)) {
         return '';
     }
-    let firstNameValue = firstName(row, firstNameColumn, ...nameColumns);
+    let firstNameValue = firstName(fields, row, firstNameColumn, ...nameColumns);
     return firstNameValue ? firstNameValue : '';
 }
 
 export const middleNameIfCustomerIsPerson = async (
+    fields: FieldDictionary,
     row: Record<string, any>,
     entityIdColumn: string,
     middleNameColumn?: string,
@@ -70,14 +76,15 @@ export const middleNameIfCustomerIsPerson = async (
     if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return '';
     }
-    if (!await isPerson(row, entityIdColumn)) {
+    if (!isPerson(fields, row, entityIdColumn)) {
         return '';
     }
-    let middleNameValue = middleName(row, middleNameColumn, ...nameColumns);
+    let middleNameValue = middleName(fields, row, middleNameColumn, ...nameColumns);
     return middleNameValue ? middleNameValue : '';
 }
 
 export const lastNameIfCustomerIsPerson = async (
+    fields: FieldDictionary,
     row: Record<string, any>,
     entityIdColumn: string,
     lastNameColumn?: string,
@@ -86,43 +93,27 @@ export const lastNameIfCustomerIsPerson = async (
     if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return '';
     }
-    if (!await isPerson(row, entityIdColumn)) {
+    if (!isPerson(fields, row, entityIdColumn)) {
         return '';
     }
-    let lastNameValue = lastName(row, lastNameColumn, ...nameColumns);
+    let lastNameValue = lastName(fields, row, lastNameColumn, ...nameColumns);
     return lastNameValue ? lastNameValue : '';
 }
 
 export const customerCategory = async (
+    fields: FieldDictionary,
     row: Record<string, any>,
     categoryColumn: string,
 ): Promise<FieldValue> => {
     if (!row || !categoryColumn) {
         return '';
     }
-    const categoryDict = await getCustomerCategoryDictionary()
+    const categoryDict = getCustomerCategoryDictionary()
     let categoryValue = row[categoryColumn] as string;
     if (!categoryValue || !categoryDict[categoryValue]) {
         return '';
     }
     return categoryDict[categoryValue] as FieldValue;
-}
-
-/**
- * @deprecated
- * Error: "You have entered an Invalid Field Value 7 for the following field: entitystatus"
- * -> not possible to set a customer record to qualified; instead make a 'lead' record, 
- * just returning empty string (not setting value) for now. 
- * */
-export const customerStatus = (
-    row: Record<string, any>,
-    categoryColumn: string,
-): FieldValue => {
-    if (!row || !categoryColumn) {
-        return '';
-    }
-
-    return '';
 }
 
 
@@ -135,6 +126,7 @@ export const customerStatus = (
  * - or the `entityId` if no company name is provided.
  */
 export const customerCompany = async (
+    fields: FieldDictionary,
     row: Record<string, any>,
     entityIdColumn: string,
     companyNameColumn: string=C.COMPANY,
@@ -142,7 +134,7 @@ export const customerCompany = async (
     if (!row || !entityIdColumn || !row[entityIdColumn]) {
         return '';
     }
-    let entity = entityId(row, entityIdColumn);
+    let entity = isNonEmptyString(fields.entityid) ? fields.entityid : entityId(fields, row, entityIdColumn);
     // if (!isPerson(row, entityIdColumn, companyNameColumn)) {
     //     return entity;
     // }
@@ -150,7 +142,7 @@ export const customerCompany = async (
         ? checkForOverride(
             clean(row[companyNameColumn], STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION), 
             companyNameColumn, 
-            await getEntityValueOverrides()
+            getEntityValueOverrides()
         ) as string
         : ''
     );

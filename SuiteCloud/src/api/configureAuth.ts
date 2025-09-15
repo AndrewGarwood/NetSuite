@@ -3,7 +3,7 @@
  */
 
 import { AuthManager } from "@api/server";
-import { STOP_RUNNING } from "../config/env";
+import { STOP_RUNNING, SERVER_PORT, AUTH_URL, TOKEN_URL, REDIRECT_URI } from "../config/env";
 import { AuthOptions, AuthState } from "./server/types";
 
 let auth: AuthManager | null = null;
@@ -12,7 +12,7 @@ let authInitialized = false;
 export async function instantiateAuthManager(options?: AuthOptions): Promise<void> {
     try {
         // Create AuthManager with optional configuration
-        auth = new AuthManager(options);
+        auth = new AuthManager(options, AUTH_URL, TOKEN_URL, REDIRECT_URI, SERVER_PORT);
         authInitialized = true;
     } catch (error) {
         authInitialized = false;
@@ -102,7 +102,7 @@ export async function getAuthStatus(): Promise<{
  * @returns A new AuthManager instance
  */
 export function createAuthManager(options?: AuthOptions): AuthManager {
-    return new AuthManager(options);
+    return new AuthManager(options, AUTH_URL, TOKEN_URL, REDIRECT_URI, SERVER_PORT);
 }
 
 /**

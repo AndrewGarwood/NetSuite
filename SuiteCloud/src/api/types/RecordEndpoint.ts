@@ -11,7 +11,6 @@ import {
     FindSublistLineWithValueOptions 
 } from ".";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "../../utils/ns/record/Record";
-import { RowSourceMetaData } from "typeshi:utils/io";
 /**
  * @typedefn **`RecordRequest`**
  */
@@ -44,19 +43,9 @@ export type RecordResponse = {
  */
 export type RecordOptions = {
     recordType: RecordTypeEnum | EntityRecordTypeEnum;
-    isDynamic?: boolean;
     idOptions?: idSearchOptions[];
     fields?: FieldDictionary;
     sublists?: SublistDictionary;
-    meta?: {
-        /** 
-         * info about what generated this RecordOptions object
-         * e.g. {@link RowSourceMetaData} 
-         * */
-        dataSource: RowSourceMetaData | any;
-        sourceType: string;
-        [key: string]: any
-    }
 }
 
 export type RelatedRecordRequest = {
@@ -78,22 +67,6 @@ export type ChildSearchOptions = {
     responseOptions?: RecordResponseOptions
 }
 
-/**
- * @enum {string} **`SourceTypeEnum`**
- */
-export enum SourceTypeEnum {
-    LOCAL_FILE = 'LOCAL_FILE',
-    /** 
-     * `if` `sourceType === ROW_ARRAY` and `dataSource === number[]`, and know corresponding `filePath`,
-     * then subsequently indexing `await getRows(filePath)` with numbers from `dataSource` will be accurate
-     */
-    ROW_ARRAY = 'ROW_ARRAY',
-    ROW_SUBSET_ARRAY = 'ROW_SUBSET_ARRAY',
-    /** assume `base64` encoded `string` */
-    ENCODED_FILE_CONTENT_STRING = 'ENCODED_FILE_CONTENT_STRING',
-    /** the {@link Buffer} object created from `Buffer.from(ENCODED_FILE_CONTENT_STRING, 'base64')` or `fs.readFileSync(filePath)` */
-    BUFFER = 'BUFFER',
-}
 
 /**
  * @typedefn **`RecordResponseOptions`**
@@ -167,7 +140,7 @@ export type SublistDictionary = {
     [sublistId: string]: Array<SublistLine> | SublistUpdateDictionary
 };
 
-export type SublistContent = SublistUpdateDictionary | SublistLine[];
+// export type SublistContent = SublistUpdateDictionary | SublistLine[];
 
 /**
  * @keys `fieldId` of a sublist field

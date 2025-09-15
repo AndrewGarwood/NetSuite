@@ -1,9 +1,9 @@
 /**
  * @file src/services/parse/types/ParseOptions.TypeGuards.ts
  */
-import { hasKeys, isNonEmptyArray, isNonEmptyString } from "typeshi:utils/typeValidation";
+import { hasKeys, isNonEmptyArray, isNonEmptyString, isStringArray, isObject } from "typeshi:utils/typeValidation";
 import { FieldParseOptions, ParseResults, ValueMappingEntry } from "./ParseOptions";
-import { isRecordOptions } from "../../../api/types";
+import { isFieldValue, isRecordOptions, isRecordTypeEnum } from "../../../api/types";
 
 /**
  * @description Checks if the given value is a {@link ValueMappingEntry} = `{ newValue`: {@link FieldValue}, `validColumns`: `string | string[] }`.
@@ -13,8 +13,10 @@ import { isRecordOptions } from "../../../api/types";
  * - **`false`** `otherwise`.
  */
 export function isValueMappingEntry(value: any): value is ValueMappingEntry {
-    return (value && typeof value === 'object' 
-        && hasKeys(value, ['newValue', 'validColumns'])
+    const candidate = value as ValueMappingEntry;
+    return (isObject(candidate)
+        && isFieldValue(candidate.newValue)
+        && (isNonEmptyString(candidate.validColumns) || isStringArray(candidate.validColumns))
     );
 }
 
@@ -27,16 +29,17 @@ export function isValueMappingEntry(value: any): value is ValueMappingEntry {
  * - **`false`** `otherwise`
  */
 export function isFieldParseOptions(value: any): value is FieldParseOptions {
-    return (value && typeof value === 'object' 
-        && hasKeys(value, ['defaultValue', 'colName', 'evaluator', 'args'], false)
+    const candidate = value as FieldParseOptions;
+    return (isObject(candidate)
+        && hasKeys(candidate, ['defaultValue', 'colName', 'evaluator', 'args'], false)
     );
 }
 
 export function isParseResults(value: any): value is ParseResults {
-    return (value && typeof value =='object'
-        && Object.keys(value).every(k => isNonEmptyString(k)
-            && isNonEmptyArray(value[k])
-            && value[k].every(element=>isRecordOptions(element))
+    const candidate = value as ParseResults;
+    return (isObject(candidate)
+        && Object.keys(candidate).every(k => isRecordTypeEnum(k)
+            && candidate[k].every(element=>isRecordOptions(element))
         )
     )
 }

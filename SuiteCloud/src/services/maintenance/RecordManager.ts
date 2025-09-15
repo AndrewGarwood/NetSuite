@@ -107,7 +107,7 @@ function fixTransactionMemo(
             searchValue: /(?<= )([A-Z]{2,})+ Type '[\sA-Z]+', /i, replaceValue: ''
         },
         {
-            searchValue: /QuickBooks Transaction Type.*(?=Expected)/i, replaceValue: ''
+            searchValue: /(?<= )\w+ Transaction Type.*(?=Expected)/i, replaceValue: ''
         },
     ]
 ): string {

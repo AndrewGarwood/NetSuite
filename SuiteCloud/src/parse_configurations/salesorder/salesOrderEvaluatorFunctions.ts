@@ -2,7 +2,7 @@
  * @file src/parse_configurations/salesorder/salesOrderEvaluatorFunctions.ts
  */
 import { parseLogger as plog, 
-    mainLogger as mlog, DEBUG_LOGS, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
+    mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
 } from "../../config";
 import { 
     CleanStringOptions,
@@ -14,6 +14,7 @@ import {
     isNonEmptyString 
 } from "typeshi:utils/typeValidation";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
+import { FieldDictionary, RecordOptions } from "@api/types";
 
 /**
  * @example
@@ -25,12 +26,16 @@ import { RecordTypeEnum } from "../../utils/ns/Enums";
  * result = 'SO:9999_NUM:0000_PO:1111(TRAN_TYPE)<salesorder>';
  */
 export const transactionExternalId = (
+    fields: FieldDictionary,
     row: Record<string, any>,
     recordType: RecordTypeEnum | string,
     typeColumn: string = SO.TRAN_TYPE,
     keyCleanOptions?: CleanStringOptions,
     ...idColumns: string[]
 ): string => {
+    if (isNonEmptyString(fields.externalid)) {
+        return fields.externalid;
+    }
     if (keyCleanOptions && !isCleanStringOptions(keyCleanOptions)) {
         mlog.error(`[externalId()] Invalid cleanKeyOptions:`);
         return '';
@@ -52,6 +57,7 @@ export const transactionExternalId = (
 }
 
 /**
+ * `otherrefnum`
  * from NetSuite documentation: `"If your customer is paying by check, enter the number here.
  * If your customer is issuing a purchase order, enter the PO number here."`
  * @param row `Record<string, any>`
@@ -60,6 +66,7 @@ export const transactionExternalId = (
  * @returns **`otherReferenceNumber`** `string` - the check number or PO number.
  */
 export const otherReferenceNumber = (
+    fields: FieldDictionary,
     row: Record<string, any>,
     checkNumberColumn: string = SO.CHECK_NUMBER,
     poNumberColumn: string = SO.PO_NUMBER,
@@ -74,6 +81,7 @@ export const otherReferenceNumber = (
 
 
 export const memo = (
+    fields: FieldDictionary,
     row: Record<string, any>,
     memoPrefix?: string,
     typeColumn: string = SO.TRAN_TYPE,

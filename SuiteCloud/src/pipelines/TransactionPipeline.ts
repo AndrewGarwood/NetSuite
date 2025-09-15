@@ -17,7 +17,6 @@ import {
 import { 
     STOP_RUNNING, DELAY,
     mainLogger as mlog, INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
-    SUPPRESSED_LOGS as SUP, 
     simpleLogger as slog, apiLogger as alog,
     getProjectFolders
 } from "../config";
@@ -30,7 +29,6 @@ import {
     idSearchOptions,
     FieldValue,
     SetFieldSubrecordOptions,
-    SourceTypeEnum,
     LogTypeEnum,
     isRecordOptions,
     isRecordResponseOptions,
@@ -40,7 +38,7 @@ import {
     processParseResults, getCompositeDictionaries 
 } from "src/services/post_process/parseResultsProcessor";
 import { 
-    isNonEmptyArray, isNullLike as isNull, isEmptyArray, hasKeys, 
+    isNonEmptyArray, isEmptyArray, hasKeys, 
     TypeOfEnum, isNonEmptyString, isIntegerArray,
 } from "typeshi:utils/typeValidation";
 import { getColumnValues, getRows, isValidCsvSync, isFile, isDirectory } from "typeshi:utils/io";
@@ -54,7 +52,7 @@ import { isTransactionEntityMatchOptions, LocalFileMatchOptions, MatchErrorDetai
 import { encodeExternalId } from "../utils/ns/utils";
 import { parseRecordCsv } from "src/services/parse/csvParser";
 import { 
-    ParseDictionary, ParseResults, ValidatedParseResults 
+    ParseDictionary, ParseResults, RecordParseMeta, SourceTypeEnum, ValidatedParseResults 
 } from "src/services/parse/types/index";
 import { PostProcessDictionary } from "src/services/post_process/types/PostProcessing";
 import { DEFAULT_SALES_ORDER_RESPONSE_OPTIONS } from "./TransactionConfig";
@@ -66,12 +64,12 @@ import { DEFAULT_SALES_ORDER_RESPONSE_OPTIONS } from "./TransactionConfig";
  * @param stageData 
  * @returns **`boolean`**
  */
-async function done(
+function done(
     options: TransactionMainPipelineOptions, 
     fileName: string,
     stage: TransactionMainPipelineStageEnum,
     stageData: Record<string, any>,
-): Promise<boolean> {
+): boolean {
     const source = `[TransactionPipeline.done()]`
     let stagesToWrite = (isNonEmptyArray(options.stagesToWrite) 
         ? options.stagesToWrite
@@ -132,11 +130,11 @@ export async function runMainTransactionPipeline(
         // ====================================================================
         // TransactionMainPipelineStageEnum.PARSE
         // ====================================================================
-        const parseResults: ParseResults = await parseRecordCsv(
+        const { parseResults, meta } = await parseRecordCsv(
             csvPath, parseOptions, SourceTypeEnum.LOCAL_FILE
         );
-        if (await done(options, 
-            fileName, TransactionMainPipelineStageEnum.PARSE, parseResults
+        if (done(options, 
+            fileName, TransactionMainPipelineStageEnum.PARSE, {parseResults, meta}
         )) {
             continue;
         }
@@ -147,7 +145,7 @@ export async function runMainTransactionPipeline(
         const validatedResults = await processParseResults(
             parseResults, postProcessingOptions
         ) as ValidatedParseResults;
-        if (await done(options, 
+        if (done(options, 
             fileName, TransactionMainPipelineStageEnum.VALIDATE, validatedResults
         )) {
             continue;
@@ -186,7 +184,8 @@ export async function runMainTransactionPipeline(
             if (options.generateMissingEntities === true) {
                 resolvedTransactions.push(...await resolveUnmatchedTransactions(
                     csvPath, matchResults.errors, 
-                    options.matchOptions.entityType as EntityRecordTypeEnum
+                    options.matchOptions.entityType as EntityRecordTypeEnum, 
+                    meta
                 ));
                 slog.debug([`back in pipeline func after calling resolveUnmatched func...`,
                     ` matchResults.errors.length: ${matchResults.errors.length}`,
@@ -204,7 +203,7 @@ export async function runMainTransactionPipeline(
                 );
             }
         }
-        if (await done(options, 
+        if (done(options, 
             fileName, TransactionMainPipelineStageEnum.MATCH_ENTITY, matchResults
         )) {
             continue;
@@ -270,7 +269,7 @@ export async function runMainTransactionPipeline(
             );
         }
         slog.debug(`checking if done after PUT_SALES_ORDERS...`)
-        if (await done(options, 
+        if (done(options, 
             fileName, TransactionMainPipelineStageEnum.PUT_SALES_ORDERS, 
             { sourceFile: csvPath, successCount, failureCount: numRejects}
         )) break;
@@ -295,7 +294,7 @@ export async function runMainTransactionPipeline(
  */
 export async function matchTransactionEntity(
     transactions: RecordOptions[],
-    options: TransactionEntityMatchOptions,
+    options: TransactionEntityMatchOptions
 ): Promise<{
     matches: RecordOptions[],
     errors: RecordOptions[]
@@ -312,7 +311,7 @@ export async function matchTransactionEntity(
         case MatchSourceEnum.API:
             return matchUsingApi(transactions,
                 options.entityType as EntityRecordTypeEnum,
-                options.entityFieldId
+                options.entityFieldId,
             );
         case MatchSourceEnum.LOCAL:
             return matchUsingLocalFile(transactions, options);
@@ -333,7 +332,7 @@ export async function matchTransactionEntity(
 async function matchUsingApi(
     transactions: RecordOptions[],
     entityType: EntityRecordTypeEnum,
-    entityFieldId: string,
+    entityFieldId: string
 ): Promise<{
     matches: RecordOptions[],
     errors: RecordOptions[]
@@ -389,49 +388,6 @@ async function matchUsingApi(
 }
 
 /**
- * @param transaction 
- * @param entityType 
- * @param entityFieldId 
- * @returns **`idOptions`** = {@link idSearchOptions}`[]`
- */
-function generateIdOptions(
-    transaction: RecordOptions,
-    entityType: string,
-    entityFieldId: string
-): idSearchOptions[] {
-    if (!transaction.fields) {
-        return []
-    }
-    const entityValue = transaction.fields[entityFieldId] as string;
-    const idOptions: idSearchOptions[] = [
-        Factory.idSearchOptions(idPropertyEnum.ENTITY_ID, entityValue),
-        Factory.idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
-            encodeExternalId(`${entityValue}<${entityType}>`)
-        ),
-    ];
-    for (const addrFieldId of ['billingaddress', 'shippingaddress']) {
-        if (!transaction.fields[addrFieldId]) continue;
-        const addr = transaction.fields[addrFieldId] as SetFieldSubrecordOptions;
-        if (!addr.fields) continue;
-        const addressee = addr.fields.addressee as string;
-        const attention = addr.fields.attention as string;
-        if (addressee) {
-            idOptions.push(Factory.idSearchOptions(idPropertyEnum.ENTITY_ID, addressee));
-            idOptions.push(Factory.idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
-                encodeExternalId(`${addressee}<${entityType}>`))
-            );
-        }
-        if (attention) {
-            idOptions.push(Factory.idSearchOptions(idPropertyEnum.ENTITY_ID, attention));
-            idOptions.push(Factory.idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
-                encodeExternalId(`${attention}<${entityType}>`))
-            );
-        }
-    }
-    return idOptions;
-}
-
-/**
  * @param transactions {@link RecordOptions}`[]` 
  * @param responseOptions {@link RecordResponseOptions}
  * @returns **`responses`** {@link RecordResponse}`[]`
@@ -470,14 +426,15 @@ export async function putTransactions(
  * @TODO have the creation of entities be handled by invoking EntityPipeline instead of doing it here
  * - this is ineffecient and could likely be improved by having better way to retrieve source rows.
  * - GroupedParser might help if I ever have time to finish it
- * - still testing, so there are some unnecessary actions/variables used just for debugging
+ * - still testing, so there are some unnecessary lines used just for debugging
  * @TODO export customers and can run equivalentAlphanumeric pairwise on entity id from transactions
  * ... slow, but might get the job done...
  */
 async function resolveUnmatchedTransactions(
     filePath: string,
     transactions: RecordOptions[],
-    entityType: EntityRecordTypeEnum = EntityRecordTypeEnum.CUSTOMER
+    entityType: EntityRecordTypeEnum = EntityRecordTypeEnum.CUSTOMER,
+    meta?: { [recordType: string]: RecordParseMeta }
 ): Promise<any> {
     const source = `[TransactionPipeline.resolveUnmatchedTransactions()]`
     validate.stringArgument(source, {entityType});
@@ -497,19 +454,6 @@ async function resolveUnmatchedTransactions(
         } else {
             entDict[ent].push(txn)
         }
-        
-        if (!txn.meta) {
-            throw new Error(`${source} ayo where da meta at`)
-        }
-        if (isRowSourceMetaData(txn.meta.dataSource)) {
-            if (!txn.meta.dataSource[filePath]) {
-                throw new Error(`${source} yo da filePath from TransactionPipeline should've been added as a sourceData after running csvParser`)
-            }
-            targetRowIndices.push(...txn.meta.dataSource[filePath])
-        } else if (isIntegerArray(txn.meta.dataSource)
-            && txn.meta.sourceType === SourceTypeEnum.ROW_ARRAY) {
-            targetRowIndices.push(...txn.meta.dataSource)
-        }
     }
     for (let index of Array.from(new Set(targetRowIndices))) {
         targetRows.push(sourceRows[index])
@@ -526,7 +470,7 @@ async function resolveUnmatchedTransactions(
     if (diff !== 0) {
         mlog.error(`ayo the diff should be 0`)
     }
-    const parseResults: ParseResults = await parseRecordCsv(
+    const {parseResults} = await parseRecordCsv(
         targetRows, { [entityType]: SO_CUSTOMER_PARSE_OPTIONS } as ParseDictionary
     );
     const validatedResults = await processParseResults(
@@ -598,22 +542,17 @@ async function resolveUnmatchedTransactions(
 /**
  * @param transactions {@link RecordOptions}`[]`
  * @param options {@link TransactionEntityMatchOptions}
- * @param options.entityType {@link EntityRecordTypeEnum}
- * @param options.entityFieldId `string`
- * @param options.localFileOptions.filePath `string`
- * @param options.localFileOptions.entityIdColumn `string`
- * @param options.localFileOptions.internalIdColumn `string`
  * @returns **`result`** - `{ matches: `{@link RecordOptions}`[], errors: RecordOptions[] }`
  * - **`result.matches`** - the elements from `transactions` that were successfully matched to an entity.
  */
 async function matchUsingLocalFile(
     transactions: RecordOptions[],
-    options: TransactionEntityMatchOptions
+    options: TransactionEntityMatchOptions,
 ): Promise<{
     matches: RecordOptions[],
     errors: RecordOptions[]
 }> {
-    const source = `[TransactionPipeline.matchUsingLocalFile()]`
+    const source = getSourceString(__filename, matchUsingLocalFile.name);
     try {
         validate.arrayArgument(source, {transactions, isRecordOptions});
         validate.objectArgument(source, {options, isTransactionEntityMatchOptions});
@@ -661,4 +600,48 @@ async function matchUsingLocalFile(
         result.matches.push(txn);
     }
     return result;
+}
+
+
+/**
+ * @param transaction 
+ * @param entityType 
+ * @param entityFieldId 
+ * @returns **`idOptions`** = {@link idSearchOptions}`[]`
+ */
+function generateIdOptions(
+    transaction: RecordOptions,
+    entityType: string,
+    entityFieldId: string
+): idSearchOptions[] {
+    if (!transaction.fields) {
+        return []
+    }
+    const entityValue = transaction.fields[entityFieldId] as string;
+    const idOptions: idSearchOptions[] = [
+        Factory.idSearchOptions(idPropertyEnum.ENTITY_ID, entityValue),
+        Factory.idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
+            encodeExternalId(`${entityValue}<${entityType}>`)
+        ),
+    ];
+    for (const addrFieldId of ['billingaddress', 'shippingaddress']) {
+        if (!transaction.fields[addrFieldId]) continue;
+        const addr = transaction.fields[addrFieldId] as SetFieldSubrecordOptions;
+        if (!addr.fields) continue;
+        const addressee = addr.fields.addressee as string;
+        const attention = addr.fields.attention as string;
+        if (addressee) {
+            idOptions.push(Factory.idSearchOptions(idPropertyEnum.ENTITY_ID, addressee));
+            idOptions.push(Factory.idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
+                encodeExternalId(`${addressee}<${entityType}>`))
+            );
+        }
+        if (attention) {
+            idOptions.push(Factory.idSearchOptions(idPropertyEnum.ENTITY_ID, attention));
+            idOptions.push(Factory.idSearchOptions(idPropertyEnum.EXTERNAL_ID, 
+                encodeExternalId(`${attention}<${entityType}>`))
+            );
+        }
+    }
+    return idOptions;
 }

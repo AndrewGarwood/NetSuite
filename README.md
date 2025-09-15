@@ -48,7 +48,7 @@ type DataSourceConfiguration = FolderHierarchy & { options?: LoadFileOptions }
 - Request bodies for these endpoints are defined in [RecordEndpoint.ts][record_endpoint_types_file]
 
 Okay, now we have to extract the csv content and load it into a request body. This is handled by code in [src/services/parse][parse_folder] (to generate ParseResults) and [src/services/post_process][post_process_folder] (to validate/edit ParseResults)
-- I'd like to improve the efficiency of the parsing logic, but time constraints compelled me to postpone this.
+- I'd like to improve the logic and increase the efficiency of the parsing step, but time constraints compelled me to postpone.
 
 // TODO: finish README
 

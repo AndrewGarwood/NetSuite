@@ -4,33 +4,89 @@
 
 import { RecordOptions } from "../../../api/types/RecordEndpoint";
 import { NumericOperatorEnum, RecordOperatorEnum, 
+    RecordTypeEnum, 
     SearchOperatorEnum, TextOperatorEnum 
 } from "../../../utils/ns/Enums";
 import { FieldDictionary, FieldValue, idPropertyEnum, 
     SublistDictionary, SublistLine 
 } from "../../../api/types";
+import { RowSourceMetaData } from "@typeshi/io";
+import { RecordPostProcessingOptions } from "src/services/post_process";
 
-export type ParseDictionary = {
+
+export { 
+    ParseDictionary, RecordParseOptions, 
+    FieldDictionaryParseOptions, SublistDictionaryParseOptions, 
+    FieldParseOptions, FieldEvaluator, RowContext,
+    EvaluationContext, SubrecordParseOptions,
+    idSearchParseOptions, ValueMappingEntry, ColumnSliceOptions,
+    ValueMapping, IntermediateParseResults, ParseResults,
+    ValidatedParseResults, SublistLineParseOptions,
+    SublistLineIdOptions,
+    RecordParseMeta, SourceTypeEnum
+}
+
+type ParseDictionary = {
     [recordType: string]: RecordParseOptions;
 }
 
-export type RecordParseOptions = {
+type RecordParseOptions = {
     keyColumn: string;
     fieldOptions?: FieldDictionaryParseOptions;
     sublistOptions?: SublistDictionaryParseOptions;
 }
 
-export type IntermediateParseResults = {
+
+
+/**
+ * @enum {string} **`SourceTypeEnum`**
+ */
+enum SourceTypeEnum {
+    LOCAL_FILE = 'LOCAL_FILE',
+    /** 
+     * `if` `sourceType === ROW_ARRAY` and `dataSource === number[]`, and know corresponding `filePath`,
+     * then subsequently indexing `await getRows(filePath)` with numbers from `dataSource[filePath]` will be accurate
+     */
+    ROW_ARRAY = 'ROW_ARRAY',
+    ROW_SUBSET_ARRAY = 'ROW_SUBSET_ARRAY',
+    /** assume `base64` encoded `string` */
+    ENCODED_FILE_CONTENT_STRING = 'ENCODED_FILE_CONTENT_STRING',
+    /** the {@link Buffer} object created from `Buffer.from(ENCODED_FILE_CONTENT_STRING, 'base64')` or `fs.readFileSync(filePath)` */
+    BUFFER = 'BUFFER',
+    UNKNOWN = 'UNKNOWN'
+}
+
+/*
+    /** 
+     * info about what generated this RecordOptions object
+     * e.g. {@link RowSourceMetaData} 
+     * *
+    dataSource: RowSourceMetaData | any;
+    sourceType: string;
+*/
+type IntermediateParseResults = {
     [recordType: string]: {
-        [recordId: string]: RecordOptions
+        [recordId: string]: Required<RecordOptions>
     }
 };
 
-export type ParseResults = {
-    [recordType: string]: RecordOptions[]
+type ParseResults = {
+    [recordType: string]: Required<RecordOptions>[]
 };
 
-export type ValidatedParseResults = {
+type RecordParseMeta = {
+    // recordType: RecordTypeEnum;
+    sourceType: SourceTypeEnum;
+    sourceLabel: string;
+    recordRows: {
+        [recordId: string]: number[];
+    }
+    parseOptions: RecordParseOptions;
+    postProcessOptions?: RecordPostProcessingOptions;
+    file?: string;
+}
+
+type ValidatedParseResults = {
     [recordType: string]: {
         valid: RecordOptions[], 
         invalid: RecordOptions[]
@@ -45,7 +101,7 @@ export type ValidatedParseResults = {
  * - {@link SubrecordParseOptions} 
  * = `{ subrecordType: string, fieldOptions: FieldDictionaryParseOptions, sublistOptions`: {@link SublistDictionaryParseOptions}` }`
  */
-export type FieldDictionaryParseOptions = {
+type FieldDictionaryParseOptions = {
     [fieldId: string]: FieldParseOptions | SubrecordParseOptions;
 }
 
@@ -56,7 +112,7 @@ export type FieldDictionaryParseOptions = {
  * - `{ [sublistFieldId: string]: `{@link FieldParseOptions} | {@link SubrecordParseOptions}` }` 
  * `& { lineIdOptions?:` {@link SublistLineIdOptions}` }`
  */
-export type SublistDictionaryParseOptions = {
+type SublistDictionaryParseOptions = {
     [sublistId: string] : Array<SublistLineParseOptions>;
 };
 
@@ -66,7 +122,7 @@ export type SublistDictionaryParseOptions = {
  * @property {string} [lineIdOptions.lineIdProp] `string` - `optional` the `'internalid'` of the sublist field used to identify existing sublist lines for editing.
  * - e.g. for the addressbook sublist, can define values for the sublistFieldId 'label', then set 'label' as the `lineIdProp`. 
  */
-export type SublistLineParseOptions = { 
+type SublistLineParseOptions = { 
     [sublistFieldId: string]: FieldParseOptions | SubrecordParseOptions | SublistLineIdOptions
 } & {
     lineIdOptions?: SublistLineIdOptions | {
@@ -77,7 +133,7 @@ export type SublistLineParseOptions = {
     }
 }
 
-export type SublistLineIdOptions = {
+type SublistLineIdOptions = {
     /**`string` - the `'internalid'` of the sublist field used to identify existing sublist lines for editing. */
     lineIdProp?: string;
     /** function to calculate an id value used to compare if a sublist line is identical to another. */
@@ -95,7 +151,7 @@ export type SublistLineIdOptions = {
  * - This is used when the value is not in the CSV file or is determined by the contents/context of the `row`.
  * @property {Array<any>} args - An optional array of arguments to pass to the `evaluator` function.
  */
-export type FieldParseOptions = {
+type FieldParseOptions = {
     defaultValue?: FieldValue;
     /** Fields that must be evaluated before this field */
     dependencies?: string[];
@@ -111,12 +167,12 @@ export type FieldParseOptions = {
 } | { 
     colName?: never; 
     /**`function` that takes a `row` object (and arbitrary `args`) and returns the value for the `field`. */
-    evaluator?: ((row: Record<string, any>, ...args: any[]) => FieldValue | Promise<FieldValue>); 
+    evaluator?: ((fields: FieldDictionary, row: Record<string, any>, ...args: any[]) => FieldValue | Promise<FieldValue>); 
     /**`optional` `array` of arguments to pass to the `evaluator` function. */
     args?: any[]; 
 });
 
-export type FieldEvaluator = (
+type FieldEvaluator = (
     row: Record<string, any>,
     context: EvaluationContext,
     ...args: any[]
@@ -130,7 +186,7 @@ export type FieldEvaluator = (
  * @property **`filePath`** `string` - The path to the source CSV file being processed
  * @property **`cache`** {@link FieldDictionary} - Cache for expensive computations to avoid re-evaluation
  */
-export type RowContext = {
+type RowContext = {
     /** Current row index (0-based) */
     rowIndex: number;
     /** Current record type being processed */
@@ -157,7 +213,7 @@ export type RowContext = {
  * @property **`sublistId`** `string` - The ID of the sublist currently being evaluated (optional)
  * @property **`sublists`** {@link SublistDictionary} - Dictionary mapping `sublistId` to {@link SublistLine}`[]`.
  */
-export type EvaluationContext = RowContext & {
+type EvaluationContext = RowContext & {
     /** Field ID currently being evaluated */
     currentFieldId: string;
 } & ({
@@ -177,7 +233,7 @@ export type EvaluationContext = RowContext & {
  * @property {FieldDictionaryParseOptions} fieldOptions - {@link FieldDictionaryParseOptions} - The field dictionary parse options for the subrecord.
  * @property {SublistDictionaryParseOptions} sublistOptions - {@link SublistDictionaryParseOptions} - The sublist dictionary parse options for the subrecord.
  */
-export type SubrecordParseOptions = {
+type SubrecordParseOptions = {
     subrecordType: string;
     fieldOptions?: FieldDictionaryParseOptions;
     sublistOptions?: SublistDictionaryParseOptions;
@@ -187,7 +243,7 @@ export type SubrecordParseOptions = {
 /** 
  * options for parsing a csv to extract an {@link idSearchOptions} object 
  * */
-export type idSearchParseOptions = {
+type idSearchParseOptions = {
     idProp: idPropertyEnum;
     searchOperator: RecordOperatorEnum | SearchOperatorEnum | TextOperatorEnum | NumericOperatorEnum;
     idValueMapping: FieldParseOptions 
@@ -199,7 +255,7 @@ export type idSearchParseOptions = {
  * @property {FieldValue} newValue - The new value to set for the column.
  * @property {string | string[]} validColumns - The column names that this mapping applies to. Can be a single string or an array of strings.
  */
-export type ValueMappingEntry = {
+type ValueMappingEntry = {
     newValue: FieldValue;
     validColumns: string | string[];
 };
@@ -209,7 +265,7 @@ export type ValueMappingEntry = {
  * @property {string} col - The column name to extract a value from.
  * @property {number} [minIndex] - Accept values from col starting at this index of `matchResults RegExpArray` returned from `extractor(row[col])`
  */
-export type ColumnSliceOptions = {
+type ColumnSliceOptions = {
     /**The column name to extract a value from. */
     colName: string;
     /** *`(zero-based)`* Accept values from col starting at this index of `matchResults RegExpArray` returned from `extractor(row[col])` */
@@ -224,4 +280,4 @@ export type ColumnSliceOptions = {
  * - - a {@link FieldValue} -> override occurrences of `key` in any column it's found in with the `FieldValue`
  * - - a {@link ValueMappingEntry} -> override occurences of `key` only in specified columns (see {@link ValueMappingEntry.validColumns}) with {@link ValueMappingEntry.newValue}.
  */
-export type ValueMapping = Record<string, FieldValue | ValueMappingEntry>;
+type ValueMapping = Record<string, FieldValue | ValueMappingEntry>;

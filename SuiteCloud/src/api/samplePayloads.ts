@@ -47,7 +47,6 @@ const SUZZALLO_ADDRESS_SUBRECORD_OPTIONS: SetSublistSubrecordOptions = {
 
 export const SAMPLE_POST_CUSTOMER_OPTIONS: RecordOptions = {
     recordType: RecordTypeEnum.CUSTOMER,
-    isDynamic: NOT_DYNAMIC,
     fields: {
         companyname: 'Sample Customer Company Name',
         entityid: 'Sample Customer Company Name',
@@ -65,7 +64,6 @@ export const SAMPLE_POST_CUSTOMER_OPTIONS: RecordOptions = {
 
 export const UW_LIBRARIES_POST_VENDOR_OPTIONS: RecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
-    isDynamic: NOT_DYNAMIC,
     fields: {
         entityid: 'UW_LIBRARIES',
         externalid: 'UW_LIBRARIES',
@@ -104,7 +102,6 @@ const MISSION_VIEJO_LIBRARY_ADDRESS_SUBRECORD_OPTIONS: SetSublistSubrecordOption
 
 export const MISSION_VIEJO_LIBRARY_POST_VENDOR_OPTIONS: RecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
-    isDynamic: NOT_DYNAMIC,
     fields: {
         companyname: 'City of Mission Viejo',
         isperson: RADIO_FIELD_FALSE,  

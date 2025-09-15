@@ -29,7 +29,6 @@ import {
     idSearchOptions,
     FieldValue,
     SetFieldSubrecordOptions,
-    SourceTypeEnum,
     LogTypeEnum,
     isRecordOptions,
     isRecordResponseOptions,
@@ -51,7 +50,7 @@ import { DEFAULT_ITEM_RESPONSE_OPTIONS, BIN_RESPONSE_OPTIONS } from "./ItemConfi
 import { clean, CleanStringOptions, extractFileName, extractLeaf } from "typeshi:utils/regex";
 import { CLEAN_ITEM_ID_OPTIONS } from "src/parse_configurations/evaluators/item";
 import { parseRecordCsv } from 'src/services/parse';
-import { ParseResults, ValidatedParseResults } from 'src/services/parse/types/index';
+import { ParseResults, SourceTypeEnum, ValidatedParseResults } from 'src/services/parse/types/index';
 import { 
     getCompositeDictionaries, processParseResults 
 } from 'src/services/post_process/parseResultsProcessor';
@@ -65,12 +64,12 @@ const F = extractFileName(__filename);
  * @param stageData 
  * @returns **`boolean`**
  */
-async function done(
+function done(
     options: ItemPipelineOptions, 
     fileName: string,
     stage: ItemPipelineStageEnum,
     stageData: Record<string, any>,
-): Promise<boolean> {
+): boolean {
     let stagesToWrite = (isNonEmptyArray(options.stagesToWrite) 
         ? options.stagesToWrite
         : []
@@ -117,11 +116,11 @@ export async function runMainItemPipeline(
         // ====================================================================
         // ItemPipelineStageEnum.PARSE
         // ====================================================================
-        const parseResults: ParseResults = await parseRecordCsv(
+        const {parseResults, meta} = await parseRecordCsv(
             csvPath, parseOptions, SourceTypeEnum.LOCAL_FILE
         );
-        if (await done(
-            options, fileName, ItemPipelineStageEnum.PARSE, parseResults
+        if (done(
+            options, fileName, ItemPipelineStageEnum.PARSE, {parseResults, meta}
         )) return;
         // ====================================================================
         // ItemPipelineStageEnum.VALIDATE
@@ -129,7 +128,7 @@ export async function runMainItemPipeline(
         const validatedResults = await processParseResults(
             parseResults, postProcessingOptions
         ) as ValidatedParseResults;
-        if (await done(
+        if (done(
             options, fileName, ItemPipelineStageEnum.VALIDATE, validatedResults
         )) return;
         const { validDict, invalidDict } = getCompositeDictionaries(validatedResults);
@@ -180,7 +179,7 @@ export async function runMainItemPipeline(
                 )
             );
         }
-        if (await done(
+        if (done(
             options, fileName, 
             ItemPipelineStageEnum.PUT_ITEMS, 
             { successCount, failureCount: numRejects } // itemResponses

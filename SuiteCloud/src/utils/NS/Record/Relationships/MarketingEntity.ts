@@ -4,7 +4,6 @@
  */
 import { Relationship, RelationshipSublists } from "./Relationship";
 import { Entity, EntitySublists } from "./Entity";
-import { RadioFieldBoolean } from "../../../typeValidation";
 import { CustomerTaxItemEnum } from "./Customer";
 import { RecordRef } from "../Record";
 import { AddressBook, AddressBookEntry, Address } from "./Address";

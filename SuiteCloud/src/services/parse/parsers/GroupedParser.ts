@@ -285,9 +285,9 @@ export class GroupedParser extends BaseParser {
             return;
         }
         const recordId = recordAncestor.recordId;
-        const record: RecordOptions = {
+        const record: Required<RecordOptions> = {
             recordType: recordType as RecordTypeEnum,
-            isDynamic: NOT_DYNAMIC,
+            idOptions: [],
             fields: {} as FieldDictionary,
             sublists: {} as SublistDictionary,
         };

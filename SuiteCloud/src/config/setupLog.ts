@@ -166,9 +166,3 @@ export function formatLogObj(logObj: ILogObj | (ILogObj & ILogObjMeta)): string 
     logObj['meta1'] = `${fileInfo} @ ${methodInfo}`;
     return JSON.stringify(logObj, null, 4) + "\n" 
 }
-
-/**@TODO use hidden logs and simpleLogger instead of these arrays */
-/**suppress logs by putting them here (do not print to console) */
-export const SUPPRESSED_LOGS: any[] = []
-export const INFO_LOGS: any[] = []
-export const DEBUG_LOGS: any[] = [];

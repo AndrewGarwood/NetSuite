@@ -2,7 +2,8 @@
  * @file src/parse_configurations/salesorder/salesOrderParseDefinition.ts
  */
 import { mainLogger as mlog, pruneLogger as plog, 
-    INDENT_LOG_LINE as TAB, NEW_LINE as NL } from "../../config/setupLog";
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL 
+} from "../../config/setupLog";
 import {
     SublistLine,
     RecordOptions, idSearchOptions, idPropertyEnum,
@@ -132,7 +133,7 @@ const lineItemIdEvaluator = (sublistLine: SublistLine, ...args: string[]): strin
 const LINE_ITEM_SUBLIST_OPTIONS: SublistDictionaryParseOptions = {
     item: [{
         lineIdOptions: {lineIdEvaluator: lineItemIdEvaluator},
-        item: { evaluator: evaluate.itemId, args: [SO.ITEM] },
+        item: { evaluator: evaluate.itemId, args: [SO.ITEM, evaluate.CLEAN_ITEM_ID_OPTIONS] },
         quantity: { colName: SO.QUANTITY, defaultValue: 0 },
         price: { defaultValue: PriceLevelEnum.CUSTOM },
         rate: { colName: SO.RATE, defaultValue: 0.0 },
@@ -140,7 +141,7 @@ const LINE_ITEM_SUBLIST_OPTIONS: SublistDictionaryParseOptions = {
         description: { colName: SO.ITEM_MEMO },
         istaxable: { defaultValue: false },
         isclosed: { defaultValue: true },
-    }] as SublistLineParseOptions[],
+    }],
 };
 
 /**

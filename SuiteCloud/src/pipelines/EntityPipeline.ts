@@ -81,12 +81,12 @@ export type EntityPipelineOptions = {
  * @param stageData 
  * @returns 
  */
-async function done(
+function done(
     options: EntityPipelineOptions, 
     fileName: string,
     stage: EntityPipelineStageEnum,
     stageData: Record<string, any>,
-): Promise<boolean> {
+): boolean {
     const { stopAfter, outputDir } = options;
     if (outputDir && fs.existsSync(outputDir)) {
         const outputPath = path.join(outputDir, `${fileName}_${stage}.json`);
@@ -133,19 +133,19 @@ export async function runEntityPipeline(
             [entityType]: CUSTOMER_PARSE_OPTIONS,
             [RecordTypeEnum.CONTACT]: CONTACT_PARSE_OPTIONS
         };
-        const parseResults: ParseResults = await parseRecordCsv(
+        const {parseResults, meta} = await parseRecordCsv(
             csvFilePath, parseOptions
         );
-        if (await done(options, fileName, EntityPipelineStageEnum.PARSE, parseResults)) return;
+        if (done(options, fileName, EntityPipelineStageEnum.PARSE, {parseResults, meta})) return;
         const validatedResults: ValidatedParseResults = await processParseResults(
             parseResults, 
             POST_PROCESSING_OPTIONS as PostProcessDictionary 
         );
-        if (await done(options, fileName, EntityPipelineStageEnum.VALIDATE, validatedResults)) return;
+        if (done(options, fileName, EntityPipelineStageEnum.VALIDATE, validatedResults)) return;
         
         const entityResponses: RecordResponse[] 
             = await putEntities(validatedResults[entityType].valid);
-        if (await done(options, fileName, EntityPipelineStageEnum.ENTITIES, entityResponses)) return;
+        if (done(options, fileName, EntityPipelineStageEnum.ENTITIES, entityResponses)) return;
         
         await DELAY(TWO_SECONDS);
         const matches: RecordOptions[] = matchContactsToEntityResponses(
@@ -153,19 +153,19 @@ export async function runEntityPipeline(
             entityResponses
         ).matches;
         const contactResponses: RecordResponse[] = await putContacts(matches);
-        if (await done(options, fileName, EntityPipelineStageEnum.CONTACTS, contactResponses)) return;
+        if (done(options, fileName, EntityPipelineStageEnum.CONTACTS, contactResponses)) return;
         
         // const entityUpdates: RecordOptions[] = generateEntityUpdates(
         //     entityType,
         //     contactResponses
         // );
-        // if (await done(options, fileName, EntityProcessorStageEnum.GENERATE, entityUpdates)) return;
+        // if (done(options, fileName, EntityProcessorStageEnum.GENERATE, entityUpdates)) return;
         
         // await DELAY(TWO_SECONDS);
         // const updateResponses: RecordResponse[] = await putEntities(
         //     entityUpdates
         // );
-        // if (await done(options, fileName, EntityProcessorStageEnum.UPDATE, updateResponses)) return;
+        // if (done(options, fileName, EntityProcessorStageEnum.UPDATE, updateResponses)) return;
     }
     mlog.info(`[END runEntityPipeline()]`);
     STOP_RUNNING(0);

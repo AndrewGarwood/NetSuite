@@ -6,26 +6,20 @@ import {
     pruneLogger as plog, mainLogger as mlog, INDENT_LOG_LINE as TAB, simpleLogger as slog 
 } from "../config/setupLog";
 import { 
-    FieldDictionary,
     isSublistUpdateDictionary,
     RecordOptions,
     SetFieldSubrecordOptions,
-    SetFieldValueOptions,
     SetSublistSubrecordOptions,
-    SetSublistValueOptions,
     SublistLine,
-    SubrecordValue,
 } from "../api/types";
 import { 
     hasKeys, isEmpty, isInteger, isNonEmptyArray, isNonEmptyString, 
     isNumeric
 } from "typeshi:utils/typeValidation";
-import { clean, 
+import { 
     equivalentAlphanumericStrings, 
-    RegExpFlagsEnum 
 } from "typeshi:utils/regex";
 import { EntityRecordTypeEnum, RecordTypeEnum } from "../utils/ns/Enums";
-import { indentedStringify } from "typeshi:utils/io/writing";
 import { RADIO_FIELD_FALSE, RADIO_FIELD_TRUE } from "../utils/ns";
 import { getSourceString } from "@typeshi/io";
 
@@ -236,7 +230,6 @@ export const salesOrder = async (
         mlog.error([`${source}: lineItem.amount is < 0`,
             `    item sublist: ${JSON.stringify(options.sublists.item)}`,
             `order externalid: ${externalId}`,
-            `meta: ${indentedStringify(options.meta || {})}`
         ].join(TAB));
         throw new Error(`bad amount`);
     }

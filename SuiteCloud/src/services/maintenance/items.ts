@@ -1150,6 +1150,7 @@ async function performFinalValidation(
 }
 
 /**
+ * @deprecated - needs to handle change to where parse metadata is stored 
  * just wanted to move this code block out of main()
  * @TODO parameterize
  * @param filePath `string` path to json `{ items: Required<RecordOptions>[] }`
@@ -1164,7 +1165,7 @@ export async function getItemRecordOptions(filePath: string): Promise<Required<R
         inventoryRows, 'Name', itemIdExtractor
     );
     let newItems = lnii_data.items;
-    let dataSource = newItems[0].meta.dataSource ?? {};
+    let dataSource = {} //newItems[0].meta.dataSource ?? {};
     const [ogParseSourcePath] = Object.keys(dataSource);
     let fileName = extractFileName(ogParseSourcePath, false);
     let parseSourcePath = path.join(getProjectFolders().dataDir, 'accounting', 'items', fileName);
@@ -1190,12 +1191,12 @@ export async function getItemRecordOptions(filePath: string): Promise<Required<R
             setPriceCount++;
         }
         if (isEmpty(record.fields.unitstype)) {
-            let dataSource = record.meta.dataSource as RowSourceMetaData;
-            validate.objectArgument(source, {dataSource, isRowSourceMetaData});
-            let [sourceIndex] = dataSource[ogParseSourcePath];
-            validate.numberArgument(source, {rowIndex: sourceIndex}, true);
-            let row = sourceRows[sourceIndex];
-            record.fields.unitstype = await unitType(row, ItemColumnEnum.UNIT_OF_MEASUREMENT);
+            // let dataSource = record.meta.dataSource as RowSourceMetaData;
+            // validate.objectArgument(source, {dataSource, isRowSourceMetaData});
+            // let [sourceIndex] = dataSource[ogParseSourcePath];
+            // validate.numberArgument(source, {rowIndex: sourceIndex}, true);
+            // let row = sourceRows[sourceIndex];
+            // record.fields.unitstype = await unitType(row, ItemColumnEnum.UNIT_OF_MEASUREMENT);
         }
         if (isEmpty(record.fields.class) && isNonEmptyString(record.fields.itemid)) {
             if (!hasKeys(indexedInventoryRows, record.fields.itemid)) {

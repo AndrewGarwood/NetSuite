@@ -12,12 +12,14 @@ import {
     areEquivalentObjects,
     isIntegerArray,
     hasKeys,
-    isNonEmptyString
+    isNonEmptyString,
+    isInteger
 } from "typeshi:utils/typeValidation";
-import { isRowSourceMetaData, RowSourceMetaData, 
+import { 
     handleFileArgument, indentedStringify, 
     isFileData, FileData, 
-    getSourceString
+    getSourceString,
+    isFile
 } from "typeshi:utils/io";
 import * as validate from "typeshi:utils/argumentValidation";
 import { 
@@ -32,7 +34,9 @@ import {
     SublistLineParseOptions,
     isFieldParseOptions,
     isValueMappingEntry,
-    SublistLineIdOptions
+    SublistLineIdOptions,
+    SourceTypeEnum, RecordParseMeta,
+    RecordParseOptions
 } from "./types/index";
 import {
     clean, equivalentAlphanumericStrings, DATE_STRING_PATTERN
@@ -41,14 +45,26 @@ import {
     FieldValue, FieldDictionary, SublistDictionary, SublistLine, 
     SubrecordValue, SetFieldSubrecordOptions, SetSublistSubrecordOptions, 
     RecordOptions, isFieldValue, isSubrecordValue,
-    SourceTypeEnum
 } from "../../api";
 import { RecordTypeEnum } from "../../utils/ns/Enums";
 import { BOOLEAN_FALSE_VALUES, BOOLEAN_TRUE_VALUES, isBooleanFieldId } from "../../utils/ns/utils";
-/** tells endpoint to load record in standard mode */
-const NOT_DYNAMIC = false;
-let rowIndex: number = 0;
 
+
+let currentRowIndex: number | null;
+let currentRecord: Required<RecordOptions> | null = null;
+function getCurrentRecord(): Required<RecordOptions> {
+    if (!currentRecord) {
+        throw new Error(`${getSourceString(__filename, getCurrentRecord.name)} currentRecord is undefined (haven't started parsing yet)`)
+    }
+    return currentRecord;
+}
+
+function getCurrentRowIndex(): number {
+    if (!isInteger(currentRowIndex)) {
+        throw new Error(`${getSourceString(__filename, getCurrentRowIndex.name)} rowIndex is undefined (haven't started parsing yet)`)
+    }
+    return currentRowIndex;
+}
 /**
  * @param recordSource `string | Record<string, any>[]` 
  * - does {@link handleFileArgument}`(recordSource)` -> rows: `Record<string, any>[]`, 
@@ -61,7 +77,10 @@ export async function parseRecordCsv(
     recordSource: string | FileData | Record<string, any>[],
     parseDictionary: ParseDictionary,
     sourceType?: SourceTypeEnum
-): Promise<ParseResults> {
+): Promise<{
+    parseResults: ParseResults; 
+    meta: { [recordType: string]: RecordParseMeta }
+}> {
     const source = getSourceString(__filename, parseRecordCsv.name);
     if (isEmpty(recordSource)) {
         throw new Error([
@@ -70,69 +89,89 @@ export async function parseRecordCsv(
             `Received recordSource: ${typeof recordSource}`,
         ].join(TAB));
     }
-    validate.objectArgument(source, {parseDictionary});
     mlog.info([`${source} START`,
         `recordSource: ${getRecordSourceLabel(recordSource)}`,
         ` recordTypes: ${Object.keys(parseDictionary).join(', ')}`,
-    ].join(TAB));           
+    ].join(TAB));     
+    const meta: { [recordType: string]: RecordParseMeta } = {};      
     const rows = await handleFileArgument(recordSource, source);
     const results: ParseResults = {};
     const intermediate: IntermediateParseResults = {};
-    for (const recordType of Object.keys(parseDictionary)) {
+    for (const recordType in parseDictionary) {
         results[recordType] = [];
         intermediate[recordType] = {};
+        meta[recordType] = {
+            sourceType: sourceType ?? SourceTypeEnum.UNKNOWN,
+            sourceLabel: getRecordSourceLabel(recordSource),
+            recordRows: {},
+            parseOptions: parseDictionary[recordType]
+        } as RecordParseMeta;
+        if (isNonEmptyString(recordSource) && isFile(recordSource)) {
+            meta[recordType].file = recordSource;
+        } else if (isFileData(recordSource)) {
+            meta[recordType].file = recordSource.fileName;
+        }
     }
-    rowIndex = 0;
-    for (const row of rows) {
-        for (const recordType of Object.keys(parseDictionary)) {
+    rowLoop:
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        currentRowIndex = i;
+        recordTypeLoop:
+        for (const recordType in parseDictionary) {
             const { 
                 keyColumn, fieldOptions, sublistOptions 
-            } = parseDictionary[recordType];
+            } = parseDictionary[recordType] as RecordParseOptions;
             const recordId = clean(row[keyColumn]);
-            if (!recordId) {
-                mlog.warn([`${source} key column value is empty `,
-                    `@ row ${rowIndex} for recordType '${recordType}'`,
+            if (isEmpty(recordId)) {
+                mlog.warn([`${source} encountered row with invalid/empty recordId`,
+                    `@ row ${currentRowIndex} for recordType '${recordType}', keyColumn: '${keyColumn}'`,
+                    ...(keyColumn in row ? [
+                        `       row[keyColumn]: '${row[keyColumn]}'`,
+                        `clean(row[keyColumn]): '${clean(row[keyColumn])}'`,
+                    ] : [`keyColumn in row === false`]),
                     `skipping row...`
                 ].join(NL));
-                continue;
+                continue recordTypeLoop;
             }
             /** 
              * `if row` pertains to an existing record in `IntermediateParseResults` 
              * (e.g. recordType=salesorder and have already processed one of its rows) 
              * */
-            let record = (intermediate[recordType][recordId]  
-                ? intermediate[recordType][recordId] 
-                : {
+            currentRecord = (intermediate[recordType][recordId] 
+                ?? {
                     recordType: recordType as RecordTypeEnum,
-                    isDynamic: NOT_DYNAMIC,
-                    fields: {} as FieldDictionary,
-                    sublists: {} as SublistDictionary,
+                    idOptions: [],
+                    fields: {},
+                    sublists: {},
                 }
-            ) as RecordOptions;
-            await updateRecordMeta(record, rowIndex, recordSource, sourceType);
-            intermediate[recordType][recordId] = await processRow(row,
-                record, 
-                fieldOptions as FieldDictionaryParseOptions, 
-                sublistOptions as SublistDictionaryParseOptions
+            ) as Required<RecordOptions>;
+            currentRecord = await processRow(
+                row,
+                fieldOptions ?? {}, 
+                sublistOptions ?? {}
             );
+            meta[recordType] = updateRecordMeta(recordId, meta[recordType]);
+            intermediate[recordType][recordId] = currentRecord;
         }
-        rowIndex++;
     }
     
-    for (const recordType of Object.keys(intermediate)) {
-        results[recordType] = Object.values(intermediate[recordType]) as RecordOptions[];
+    for (const recordType in intermediate) {
+        results[recordType] = Object.values(intermediate[recordType]);
     }
     const parseSummary = Object.keys(results).reduce((acc, recordType) => {
         acc[recordType] = results[recordType].length;
         return acc;
     }, {} as Record<string, number>);
-    slog.info([`${source} END`,
+    slog.info([`${source} (END)`,
         ` recordSource:  ${getRecordSourceLabel(recordSource)}`,
-        `  recordTypes:  ${JSON.stringify(Object.keys(parseDictionary))}`,
-        `Last rowIndex:  ${rowIndex}`,
+        `  recordTypes:  ${Object.keys(parseDictionary).join(', ')}`,
+        `Last rowIndex:  ${getCurrentRowIndex()}`,
         `Parse Summary:  ${indentedStringify(parseSummary)}`
     ].join(TAB));
-    return results;
+    return {
+        parseResults: results,
+        meta: meta
+    };
 }
 
 function getRecordSourceLabel(recordSource: string | FileData | Record<string, any>[]): string {
@@ -140,90 +179,44 @@ function getRecordSourceLabel(recordSource: string | FileData | Record<string, a
         ? `(filePath) '${recordSource}'` 
         : isFileData(recordSource) 
         ? recordSource.fileName 
-        : `(rowArray).length ${recordSource.length}`
+        : `Array<Row>( ${recordSource.length} )`
     );
 }
 
-async function updateRecordMeta(
-    record: RecordOptions, 
-    rowIndex: number,
-    recordSource: string | FileData | Record<string, any>[],
-    sourceType?: SourceTypeEnum
-): Promise<void> {
-    const source = getSourceString(__filename, updateRecordMeta.name);
-    if (typeof recordSource === 'string') {
-        if (!record.meta || !isRowSourceMetaData(record.meta.dataSource)) {
-            record.meta = {
-                dataSource: { [recordSource]: [rowIndex] } as RowSourceMetaData,
-                sourceType: SourceTypeEnum.LOCAL_FILE
-            };
-        } else if (!record.meta.dataSource[recordSource].includes(rowIndex)) {
-            record.meta.dataSource[recordSource].push(rowIndex);
-        } else {
-            throw new Error([
-                `${source} Invalid RecordOptions.meta.dataSource`,
-            ].join(TAB));
-        }
-    } else if (isNonEmptyArray(recordSource)) { // source is array of rows
-        if (!record.meta || !isIntegerArray(record.meta.dataSource)) {
-            record.meta = {
-                dataSource: [rowIndex],
-                sourceType: sourceType ? sourceType : SourceTypeEnum.ROW_SUBSET_ARRAY
-            };
-        } else if (!record.meta.dataSource.includes(rowIndex)) {
-            record.meta.dataSource.push(rowIndex);
-        } else {
-            throw new Error([`${source} Invalid RecordOptions.meta.dataSource`,
-            ].join(TAB));
-        }
-    } else if (isFileData(recordSource)) {
-        if (!record.meta || !isIntegerArray(record.meta.dataSource)) {
-            record.meta = {
-                dataSource: [rowIndex],
-                sourceType: sourceType ? sourceType : SourceTypeEnum.ENCODED_FILE_CONTENT_STRING
-            };
-        } else if (!record.meta.dataSource.includes(rowIndex)) {
-            record.meta.dataSource.push(rowIndex);
-        } else {
-            throw new Error([`${source} Invalid RecordOptions.meta.dataSource`,
-            ].join(TAB));
-        }
-    } else {
-        throw new Error([
-            `${source} Invalid type for param 'recordSource'`,
-            `Expected recordSource: string | FileData | Record<string, any>[]`,
-            `Received recordSource: ${typeof recordSource}`,
-            `I didn't think we would ever end up here...`
-        ].join(TAB));
+function updateRecordMeta(recordId: string, recordMeta: RecordParseMeta): RecordParseMeta {
+    let rowIndex = getCurrentRowIndex();
+    if (!(recordId in recordMeta.recordRows)) {
+        recordMeta.recordRows[recordId] = [];
     }
+    if (!recordMeta.recordRows[recordId].includes(rowIndex)) {
+        recordMeta.recordRows[recordId].push(rowIndex)
+    }
+    return recordMeta;
 }
+
 /**
  * - for fields, if want to allow override for fields and if files parsed in chrono order (ascending), 
  * then most recent value will be assigned to field. 
  * - for sublists, make a new {@link SublistLine} if all key-value pairs not equal?
  * @param row `Record<string, any>` - the current row
- * @param record {@link RecordOptions}
  * @param fieldOptions {@link FieldDictionaryParseOptions}
  * @param sublistOptions {@link SublistDictionaryParseOptions}
  * @returns **`record`** — {@link RecordOptions}
  */
 async function processRow(
     row: Record<string, any>,
-    record: RecordOptions,
     fieldOptions: FieldDictionaryParseOptions,
     sublistOptions: SublistDictionaryParseOptions,
-): Promise<RecordOptions> {
-    if (!row || !record) {
-        return record;
-    }
-    if (fieldOptions && !isEmpty(fieldOptions)) {
+): Promise<Required<RecordOptions>> {
+    let record = getCurrentRecord();
+    if (!isEmpty(fieldOptions)) {
         record.fields = await processFieldDictionaryParseOptions(
-            row, record.fields ?? {}, fieldOptions
+            row, record.fields, fieldOptions
         );
     }
-    if (sublistOptions && !isEmpty(sublistOptions)) {
+    if (!isEmpty(sublistOptions)) {
         record.sublists = await processSublistDictionaryParseOptions(
-            row, record.sublists ?? {}, sublistOptions
+            row, record.sublists, sublistOptions
         );
     }
     return record;
@@ -240,24 +233,23 @@ async function processFieldDictionaryParseOptions(
     fields: FieldDictionary,
     fieldOptions: FieldDictionaryParseOptions,
 ): Promise<FieldDictionary> {
-    if (!row || !fields || isEmpty(fieldOptions)) {
+    if (!fields || isEmpty(fieldOptions)) {
         return fields;
     }
-    for (const fieldId of Object.keys(fieldOptions)) {
-        if (!isNonEmptyString(fieldId)) { continue; }
-        if (fieldId in fields && !isEmpty(fields[fieldId])) {
+    for (const fieldId in fieldOptions) {
+        if (!isNonEmptyString(fieldId)) { continue }
+        if (fieldId in fields) {
             continue;
         }
-        const valueOptions = fieldOptions[fieldId];
-        const value = (isFieldParseOptions(valueOptions)
+        const value = (isFieldParseOptions(fieldOptions[fieldId])
             ? await parseFieldValue(row, 
-                fieldId, valueOptions as FieldParseOptions
+                fieldId, fieldOptions[fieldId] as FieldParseOptions
             ) as FieldValue
             : await generateFieldSubrecordOptions(row, fields, 
-                fieldId, valueOptions as SubrecordParseOptions
+                fieldId, fieldOptions[fieldId] as SubrecordParseOptions
             ) as SubrecordValue
         );
-        if (value === '' || value === undefined) { continue; }
+        if (value === '' || value === undefined) { continue }
         fields[fieldId] = value;
     }
     return fields;
@@ -274,13 +266,11 @@ async function processSublistDictionaryParseOptions(
     sublists: SublistDictionary,
     sublistOptions: SublistDictionaryParseOptions,
 ): Promise<SublistDictionary> {
-    if (!row || isEmpty(sublistOptions)) {
+    if (isEmpty(sublistOptions)) {
         return sublists;
     }
     for (const [sublistId, lineOptionsArray] of Object.entries(sublistOptions)) {
-        const sublistLines = (isNonEmptyArray(sublists[sublistId]) 
-            ? sublists[sublistId] : []
-        ) as SublistLine[];
+        const sublistLines = (sublists[sublistId] ?? []) as SublistLine[];
         sublists[sublistId] = await processSublistLineParseOptions(
             row, sublistId, sublistLines, lineOptionsArray as SublistLineParseOptions[]
         );
@@ -294,21 +284,8 @@ async function processSublistLineParseOptions(
     sublistLines: SublistLine[],
     lineOptionsArray: SublistLineParseOptions[],
 ): Promise<SublistLine[]> {
-    if (!row || !sublistId || !isNonEmptyArray(lineOptionsArray) 
-        || !Array.isArray(sublistLines)) {
+    if (!sublistId || !isNonEmptyArray(lineOptionsArray) || !Array.isArray(sublistLines)) {
         return sublistLines;
-    }
-    const source = `[csvParser.processSublistLineParseOptions()]`
-    try {
-        validate.stringArgument(source, {sublistId});
-        validate.objectArgument(source, {row});
-        validate.arrayArgument(source, {lineOptionsArray});
-    } catch (error) {
-        mlog.error(`${source} caught arg validation error`,
-            `gonna throw it for now`, error
-        );
-        throw error;
-        // return sublistLines;
     }
     for (const lineOptions of lineOptionsArray) {
         const newSublistLine: SublistLine = {};
@@ -317,7 +294,7 @@ async function processSublistLineParseOptions(
             newSublistLine.idFields = lineIdOptions.lineIdProp;
         }
         delete lineOptions.lineIdOptions;
-        for (const sublistFieldId of Object.keys(lineOptions)) {
+        for (const sublistFieldId in lineOptions) {
             const valueOptions = lineOptions[sublistFieldId];
             const value = (isFieldParseOptions(valueOptions)
                 ? await parseFieldValue(row, 
@@ -327,10 +304,10 @@ async function processSublistLineParseOptions(
                     sublistFieldId, valueOptions as SubrecordParseOptions
                 ) as SubrecordValue
             );
-            if (value === '' || value === undefined) { continue; }
+            if (value === '' || value === undefined) { continue }
             newSublistLine[sublistFieldId] = value;
         }
-        if (!(await isDuplicateSublistLine(sublistLines, newSublistLine, lineIdOptions))) {
+        if (!isDuplicateSublistLine(sublistLines, newSublistLine, lineIdOptions)) {
             sublistLines.push(newSublistLine);
         }
     }
@@ -342,33 +319,29 @@ async function processSublistLineParseOptions(
  * @param parentSublistId `string` the `parentSublistId` (The `internalid` of the main record's sublist)
  * @param parentFieldId `string` (i.e. `parentFieldId`) The `internalid` of the sublist field that holds a subrecord
  * @param subrecordOptions {@link SubrecordParseOptions} = `{ subrecordType`: string, `fieldOptions`: {@link FieldDictionaryParseOptions}, `sublistOptions`: {@link SublistDictionaryParseOptions}` }`
- * @returns **`result`** {@link SetSublistSubrecordOptions}
+ * @returns **`sublistSubrecord`** {@link SetSublistSubrecordOptions}
  */
 async function generateSublistSubrecordOptions(
     row: Record<string, any>,
     parentSublistId: string,
     parentFieldId: string,
     subrecordOptions: SubrecordParseOptions,
-): Promise<SetSublistSubrecordOptions> {
-    const source = getSourceString(__filename, generateSublistSubrecordOptions.name);
-    validate.multipleStringArguments(source, { parentSublistId, parentFieldId });
-    validate.objectArgument(source, {row});
-    validate.objectArgument(source, 
-        {subrecordOptions, SubrecordParseOptions: isSubrecordValue}
-    );
+): Promise<Required<SetSublistSubrecordOptions>> {
     const { subrecordType, fieldOptions, sublistOptions } = subrecordOptions;
-    const result = {
+    const sublistSubrecord = {
         subrecordType, 
         sublistId: parentSublistId, 
-        fieldId: parentFieldId
-    } as SetSublistSubrecordOptions;
-    if (fieldOptions && isNonEmptyArray(Object.keys(fieldOptions))) {
-        result.fields = await processFieldDictionaryParseOptions(row, {}, fieldOptions);
+        fieldId: parentFieldId,
+        fields: {},
+        sublists: {}
+    } as Required<SetSublistSubrecordOptions>;
+    if (!isEmpty(fieldOptions)) {
+        sublistSubrecord.fields = await processFieldDictionaryParseOptions(row, sublistSubrecord.fields, fieldOptions);
     }
-    if (sublistOptions && isNonEmptyArray(Object.keys(sublistOptions))) {
-        result.sublists = await processSublistDictionaryParseOptions(row, {}, sublistOptions);
+    if (!isEmpty(sublistOptions)) {
+        sublistSubrecord.sublists = await processSublistDictionaryParseOptions(row, sublistSubrecord.sublists, sublistOptions);
     }
-    return result;
+    return sublistSubrecord;
 }
 
 /**
@@ -376,30 +349,30 @@ async function generateSublistSubrecordOptions(
  * @param fields 
  * @param fieldId 
  * @param subrecordOptions 
- * @returns **`result`** {@link SetFieldSubrecordOptions}
+ * @returns **`fieldSubrecord`** {@link SetFieldSubrecordOptions}
  */
 async function generateFieldSubrecordOptions(
     row: Record<string, any>,
     fields: FieldDictionary,
     fieldId: string,
     subrecordOptions: SubrecordParseOptions,
-): Promise<SetFieldSubrecordOptions> {
+): Promise<Required<SetFieldSubrecordOptions>> {
     const { subrecordType, fieldOptions, sublistOptions} = subrecordOptions;
-    const result = (fields && fields[fieldId] 
+    const fieldSubrecord = (fields[fieldId] 
         ? fields[fieldId] // overwrite existing subrecord options
         : { subrecordType, fieldId, fields: {}, sublists: {} } // create new subrecord options
-    ) as SetFieldSubrecordOptions;
-    if (fieldOptions && isNonEmptyArray(Object.keys(fieldOptions))) {
-        result.fields = await processFieldDictionaryParseOptions(row, 
-            result.fields as FieldDictionary, fieldOptions
+    ) as Required<SetFieldSubrecordOptions>;
+    if (!isEmpty(fieldOptions)) {
+        fieldSubrecord.fields = await processFieldDictionaryParseOptions(row, 
+            fieldSubrecord.fields, fieldOptions
         );
     }
-    if (sublistOptions && isNonEmptyArray(Object.keys(sublistOptions))) {
-        result.sublists = await processSublistDictionaryParseOptions(row, 
-            result.sublists as SublistDictionary, sublistOptions
+    if (!isEmpty(sublistOptions)) {
+        fieldSubrecord.sublists = await processSublistDictionaryParseOptions(row, 
+            fieldSubrecord.sublists, sublistOptions
         );
     }
-    return result;
+    return fieldSubrecord;
 }
 
 /**
@@ -413,14 +386,12 @@ async function parseFieldValue(
     fieldId: string,
     valueParseOptions: FieldParseOptions,
 ): Promise<FieldValue> {
-    const source = `[csvParser.parseFieldValue()]`
-    validate.stringArgument(source, {fieldId});
-    validate.objectArgument(source,  {valueParseOptions, isFieldParseOptions});
+    const source = getSourceString(__filename, parseFieldValue.name, fieldId)
     let value: FieldValue | undefined = undefined;
     const { defaultValue, colName, evaluator, args } = valueParseOptions;
     if (typeof evaluator === 'function') {
         try {
-            value = await evaluator(row, ...(args || []));
+            value = await evaluator(getCurrentRecord().fields, row, ...(args || []));
         } catch (error) {
             mlog.error(`${source} Error in evaluator for field '${fieldId}':`, error);
             value = defaultValue !== undefined ? defaultValue : null;
@@ -496,7 +467,7 @@ export async function transformValue(
         // }
         return trimmedValue;
     } catch (error) {
-        mlog.error(`ERROR transformValue(): at row ${rowIndex} could not parse value: ${trimmedValue}`);
+        mlog.error(`ERROR transformValue(): at row ${currentRowIndex} could not parse value: ${trimmedValue}`);
         return trimmedValue;
     }
 }
@@ -508,11 +479,11 @@ export async function transformValue(
  * - `true` if the `newLine` is a duplicate of any line in `existingLines` (every key-value pair is the same), 
  * - `false` otherwise.
  */
-export async function isDuplicateSublistLine(
+export function isDuplicateSublistLine(
     existingLines: SublistLine[],
     newLine: SublistLine,
     lineIdOptions?: SublistLineIdOptions
-): Promise<boolean> {
+): boolean {
     if (!isNonEmptyArray(existingLines)) { return false }
     const { lineIdProp, lineIdEvaluator, args } = lineIdOptions || {};
     const isDuplicate = existingLines.some((existingLine, sublistLineIndex) => {

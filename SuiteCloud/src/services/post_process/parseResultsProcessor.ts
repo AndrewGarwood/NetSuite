@@ -12,7 +12,7 @@ import {
     STOP_RUNNING,
 } from "../../config"
 import {
-    isNonEmptyArray, isEmptyArray, isNullLike, hasNonTrivialKeys,
+    isNonEmptyArray, isEmptyArray, isEmpty, hasNonTrivialKeys,
     areEquivalentObjects,
     hasKeys,
     isNonEmptyString
@@ -32,13 +32,11 @@ import {
 } from "./types/PostProcessing";
 import * as validate from "typeshi:utils/argumentValidation";
 import { cloneDeep } from "lodash";
-import { indentedStringify } from "typeshi:utils/io";
+import { getSourceString, indentedStringify } from "typeshi:utils/io";
 import { ParseResults, ValidatedParseResults } from "../parse/types/index";
 import { isParseResults } from "../parse/types/index";
 import { isCloneOptions, isComposeOptions, isCompositeSublistComposer } from "src/services/post_process/types/PostProcessing.TypeGuards";
 import path from "node:path";
-
-const F = path.basename(__filename);
 
 /**
  * = `[OperationEnum.CLONE, OperationEnum.COMPOSE, OperationEnum.PRUNE]`
@@ -62,10 +60,10 @@ export async function processParseResults(
     initialResults: ParseResults,
     processDictionary?: PostProcessDictionary,
 ): Promise<ValidatedParseResults> {
-    const source = `[parseResultsProcessor.processParseResults()]`
+    const source = getSourceString(__filename, processParseResults.name)
     const results: ValidatedParseResults = {};
     validate.objectArgument(source, {initialResults, isParseResults});
-    if (isNullLike(processDictionary)) {
+    if (isEmpty(processDictionary)) {
         for (const recordType in initialResults) {
             results[recordType] = {
                 valid: initialResults[recordType],
@@ -202,8 +200,8 @@ export async function processCloneOptions(
     recordType: RecordTypeEnum | EntityRecordTypeEnum | string,
     index: number,
     cloneOptions: CloneOptions
-): Promise<RecordOptions> {
-    const source = `[${F}.processCloneOptions()]`
+): Promise<Required<RecordOptions>> {
+    const source = getSourceString(__filename, processCloneOptions.name)
     const recipientOptions = parseResults[recordType][index];
     validate.objectArgument(source, {recipientOptions, isRecordOptions});
     validate.objectArgument(source, {cloneOptions, isCloneOptions});
@@ -213,12 +211,12 @@ export async function processCloneOptions(
     if (!idProp || !donorType || !recipientType || recordType !== recipientType
         || !hasKeys(parseResults, [donorType, recipientType])
         || (!isNonEmptyArray(fieldIds) && !isNonEmptyArray(sublistIds))) {
-        mlog.error(`[processCloneOptions() ]Invalid CloneOptions - returning postOptions unchanged:`,);
+        mlog.error(`${source} Invalid CloneOptions - returning postOptions unchanged:`,);
         return recipientOptions;
     }
     const recipientId = getRecordId(recipientOptions, idProp);
     if (!recipientId) {
-        mlog.error([`[processCloneOptions()] Could not find recipient record id in parseResults:`,
+        mlog.error([`${source} Could not find recipient record id in parseResults:`,
             `  recipientType: '${recipientType}', idProp: '${idProp}'`,
             `Returning postOptions unchanged.`
         ].join(TAB));
@@ -228,14 +226,14 @@ export async function processCloneOptions(
         return (getRecordId(donor, idProp) === recipientId);
     });
     if (!donorOptions) {
-        mlog.error([`[processCloneOptions()] Could not find donor record in parseResults:`,
+        mlog.error([`${source} Could not find donor record in parseResults:`,
             `  donorType: '${donorType}', recipientType: '${recipientType}', idProp: '${idProp}'`,
             `recipientId: '${recipientId}'`,
             `Returning postOptions unchanged.`
         ].join(TAB));
         return recipientOptions;
     }
-    // mlog.debug(`[processCloneOptions()] - found donor for recipient`,
+    // mlog.debug(`${source}  - found donor for recipient`,
     //     TAB+`recipient number of fields before cloning: ${recipientOptions.fields ? Object.keys(recipientOptions.fields).length : 0}`,
     // );
     if (isNonEmptyArray(fieldIds) && hasNonTrivialKeys(donorOptions.fields)) {
@@ -244,7 +242,7 @@ export async function processCloneOptions(
         }
         for (const fieldId of fieldIds) {
             if (!(fieldId in donorOptions.fields)) {
-                plog.warn(`processCloneOptions() Field '${fieldId}' not found in donor record:`,
+                plog.warn(`${source} Field '${fieldId}' not found in donor record:`,
                     TAB+`  donorType: '${donorType}', recipientType: '${recipientType}', idProp: '${idProp}'`,
                     TAB+`recipientId: '${recipientId}'`,
                     // TAB+`donorOptions.fields: ${indentedStringify(donorOptions.fields)}`,
@@ -265,7 +263,7 @@ export async function processCloneOptions(
                 recipientOptions.sublists = {};
             }
             if (!(sublistId in donorOptions.sublists)) {
-                mlog.warn([`[processCloneOptions()] Sublist '${sublistId}' not found in donor record:`,
+                mlog.warn([`${source} Sublist '${sublistId}' not found in donor record:`,
                     `  donorType: '${donorType}', recipientType: '${recipientType}', idProp: '${idProp}'`,
                     `recipientId: '${recipientId}'`,
                     `Skipping sublist....`
@@ -275,7 +273,7 @@ export async function processCloneOptions(
             recipientOptions.sublists[sublistId] = cloneDeep(donorOptions.sublists[sublistId]);
         }
     }
-    return recipientOptions as RecordOptions;
+    return recipientOptions as Required<RecordOptions>;
 }
 
 /**
@@ -284,10 +282,10 @@ export async function processCloneOptions(
  * @returns **`recordOptions`** {@link RecordOptions} - the modified record options
  */
 export async function processComposeOptions(
-    record: RecordOptions,
+    record: Required<RecordOptions>,
     composeOptions: ComposeOptions
-): Promise<RecordOptions> {
-    const source = `[${F}.processComposeOptions()]`;
+): Promise<Required<RecordOptions>> {
+    const source = getSourceString(__filename, processComposeOptions.name)
     try {
         validate.objectArgument(source, {record, isRecordOptions});
         validate.objectArgument(source, {composeOptions, isComposeOptions});
@@ -323,21 +321,21 @@ export async function processComposeOptions(
 
 
 /**
- * @param postOptions {@link RecordOptions} - the record options to get the id from
+ * @param record {@link RecordOptions} - the record options to get the id from
  * @param idProp `string` - the property to search for the id, see {@link idPropertyEnum}
  * @returns `string | undefined` - the id value if found, `undefined` otherwise
  */
 function getRecordId(
-    postOptions: RecordOptions, 
+    record: RecordOptions, 
     idProp: string
 ): string | undefined {
-    if (postOptions.idOptions) {
-        const idOption = postOptions.idOptions.find(idOption => 
+    if (record.idOptions) {
+        const idOption = record.idOptions.find(idOption => 
             idOption.idProp === idProp
         );
         return idOption ? idOption.idValue as string: undefined;
-    } else if (postOptions.fields && hasKeys(postOptions.fields, idProp)) {
-        return postOptions.fields[idProp] as string;
+    } else if (record.fields && hasKeys(record.fields, idProp)) {
+        return record.fields[idProp] as string;
     }
     return undefined;
 }
@@ -346,7 +344,7 @@ export function getCompositeDictionaries(validatedResults: ValidatedParseResults
     validDict: { [recordType: string]: RecordOptions[] }, 
     invalidDict: { [recordType: string]: RecordOptions[]} 
 } {
-    const source = `[${F}.getCompositeDictionaries()]`
+    const source = getSourceString(__filename, getCompositeDictionaries.name);
     validate.objectArgument(source, {validatedResults});
     const invalidDict = Object.keys(validatedResults).reduce((acc, key) => {
         if (isNonEmptyArray(validatedResults[key].invalid)) acc[key] = validatedResults[key].invalid;

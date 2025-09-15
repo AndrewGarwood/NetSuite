@@ -217,7 +217,7 @@ export const inventoryItemFieldComposer = async (
     if (!isNonEmptyString(itemId)) {
         throw new Error(`${source} Invalid RecordOptions: fields.itemid is undefined`);
     }
-    const wRows = await getWarehouseRows() as WarehouseRow[];
+    const wRows = getWarehouseRows() as WarehouseRow[];
     if (!wItems) wItems = await getIndexedColumnValues(wRows, WarehouseColumnEnum.ITEM_ID);
     const indexedWarehouseItems = wItems;
     if (hasKeys(indexedWarehouseItems, itemId)) {
@@ -238,7 +238,7 @@ export const inventoryItemSublistComposer = async (
     if (!isNonEmptyString(itemId)) {
         throw new Error(`${source} Invalid RecordOptions: fields.itemid is undefined`);
     }
-    const wRows = await getWarehouseRows() as WarehouseRow[];
+    const wRows = getWarehouseRows() as WarehouseRow[];
     if (!wItems) wItems = await getIndexedColumnValues(wRows, WarehouseColumnEnum.ITEM_ID);
     const indexedWarehouseItems = wItems;
     if (hasKeys(indexedWarehouseItems, itemId)) {

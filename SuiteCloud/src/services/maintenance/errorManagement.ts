@@ -59,6 +59,7 @@ export type RejectInfo = {
 }
 
 /**
+ * @deprecated - needs to handle change of where metadata is stored
  * @param inputDir `string` directory path to look files ending with `targetSuffix` 
  * @param targetSuffix `string` e.g. `'_putRejects.json'`
  * @param outputDir `string` `optional` directory path to write two files:
@@ -66,7 +67,7 @@ export type RejectInfo = {
  * 2. reasons the source data's generated request objects were rejected
  * @returns `Promise<void>`
  */
-export async function isolateFailedRequests(
+async function isolateFailedRequests(
     inputDir: string, 
     targetSuffix: string,
     outputDir?: string
@@ -90,32 +91,32 @@ export async function isolateFailedRequests(
     const issueDict: { [filePath: string]: number[] } = {};
     fileLoop:
     for (const filePath of rejectFiles) {
-        const jsonData = read(filePath);
-        let { sourceFile, rejectResponses } = jsonData as RejectInfo;
-        let correctedPath = sourceFile.replace(/\.dev/, 'dev');
-        issueDict[correctedPath] = [];
-        responseLoop:
-        for (const res of rejectResponses) {
-            const logDetails = (res.logs
-                .filter(l => l.type === LogTypeEnum.ERROR)
-                .map(l => JSON.parse(l.details))
-            );
-            rejectReasons.push(...logDetails);
-            const rejects: RecordOptions[] = res.rejects ?? [];
-            rejectLoop:
-            for (let i = 0; i < rejects.length; i++) {
-                const record = rejects[i];
-                if (isEmpty(record.meta)) { continue }
-                let dataSource = record.meta.dataSource;
-                if (!isRowSourceMetaData(dataSource)) { continue }
-                if (!hasKeys(dataSource, sourceFile)) {
-                    mlog.error(`${source} RejectInfo.sourceFile not in dataSource.keys()`)
-                    isoErrors.push(res);
-                    break responseLoop;
-                }
-                issueDict[correctedPath].push(...dataSource[sourceFile])
-            }
-        }
+        // const jsonData = read(filePath);
+        // let { sourceFile, rejectResponses } = jsonData as RejectInfo;
+        // let correctedPath = sourceFile.replace(/\.dev/, 'dev');
+        // issueDict[correctedPath] = [];
+        // responseLoop:
+        // for (const res of rejectResponses) {
+        //     const logDetails = (res.logs
+        //         .filter(l => l.type === LogTypeEnum.ERROR)
+        //         .map(l => JSON.parse(l.details))
+        //     );
+        //     rejectReasons.push(...logDetails);
+        //     const rejects: RecordOptions[] = res.rejects ?? [];
+        //     rejectLoop:
+        //     for (let i = 0; i < rejects.length; i++) {
+        //         const record = rejects[i];
+        //         if (isEmpty(record.meta)) { continue }
+        //         let dataSource = record.meta.dataSource;
+        //         if (!isRowSourceMetaData(dataSource)) { continue }
+        //         if (!hasKeys(dataSource, sourceFile)) {
+        //             mlog.error(`${source} RejectInfo.sourceFile not in dataSource.keys()`)
+        //             isoErrors.push(res);
+        //             break responseLoop;
+        //         }
+        //         issueDict[correctedPath].push(...dataSource[sourceFile])
+        //     }
+        // }
     }
     const issueRows: Record<string, any>[] = [];
     for (const [sourceFile, rowIndices] of Object.entries(issueDict)) {
