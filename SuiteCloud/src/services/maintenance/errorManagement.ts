@@ -4,40 +4,18 @@
  */
 import * as fs from "node:fs";
 import { 
-    EntityRecordTypeEnum, RecordTypeEnum, CustomerTaxItemEnum,
-    CustomerStatusEnum, SearchOperatorEnum, 
     SuiteScriptError
 } from "../../utils/ns";
-import { isNonEmptyArray, isEmptyArray, hasKeys, isNullLike as isNull,
-    isNonEmptyString, 
-    isStringArray,
-    isIntegerArray,
-    isObject,
-    isEmpty,
-    isNumeric,
-    isInteger
+import {
+    isEmptyArray, hasKeys,
 } from "typeshi:utils/typeValidation";
 import { 
-    mainLogger as mlog, parseLogger as plog, simpleLogger as slog, 
-    INDENT_LOG_LINE as TAB, NEW_LINE as NL, STOP_RUNNING, 
-    getSkuDictionary,
-    DELAY,
-    getProjectFolders, isEnvironmentInitialized, isDataInitialized,
-    setSkuInternalId,
-    getClassDictionary
+    mainLogger as mlog, simpleLogger as slog, 
+    INDENT_LOG_LINE as TAB, NEW_LINE as NL, 
 } from "../../config";
 import { getColumnValues, getRows, 
     writeObjectToJsonSync as write, readJsonFileAsObject as read, 
-    getIndexedColumnValues, handleFileArgument, 
-    isValidCsvSync,
-    getFileNameTimestamp,
-    indentedStringify,
-    isFile,
-    getSourceString, clearFile, trimFile,
-    getCurrentPacificTime,
-    autoFormatLogsOnExit,
-    RowSourceMetaData,
-    isRowSourceMetaData,
+    getSourceString,
     getDirectoryFiles, writeRowsToCsvSync as writeRows
 } from "typeshi:utils/io";
 import * as validate from "typeshi:utils/argumentValidation";
@@ -51,6 +29,33 @@ import { SalesOrderColumnEnum } from "src/parse_configurations/salesorder";
 
 
 
+
+
+/**
+ * @param errorResolutionDir 
+ * @param fileName 
+ */
+export async function storeReadableErrors(
+    errorResolutionDir: string,
+    fileName: string,
+): Promise<void> {
+    const jsonData = read(
+        path.join(errorResolutionDir, fileName)
+    ) as { rejectReasons: SuiteScriptError[] }; 
+    const errors = jsonData.rejectReasons ?? [];
+    const errorDict: Record<string, any> = {};
+    for (const e of errors) {
+        if (!hasKeys(errorDict, e.name)) {
+            errorDict[e.name] = [];
+        }
+        if (!errorDict[e.name].includes(e.message)) {
+            errorDict[e.name].push(e.message)
+        }
+    }
+    write(errorDict, path.join(errorResolutionDir, 'readable_errors.json'))
+}
+
+
 export type RejectInfo = {
     timestamp: string;
     sourceFile: string;
@@ -59,7 +64,7 @@ export type RejectInfo = {
 }
 
 /**
- * @deprecated - needs to handle change of where metadata is stored
+ * @deprecated - **need update to handle change of where metadata is stored**
  * @param inputDir `string` directory path to look files ending with `targetSuffix` 
  * @param targetSuffix `string` e.g. `'_putRejects.json'`
  * @param outputDir `string` `optional` directory path to write two files:
@@ -135,28 +140,4 @@ async function isolateFailedRequests(
         writeRows(issueRows, path.join(outputDir, `${path.basename(inputDir)}_reject_rows.tsv`));
         write({rejectReasons}, path.join(outputDir, `${path.basename(inputDir)}_reject_reasons.json`));
     }
-}
-
-/**
- * @param errorResolutionDir 
- * @param fileName 
- */
-export async function storeReadableErrors(
-    errorResolutionDir: string,
-    fileName: string,
-): Promise<void> {
-    const jsonData = read(
-        path.join(errorResolutionDir, fileName)
-    ) as { rejectReasons: SuiteScriptError[] }; 
-    const errors = jsonData.rejectReasons ?? [];
-    const errorDict: Record<string, any> = {};
-    for (const e of errors) {
-        if (!hasKeys(errorDict, e.name)) {
-            errorDict[e.name] = [];
-        }
-        if (!errorDict[e.name].includes(e.message)) {
-            errorDict[e.name].push(e.message)
-        }
-    }
-    write(errorDict, path.join(errorResolutionDir, 'readable_errors.json'))
 }

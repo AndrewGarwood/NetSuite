@@ -42,7 +42,7 @@ export type RecordResponse = {
  * @typedefn **`RecordOptions`**
  */
 export type RecordOptions = {
-    recordType: RecordTypeEnum | EntityRecordTypeEnum;
+    recordType: RecordTypeEnum;
     idOptions?: idSearchOptions[];
     fields?: FieldDictionary;
     sublists?: SublistDictionary;
@@ -88,7 +88,7 @@ export type RecordResult = {
     recordType: RecordTypeEnum; 
     fields: FieldDictionary;
     sublists: { [sublistId: string]: SublistLine[] }; 
-};
+}
 
 
 /**

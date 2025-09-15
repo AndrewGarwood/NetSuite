@@ -22,12 +22,12 @@ import {
     isFile
 } from "typeshi:utils/io";
 import { 
-    DataSourceDictionary, isDataSourceConfiguration, 
-    isDataSourceDictionary, isFileDictionary, 
+    DataSourceDictionary,
+    isDataSourceDictionary,
     isFolderHierarchy, isLoadFileOptions 
 } from "@config/types";
 import {
-    hasKeys, hasNonTrivialKeys, isNonEmptyArray, isNonEmptyString, 
+    isNonEmptyArray, isNonEmptyString, 
     isNullLike as isEmpty, isStringArray, 
     isObject,
     isInteger,

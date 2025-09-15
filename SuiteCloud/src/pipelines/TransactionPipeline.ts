@@ -70,7 +70,7 @@ function done(
     stage: TransactionMainPipelineStageEnum,
     stageData: Record<string, any>,
 ): boolean {
-    const source = `[TransactionPipeline.done()]`
+    const source = getSourceString(__filename, done.name, stage)
     let stagesToWrite = (isNonEmptyArray(options.stagesToWrite) 
         ? options.stagesToWrite
         : []
@@ -423,6 +423,7 @@ export async function putTransactions(
 }
 
 /**
+ * @TODO store matched entity values to local cache...
  * @TODO have the creation of entities be handled by invoking EntityPipeline instead of doing it here
  * - this is ineffecient and could likely be improved by having better way to retrieve source rows.
  * - GroupedParser might help if I ever have time to finish it
@@ -436,10 +437,9 @@ async function resolveUnmatchedTransactions(
     entityType: EntityRecordTypeEnum = EntityRecordTypeEnum.CUSTOMER,
     meta?: { [recordType: string]: RecordParseMeta }
 ): Promise<any> {
-    const source = `[TransactionPipeline.resolveUnmatchedTransactions()]`
+    const source = getSourceString(__filename, resolveUnmatchedTransactions.name, entityType)
     validate.stringArgument(source, {entityType});
     validate.arrayArgument(source, {transactions, isRecordOptions});
-    /** */
     const sourceRows = await getRows(filePath);
     let targetRowIndices: number[] = [];
     const targetRows: Record<string, any>[] = [];

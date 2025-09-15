@@ -10,8 +10,6 @@ import {
     RecordOptions, SetSublistValueOptions, SublistDictionary, SublistLine 
 } from "./types";
 
-const NOT_INACTIVE = false; // const IS_INACTIVE = true;
-const NOT_DYNAMIC = false;
 
 const ODEGAARD_ADDRESS_SUBRECORD_OPTIONS: SetSublistSubrecordOptions = {
     sublistId: 'addressbook',
@@ -45,6 +43,9 @@ const SUZZALLO_ADDRESS_SUBRECORD_OPTIONS: SetSublistSubrecordOptions = {
     } as FieldDictionary,
 };
 
+
+const NOT_INACTIVE = false; // const IS_INACTIVE = true;
+
 export const SAMPLE_POST_CUSTOMER_OPTIONS: RecordOptions = {
     recordType: RecordTypeEnum.CUSTOMER,
     fields: {
@@ -66,7 +67,7 @@ export const UW_LIBRARIES_POST_VENDOR_OPTIONS: RecordOptions = {
     recordType: RecordTypeEnum.VENDOR,
     fields: {
         entityid: 'UW_LIBRARIES',
-        externalid: 'UW_LIBRARIES',
+        externalid: `UW_LIBRARIES<${RecordTypeEnum.VENDOR}>`,
         isperson: RADIO_FIELD_FALSE,  
         companyname: 'UW Libraries',
     } as FieldDictionary,

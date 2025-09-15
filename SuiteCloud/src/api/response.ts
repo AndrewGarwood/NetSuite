@@ -7,6 +7,7 @@ import { RecordResponse } from "@api/types";
 export { standardizeResponse }
 
 /**
+ * - **This function should no longer be necessary after most recent changes, but leaving it for now**
  * ensure `response.results.every(r=>isObject(r.fields) && isObject(r.sublists))`
  * @param response {@link RecordResponse}
  * @returns **`response`**

@@ -321,12 +321,12 @@ export function matchContactsToEntityResponses(
 
 
 /** 
- * @param entityType {@link EntityRecordTypeEnum} - type of the primary entity to update
+ * @param entityType `string` - type of the primary entity to update
  * @param contactResponses `Array<`{@link RecordResponse}`>` - responses from initial contact post.
  * @returns **`entityUpdates`** = `Array<`{@link RecordOptions}`>` - updates to set `entity.contact` to `internalid` of entity-company's corresponding contact 
  * */
 export function generateEntityUpdates(
-    entityType: EntityRecordTypeEnum,
+    entityType: RecordTypeEnum,
     contactResponses: RecordResponse[]
 ): RecordOptions[] {
     const entityUpdates: RecordOptions[] = [];

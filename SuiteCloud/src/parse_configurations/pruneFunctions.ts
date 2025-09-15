@@ -38,13 +38,6 @@ export const entity = (
         plog.warn(`pruneEntity(): options or options.fields is null or undefined, returning null`);
         return null;
     }
-    if (!Object.values(EntityRecordTypeEnum).includes(options.recordType as EntityRecordTypeEnum)) {
-        mlog.error([`pruneEntity(): options.recordType is not a valid EntityRecordType`,
-            `expected one of: ${JSON.stringify(Object.values(EntityRecordTypeEnum))}`,
-            `       received: '${options.recordType}'`
-        ].join(TAB));
-        return null;
-    }
     if (!hasKeys(options.fields, requiredFields)) { 
         plog.warn([`pruneEntity(): options.fields does not have required fields.`,
             `required: ${JSON.stringify(requiredFields)}`,

@@ -56,7 +56,6 @@ import {
 } from 'src/services/post_process/parseResultsProcessor';
 import { ItemColumnEnum } from 'src/parse_configurations';
 
-const F = extractFileName(__filename);
 /**
  * @param options 
  * @param fileName 
@@ -99,7 +98,7 @@ export async function runMainItemPipeline(
     filePaths: string | string[],
     options: ItemPipelineOptions
 ): Promise<void> {
-    const source = getSourceString(F, runMainItemPipeline.name);
+    const source = getSourceString(__filename, runMainItemPipeline.name);
     validate.enumArgument(source, {itemType, RecordTypeEnum})
     validate.objectArgument(source, {options});
     filePaths = isNonEmptyArray(filePaths) ? filePaths : [filePaths];
@@ -288,7 +287,7 @@ export async function extractLotNumberedItemRows(
     itemSourceFile: string,
     locationBins: WarehouseDictionary
 ): Promise<Record<string, any>[]> {
-    const source = getSourceString(F, extractLotNumberedItemRows.name);
+    const source = getSourceString(__filename, extractLotNumberedItemRows.name);
     let itemRows = await getRows(itemSourceFile);
     let targetItems: string[] = [];
     for (let [locId, binDict] of Object.entries(locationBins)) {

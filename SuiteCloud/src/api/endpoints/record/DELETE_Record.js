@@ -73,21 +73,22 @@ function generateRecordResult(recordType, recordId, responseOptions) {
     /**@type {RecordResult} */
     const result = {
         recordType: recordType,
-        internalid: recordId
+        internalid: recordId,
+        fields: {},
+        sublists: {}
     };
-    if (!isRecordResponseOptions(responseOptions)) { return result }
+    responseOptions = responseOptions ?? {
+        fields: [],
+        sublists: {}
+    }
     try {
         let rec = record.load({
             type: recordType, 
             id: recordId, 
             isDynamic: NOT_DYNAMIC
         });
-        if (responseOptions.fields) {
-            result.fields = getResponseFields(rec, responseOptions.fields);
-        }
-        if (responseOptions.sublists) {
-            result.sublists = getResponseSublists(rec, responseOptions.sublists);
-        }
+        result.fields = getResponseFields(rec, responseOptions.fields);
+        result.sublists = getResponseSublists(rec, responseOptions.sublists);
     } catch (error) {
         writeLog(LogTypeEnum.ERROR, `[generateRecordResult()] Error processing ResponseOptions`,
             `recordType: ${recordType}`,

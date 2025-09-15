@@ -9,6 +9,8 @@ Transfer historical data exported from QuickBooks Desktop into NetSuite account.
 ### Context 
 - It was necessary to export the historical data as csv files. 
 - I initially used Python + Pandas to transform the data into import-compatible files, but later elected to use SuiteScript's [RESTlet][restlet_docs] because it allows for more control/precision/visibility on how records are created/updated and any errors therein. (and it would be fun to learn something new).
+- I'd like to improve the logic/efficiency in various areas, but time constraints compelled me to postpone. Some things I was able to return to, others remain as tech debt. 
+
 
 ### Some Things to Note
 The formal entry point for this project is [main.ts][main_file]
@@ -44,13 +46,55 @@ type DataSourceConfiguration = FolderHierarchy & { options?: LoadFileOptions }
 ```
 3. **instantiateAuthManager()** (a function defined in [configureAuth.ts][auth_setup_file])
 - It creates an instance of [AuthManager][auth_manager_file] to obtain auth tokens.
-- This step is necessary to make API calls to the [endpoints][record_endpoint_folder] used to manipulate NetSuite records
+- This step is necessary to make API calls to the [record endpoints][record_endpoint_folder] I wrote to manipulate NetSuite records. (GET_Record, PUT_Record, DELETE_Record, GET_RelatedRecord)
 - Request bodies for these endpoints are defined in [RecordEndpoint.ts][record_endpoint_types_file]
 
-Okay, now we have to extract the csv content and load it into a request body. This is handled by code in [src/services/parse][parse_folder] (to generate ParseResults) and [src/services/post_process][post_process_folder] (to validate/edit ParseResults)
-- I'd like to improve the logic and increase the efficiency of the parsing step, but time constraints compelled me to postpone.
+Okay, now we have to extract the csv content and load it into a request body. 
+Behold, my ["pipelines"][pipelines_folder], which passes the csv content through various stages. Each pipeline has a few core stages, with some having more for record-type-specific* operations.
+1. **PARSE** [src/services/parse][parse_folder] 
+- csvData -> [parseRecordCsv()][parser_file] -> { results: ParseResults, meta: Record<string, RecordParseMeta> }
+2. **VALIDATE** [src/services/post_process][post_process_folder] 
+- ParseResults -> [processParseResults()][post_process_file] -> ValidatedParseResults
+3. **PUT_RECORDS** 
+- ValidatedParseResults -> RecordRequest -> api -> RecordResponse
 
-// TODO: finish README
+*An example of a "record-type-specific operation" is matchTransactionEntity() from [TransactionPipeline][transaction_pipeline].
+- Transaction records have an "entity" field, whose value must be the "internalid" of a Customer/Vendor (Entity) record in NetSuite; however, the entity value in the ParseResults is a string representing the entity's name (e.g. company name). Thus, in TransactionPipeline, between VALIDATE and PUT_RECORDS, there is a "MATCH_ENTITY" stage uses either a local file or get requests to obtain each entity's "internalid" with the option to create a new entity record if it does not yet exist.
+
+```ts
+// from src/services/parse/types/ParseOptions.ts
+type ParseResults = {
+    [recordType: string]: Required<RecordOptions>[]
+}
+
+// from src/api/types/RecordEndpoint.ts
+type RecordOptions = {
+    recordType: RecordTypeEnum;
+    idOptions?: idSearchOptions[];
+    fields?: FieldDictionary;
+    sublists?: SublistDictionary;
+}
+type RecordRequest = {
+    recordOptions: RecordOptions | RecordOptions[];
+    responseOptions?: RecordResponseOptions;
+}
+type RecordResponse = {
+    status: number;
+    message: string;
+    results: RecordResult[];
+    rejects: any[] | RecordOptions[];
+    error?: string; 
+    logs: LogStatement[];
+}
+type RecordResult = { 
+    internalid: number;
+    recordType: RecordTypeEnum; 
+    fields: FieldDictionary;
+    sublists: { [sublistId: string]: SublistLine[] }; 
+}
+```
+
+Once the records were in NetSuite, I did validation/editing in [src/services/maintenance][maintenance_folder]. 
 
 ## Links
 -----
@@ -64,6 +108,8 @@ Okay, now we have to extract the csv content and load it into a request body. Th
 [parser_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/services/parse/csvParser.ts
 [post_process_folder]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/services/post_process
 [post_process_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/services/post_process/parseResultsProcessor.ts
+
+[maintenance_folder]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/services/post_process
 
 [auth_setup_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/api/configureAuth.ts
 [auth_manager_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/api/server/AuthManager.ts
@@ -85,3 +131,5 @@ Okay, now we have to extract the csv content and load it into a request body. Th
 [record_endpoint_folder]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/api/endpoints/record
 [put_endpoint_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/api/endpoints/record/PUT_Record.js
 
+[pipelines_folder]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/pipelines
+[transaction_pipeline]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/pipelines/TransactionPipeline

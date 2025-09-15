@@ -102,19 +102,18 @@ function generateRecordResult(recordType, recordId, responseOptions) {
         recordType: recordType,
         internalid: recordId
     };
-    if (!isRecordResponseOptions(responseOptions)) { return result }
+    responseOptions = responseOptions ?? {
+        fields: [],
+        sublists: {}
+    }
     try {
         let rec = record.load({
             type: recordType, 
             id: recordId, 
             isDynamic: NOT_DYNAMIC
         });
-        if (responseOptions.fields) {
-            result.fields = getResponseFields(rec, responseOptions.fields);
-        }
-        if (responseOptions.sublists) {
-            result.sublists = getResponseSublists(rec, responseOptions.sublists);
-        }
+        result.fields = getResponseFields(rec, responseOptions.fields);
+        result.sublists = getResponseSublists(rec, responseOptions.sublists);
     } catch (error) {
         writeLog(LogTypeEnum.ERROR, `[generateRecordResult()] Error processing ResponseOptions`,
             `recordType: ${recordType}`,
@@ -538,10 +537,10 @@ function searchForRecordById(recordType, idOptions, fields) {
  */
 function getResponseFields(rec, responseFields) {
     if (!rec || (!isNonEmptyString(responseFields) && !isNonEmptyArray(responseFields))) {
-        writeLog(LogTypeEnum.ERROR, 
-            'getResponseFields() Invalid parameters', 
-            'rec (object) and responseFields (string | string[]) are required'
-        );
+        // writeLog(LogTypeEnum.ERROR, 
+        //     'getResponseFields() Invalid parameters', 
+        //     'rec (object) and responseFields (string | string[]) are required'
+        // );
         return {};
     }
     /**@type {FieldDictionary} */
@@ -579,10 +578,10 @@ function getResponseFields(rec, responseFields) {
  */
 function getResponseSublists(rec, responseSublists) {
     if (!rec || !isObject(responseSublists)) {
-        writeLog(LogTypeEnum.ERROR, 
-            '[getResponseSublists()] Invalid parameters', 
-            'rec and responseSublists are required'
-        );
+        // writeLog(LogTypeEnum.ERROR, 
+        //     '[getResponseSublists()] Invalid parameters', 
+        //     'rec and responseSublists are required'
+        // );
         return {};
     }
     /**@type {SublistDictionary} */
