@@ -2,15 +2,10 @@
 **This repository will no longer receive substantial updates because I was laid off and my position was eliminated as a result of company restructuring.**
 
 # Overview:
-- A collection of scripts using [NetSuite's][netsuite_home] [SuiteScript 2.0][suitescript_docs] to implement NetSuite as company's ERP.
+- A project using [NetSuite's][netsuite_home] [SuiteScript 2.0][suitescript_docs] to implement NetSuite as company's ERP.
 
 ### Objective 
 Transfer historical data exported from QuickBooks Desktop into NetSuite account.
-### Context 
-- It was necessary to export the historical data as csv files. 
-- I initially used python to transform the data into import-compatible files, but later elected to use SuiteScript's [RESTlet][restlet_docs] because it allows for more control/precision/visibility on how records are created/updated and any errors therein. (and it would be fun to learn something new). I still used python for some pre-processing.
-- I'd like to improve the logic/efficiency in various parts, but time constraints compelled me to move on. While there are some things I was able to return to, others remain as areas for improvement. 
-
 
 **The project works by making the following sequence of function calls:**
 
@@ -90,6 +85,11 @@ type RecordResult = {
 ```
 
 Once the records were in NetSuite, I did validation/editing in [src/services/maintenance][maintenance_folder]. 
+
+### Context 
+- It was necessary to export the historical data as csv files. 
+- I initially used python to transform the data into import-compatible files, but later elected to use SuiteScript's [RESTlet][restlet_docs] because it allows for more control/precision/visibility on how records are created/updated and any errors therein. (and it would be fun to learn something new). I still used python for some pre-processing.
+- I'd like to improve the logic/efficiency in various parts, but time constraints compelled me to move on. While there are some things I was able to return to, others remain as areas for improvement. 
 
 ## Links
 -----
