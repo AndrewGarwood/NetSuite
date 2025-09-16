@@ -8,15 +8,15 @@
 Transfer historical data exported from QuickBooks Desktop into NetSuite account.
 ### Context 
 - It was necessary to export the historical data as csv files. 
-- I initially used Python + Pandas to transform the data into import-compatible files, but later elected to use SuiteScript's [RESTlet][restlet_docs] because it allows for more control/precision/visibility on how records are created/updated and any errors therein. (and it would be fun to learn something new).
+- I initially used python to transform the data into import-compatible files, but later elected to use SuiteScript's [RESTlet][restlet_docs] because it allows for more control/precision/visibility on how records are created/updated and any errors therein. (and it would be fun to learn something new). I still used python for some pre-processing.
 - I'd like to improve the logic/efficiency in various parts, but time constraints compelled me to move on. While there are some things I was able to return to, others remain as areas for improvement. 
 
 
 ### Some Things to Note
-The formal entry point for this project is [main.ts][main_file]
-The project works by making the following sequence of function calls:
+- The formal entry point for this project is [main.ts][main_file]
+- The project works by making the following sequence of function calls:
 1. **initializeEnvironment()** (a function defined in [env.ts][env_setup_file])
-The project requires a configuration file ([project.config.json][env_config_file]) to be defined adjacent to package.json
+- The project requires a configuration file ([project.config.json][env_config_file]) to be defined adjacent to package.json
 - The definition for this configuration is found in [ProjectEnvironment.ts][project_env_file]
 - The ProjectEnvironment object is used to:
     - define environment type (sandbox or production) (affects request urls)
@@ -24,11 +24,12 @@ The project requires a configuration file ([project.config.json][env_config_file
     - define a DataLoaderConfiguration object that provides instructions to use in the next step. 
     - define a SuiteScriptEnvironment object that provides the details necessary to construct the RESTlet URLs used in API calls
 2. **initializeData()** (a function defined in [dataLoader.ts][data_setup_file])
-The project requires a second configuration file ([project.data.config.json][data_config_file]) to be defined adjacent to the first one.
+- The project requires a second configuration file ([project.data.config.json][data_config_file]) to be defined adjacent to the first one.
 - The definition for this configuration is found in [ProjectData.ts][project_data_file]
 - This json file is a DataSourceDictionary object, which groups data into "domains" that are intended to mirror the category hierarchy under the "Lists" tab in the NetSuite UI.
 - It is expected that each DataDomainEnum value is both a key in the DataSourceDictionary and the name of a subfolder in the 'dataDir' directory defined in initializeEnvironment()
 - The value of each DataDomainEnum is a DataSourceConfiguration object. 
+
 ```ts
 // from src/config/types/ProjectData.ts
 /** add more as needed */
@@ -40,9 +41,9 @@ enum DataDomainEnum {
 type DataSourceDictionary = { [key in DataDomainEnum]: DataSourceConfiguration }
 type DataSourceConfiguration = FolderHierarchy & { options?: LoadFileOptions }
 ```
-3. **instantiateAuthManager()** (a function defined in [configureAuth.ts][auth_setup_file])
+3. **instantiateAuthManager()** (a function defined in [src/api/configureAuth.ts][auth_setup_file])
 - It creates an instance of [AuthManager][auth_manager_file] to obtain auth tokens.
-- This step is necessary to make API calls to the [record endpoints][record_endpoint_folder] I wrote to manipulate NetSuite records. (GET_Record, PUT_Record, DELETE_Record, GET_RelatedRecord)
+- This step is necessary to make API calls to the record endpoints in [src/api/endpoints/record][record_endpoint_folder] I wrote to manipulate NetSuite records. (GET_Record, PUT_Record, DELETE_Record, GET_RelatedRecord)
 - Request bodies for these endpoints are defined in [RecordEndpoint.ts][record_endpoint_types_file]
 
 Okay, now we have to extract the csv content and load it into a request body. 
