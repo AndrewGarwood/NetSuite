@@ -47,12 +47,12 @@ type DataSourceConfiguration = FolderHierarchy & { options?: LoadFileOptions }
 
 Okay, now we have to extract the csv content and load it into a request body. 
 Behold, my ["pipelines"][pipelines_folder]. In this project's context, a "pipeline" is a module that manages the process of getting the csv data into NetSuite records (please let me know if there is a more appropriate name). Each pipeline has a few core stages, with some having more for record-type-specific* operations.
-1. **PARSE** [src/services/parse][parse_folder] 
-- csvData -> [parseRecordCsv()][parser_file] -> { results: ParseResults, meta: Record<string, RecordParseMeta> }
-2. **VALIDATE** [src/services/post_process][post_process_folder] 
-- ParseResults -> [processParseResults()][post_process_file] -> ValidatedParseResults
-3. **PUT_RECORDS** 
-- ValidatedParseResults -> RecordRequest -> api -> RecordResponse
+1. **PARSE** (call functions from [src/services/parse][parse_folder]) 
+    - csvData -> [parseRecordCsv()][parser_file] -> { results: ParseResults, meta: Record<string, RecordParseMeta> }
+2. **VALIDATE** (call functions from [src/services/post_process][post_process_folder]) 
+    - ParseResults -> [processParseResults()][post_process_file] -> ValidatedParseResults
+3. **PUT_RECORDS** (make requests through [src/api/requests/put.ts][put_file])
+    - ValidatedParseResults -> RecordRequest -> api -> RecordResponse
 
 *An example of a "record-type-specific operation" is matchTransactionEntity() from [TransactionPipeline][transaction_pipeline].
 - Transaction records (e.g. Sales Order) have an "entity" field, whose value must be the "internalid" of a Customer/Vendor (Entity) record in NetSuite; however, the entity value in the ParseResults is a string representing the entity's name (e.g. company name). Thus, in TransactionPipeline, between VALIDATE and PUT_RECORDS, there is a "MATCH_ENTITY" stage uses either a local file or get requests to obtain each entity's "internalid" with the option to create a new entity record if it does not yet exist.
