@@ -1,5 +1,5 @@
 # Note:
-**This repository will no longer receive substantial updates because I was laid off and my position was eliminated as a result of company restructuring.**
+**This repository will no longer receive substantial updates because I was laid off due to my position's elimination as a result of company restructuring.**
 
 # Overview:
 - A project using [NetSuite's][netsuite_home] [SuiteScript 2.0][suitescript_docs] to implement NetSuite as company's ERP.
@@ -129,4 +129,5 @@ Once the records were in NetSuite, I did validation/editing in [src/services/mai
 [put_endpoint_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/api/endpoints/record/PUT_Record.js
 
 [pipelines_folder]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/pipelines
+
 [transaction_pipeline]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/pipelines/TransactionPipeline
