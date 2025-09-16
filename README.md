@@ -54,8 +54,7 @@ Behold, my ["pipelines"][pipelines_folder]. In this project's context, a "pipeli
 3. **PUT_RECORDS** (make requests through [src/api/requests/put.ts][put_file])
     - ValidatedParseResults -> RecordRequest -> api -> RecordResponse
 
-*An example of a "record-type-specific operation" is matchTransactionEntity() from [TransactionPipeline][transaction_pipeline].
-- Transaction records (e.g. Sales Order) have an "entity" field, whose value must be the "internalid" of a Customer/Vendor (Entity) record in NetSuite; however, the entity value in the ParseResults is a string representing the entity's name (e.g. company name). Thus, in TransactionPipeline, between VALIDATE and PUT_RECORDS, there is a "MATCH_ENTITY" stage uses either a local file or get requests to obtain each entity's "internalid" with the option to create a new entity record if it does not yet exist.
+*An example of a "record-type-specific operation" is matchTransactionEntity() from [TransactionPipeline][transaction_pipeline]. Transaction records have an "entity" field, whose value must be the "internalid" of a Customer/Vendor (Entity) record in NetSuite; however, the entity value in the ParseResults is a string representing the entity's name (e.g. company name). Thus, in TransactionPipeline, between VALIDATE and PUT_RECORDS, there is a "MATCH_ENTITY" stage uses either a local file or get requests to obtain each entity's "internalid" with the option to create a new entity record if it does not yet exist.
 
 ```ts
 // from src/services/parse/types/ParseOptions.ts
