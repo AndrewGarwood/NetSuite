@@ -7,9 +7,7 @@ import axios from "axios";
 import open from "open";
 import bodyParser from "body-parser";
 import path from "node:path";
-import fs from "node:fs";
 import { 
-    SERVER_PORT,
     REST_CLIENT_ID as CLIENT_ID, REST_CLIENT_SECRET as CLIENT_SECRET,
     SCOPE, STATE, getProjectFolders,
     isEnvironmentInitialized
@@ -24,7 +22,7 @@ import {
     isFile,
     readJsonFileAsObject as read
 } from "typeshi/dist/utils/io/reading";
-import { getCurrentPacificTime, calculateDifferenceOfDateStrings, TimeUnitEnum } from "typeshi/dist/utils/io/dateTime";
+import { getCurrentPacificTime } from "typeshi/dist/utils/io/dateTime";
 import { 
     mainLogger as mlog, apiLogger as alog, INDENT_LOG_LINE as TAB, NEW_LINE as NL,
     simpleLogger as slog
@@ -503,8 +501,13 @@ class AuthManager {
     }
 
     private generateGrantParams(
-        options: {code?: string; refreshToken?: never} 
-        | {code?: never; refreshToken?: string}
+        options: ({
+            code?: string; 
+            refreshToken?: never
+        } | {
+            code?: never; 
+            refreshToken?: string
+        })
     ): URLSearchParams {
         const source = getSourceString(__filename, this.generateGrantParams.name);
         if (options.code && options.refreshToken) {

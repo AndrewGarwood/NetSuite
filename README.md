@@ -9,7 +9,7 @@ Transfer historical data exported from QuickBooks Desktop into NetSuite account.
 ### Context 
 - It was necessary to export the historical data as csv files. 
 - I initially used Python + Pandas to transform the data into import-compatible files, but later elected to use SuiteScript's [RESTlet][restlet_docs] because it allows for more control/precision/visibility on how records are created/updated and any errors therein. (and it would be fun to learn something new).
-- I'd like to improve the logic/efficiency in various areas, but time constraints compelled me to postpone. Some things I was able to return to, others remain as tech debt. 
+- I'd like to improve the logic/efficiency in various parts, but time constraints compelled me to move on. While there are some things I was able to return to, others remain as areas for improvement. 
 
 
 ### Some Things to Note
@@ -30,17 +30,13 @@ The project requires a second configuration file ([project.data.config.json][dat
 - It is expected that each DataDomainEnum value is both a key in the DataSourceDictionary and the name of a subfolder in the 'dataDir' directory defined in initializeEnvironment()
 - The value of each DataDomainEnum is a DataSourceConfiguration object. 
 ```ts
-// from ProjectData.ts
-/** can add more entries */
+// from src/config/types/ProjectData.ts
+/** add more as needed */
 enum DataDomainEnum {
     ACCOUNTING = 'accounting',
     SUPPLY = 'supply',
     RELATIONSHIPS = 'relationships'
 }
-/** 
- * simplify this? i.e. 
- * `DataSourceDictionary = { [key in DataDomainEnum]: FolderHierarchy & { options?: LoadFileOptions } }` 
- * */
 type DataSourceDictionary = { [key in DataDomainEnum]: DataSourceConfiguration }
 type DataSourceConfiguration = FolderHierarchy & { options?: LoadFileOptions }
 ```
@@ -50,7 +46,7 @@ type DataSourceConfiguration = FolderHierarchy & { options?: LoadFileOptions }
 - Request bodies for these endpoints are defined in [RecordEndpoint.ts][record_endpoint_types_file]
 
 Okay, now we have to extract the csv content and load it into a request body. 
-Behold, my ["pipelines"][pipelines_folder], which passes the csv content through various stages. Each pipeline has a few core stages, with some having more for record-type-specific* operations.
+Behold, my ["pipelines"][pipelines_folder]. In this project's context, a "pipeline" is a module that manages the process of getting the csv data into NetSuite records (please let me know if there is a more appropriate name). Each pipeline has a few core stages, with some having more for record-type-specific* operations.
 1. **PARSE** [src/services/parse][parse_folder] 
 - csvData -> [parseRecordCsv()][parser_file] -> { results: ParseResults, meta: Record<string, RecordParseMeta> }
 2. **VALIDATE** [src/services/post_process][post_process_folder] 
@@ -59,7 +55,7 @@ Behold, my ["pipelines"][pipelines_folder], which passes the csv content through
 - ValidatedParseResults -> RecordRequest -> api -> RecordResponse
 
 *An example of a "record-type-specific operation" is matchTransactionEntity() from [TransactionPipeline][transaction_pipeline].
-- Transaction records have an "entity" field, whose value must be the "internalid" of a Customer/Vendor (Entity) record in NetSuite; however, the entity value in the ParseResults is a string representing the entity's name (e.g. company name). Thus, in TransactionPipeline, between VALIDATE and PUT_RECORDS, there is a "MATCH_ENTITY" stage uses either a local file or get requests to obtain each entity's "internalid" with the option to create a new entity record if it does not yet exist.
+- Transaction records (e.g. Sales Order) have an "entity" field, whose value must be the "internalid" of a Customer/Vendor (Entity) record in NetSuite; however, the entity value in the ParseResults is a string representing the entity's name (e.g. company name). Thus, in TransactionPipeline, between VALIDATE and PUT_RECORDS, there is a "MATCH_ENTITY" stage uses either a local file or get requests to obtain each entity's "internalid" with the option to create a new entity record if it does not yet exist.
 
 ```ts
 // from src/services/parse/types/ParseOptions.ts

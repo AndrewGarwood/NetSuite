@@ -11,7 +11,6 @@ let authInitialized = false;
 
 export async function instantiateAuthManager(options?: AuthOptions): Promise<void> {
     try {
-        // Create AuthManager with optional configuration
         auth = new AuthManager(options, AUTH_URL, TOKEN_URL, REDIRECT_URI, SERVER_PORT);
         authInitialized = true;
     } catch (error) {
@@ -21,11 +20,9 @@ export async function instantiateAuthManager(options?: AuthOptions): Promise<voi
 }
 
 export async function getAuthManager(): Promise<AuthManager> {
-    if (!isAuthInitialized() || !auth) {
+    if (!isAuthInitialized()) {
         await instantiateAuthManager();
     }
-    
-    // auth should never be null at this point, but TypeScript safety check
     if (!auth) {
         throw new Error(`[configureAuth.getAuthManager()] AuthManager failed to initialize properly.`);
     }
@@ -49,11 +46,9 @@ export async function getAuthManager(): Promise<AuthManager> {
  * @returns **`Promise<string>`** - The access token
  * */
 export async function getAccessToken(): Promise<string> {
-    if (!isAuthInitialized() || !auth) {
+    if (!isAuthInitialized()) {
         await instantiateAuthManager();
     }
-    
-    // auth should never be null at this point, but TypeScript safety check
     if (!auth) {
         throw new Error(`[configureAuth.getAccessToken()] AuthManager failed to initialize properly.`);
     }

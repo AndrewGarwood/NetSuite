@@ -17,7 +17,7 @@ export enum DataDomainEnum {
 
 export type DataSourceDictionary = {
     [key in DataDomainEnum]: DataSourceConfiguration
-};
+}
 
 export type DataSourceConfiguration = FolderHierarchy & { options?: LoadFileOptions }
 
@@ -31,11 +31,11 @@ export type FolderHierarchy = {
 
 export type LoadFileOptions = { 
     [key: string]: string | number | boolean 
-};
+}
 
 export type FileDictionary = { 
     [fileKey: string]: string | string[]
-};
+}
 
 
 

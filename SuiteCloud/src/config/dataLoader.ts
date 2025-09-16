@@ -24,7 +24,7 @@ import {
 import { 
     DataSourceDictionary,
     isDataSourceDictionary,
-    isFolderHierarchy, isLoadFileOptions 
+    isLoadFileOptions 
 } from "@config/types";
 import {
     isNonEmptyArray, isNonEmptyString, 
@@ -35,7 +35,7 @@ import {
 } from "typeshi:utils/typeValidation";
 import { AccountTypeEnum, AccountDictionary } from "../utils/ns";
 import { WarehouseDictionary, WarehouseRow, WarehouseColumnEnum } from "src/pipelines";
-import { clean, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION, extractFileName } from "typeshi:utils/regex";
+import { clean, STRIP_DOT_IF_NOT_END_WITH_ABBREVIATION } from "typeshi:utils/regex";
 import * as validate from "typeshi:utils/argumentValidation"
 import { 
     DataDomainEnum, 
@@ -54,7 +54,6 @@ export function isDataInitialized(): boolean {
 }
 /** Global state to track if data has been loaded */
 let dataInitialized = false;
-const F = extractFileName(__filename);
 /* ------------------------------ ACCOUNTING ------------------------------ */
 let skuDictionary: Record<string, string> | null = null;
 let inventoryRows: Record<string, any>[] | null = null;
@@ -94,7 +93,7 @@ const delimitedFileExtensions = ['.tsv', '.csv'];
  * - sets {@link dataInitialized} to `true`
  */
 export async function initializeData(): Promise<void> {
-    const source = getSourceString(F, initializeData.name);
+    const source = getSourceString(__filename, initializeData.name);
     if (!isEnvironmentInitialized()) {
         throw new Error(`${source} Unable to load data. Please  call initializeEnvironment() first.`)
     }
@@ -171,7 +170,7 @@ function getDomainFilePath(
     fileLabel: string,
     folderName?: string
 ): string {
-    const source = getSourceString(F, getDomainFilePath.name);
+    const source = getSourceString(__filename, getDomainFilePath.name);
     if (!dataSources) {
         throw new Error([`${source} Unable to get domain filepath`,
             `dataSources (DataSourceDictionary) is not defined.`,
@@ -238,7 +237,7 @@ function getDescendant(
 function getDomainLoadFileOptions(
     domain: DataDomainEnum
 ): LoadFileOptions {
-    const source = getSourceString(F, getDomainLoadFileOptions.name);
+    const source = getSourceString(__filename, getDomainLoadFileOptions.name);
     if (!dataSources) {
         throw new Error([`${source} Unable to get domainOptions, dataSources (DataSourceDictionary) is not defined yet.`].join(TAB));
     }
@@ -257,7 +256,7 @@ async function loadInventoryRows(
     fileLabel: string = "inventoryExport",
     folderName: string = 'items',
 ): Promise<Record<string, any>[]> {
-    const source = getSourceString(F, loadInventoryRows.name);
+    const source = getSourceString(__filename, loadInventoryRows.name);
     let filePath = getDomainFilePath(domain, fileLabel, folderName);
     validate.existingFileArgument(source, delimitedFileExtensions, {filePath});
     const rows = await getRows(filePath);
@@ -274,7 +273,7 @@ async function loadUnitTypeDictionary(
     fileLabel = 'unitTypeDictionary',
     folderName?: string
 ): Promise<Record<string, number>> {
-    const source = getSourceString(F, loadUnitTypeDictionary.name);
+    const source = getSourceString(__filename, loadUnitTypeDictionary.name);
     let filePath = getDomainFilePath(domain, fileLabel, folderName);
     validate.existingFileArgument(source, '.json', {filePath});
     let data = read(filePath);
@@ -297,7 +296,7 @@ async function loadBinDictionary(
     fileLabel: string = 'binDictionary',
     folderName: string = 'binnumbers',
 ): Promise<Record<string, string>> {
-    const source = getSourceString(F, loadBinDictionary.name);
+    const source = getSourceString(__filename, loadBinDictionary.name);
     let filePath = getDomainFilePath(domain, fileLabel, folderName);
     validate.existingFileArgument(source, delimitedFileExtensions, {filePath});
     let options = getDomainLoadFileOptions(domain);
@@ -323,7 +322,7 @@ async function loadClassDictionary(
     fileLabel: string = "classDictionary",
     folderName?: string,
 ): Promise<Record<string, string>> {
-    const source = getSourceString(F, loadClassDictionary.name);
+    const source = getSourceString(__filename, loadClassDictionary.name);
     let filePath = getDomainFilePath(domain, fileLabel, folderName);
     validate.existingFileArgument(source, delimitedFileExtensions, {filePath});
     let options = getDomainLoadFileOptions(domain);
@@ -344,7 +343,7 @@ async function loadInventoryCache(
     fileLabel: string = "inventoryCache",
     folderName: string = 'items',
 ): Promise<Record<string, string>> {
-    const source = getSourceString(F, loadInventoryCache.name);
+    const source = getSourceString(__filename, loadInventoryCache.name);
     let filePath = getDomainFilePath(domain, fileLabel, folderName);
     validate.existingFileArgument(source, '.json', {filePath});
     let jsonData = read(filePath);
@@ -374,7 +373,7 @@ async function loadBomRows(
     fileLabel: string = 'bomExport',
     folderName: string = 'billofmaterials'
 ): Promise<Record<string, any>[]> {
-    const source = getSourceString(F, loadBomRows.name);
+    const source = getSourceString(__filename, loadBomRows.name);
     let filePath = getDomainFilePath(domain, fileLabel, folderName);
     validate.existingFileArgument(source, delimitedFileExtensions, {filePath});
     const rows = await getRows(filePath) as Record<string, any>[];
@@ -387,7 +386,7 @@ async function loadWarehouseRows(
     fileLabel: string = 'warehouseData',
     folderName: string = 'binnumbers',
 ): Promise<WarehouseRow[]> {
-    const source = getSourceString(F, loadWarehouseRows.name);
+    const source = getSourceString(__filename, loadWarehouseRows.name);
     let filePath = getDomainFilePath(domain, fileLabel, folderName);
     validate.existingFileArgument(source, delimitedFileExtensions, {filePath});
     const rows = await getRows(filePath) as WarehouseRow[];
@@ -397,7 +396,7 @@ async function loadWarehouseRows(
 async function loadWarehouseDictionary(
     rows: Record<string, any>[]
 ): Promise<WarehouseDictionary> {
-    const source = getSourceString(F, loadWarehouseDictionary.name);
+    const source = getSourceString(__filename, loadWarehouseDictionary.name);
     validate.arrayArgument(source, {rows, isObject})
     const dict: WarehouseDictionary = {};
     for (let i = 0; i < rows.length; i++) {
@@ -444,7 +443,7 @@ async function loadEntityOverrides(
     fileLabel: string = 'entityOverrides',
     folderName: string = 'customers',
 ): Promise<Record<string, string>> {
-    const source = getSourceString(F, loadEntityOverrides.name);
+    const source = getSourceString(__filename, loadEntityOverrides.name);
     let filePath = getDomainFilePath(domain, fileLabel, folderName);
     validate.existingFileArgument(source, '.json', {filePath});
     let jsonData = read(filePath);
@@ -473,7 +472,7 @@ async function loadHumanVendorList(
     fileLabel: string = 'humanVendors',
     folderName: string = 'vendors'
 ): Promise<string[]> {
-    const source = getSourceString(F, loadHumanVendorList.name);
+    const source = getSourceString(__filename, loadHumanVendorList.name);
     let filePath = getDomainFilePath(domain, fileLabel, folderName);
     validate.existingFileArgument(source, '.json', {filePath});
     const jsonData = read(filePath);
@@ -494,7 +493,7 @@ async function loadCustomerCategoryDictionary(
     fileLabel: string='categoryDictionary',
     folderName: string='customers'
 ): Promise<Record<string, number>> {
-    const source = getSourceString(F, loadCustomerCategoryDictionary.name);
+    const source = getSourceString(__filename, loadCustomerCategoryDictionary.name);
     let filePath = getDomainFilePath(domain, fileLabel, folderName);
     validate.existingFileArgument(source, '.json', {filePath});
     const jsonData = read(filePath);
@@ -524,7 +523,7 @@ async function loadAccountDictionary(
     fileLabel: string = 'accountDictionary',
     folderName: string = 'accounts'
 ): Promise<AccountDictionary> {
-    const source = getSourceString(F, loadAccountDictionary.name);
+    const source = getSourceString(__filename, loadAccountDictionary.name);
     let filePath = getDomainFilePath(domain, fileLabel, folderName);
     validate.existingFileArgument(source, '.json', {filePath});
     const data = read(filePath);
@@ -560,7 +559,7 @@ async function loadOneToOneDictionary(
     keyColumn: string,
     valueColumn: string,
 ): Promise<Record<string, string>> {
-    const source = getSourceString(F, loadOneToOneDictionary.name);
+    const source = getSourceString(__filename, loadOneToOneDictionary.name);
     validate.multipleStringArguments(source, {keyColumn, valueColumn});
     if (isNonEmptyString(rowSource) && !isValidCsvSync(rowSource, [keyColumn, valueColumn])) {
         let msg = [`${source} Invalid CSV file provided (either not found or missing required columns)`,
@@ -597,7 +596,7 @@ async function loadOneToOneDictionary(
  */
 export function getAccountDictionary(): AccountDictionary {
     if (!accountDictionary) {
-        throw new Error([`${getSourceString(F, getAccountDictionary.name)} accountDictionary undefined`,
+        throw new Error([`${getSourceString(__filename, getAccountDictionary.name)} accountDictionary undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
@@ -611,7 +610,7 @@ export function getAccountDictionary(): AccountDictionary {
  */
 export function getClassDictionary(): Record<string, string> {
     if (!classDictionary) {
-        throw new Error([`${getSourceString(F, getClassDictionary.name)} classDictionary undefined`,
+        throw new Error([`${getSourceString(__filename, getClassDictionary.name)} classDictionary undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
@@ -624,7 +623,7 @@ export function getClassDictionary(): Record<string, string> {
  */
 export function getUnitTypeDictionary(): Record<string, number> {
     if (!unitTypeDictionary) {
-        throw new Error([`${getSourceString(F, getUnitTypeDictionary.name)} unitTypeDictionary undefined`,
+        throw new Error([`${getSourceString(__filename, getUnitTypeDictionary.name)} unitTypeDictionary undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
@@ -637,7 +636,7 @@ export function getUnitTypeDictionary(): Record<string, number> {
  */
 export function getSkuDictionary(): Record<string, string> {
     if (!skuDictionary) {
-        throw new Error([`${getSourceString(F, getSkuDictionary.name)} skuDictionary undefined`,
+        throw new Error([`${getSourceString(__filename, getSkuDictionary.name)} skuDictionary undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
@@ -652,7 +651,7 @@ export function getSkuDictionary(): Record<string, string> {
  * - else return undefined
  */
 export function setSkuInternalId(itemId: string, newInternalId: string | number): string | undefined {
-    const source = getSourceString(F, setSkuInternalId.name);
+    const source = getSourceString(__filename, setSkuInternalId.name);
     if (!skuDictionary) {
         throw new Error([`${source} skuDictionary undefined`,
             `call initializeData() first`
@@ -677,7 +676,7 @@ export function setSkuInternalId(itemId: string, newInternalId: string | number)
  */
 export function getInventoryRows(): Record<string, any>[] {
     if (!inventoryRows) {
-        throw new Error([`${getSourceString(F, getInventoryRows.name)} inventoryRows undefined`,
+        throw new Error([`${getSourceString(__filename, getInventoryRows.name)} inventoryRows undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
@@ -690,7 +689,7 @@ export function getInventoryRows(): Record<string, any>[] {
  */
 export function getBinDictionary(): Record<string, string> {
     if (!binDictionary) {
-        throw new Error([`${getSourceString(F, getBinDictionary.name)} binDictionary undefined`,
+        throw new Error([`${getSourceString(__filename, getBinDictionary.name)} binDictionary undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
@@ -703,7 +702,7 @@ export function getBinDictionary(): Record<string, string> {
  */
 export function getWarehouseRows(): WarehouseRow[] {
     if (!warehouseRows) {
-        throw new Error([`${getSourceString(F, getWarehouseRows.name)} warehouseRows undefined`,
+        throw new Error([`${getSourceString(__filename, getWarehouseRows.name)} warehouseRows undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
@@ -716,7 +715,7 @@ export function getWarehouseRows(): WarehouseRow[] {
  */
 export function getBomRows(): Record<string, any>[] {
     if (!bomRows) {
-        throw new Error([`${getSourceString(F, getBomRows.name)} bomRows undefined`,
+        throw new Error([`${getSourceString(__filename, getBomRows.name)} bomRows undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
@@ -729,7 +728,7 @@ export function getBomRows(): Record<string, any>[] {
  */
 export function getWarehouseDictionary(): WarehouseDictionary {
     if (!warehouseDictionary) {
-        throw new Error([`${getSourceString(F, getWarehouseDictionary.name)} warehouseDictionary undefined`,
+        throw new Error([`${getSourceString(__filename, getWarehouseDictionary.name)} warehouseDictionary undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
@@ -743,7 +742,7 @@ export function getWarehouseDictionary(): WarehouseDictionary {
 export function getEntityValueOverrides(): Record<string, string> {
     if (!entityValueOverrides) {
         throw new Error([
-            `${getSourceString(F, getEntityValueOverrides.name)} entityValueOverrides undefined`,
+            `${getSourceString(__filename, getEntityValueOverrides.name)} entityValueOverrides undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
@@ -753,7 +752,7 @@ export function getEntityValueOverrides(): Record<string, string> {
 export function getCustomerCategoryDictionary(): { [category: string]: number } {
     if (!customerCategoryDictionary) {
         throw new Error([
-            `${getSourceString(F, getCustomerCategoryDictionary.name)} customerCategoryDictionary undefined`,
+            `${getSourceString(__filename, getCustomerCategoryDictionary.name)} customerCategoryDictionary undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
@@ -763,7 +762,7 @@ export function getCustomerCategoryDictionary(): { [category: string]: number } 
 export function getHumanVendorList(): string[] {
     if (!humanVendorList) {
         throw new Error([
-            `${getSourceString(F, getHumanVendorList.name)} humanVendorList undefined`,
+            `${getSourceString(__filename, getHumanVendorList.name)} humanVendorList undefined`,
             `call initializeData() first`
         ].join(TAB));
     }
