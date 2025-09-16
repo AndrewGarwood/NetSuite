@@ -9,17 +9,17 @@ Transfer historical data exported from QuickBooks Desktop into NetSuite account.
 
 **The project works by making the following sequence of function calls:**
 
-1. **initializeEnvironment()** (a function defined in [env.ts][env_setup_file])
+1. **initializeEnvironment()** (defined in [src/config/env.ts][env_setup_file])
 - The project requires a configuration file ([project.config.json][env_config_file]) to be defined adjacent to package.json
-- The definition for this configuration is found in [ProjectEnvironment.ts][project_env_file]
+- The definition for this configuration is found in [src/config/types/ProjectEnvironment.ts][project_env_file]
 - The ProjectEnvironment object is used to:
     - define environment type (sandbox or production) (affects request urls)
     - define directory paths for IO operations
     - define a DataLoaderConfiguration object that provides instructions to use in the next step. 
     - define a SuiteScriptEnvironment object that provides the details necessary to construct the RESTlet URLs used in API calls
-2. **initializeData()** (a function defined in [dataLoader.ts][data_setup_file])
+2. **initializeData()** (defined in [src/config/dataLoader.ts][data_setup_file])
 - The project requires a second configuration file ([project.data.config.json][data_config_file]) to be defined adjacent to the first one.
-- The definition for this configuration is found in [ProjectData.ts][project_data_file]
+- The definition for this configuration is found in [src/config/types/ProjectData.ts][project_data_file]
 - This json file is a DataSourceDictionary object, which groups data into "domains" that are intended to mirror the category hierarchy under the "Lists" tab in the NetSuite UI.
 - It is expected that each DataDomainEnum value is both a key in the DataSourceDictionary and the name of a subfolder in the 'dataDir' directory defined in initializeEnvironment()
 - The value of each DataDomainEnum is a DataSourceConfiguration object. 
@@ -35,7 +35,7 @@ enum DataDomainEnum {
 type DataSourceDictionary = { [key in DataDomainEnum]: DataSourceConfiguration }
 type DataSourceConfiguration = FolderHierarchy & { options?: LoadFileOptions }
 ```
-3. **instantiateAuthManager()** (a function defined in [src/api/configureAuth.ts][auth_setup_file])
+3. **instantiateAuthManager()** (defined in [src/api/configureAuth.ts][auth_setup_file])
 - It creates an instance of [AuthManager][auth_manager_file] to obtain auth tokens.
 - This step is necessary to make API calls to the record endpoints in [src/api/endpoints/record][record_endpoint_folder] I wrote to manipulate NetSuite records. (GET_Record, PUT_Record, DELETE_Record, GET_RelatedRecord)
 - Request bodies for these endpoints are defined in [RecordEndpoint.ts][record_endpoint_types_file]
@@ -43,7 +43,7 @@ type DataSourceConfiguration = FolderHierarchy & { options?: LoadFileOptions }
 Okay, now we have to extract the csv content and load it into a request body. 
 Behold, my ["pipelines"][pipelines_folder]. In this project's context, a "pipeline" is a module that manages the process of getting the csv data into NetSuite records (please let me know if there is a more appropriate name). Each pipeline has a few core stages, with some having more for record-type-specific* operations.
 1. **PARSE** (call functions from [src/services/parse][parse_folder] using ParseOptions defined in [src/parse_configurations][parse_configurations_folder]) 
-    - csvData -> [parseRecordCsv()][parser_file] -> { results: ParseResults, meta: Record<string, RecordParseMeta> }
+    - csv data -> [parseRecordCsv()][parser_file] -> { results: ParseResults, meta: { [recordType: string]: RecordParseMeta } }
 2. **VALIDATE** (call functions from [src/services/post_process][post_process_folder]) 
     - ParseResults -> [processParseResults()][post_process_file] -> ValidatedParseResults
 3. **PUT_RECORDS** (make requests through [src/api/requests/put.ts][put_file])
