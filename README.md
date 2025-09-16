@@ -47,7 +47,7 @@ type DataSourceConfiguration = FolderHierarchy & { options?: LoadFileOptions }
 
 Okay, now we have to extract the csv content and load it into a request body. 
 Behold, my ["pipelines"][pipelines_folder]. In this project's context, a "pipeline" is a module that manages the process of getting the csv data into NetSuite records (please let me know if there is a more appropriate name). Each pipeline has a few core stages, with some having more for record-type-specific* operations.
-1. **PARSE** (call functions from [src/services/parse][parse_folder]) 
+1. **PARSE** (call functions from [src/services/parse][parse_folder] using ParseOptions defined in [src/parse_configurations][parse_configurations_folder]) 
     - csvData -> [parseRecordCsv()][parser_file] -> { results: ParseResults, meta: Record<string, RecordParseMeta> }
 2. **VALIDATE** (call functions from [src/services/post_process][post_process_folder]) 
     - ParseResults -> [processParseResults()][post_process_file] -> ValidatedParseResults
@@ -97,6 +97,8 @@ Once the records were in NetSuite, I did validation/editing in [src/services/mai
 [suitescript_docs]: https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/article_4140956840.html
 [restlet_docs]: https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4387799403.html
 [record_browser]: https://system.netsuite.com/help/helpcenter/en_US/srbrowser/Browser2024_2/script/record/account.html
+
+[parse_configurations_folder]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/parse_configurations
 
 [parse_folder]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/services/parse
 [parse_options_file]: https://github.com/AndrewGarwood/NetSuite/blob/master/SuiteCloud/src/services/parse/types/ParseOptions.ts

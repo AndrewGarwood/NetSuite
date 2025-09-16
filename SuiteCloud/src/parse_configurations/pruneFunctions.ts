@@ -19,7 +19,7 @@ import {
 import { 
     equivalentAlphanumericStrings, 
 } from "typeshi:utils/regex";
-import { EntityRecordTypeEnum, RecordTypeEnum } from "../utils/ns/Enums";
+import { RecordTypeEnum } from "../utils/ns/Enums";
 import { RADIO_FIELD_FALSE, RADIO_FIELD_TRUE } from "../utils/ns";
 import { getSourceString } from "@typeshi/io";
 

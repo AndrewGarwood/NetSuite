@@ -1,7 +1,7 @@
 /**
  * @file src/parse_configurations/salesorder/salesOrderParseDefinition.ts
  */
-import { mainLogger as mlog, pruneLogger as plog, 
+import { mainLogger as mlog,
     INDENT_LOG_LINE as TAB, NEW_LINE as NL 
 } from "../../config/setupLog";
 import {
@@ -17,11 +17,11 @@ import * as evaluate from "../evaluatorFunctions";
 import * as customerEval from "../customer/customerEvaluatorFunctions";
 import * as soEval from "./salesOrderEvaluatorFunctions";
 import { SalesOrderColumnEnum as SO } from "./salesOrderConstants";
-import { CustomerStatusEnum, CustomerTaxItemEnum, PriceLevelEnum, RecordTypeEnum, SearchOperatorEnum } from "../../utils/ns/Enums";
+import { CustomerStatusEnum, CustomerTaxItemEnum, PriceLevelEnum, RecordTypeEnum, SearchOperatorEnum, LocationEnum } from "../../utils/ns/Enums";
 import { getSkuDictionary } from "../../config/dataLoader";
 import { isEmpty, isNonEmptyArray, isNonEmptyString, isNumeric } from "typeshi:utils/typeValidation";
 import { SB_TERM_DICTIONARY } from "../../utils/ns";
-import { CleanStringOptions, toTitleCase } from "typeshi:utils/regex";
+import { CleanStringOptions } from "typeshi:utils/regex";
 import { 
     SubrecordParseOptions, FieldDictionaryParseOptions, 
     SublistDictionaryParseOptions, SublistLineParseOptions, RecordParseOptions, 
@@ -36,6 +36,7 @@ import {
 /** 
  * @TODO decide if it is better to move value assignment of 
  * fields with only defaultValue in their FieldParseOptions to Post Processing
+ *  - probably should move to post processing
  * */
 
 /**
@@ -161,7 +162,7 @@ const EXTERNAL_ID_ARGS: any[] = [
 ];
 
 const MEMO_ARGS: any[] = [
-    'QB Summary', SO.TRAN_TYPE, SO.TRAN_NUM,
+    'Summary', SO.TRAN_TYPE, SO.TRAN_NUM,
     SO.SO_ID, SO.INVOICE_NUMBER, SO.PO_NUMBER,
 ]
 
@@ -169,8 +170,7 @@ const MEMO_ARGS: any[] = [
 export const SALES_ORDER_PARSE_OPTIONS: RecordParseOptions = {
     keyColumn: SO.SO_ID,
     fieldOptions: {
-        custbody_ava_disable_tax_calculation: { defaultValue: true },
-        location: { defaultValue: 1 },
+        location: { defaultValue: LocationEnum.HQ },
         istaxable: { defaultValue: false },
         taxrate: { defaultValue: 0 },
         memo: { evaluator: soEval.memo, args: MEMO_ARGS },
