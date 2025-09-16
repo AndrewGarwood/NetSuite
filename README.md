@@ -12,9 +12,8 @@ Transfer historical data exported from QuickBooks Desktop into NetSuite account.
 - I'd like to improve the logic/efficiency in various parts, but time constraints compelled me to move on. While there are some things I was able to return to, others remain as areas for improvement. 
 
 
-### Some Things to Note
-- The formal entry point for this project is [main.ts][main_file]
-- The project works by making the following sequence of function calls:
+**The project works by making the following sequence of function calls:**
+
 1. **initializeEnvironment()** (a function defined in [env.ts][env_setup_file])
 - The project requires a configuration file ([project.config.json][env_config_file]) to be defined adjacent to package.json
 - The definition for this configuration is found in [ProjectEnvironment.ts][project_env_file]
